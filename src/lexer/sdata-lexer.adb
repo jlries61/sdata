@@ -1,0 +1,258 @@
+with Ada.Characters.Handling; use Ada.Characters.Handling;
+with Ada.Strings.Fixed; use Ada.Strings.Fixed;
+
+package body SData.Lexer is
+
+   procedure Initialize (Ctx : in out Lexer_Context; Source : String) is
+   begin
+      Ctx.Source (1 .. Source'Length) := Source;
+      Ctx.Source_Len := Source'Length;
+      Ctx.Pos := 1;
+      Ctx.Line := 1;
+      Ctx.Column := 1;
+      Ctx.Has_Peeked := False;
+   end Initialize;
+
+   function Is_End_Of_Source (Ctx : Lexer_Context) return Boolean is
+   begin
+      return Ctx.Pos > Ctx.Source_Len;
+   end Is_End_Of_Source;
+
+   function Current_Char (Ctx : Lexer_Context) return Character is
+   begin
+      if Is_End_Of_Source (Ctx) then
+         return ASCII.NUL;
+      else
+         return Ctx.Source (Ctx.Pos);
+      end if;
+   end Current_Char;
+
+   procedure Advance (Ctx : in out Lexer_Context) is
+   begin
+      if not Is_End_Of_Source (Ctx) then
+         if Ctx.Source (Ctx.Pos) = ASCII.LF then
+            Ctx.Line := Ctx.Line + 1;
+            Ctx.Column := 1;
+         else
+            Ctx.Column := Ctx.Column + 1;
+         end if;
+         Ctx.Pos := Ctx.Pos + 1;
+      end if;
+   end Advance;
+
+   function Get_Next_Token_Internal (Ctx : in out Lexer_Context) return Token is
+      T : Token;
+   begin
+      -- Skip whitespace
+      loop
+         while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) in ' ' | ASCII.HT | ASCII.CR loop
+            Advance (Ctx);
+         end loop;
+
+         -- Handle line continuation: trailing comma before a newline
+         if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ',' then
+            declare
+               Saved_Pos : constant Positive := Ctx.Pos;
+               Saved_Col : constant Positive := Ctx.Column;
+               Saved_Line : constant Positive := Ctx.Line;
+            begin
+               Advance (Ctx);
+               -- Skip more spaces/tabs
+               while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) in ' ' | ASCII.HT | ASCII.CR loop
+                  Advance (Ctx);
+               end loop;
+               if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ASCII.LF then
+                  Advance (Ctx); -- Consume LF
+                  -- Continued, loop again to skip more whitespace
+               else
+                  -- Not a continuation, backtrack
+                  Ctx.Pos := Saved_Pos;
+                  Ctx.Column := Saved_Col;
+                  Ctx.Line := Saved_Line;
+                  exit; -- Normal comma
+               end if;
+            end;
+         elsif not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ASCII.LF then
+            -- We might want to return a Newline token if the grammar needs it,
+            -- but BW BASIC usually treats it as a statement separator.
+            -- For now, let's just skip it or handle it.
+            -- Actually, many BASICs use colon or newline as statement separator.
+            T.Kind := Token_Newline; -- Treat LF as Newline
+            T.Line := Ctx.Line;
+            T.Column := Ctx.Column;
+            T.Text (1) := ' ';
+            T.Length := 1;
+            Advance (Ctx);
+            return T;
+         else
+            exit;
+         end if;
+      end loop;
+
+      T.Line := Ctx.Line;
+      T.Column := Ctx.Column;
+      T.Length := 0;
+
+      if Is_End_Of_Source (Ctx) then
+         T.Kind := Token_EOF;
+         return T;
+      end if;
+
+      declare
+         C : Character := Current_Char (Ctx);
+      begin
+         if Is_Digit (C) then
+            T.Kind := Token_Numeric_Literal;
+            while not Is_End_Of_Source (Ctx) and then (Is_Digit (Current_Char (Ctx)) or Current_Char (Ctx) = '.') loop
+               T.Length := T.Length + 1;
+               T.Text (T.Length) := Current_Char (Ctx);
+               Advance (Ctx);
+            end loop;
+         elsif Is_Letter (C) then
+            while not Is_End_Of_Source (Ctx) and then (Is_Alphanumeric (Current_Char (Ctx)) or Current_Char (Ctx) = '_' or Current_Char (Ctx) = '$') loop
+               T.Length := T.Length + 1;
+               T.Text (T.Length) := Current_Char (Ctx);
+               Advance (Ctx);
+            end loop;
+
+            declare
+               Upper : constant String := To_Upper (T.Text (1 .. T.Length));
+            begin
+               if Upper = "USE" then T.Kind := Token_USE;
+               elsif Upper = "SAVE" then T.Kind := Token_SAVE;
+               elsif Upper = "KEEP" then T.Kind := Token_KEEP;
+               elsif Upper = "DROP" then T.Kind := Token_DROP;
+               elsif Upper = "HOLD" then T.Kind := Token_HOLD;
+               elsif Upper = "UNHOLD" then T.Kind := Token_UNHOLD;
+               elsif Upper = "NEW" then T.Kind := Token_NEW;
+               elsif Upper = "IF" then T.Kind := Token_IF;
+               elsif Upper = "THEN" then T.Kind := Token_THEN;
+               elsif Upper = "ELSE" then T.Kind := Token_ELSE;
+               elsif Upper = "FOR" then T.Kind := Token_FOR;
+               elsif Upper = "NEXT" then T.Kind := Token_NEXT;
+               elsif Upper = "WHILE" then T.Kind := Token_WHILE;
+               elsif Upper = "WEND" then T.Kind := Token_WEND;
+               elsif Upper = "REPEAT" then T.Kind := Token_REPEAT;
+               elsif Upper = "UNTIL" then T.Kind := Token_UNTIL;
+               elsif Upper = "SELECT" then T.Kind := Token_SELECT;
+               elsif Upper = "CASE" then T.Kind := Token_CASE;
+               elsif Upper = "SUBMIT" then T.Kind := Token_SUBMIT;
+               elsif Upper = "LET" then T.Kind := Token_LET;
+               elsif Upper = "SET" then T.Kind := Token_SET;
+               elsif Upper = "DIM" then T.Kind := Token_DIM;
+               elsif Upper = "ARRAY" then T.Kind := Token_ARRAY;
+               elsif Upper = "PRINT" then T.Kind := Token_PRINT;
+               elsif Upper = "OUTPUT" then T.Kind := Token_OUTPUT;
+               elsif Upper = "ECHO" then T.Kind := Token_ECHO;
+               elsif Upper = "BY" then T.Kind := Token_BY;
+               elsif Upper = "SORT" then T.Kind := Token_SORT;
+               elsif Upper = "RENAME" then T.Kind := Token_RENAME;
+               elsif Upper = "DELETE" then T.Kind := Token_DELETE;
+               elsif Upper = "OPTIONS" then T.Kind := Token_OPTIONS;
+               elsif Upper = "DIGITS" then T.Kind := Token_DIGITS;
+               elsif Upper = "FPATH" then T.Kind := Token_FPATH;
+               elsif Upper = "HEADER" then T.Kind := Token_HEADER;
+               elsif Upper = "REM" then 
+                  T.Kind := Token_REM;
+                  -- Skip rest of line for REM
+                  while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= ASCII.LF loop
+                     Advance (Ctx);
+                  end loop;
+               elsif Upper = "HELP" then T.Kind := Token_HELP;
+               elsif Upper = "END" then T.Kind := Token_END;
+               elsif Upper = "RUN" then T.Kind := Token_RUN;
+               else
+                  T.Kind := Token_Identifier;
+               end if;
+            end;
+         elsif C = '"' then
+            T.Kind := Token_String_Literal;
+            Advance (Ctx); -- skip opening quote
+            while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= '"' loop
+               T.Length := T.Length + 1;
+               T.Text (T.Length) := Current_Char (Ctx);
+               Advance (Ctx);
+               -- Handle escaped quotes if necessary. Design doc says "embedded quotes".
+               -- Usually in BASIC it's double double quotes.
+               if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '"' then
+                  declare
+                     Saved_Pos : constant Positive := Ctx.Pos;
+                  begin
+                     Advance (Ctx);
+                     if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '"' then
+                        -- Embedded quote
+                        null;
+                     else
+                        -- End of string, backtrack to the quote
+                        Ctx.Pos := Saved_Pos;
+                        exit;
+                     end if;
+                  end;
+               end if;
+            end loop;
+            if not Is_End_Of_Source (Ctx) then
+               Advance (Ctx); -- skip closing quote
+            end if;
+         else
+            case C is
+               when '+' => T.Kind := Token_Plus; Advance (Ctx);
+               when '-' => T.Kind := Token_Minus; Advance (Ctx);
+               when '*' => T.Kind := Token_Star; Advance (Ctx);
+               when '/' => T.Kind := Token_Slash; Advance (Ctx);
+               when '^' => T.Kind := Token_Caret; Advance (Ctx);
+               when '=' => T.Kind := Token_Equal; Advance (Ctx);
+               when '<' =>
+                  Advance (Ctx);
+                  if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '=' then
+                     T.Kind := Token_Less_Equal;
+                     Advance (Ctx);
+                  elsif not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '>' then
+                     T.Kind := Token_Not_Equal;
+                     Advance (Ctx);
+                  else
+                     T.Kind := Token_Less;
+                  end if;
+               when '>' =>
+                  Advance (Ctx);
+                  if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '=' then
+                     T.Kind := Token_Greater_Equal;
+                     Advance (Ctx);
+                  else
+                     T.Kind := Token_Greater;
+                  end if;
+               when '(' => T.Kind := Token_Left_Paren; Advance (Ctx);
+               when ')' => T.Kind := Token_Right_Paren; Advance (Ctx);
+               when ',' => T.Kind := Token_Comma; Advance (Ctx);
+               when ';' => T.Kind := Token_Semicolon; Advance (Ctx);
+               when ':' => T.Kind := Token_Colon; Advance (Ctx);
+               when others =>
+                  -- Unknown character, skip it for now or return error token
+                  Advance (Ctx);
+                  return Get_Next_Token_Internal (Ctx);
+            end case;
+         end if;
+      end;
+
+      return T;
+   end Get_Next_Token_Internal;
+
+   function Get_Next_Token (Ctx : in out Lexer_Context) return Token is
+   begin
+      if Ctx.Has_Peeked then
+         Ctx.Has_Peeked := False;
+         return Ctx.Peeked;
+      else
+         return Get_Next_Token_Internal (Ctx);
+      end if;
+   end Get_Next_Token;
+
+   function Peek_Next_Token (Ctx : in out Lexer_Context) return Token is
+   begin
+      if not Ctx.Has_Peeked then
+         Ctx.Peeked := Get_Next_Token_Internal (Ctx);
+         Ctx.Has_Peeked := True;
+      end if;
+      return Ctx.Peeked;
+   end Peek_Next_Token;
+
+end SData.Lexer;

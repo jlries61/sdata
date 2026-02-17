@@ -1,0 +1,96 @@
+V "GNAT Lib v15"
+A -gnat2012
+P ZX
+
+RN
+RV NO_FLOATING_POINT
+RV NO_IMPLICIT_CONDITIONALS
+RV NO_STANDARD_STORAGE_POOLS
+RV NO_DYNAMIC_SIZED_OBJECTS
+RV NO_IMPLICIT_LOOPS
+
+U sdata.ast%s		sdata-ast.ads		bf4ac2de NE OO PK
+W sdata%s		sdata.ads		sdata.ali
+
+D sdata.ads		20260217010305 80fa9d3c sdata%s
+D sdata-ast.ads		20260217010654 3fb05fe2 sdata.ast%s
+D system.ads		20260202094243 14286b0f system%s
+G a e
+G c Z s s [expressionIP sdata__ast 18 9 none]
+G c Z s s [variable_rangeIP sdata__ast 42 9 none]
+G c Z s s [variable_list_nodeIP sdata__ast 52 9 none]
+G c Z s s [statementIP sdata__ast 74 9 none]
+X 1 sdata.ads
+1K9*SData 2e10 2|1r9 93r5
+X 2 sdata-ast.ads
+1K15*AST 1|1k9 2|93l11 93e14
+3E9*Expression_Kind 10e5 18r28
+4n7*Expr_Numeric_Literal{3E9} 20r15
+5n7*Expr_String_Literal{3E9} 22r15
+6n7*Expr_Variable{3E9} 25r15
+7n7*Expr_Binary_Op{3E9} 28r15
+8n7*Expr_Unary_Op{3E9} 32r15
+9n7*Expr_Function_Call{3E9} 35r15
+12E9*Binary_Op 12e104 31r21
+12n23*Op_Add{12E9}
+12n31*Op_Sub{12E9}
+12n39*Op_Mul{12E9}
+12n47*Op_Div{12E9}
+12n55*Op_Pow{12E9}
+12n63*Op_Eq{12E9}
+12n70*Op_Ne{12E9}
+12n77*Op_Lt{12E9}
+12n84*Op_Le{12E9}
+12n91*Op_Gt{12E9}
+12n98*Op_Ge{12E9}
+13E9*Unary_Op 13e29 34r23
+13n22*Op_Neg{13E9}
+15R9*Expression 16r37 18c9 18d21 40e14
+16P9*Expression_Access(15R9) 29r21 30r21 33r23 80r24 82r26
+18e21*Kind{3E9} 19r12
+21f13*Value{float}
+23a13*Str_Value{string}
+24i13*Str_Length{natural}
+26a13*Var_Name{string}
+27i13*Var_Len{natural}
+29p13*Left{16P9}
+30p13*Right{16P9}
+31e13*Op{12E9}
+33p13*Operand{16P9}
+34e13*UOp{13E9}
+36a13*Func_Name{string}
+37i13*Func_Len{natural}
+42R9*Variable_Range 48e14 53r14
+43a7*Start_Name{string}
+44i7*Start_Len{natural}
+45a7*End_Name{string}
+46i7*End_Len{natural}
+47b7*Is_Range{boolean}
+50R9*Variable_List_Node 51r33 52c9 55e14
+51P9*Variable_List(50R9) 54r14 87r20
+53r7*Var{42R9}
+54p7*Next{51P9}
+57E9*Statement_Kind 69e5 74r27
+58n7*Stmt_LET{57E9} 77r15
+59n7*Stmt_PRINT{57E9} 81r15
+60n7*Stmt_USE{57E9} 83r15
+61n7*Stmt_SAVE{57E9} 83r26
+62n7*Stmt_KEEP{57E9} 86r15
+63n7*Stmt_DROP{57E9} 86r27
+64n7*Stmt_IF{57E9}
+65n7*Stmt_FOR{57E9}
+66n7*Stmt_WHILE{57E9}
+67n7*Stmt_REPEAT{57E9}
+68n7*Stmt_END{57E9}
+71R9*Statement 72r36 74c9 74d20 91e14
+72P9*Statement_Access(71R9) 75r14
+74e20*Kind{57E9} 76r12
+75p7*Next{72P9}
+78a13*Var_Name{string}
+79i13*Var_Len{natural}
+80p13*Expr{16P9}
+82p13*Print_Expr{16P9}
+84a13*File_Path{string}
+85i13*File_Len{natural}
+87p13*Vars{51P9}
+

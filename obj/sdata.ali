@@ -1,0 +1,14 @@
+V "GNAT Lib v15"
+A -gnat2012
+P ZX
+
+RN
+
+U sdata%s		sdata.ads		80fa9d3c NE OO PK
+
+D sdata.ads		20260217010305 80fa9d3c sdata%s
+D system.ads		20260202094243 14286b0f system%s
+G a e
+X 1 sdata.ads
+1K9*SData 2l5 2e10
+

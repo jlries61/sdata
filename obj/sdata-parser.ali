@@ -1,0 +1,301 @@
+V "GNAT Lib v15"
+A -gnat2012
+P ZX
+
+RN
+RV NO_ALLOCATORS
+RV NO_ENUMERATION_MAPS
+RV NO_EXCEPTIONS
+RV NO_FLOATING_POINT
+RV NO_IO
+RV NO_LOCAL_ALLOCATORS
+RV NO_RECURSION
+RV NO_STANDARD_STORAGE_POOLS
+RV NO_DEFAULT_INITIALIZATION
+RV NO_DYNAMIC_SIZED_OBJECTS
+
+U sdata.parser%b	sdata-parser.adb	c03b78f5 NE OO PK
+W ada%s			ada.ads			ada.ali
+W ada.characters%s	a-charac.ads		a-charac.ali
+W ada.characters.handling%s  a-chahan.adb	a-chahan.ali
+Z ada.strings.text_buffers%s  a-sttebu.adb	a-sttebu.ali
+Z ada.tags%s		a-tags.adb		a-tags.ali
+W ada.text_io%s		a-textio.adb		a-textio.ali
+W sdata%s		sdata.ads		sdata.ali
+Z system.concat_2%s	s-conca2.adb		s-conca2.ali
+Z system.concat_3%s	s-conca3.adb		s-conca3.ali
+Z system.concat_4%s	s-conca4.adb		s-conca4.ali
+Z system.img_int%s	s-imgint.ads		s-imgint.ali
+Z system.val_flt%s	s-valflt.ads		s-valflt.ali
+
+U sdata.parser%s	sdata-parser.ads	459e1ce9 EE NE OO PK
+W sdata%s		sdata.ads		sdata.ali
+W sdata.ast%s		sdata-ast.ads		sdata-ast.ali
+W sdata.lexer%s		sdata-lexer.adb		sdata-lexer.ali
+
+D ada.ads		20260202094243 76789da1 ada%s
+D a-charac.ads		20260202094243 2d3ec45b ada.characters%s
+D a-chahan.ads		20260202094243 bf752ff6 ada.characters.handling%s
+D a-chlat1.ads		20260202094243 e0d72e76 ada.characters.latin_1%s
+D a-except.ads		20260202094243 e7970cd9 ada.exceptions%s
+D a-ioexce.ads		20260202094243 40018c65 ada.io_exceptions%s
+D a-stream.ads		20260202094243 17477cbd ada.streams%s
+D a-string.ads		20260202094243 90ac6797 ada.strings%s
+D a-sttebu.ads		20260202094243 f1ad67a2 ada.strings.text_buffers%s
+D a-stuten.ads		20260202094243 c6ced0ae ada.strings.utf_encoding%s
+D a-tags.ads		20260202094243 fbca0ad5 ada.tags%s
+D a-textio.ads		20260202094243 34ef47de ada.text_io%s
+D a-unccon.ads		20260202094243 0e9b276f ada.unchecked_conversion%s
+D interfac.ads		20260202094243 9111f9c1 interfaces%s
+D i-cstrea.ads		20260202094243 ffd01b9d interfaces.c_streams%s
+D sdata.ads		20260217010305 80fa9d3c sdata%s
+D sdata-ast.ads		20260217010654 3fb05fe2 sdata.ast%s
+D sdata-lexer.ads	20260217010826 0894e3b6 sdata.lexer%s
+D sdata-parser.ads	20260217010846 f2403d81 sdata.parser%s
+D sdata-parser.adb	20260217010838 b9e12d5c sdata.parser%b
+D system.ads		20260202094243 14286b0f system%s
+D s-conca2.ads		20260202094243 b5fb73f7 system.concat_2%s
+D s-conca3.ads		20260202094243 8a7a19a2 system.concat_3%s
+D s-conca4.ads		20260202094243 33f85f3e system.concat_4%s
+D s-crtl.ads		20260202094243 beb39b9e system.crtl%s
+D s-exctab.ads		20260202094243 91bef6ef system.exception_table%s
+D s-ficobl.ads		20260202094243 dc5161d4 system.file_control_block%s
+D s-imagei.ads		20260202094243 5e131ce0 system.image_i%s
+D s-imgint.ads		20260202094243 67e4edfb system.img_int%s
+D s-parame.ads		20260202094243 3597fc11 system.parameters%s
+D s-powflt.ads		20260202094243 a51ab9b8 system.powten_flt%s
+D s-putima.ads		20260202094243 17291fe4 system.put_images%s
+D s-secsta.ads		20260202094243 578279f5 system.secondary_stack%s
+D s-soflin.ads		20260202094243 5d88fdea system.soft_links%s
+D s-stache.ads		20260202094243 0b81c1fe system.stack_checking%s
+D s-stalib.ads		20260202094243 1c9580f6 system.standard_library%s
+D s-stoele.ads		20260202094243 ccded4e8 system.storage_elements%s
+D s-traent.ads		20260202094243 c81cbf8c system.traceback_entries%s
+D s-unstyp.ads		20260202094243 fa2a7f59 system.unsigned_types%s
+D s-valflt.ads		20260202094243 78fc9326 system.val_flt%s
+D s-valrea.ads		20260202094243 f0598c00 system.val_real%s
+D s-valspe.ads		20260202094243 f810d31c system.val_spec%s
+D s-vaispe.ads		20260202094243 8280550e system.value_i_spec%s
+D s-vauspe.ads		20260202094243 89269ba5 system.value_u_spec%s
+D s-vs_int.ads		20260202094243 06b6b724 system.vs_int%s
+D s-vs_uns.ads		20260202094243 e7f47a27 system.vs_uns%s
+D s-wchcon.ads		20260202094243 d9032363 system.wch_con%s
+G a e
+G c Z s b [initialize sdata__parser 8 14 none]
+G c Z s b [parse_program sdata__parser 9 13 none]
+G c Z s s [parser_contextIP sdata__parser 12 9 none]
+G c Z b b [parse_expression sdata__parser 11 13 none]
+G c Z b b [parse_primary sdata__parser 13 13 none]
+G c Z b b [get_precedence sdata__parser 69 13 none]
+G c Z b b [to_binary_op sdata__parser 80 13 none]
+G c Z b b [parse_expression_1 sdata__parser 98 13 none]
+G c Z b b [parse_variable_list sdata__parser 130 13 none]
+G c Z b b [parse_statement sdata__parser 181 13 none]
+G r c none [initialize sdata__parser 8 14 none] [initialize sdata__lexer 37 14 none]
+G r c none [parse_program sdata__parser 9 13 none] [get_next_token sdata__lexer 38 13 none]
+G r s statement [parse_program sdata__parser 9 13 none] [statementIP sdata__ast 74 9 none]
+G r s expression [parse_program sdata__parser 9 13 none] [expressionIP sdata__ast 18 9 none]
+G r c none [parse_program sdata__parser 9 13 none] [peek_next_token sdata__lexer 39 13 none]
+G r s token [parse_program sdata__parser 9 13 none] [tokenIP sdata__lexer 27 9 none]
+G r s variable_list_node [parse_program sdata__parser 9 13 none] [variable_list_nodeIP sdata__ast 52 9 none]
+G r s lexer_context [parser_contextIP sdata__parser 12 9 none] [lexer_contextIP sdata__lexer 42 9 none]
+G r c none [parse_expression sdata__parser 11 13 none] [get_next_token sdata__lexer 38 13 none]
+G r s expression [parse_expression sdata__parser 11 13 none] [expressionIP sdata__ast 18 9 none]
+G r c none [parse_expression sdata__parser 11 13 none] [peek_next_token sdata__lexer 39 13 none]
+G r c none [parse_primary sdata__parser 13 13 none] [get_next_token sdata__lexer 38 13 none]
+G r s expression [parse_primary sdata__parser 13 13 none] [expressionIP sdata__ast 18 9 none]
+G r c none [parse_primary sdata__parser 13 13 none] [peek_next_token sdata__lexer 39 13 none]
+G r c none [parse_expression_1 sdata__parser 98 13 none] [get_next_token sdata__lexer 38 13 none]
+G r s expression [parse_expression_1 sdata__parser 98 13 none] [expressionIP sdata__ast 18 9 none]
+G r c none [parse_expression_1 sdata__parser 98 13 none] [peek_next_token sdata__lexer 39 13 none]
+G r s token [parse_variable_list sdata__parser 130 13 none] [tokenIP sdata__lexer 27 9 none]
+G r c none [parse_variable_list sdata__parser 130 13 none] [peek_next_token sdata__lexer 39 13 none]
+G r c none [parse_variable_list sdata__parser 130 13 none] [get_next_token sdata__lexer 38 13 none]
+G r s variable_list_node [parse_variable_list sdata__parser 130 13 none] [variable_list_nodeIP sdata__ast 52 9 none]
+G r c none [parse_statement sdata__parser 181 13 none] [get_next_token sdata__lexer 38 13 none]
+G r s statement [parse_statement sdata__parser 181 13 none] [statementIP sdata__ast 74 9 none]
+G r s expression [parse_statement sdata__parser 181 13 none] [expressionIP sdata__ast 18 9 none]
+G r c none [parse_statement sdata__parser 181 13 none] [peek_next_token sdata__lexer 39 13 none]
+G r s token [parse_statement sdata__parser 181 13 none] [tokenIP sdata__lexer 27 9 none]
+G r s variable_list_node [parse_statement sdata__parser 181 13 none] [variable_list_nodeIP sdata__ast 52 9 none]
+X 1 ada.ads
+18K9*Ada 22e8 20|1r6 1r23 2r6 2r35
+X 2 a-charac.ads
+16K13*Characters 18e19 20|2r10 2r39
+X 3 a-chahan.ads
+43K24*Handling 454e28 20|2w21 2r50
+X 12 a-textio.ads
+58K13*Text_IO 785e16 20|1w10 1r27
+565U14*Put_Line 20|47s22 60s16 64s13 152s22 201s19 204s19 219s19 243s13
+X 16 sdata.ads
+1K9*SData 2e10 19|1r6 1r23 2r6 2r23 4r9 16r5 20|4r14 279r5
+X 17 sdata-ast.ads
+1K15*AST 93e14 19|2w12 2r29
+4n7*Expr_Numeric_Literal{3E9} 20|19r37
+5n7*Expr_String_Literal{3E9} 20|23r37
+6n7*Expr_Variable{3E9} 20|52r40
+7n7*Expr_Binary_Op{3E9} 20|113r64
+9n7*Expr_Function_Call{3E9} 20|30r40
+12E9*Binary_Op 12e104 20|80r53
+12n23*Op_Add{12E9} 20|83r36
+12n31*Op_Sub{12E9} 20|84r37
+12n39*Op_Mul{12E9} 20|85r36
+12n47*Op_Div{12E9} 20|86r37
+12n55*Op_Pow{12E9} 20|87r37
+12n63*Op_Eq{12E9} 20|88r37
+12n70*Op_Ne{12E9} 20|89r41
+12n77*Op_Lt{12E9} 20|90r36
+12n84*Op_Le{12E9} 20|91r42
+12n91*Op_Gt{12E9} 20|92r39
+12n98*Op_Ge{12E9} 20|93r45
+15R9*Expression 40e14 20|19r25 23r25 30r28 52r28 113r52
+16P9*Expression_Access(15R9) 20|11r67 13r64 15r14 41r31 98r95 99r14 112r24
+. 113r27 125r67
+21f13*Value{float} 20|20m18
+23a13*Str_Value{string} 20|25m18
+24i13*Str_Length{natural} 20|24m18
+26a13*Var_Name{string} 20|54m21
+27i13*Var_Len{natural} 20|53m21
+29p13*Left{16P9} 20|115m25
+30p13*Right{16P9} 20|116m25
+31e13*Op{12E9} 20|117m25
+36a13*Func_Name{string} 20|32m21
+37i13*Func_Len{natural} 20|31m21
+43a7*Start_Name{string} 20|143m22
+44i7*Start_Len{natural} 20|144m22
+45a7*End_Name{string} 20|155m31
+46i7*End_Len{natural} 20|156m31
+47b7*Is_Range{boolean} 20|154m31
+50R9*Variable_List_Node 55e14 20|141r41
+51P9*Variable_List(50R9) 20|130r70 131r15 132r15 141r20
+53r7*Var{42R9} 20|143m18 144m18 154m27 155m27 156m27
+54p7*Next{51P9} 20|164m21
+58n7*Stmt_LET{57E9} 20|206r39
+59n7*Stmt_PRINT{57E9} 20|212r36
+60n7*Stmt_USE{57E9} 20|222r42
+61n7*Stmt_SAVE{57E9} 20|224r42
+62n7*Stmt_KEEP{57E9} 20|231r39
+63n7*Stmt_DROP{57E9} 20|233r39
+68n7*Stmt_END{57E9} 20|237r36
+71R9*Statement 91e14 20|206r28 212r25 222r31 224r31 231r28 233r28 237r25
+72P9*Statement_Access(71R9) 19|9r64 20|181r66 183r14 259r64 260r15 261r17
+. 262r18
+75p7*Next{72P9} 20|272m21
+78a13*Var_Name{string} 20|208m21
+79i13*Var_Len{natural} 20|207m21
+80p13*Expr{16P9} 20|209m21
+82p13*Print_Expr{16P9} 20|213m18
+84a13*File_Path{string} 20|227m21
+85i13*File_Len{natural} 20|226m21
+87p13*Vars{51P9} 20|235m18
+X 18 sdata-lexer.ads
+1K15*Lexer 52e16 19|1w12 1r29
+3E9*Token_Kind 25e5 20|69r36 80r34
+4n7*Token_EOF{3E9} 20|190r21
+5n7*Token_Identifier{3E9} 20|27r15 137r32 151r38 200r35
+6n7*Token_String_Literal{3E9} 20|22r15 218r36
+7n7*Token_Numeric_Literal{3E9} 20|18r15
+10n7*Token_USE{3E9} 20|214r15 221r30
+10n18*Token_SAVE{3E9} 20|214r27
+10n30*Token_KEEP{3E9} 20|229r15 230r27
+10n42*Token_DROP{3E9} 20|229r28
+13n7*Token_LET{3E9} 20|195r15
+14n7*Token_PRINT{3E9} 20|211r15
+17n7*Token_REM{3E9} 20|238r15
+17n30*Token_END{3E9} 20|236r15
+20n7*Token_Plus{3E9} 20|73r15 83r15
+20n19*Token_Minus{3E9} 20|73r28 84r15 146r53
+20n32*Token_Star{3E9} 20|74r15 85r15
+20n44*Token_Slash{3E9} 20|74r28 86r15
+20n57*Token_Caret{3E9} 20|75r15 87r15
+21n7*Token_Equal{3E9} 20|72r15 88r15 203r34
+21n20*Token_Not_Equal{3E9} 20|72r29 89r15
+21n37*Token_Less{3E9} 20|72r47 90r15
+21n49*Token_Less_Equal{3E9} 20|72r60 91r15
+21n67*Token_Greater{3E9} 20|72r79 92r15
+21n82*Token_Greater_Equal{3E9} 20|72r95 93r15
+22n7*Token_Left_Paren{3E9} 20|29r53 57r15
+22n25*Token_Right_Paren{3E9} 20|38r60 46r59 59r53
+22n44*Token_Comma{3E9} 20|170r50
+22n74*Token_Colon{3E9} 20|146r110 186r24 248r47
+23n7*Token_Newline{3E9} 20|186r55 248r104
+27R9*Token 33e14 20|14r22 34r38 103r28 111r35 133r15 148r38 149r38 172r35
+. 182r13 197r35 198r34 216r36 250r32
+28e7*Kind{3E9} 20|17r16 29r46 38r52 46r51 59r45 64r71 104r60 117r49 137r24
+. 146r46 146r103 151r30 152r79 170r43 186r17 186r48 190r14 194r16 200r27
+. 203r26 218r28 219r75 221r23 230r20 243r61 248r40 248r97
+29a7*Text{string} 20|20r44 25r53 32r56 54r55 143r58 155r73 208r63 227r66
+30i7*Length{natural} 20|20r59 24r36 25r38 25r68 31r37 32r41 32r71 53r36 54r40
+. 54r70 143r43 143r73 144r39 155r54 155r92 156r50 207r40 208r44 208r82 226r42
+. 227r46 227r86
+31i7*Line{positive} 20|243r92
+35R9*Lexer_Context 50e14 19|13r17
+37U14*Initialize 20|8s7
+38V13*Get_Next_Token{27R9} 20|14s31 34s47 46s22 59s16 111s44 139s17 148s47
+. 149s47 172s44 182s22 187s17 197s44 198s43 216s45 250s41
+39V13*Peek_Next_Token{27R9} 20|29s16 38s22 103s37 136s17 146s16 146s73 170s13
+. 248s10 248s67
+X 19 sdata-parser.ads
+4K15*Parser 16|1k9 19|12E9 16l11 16e17 20|4b20 279l11 279t17
+6R9*Parser_Context 8r39 9r41 12c9 14e14 20|6r39 11r44 13r41 98r46 125r44
+. 130r47 181r43 259r41
+8U14*Initialize 8=26 8>55 20|6b14 9l8 9t18
+8r26 Ctx{6R9} 20|6b26 8m19 8r19
+8a55 Source{string} 20|6b55 8r32
+9V13*Parse_Program{17|72P9} 9=28 20|259b13 277l8 277t21
+9r28 Ctx{6R9} 20|259b28 265m39 265r39
+13r7*Lex_Ctx{18|35R9} 20|8m23 14m51 29m37 34m67 38m43 46m42 59m36 103m58
+. 111m64 136m38 139m37 146m37 146m94 148m67 149m67 170m34 172m64 182m42 187m37
+. 197m64 198m63 216m65 248m31 248m88 250m61
+X 20 sdata-parser.adb
+11V13 Parse_Expression{17|16P9} 11=31 41s52 58s21 125b13 128l8 128t24 209s29
+. 213s32
+11r31 Ctx{19|6R9} 125b31 127m34 127r34
+13V13 Parse_Primary{17|16P9} 13b13 13=28 67l8 67t21 99s35
+13r28 Ctx{19|6R9} 14m47 14r47 29m33 29r33 34m63 34r63 38m39 38r39 41m69 41r69
+. 46m38 46r38 58m39 58r39 59m32 59r32
+14r7 Tok{18|27R9} 17r12 20r40 20r55 24r32 25r34 25r49 25r64 31r33 32r37 32r52
+. 32r67 53r32 54r36 54r51 54r66 64r67
+15p7 Node{17|16P9} 19m13 20r13 21r20 23m13 24r13 25r13 26r20 30m16 31r16
+. 32r16 50r23 52m16 53r16 54r16 55r23 58m13 62r20
+34r19 Discard{18|27R9}
+41p25 Arg{17|16P9}
+69V13 Get_Precedence{integer} 69b13 69>29 78l8 78t22 104s40
+69e29 Kind{18|3E9} 71r12
+80V13 To_Binary_Op{17|12E9} 80b13 80>27 96l8 96t20 117s31
+80e27 Kind{18|3E9} 82r12
+98V13 Parse_Expression_1{17|16P9} 98b13 98=33 98>62 112s45 123l8 123t26 127s14
+98r33 Ctx{19|6R9} 99m50 99r50 103m54 103r54 111m60 111r60 112m65 112r65
+98i62 Min_Precedence{integer} 106r23
+99p7 Left{17|16P9} 115r33 118m16 122r14
+103r13 Tok{18|27R9} 104r56 117r45
+104i13 Prec{integer} 106r16 112r70
+111r16 Discard{18|27R9}
+112p16 Right{17|16P9} 116r34
+113p16 New_Node{17|16P9} 115r16 116r16 117r16 118r24
+130V13 Parse_Variable_List{17|51P9} 130b13 130=34 179l8 179t27 235s26
+130r34 Ctx{19|6R9} 136m34 136r34 139m33 139r33 146m33 146r33 146m90 146r90
+. 148m63 148r63 149m63 149r63 170m30 170r30 172m60 172r60
+131p7 First{17|51P9} 161r16 162m16 178r14
+132p7 Last{17|51P9} 164r16 166m13
+133r7 Tok{18|27R9} 136m10 137r20 139m10 143r39 143r54 143r69 144r35
+141p13 Node{17|51P9} 143r13 144r13 154r22 155r22 156r22 162r25 164r29 166r21
+148r19 Discard{18|27R9} 152r71
+149r19 End_Tok{18|27R9} 151r22 155r46 155r65 155r84 156r42
+172r16 Discard{18|27R9}
+181V13 Parse_Statement{17|72P9} 181b13 181=30 241s20 257l8 257t23 265s22
+181r30 Ctx{19|6R9} 182m38 182r38 187m33 187r33 197m60 197r60 198m59 198r59
+. 209m47 209r47 213m50 213r50 216m61 216r61 235m47 235r47 241m37 241r37 248m27
+. 248r27 248m84 248r84 250m57 250r57
+182r7 Tok{18|27R9} 186r13 186r44 187m10 190r10 194r12 219r71 221r19 230r16
+. 243r57 243r88
+183p7 Stmt{17|72P9} 206m16 207r16 208r16 209r16 212m13 213r13 222m19 224m19
+. 226r16 227r16 231m16 233m16 235r13 237m13 256r14
+197r16 Var_Tok{18|27R9} 200r19 207r32 208r36 208r55 208r74
+198r16 Eq_Tok{18|27R9} 203r19
+216r16 File_Tok{18|27R9} 218r19 226r33 227r37 227r57 227r77
+250r13 Discard{18|27R9}
+260p7 First{17|72P9} 268r13 269m13 276r14
+261p7 Current{17|72P9} 270m13 272r13 273m13
+262p7 New_Stmt{17|72P9} 265m10 266r20 269r22 270r24 272r29 273r24
+
