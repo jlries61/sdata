@@ -5,6 +5,8 @@ with SData.Lexer; use SData.Lexer;
 with SData.Parser; use SData.Parser;
 with SData.AST; use SData.AST;
 
+with SData.Interpreter; use SData.Interpreter;
+
 procedure SData_Main is
    
    function Read_File (Filename : String) return String is
@@ -35,38 +37,25 @@ begin
       Source : constant String := Read_File (Argument (1));
    begin
       Initialize (Ctx, Source);
+      
+      -- Debug: Print all tokens
+      -- Put_Line ("Tokens:");
+      -- declare
+      --    T : Token;
+      --    L : Lexer_Context := Ctx.Lex_Ctx;
+      -- begin
+      --    loop
+      --       T := Get_Next_Token (L);
+      --       Put_Line (T.Kind'Image & ": '" & T.Text (1 .. T.Length) & "' (Line:" & T.Line'Image & ", Col:" & T.Column'Image & ")");
+      --       exit when T.Kind = Token_EOF;
+      --    end loop;
+      -- end;
+
+      Initialize (Ctx, Source);
       Prog := Parse_Program (Ctx);
       
-      Current := Prog;
-      while Current /= null loop
-         Put ("Statement Kind: " & Current.Kind'Image);
-         case Current.Kind is
-            when Stmt_LET =>
-               Put_Line (" Variable: " & Current.Var_Name (1 .. Current.Var_Len));
-            when Stmt_PRINT =>
-               Put_Line (" Expression: [Expr]");
-            when Stmt_USE | Stmt_SAVE =>
-               Put_Line (" File: " & Current.File_Path (1 .. Current.File_Len));
-            when Stmt_KEEP | Stmt_DROP =>
-               Put (" Vars: ");
-               declare
-                  V : Variable_List := Current.Vars;
-               begin
-                  while V /= null loop
-                     Put (V.Var.Start_Name (1 .. V.Var.Start_Len));
-                     if V.Var.Is_Range then
-                        Put ("-" & V.Var.End_Name (1 .. V.Var.End_Len));
-                     end if;
-                     V := V.Next;
-                     if V /= null then Put (", "); end if;
-                  end loop;
-                  New_Line;
-               end;
-            when others =>
-               New_Line;
-         end case;
-         Current := Current.Next;
-      end loop;
+      -- Put_Line ("Execution Output:");
+      Execute (Prog);
    end;
 
 exception

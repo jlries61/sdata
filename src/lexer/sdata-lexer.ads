@@ -14,7 +14,7 @@ package SData.Lexer is
       Token_PRINT, Token_OUTPUT, Token_ECHO,
       Token_BY, Token_SORT, Token_RENAME, Token_DELETE,
       Token_OPTIONS, Token_DIGITS, Token_FPATH, Token_HEADER,
-      Token_REM, Token_HELP, Token_END, Token_RUN,
+      Token_REM, Token_HELP, Token_END, Token_RUN, Token_QUIT,
 
       -- Operators and Punctuation
       Token_Plus, Token_Minus, Token_Star, Token_Slash, Token_Caret,

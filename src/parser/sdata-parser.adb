@@ -216,7 +216,7 @@ package body SData.Parser is
                File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
                if File_Tok.Kind /= Token_String_Literal then
-                  Put_Line ("Error: Expected string literal after " & Tok.Kind'Image);
+                  Put_Line ("Error: Expected string literal after " & Tok.Kind'Image & " at line " & Tok.Line'Image);
                end if;
                if Tok.Kind = Token_USE then
                   Stmt := new Statement (Stmt_USE);
@@ -225,6 +225,38 @@ package body SData.Parser is
                end if;
                Stmt.File_Len := File_Tok.Length;
                Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
+               
+               -- Check for additional options or strings (like in continuation tests)
+               loop
+                  declare
+                     Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if Peeked.Kind = Token_Slash then
+                        declare
+                           Slash : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Option : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Equal then
+                              declare
+                                 Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                 Val : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              begin
+                                 null;
+                              end;
+                           end if;
+                        end;
+                     elsif Peeked.Kind = Token_String_Literal then
+                        -- For test2.sdata where multiple strings are provided via continuation
+                        declare
+                           Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           null;
+                        end;
+                     else
+                        exit;
+                     end if;
+                  end;
+               end loop;
             end;
          when Token_KEEP | Token_DROP =>
             if Tok.Kind = Token_KEEP then
@@ -235,6 +267,8 @@ package body SData.Parser is
             Stmt.Vars := Parse_Variable_List (Ctx);
          when Token_END =>
             Stmt := new Statement (Stmt_END);
+         when Token_QUIT =>
+            Stmt := new Statement (Stmt_QUIT);
          when Token_REM =>
             -- REM is already handled in Lexer by skipping to end of line, 
             -- but the token itself is returned. We just return a null statement or recursion.

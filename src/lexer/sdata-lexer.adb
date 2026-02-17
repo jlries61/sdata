@@ -55,21 +55,96 @@ package body SData.Lexer is
                Saved_Pos : constant Positive := Ctx.Pos;
                Saved_Col : constant Positive := Ctx.Column;
                Saved_Line : constant Positive := Ctx.Line;
+               Found_Newline : Boolean := False;
             begin
                Advance (Ctx);
-               -- Skip more spaces/tabs
+               -- Skip spaces/tabs/carriage returns
                while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) in ' ' | ASCII.HT | ASCII.CR loop
                   Advance (Ctx);
                end loop;
+               
                if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ASCII.LF then
                   Advance (Ctx); -- Consume LF
-                  -- Continued, loop again to skip more whitespace
+                  Found_Newline := True;
+                  -- After LF, skip any leading whitespace on the NEXT line
+                  -- ALSO skip comments that start with '--' or any subsequent line continuations
+                  loop
+                     while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) in ' ' | ASCII.HT | ASCII.CR | ASCII.LF loop
+                        Advance (Ctx);
+                     end loop;
+                     
+                     if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '-' then
+                        declare
+                           Saved_Comment_Pos : constant Positive := Ctx.Pos;
+                        begin
+                           Advance (Ctx);
+                           if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '-' then
+                              -- It's a comment, skip to end of line
+                              while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= ASCII.LF loop
+                                 Advance (Ctx);
+                              end loop;
+                              -- Loop continues to skip the LF and any subsequent whitespace/comments
+                           else
+                              -- Not a comment (just a single minus), backtrack and stop skipping
+                              Ctx.Pos := Saved_Comment_Pos;
+                              exit;
+                           end if;
+                        end;
+                     elsif not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ',' then
+                        -- Handle potential multiple line continuations in a row
+                        declare
+                           Saved_C_Pos : constant Positive := Ctx.Pos;
+                        begin
+                           Advance (Ctx);
+                           -- Skip whitespace after comma
+                           while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) in ' ' | ASCII.HT | ASCII.CR loop
+                              Advance (Ctx);
+                           end loop;
+                           if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ASCII.LF then
+                              Advance (Ctx); -- Consume LF
+                              -- Loop continues to handle next line
+                           else
+                              -- Not a continuation, backtrack
+                              Ctx.Pos := Saved_C_Pos;
+                              exit;
+                           end if;
+                        end;
+                     else
+                        exit;
+                     end if;
+                  end loop;
+               end if;
+
+               if Found_Newline then
+                  -- Continued, loop again to skip more potential whitespace/continuations
+                  -- We return to the top of the loop to skip potential whitespace before the next token
+                  -- null;
+                  goto Continue_Loop;
                else
                   -- Not a continuation, backtrack
                   Ctx.Pos := Saved_Pos;
                   Ctx.Column := Saved_Col;
                   Ctx.Line := Saved_Line;
                   exit; -- Normal comma
+               end if;
+            end;
+         elsif not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '-' then
+            -- Handle comments starting with '--'
+            declare
+               Saved_Pos : constant Positive := Ctx.Pos;
+            begin
+               Advance (Ctx);
+               if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '-' then
+                  -- It's a comment, skip to end of line
+                  while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= ASCII.LF loop
+                     Advance (Ctx);
+                  end loop;
+                  -- Do NOT return a token, just continue the loop to find the next actual token
+                  goto Continue_Loop;
+               else
+                  -- Not a comment, backtrack and treat as a normal minus
+                  Ctx.Pos := Saved_Pos;
+                  exit;
                end if;
             end;
          elsif not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ASCII.LF then
@@ -87,6 +162,8 @@ package body SData.Lexer is
          else
             exit;
          end if;
+         <<Continue_Loop>>
+         null;
       end loop;
 
       T.Line := Ctx.Line;
@@ -160,6 +237,7 @@ package body SData.Lexer is
                   end loop;
                elsif Upper = "HELP" then T.Kind := Token_HELP;
                elsif Upper = "END" then T.Kind := Token_END;
+               elsif Upper = "QUIT" then T.Kind := Token_QUIT;
                elsif Upper = "RUN" then T.Kind := Token_RUN;
                else
                   T.Kind := Token_Identifier;

@@ -22,16 +22,32 @@ run: build
 check: build
 	@echo "Running tests..."
 	@for f in tests/*.sdata; do \
-		echo "Testing $$f..."; \
-		./bin/sdata_main $$f > /tmp/test_out; \
-		if [ $$? -eq 0 ]; then \
-			echo "  $$f: PASSED"; \
-		else \
-			echo "  $$f: FAILED"; \
+		base=$$(basename $$f .sdata); \
+		exp="tests/expected/$$base.out"; \
+		echo -n "Testing $$f... "; \
+		./bin/sdata_main $$f > tests/$$base.tmp 2>&1; \
+		if [ $$? -ne 0 ]; then \
+			echo "FAILED (Execution Error)"; \
+			rm tests/$$base.tmp; \
 			exit 1; \
-		fi \
+		fi; \
+		if [ -f "$$exp" ]; then \
+			diff -u "$$exp" tests/$$base.tmp > tests/$$base.diff; \
+			if [ $$? -eq 0 ]; then \
+				echo "PASSED"; \
+				rm tests/$$base.tmp tests/$$base.diff; \
+			else \
+				echo "FAILED (Output Mismatch)"; \
+				cat tests/$$base.diff; \
+				rm tests/$$base.tmp tests/$$base.diff; \
+				exit 1; \
+			fi; \
+		else \
+			echo "PASSED (No expected output file found)"; \
+			rm tests/$$base.tmp; \
+		fi; \
 	done
 	@echo "All tests passed."
 
 clean:
-	rm -rf obj bin
+	rm -rf obj bin tests/*.tmp tests/*.diff
