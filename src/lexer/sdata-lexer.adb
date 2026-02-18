@@ -239,6 +239,7 @@ package body SData.Lexer is
                elsif Upper = "END" then T.Kind := Token_END;
                elsif Upper = "QUIT" then T.Kind := Token_QUIT;
                elsif Upper = "RUN" then T.Kind := Token_RUN;
+               elsif Upper = "NAMES" then T.Kind := Token_NAMES;
                else
                   T.Kind := Token_Identifier;
                end if;

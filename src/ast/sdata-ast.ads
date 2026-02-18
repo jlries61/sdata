@@ -66,7 +66,8 @@ package SData.AST is
       Stmt_WHILE,
       Stmt_REPEAT,
       Stmt_END,
-      Stmt_QUIT
+      Stmt_QUIT,
+      Stmt_NAMES
    );
 
    type Statement;

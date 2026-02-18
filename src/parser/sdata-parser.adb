@@ -210,7 +210,15 @@ package body SData.Parser is
             end;
          when Token_PRINT =>
             Stmt := new Statement (Stmt_PRINT);
-            Stmt.Print_Expr := Parse_Expression (Ctx);
+            declare
+               Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if Peeked.Kind /= Token_Newline and then Peeked.Kind /= Token_Colon and then Peeked.Kind /= Token_EOF then
+                  Stmt.Print_Expr := Parse_Expression (Ctx);
+               else
+                  Stmt.Print_Expr := null;
+               end if;
+            end;
          when Token_USE | Token_SAVE =>
             declare
                File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
@@ -269,6 +277,8 @@ package body SData.Parser is
             Stmt := new Statement (Stmt_END);
          when Token_QUIT =>
             Stmt := new Statement (Stmt_QUIT);
+         when Token_NAMES =>
+            Stmt := new Statement (Stmt_NAMES);
          when Token_REM =>
             -- REM is already handled in Lexer by skipping to end of line, 
             -- but the token itself is returned. We just return a null statement or recursion.
