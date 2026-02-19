@@ -1,5 +1,6 @@
 with SData.Variables; use SData.Variables;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
+with Ada.Characters.Handling; use Ada.Characters.Handling;
 
 package body SData.Evaluator is
 
@@ -84,8 +85,42 @@ package body SData.Evaluator is
             end;
 
          when Expr_Function_Call =>
-            -- Function evaluation not fully implemented yet
-            return (Kind => Val_Missing);
+            declare
+               Name : constant String := To_Upper (Expr.Func_Name (1 .. Expr.Func_Len));
+            begin
+               if Expr.Arguments = null then
+                  return (Kind => Val_Missing);
+               end if;
+
+               declare
+                  Arg1 : constant Value := Evaluate (Expr.Arguments.Expr);
+               begin
+                  if Name = "ABS" then
+                     if Arg1.Kind = Val_Numeric then
+                        return (Kind => Val_Numeric, Num_Val => abs (Arg1.Num_Val));
+                     end if;
+                  elsif Name = "SQRT" then
+                     if Arg1.Kind = Val_Numeric and then Arg1.Num_Val >= 0.0 then
+                        return (Kind => Val_Numeric, Num_Val => Sqrt (Arg1.Num_Val));
+                     end if;
+                  elsif Name = "MAX" or else Name = "MIN" then
+                     if Expr.Arguments.Next /= null then
+                        declare
+                           Arg2 : constant Value := Evaluate (Expr.Arguments.Next.Expr);
+                        begin
+                           if Arg1.Kind = Val_Numeric and Arg2.Kind = Val_Numeric then
+                              if Name = "MAX" then
+                                 if Arg1.Num_Val > Arg2.Num_Val then return Arg1; else return Arg2; end if;
+                              else
+                                 if Arg1.Num_Val < Arg2.Num_Val then return Arg1; else return Arg2; end if;
+                              end if;
+                           end if;
+                        end;
+                     end if;
+                  end if;
+               end;
+               return (Kind => Val_Missing);
+            end;
       end case;
    end Evaluate;
 

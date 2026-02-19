@@ -9,19 +9,26 @@ package body SData.Table is
       Current_Record := 0;
    end Clear;
 
-   procedure Add_Column (Name : String) is
+   procedure Add_Column (Name : String; Col_Type : Column_Type) is
       Upper_Name : constant String := To_Upper (Name);
       New_Col : Column;
-      Num_Rows : constant Natural := Row_Count;
+      -- Get row count from first column if any
+      Num_Rows : Natural := 0;
    begin
+      if not Data_Table.Is_Empty then
+         Num_Rows := Natural (Column_Maps.Element (Data_Table.First).Data.Length);
+      end if;
+
       if Data_Table.Contains (Upper_Name) then
          return; -- Or raise an error
       end if;
       
       New_Col.Name := (others => ' ');
       New_Col.Name (1 .. Upper_Name'Length) := Upper_Name;
+      New_Col.Typ := Col_Type;
+      
       for I in 1 .. Num_Rows loop
-         New_Col.Data.Append ( (Kind => Val_Missing) );
+         New_Col.Data.Append ((Kind => Val_Missing));
       end loop;
       
       Data_Table.Insert (Upper_Name, New_Col);
@@ -96,16 +103,25 @@ package body SData.Table is
       Upper_Name : constant String := To_Upper (Column_Name);
    begin
       if not Data_Table.Contains (Upper_Name) then
-         return; -- Or raise error
+         return;
       end if;
-      
+
       declare
          Position : constant Column_Maps.Cursor := Data_Table.Find (Upper_Name);
          Col : Column := Column_Maps.Element (Position);
       begin
          if Count_Type (Row) > Col.Data.Length then
-            return; -- Or raise
+            return;
          end if;
+
+         if Val.Kind /= Val_Missing then
+            if Col.Typ = Col_Numeric and Val.Kind /= Val_Numeric then
+               raise Type_Mismatch_Error with "Expected Numeric, got String";
+            elsif Col.Typ = Col_String and Val.Kind /= Val_String then
+               raise Type_Mismatch_Error with "Expected String, got Numeric";
+            end if;
+         end if;
+
          Col.Data.Replace_Element (Row, Val);
          Data_Table.Replace_Element (Position, Col);
       end;

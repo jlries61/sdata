@@ -11,58 +11,91 @@ package body SData.Parser is
    function Parse_Expression (Ctx : in out Parser_Context) return Expression_Access;
 
    function Parse_Primary (Ctx : in out Parser_Context) return Expression_Access is
-      Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+      Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
       Node : Expression_Access;
    begin
       case Tok.Kind is
-         when Token_Numeric_Literal =>
-            Node := new Expression (Expr_Numeric_Literal);
-            Node.Value := Float'Value (Tok.Text (1 .. Tok.Length));
-            return Node;
-         when Token_String_Literal =>
-            Node := new Expression (Expr_String_Literal);
-            Node.Str_Length := Tok.Length;
-            Node.Str_Value (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
-            return Node;
-         when Token_Identifier =>
-            -- Check for function call
-            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren then
-               Node := new Expression (Expr_Function_Call);
-               Node.Func_Len := Tok.Length;
-               Node.Func_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
-               declare
-                  Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- Consume '('
-               begin
-                  -- For now, ignore arguments or just parse one
-                  -- Node.Kind := Expr_Function_Call; -- Already set in 'new'
-                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                     -- Parse one arg for now
-                     declare
-                        Arg : Expression_Access := Parse_Expression(Ctx);
-                     begin
-                        null; -- Simplified
-                     end;
-                  end if;
-                  if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                     Put_Line ("Error: Expected ')'");
-                  end if;
-               end;
+         when Token_Minus =>
+            declare
+               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               Node := new Expression (Expr_Unary_Op);
+               Node.UOp := Op_Neg;
+               Node.Operand := Parse_Primary (Ctx);
                return Node;
-            else
-               Node := new Expression (Expr_Variable);
-               Node.Var_Len := Tok.Length;
-               Node.Var_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
-               return Node;
-            end if;
-         when Token_Left_Paren =>
-            Node := Parse_Expression (Ctx);
-            if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-               Put_Line ("Error: Expected ')'");
-            end if;
-            return Node;
+            end;
          when others =>
-            Put_Line ("Error: Unexpected token in expression: " & Tok.Kind'Image);
-            return null;
+            declare
+               Actual_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               case Actual_Tok.Kind is
+                  when Token_Numeric_Literal =>
+                     Node := new Expression (Expr_Numeric_Literal);
+                     Node.Value := Float'Value (Actual_Tok.Text (1 .. Actual_Tok.Length));
+                     return Node;
+                  when Token_String_Literal =>
+                     Node := new Expression (Expr_String_Literal);
+                     Node.Str_Length := Actual_Tok.Length;
+                     Node.Str_Value (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                     return Node;
+                  when Token_Identifier =>
+                     -- Check for function call
+                     if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren then
+                        Node := new Expression (Expr_Function_Call);
+                        Node.Func_Len := Actual_Tok.Length;
+                        Node.Func_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                        declare
+                           Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- Consume '('
+                           Last_Arg : Expression_List := null;
+                        begin
+                           if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
+                              loop
+                                 declare
+                                    Arg_Expr : constant Expression_Access := Parse_Expression (Ctx);
+                                    New_Arg  : constant Expression_List := new Expression_List_Node'(Expr => Arg_Expr, Next => null);
+                                 begin
+                                    if Node.Arguments = null then
+                                       Node.Arguments := New_Arg;
+                                    else
+                                       Last_Arg.Next := New_Arg;
+                                    end if;
+                                    Last_Arg := New_Arg;
+                                 end;
+
+                                 if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
+                                    declare
+                                       Comma : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                    begin
+                                       null; -- Consume comma
+                                    end;
+                                 else
+                                    exit;
+                                 end if;
+                              end loop;
+                           end if;
+
+                           if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
+                              Put_Line ("Error: Expected ')'");
+                           end if;
+                        end;
+                        return Node;
+                     else
+                        Node := new Expression (Expr_Variable);
+                        Node.Var_Len := Actual_Tok.Length;
+                        Node.Var_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                        return Node;
+                     end if;
+                  when Token_Left_Paren =>
+                     Node := Parse_Expression (Ctx);
+                     if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
+                        Put_Line ("Error: Expected ')'");
+                     end if;
+                     return Node;
+                  when others =>
+                     Put_Line ("Error: Unexpected token in expression: " & Actual_Tok.Kind'Image);
+                     return null;
+               end case;
+            end;
       end case;
    end Parse_Primary;
 

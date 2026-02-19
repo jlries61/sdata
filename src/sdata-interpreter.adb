@@ -12,9 +12,9 @@ package body SData.Interpreter is
    procedure Mock_Load_Data is
    begin
       Clear;
-      Add_Column ("ID");
-      Add_Column ("NAME");
-      Add_Column ("SALARY");
+      Add_Column ("ID", Col_Numeric);
+      Add_Column ("NAME", Col_String);
+      Add_Column ("SALARY", Col_Numeric);
       
       for I in 1 .. 3 loop
          Add_Row;
@@ -44,6 +44,9 @@ package body SData.Interpreter is
                   else
                      Set (Var_Name_Str, Result);
                   end if;
+               exception
+                  when E : Type_Mismatch_Error =>
+                     Put_Line ("Error: Type mismatch for variable " & Var_Name_Str);
                end;
             
             when Stmt_PRINT =>

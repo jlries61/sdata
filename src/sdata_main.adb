@@ -24,17 +24,53 @@ procedure SData_Main is
       end;
    end Read_File;
 
+   procedure Print_Usage is
+   begin
+      Put_Line ("Usage: sdata_main [options] <filename>");
+      Put_Line ("Options:");
+      Put_Line ("  -h, --help    Show this help message");
+      Put_Line ("  -m <size>     Set max in-memory table size (not yet implemented)");
+      Put_Line ("  --clen <len>  Set max character variable length (not yet implemented)");
+      Put_Line ("  --noshell     Disable SHELL command (not yet implemented)");
+      Put_Line ("  -u, --infmt   Input dataset and format (not yet implemented)");
+      Put_Line ("  -s, --outfmt  Output dataset and format (not yet implemented)");
+      Put_Line ("  -o            Console output file (not yet implemented)");
+      Put_Line ("  -q            Suppress console output (not yet implemented)");
+      Put_Line ("  -t            Max temporary variable memory (not yet implemented)");
+      Put_Line ("  -p            Pager specification (not yet implemented)");
+   end Print_Usage;
+
    Ctx : Parser_Context;
    Prog : Statement_Access;
-   Current : Statement_Access;
+   Filename : String (1 .. 1024);
+   Filename_Len : Natural := 0;
 begin
    if Argument_Count < 1 then
-      Put_Line ("Usage: sdata_main <filename>");
+      Print_Usage;
+      return;
+   end if;
+
+   for I in 1 .. Argument_Count loop
+      declare
+         Arg : constant String := Argument (I);
+      begin
+         if Arg = "-h" or Arg = "--help" then
+            Print_Usage;
+            return;
+         elsif Arg (1) /= '-' then
+            Filename (1 .. Arg'Length) := Arg;
+            Filename_Len := Arg'Length;
+         end if;
+      end;
+   end loop;
+
+   if Filename_Len = 0 then
+      Print_Usage;
       return;
    end if;
 
    declare
-      Source : constant String := Read_File (Argument (1));
+      Source : constant String := Read_File (Filename (1 .. Filename_Len));
    begin
       Initialize (Ctx, Source);
       

@@ -15,6 +15,13 @@ package SData.AST is
    type Expression;
    type Expression_Access is access Expression;
 
+   type Expression_List_Node;
+   type Expression_List is access Expression_List_Node;
+   type Expression_List_Node is record
+      Expr : Expression_Access;
+      Next : Expression_List;
+   end record;
+
    type Expression (Kind : Expression_Kind) is record
       case Kind is
          when Expr_Numeric_Literal =>
@@ -35,7 +42,7 @@ package SData.AST is
          when Expr_Function_Call =>
             Func_Name : String (1 .. 32);
             Func_Len  : Natural;
-            -- Arguments could be a list, simplified for now
+            Arguments : Expression_List;
       end case;
    end record;
 

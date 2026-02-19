@@ -8,7 +8,8 @@ with SData.Values; use SData.Values;
 package SData.Table is
 
    procedure Clear;
-   procedure Add_Column (Name : String);
+   type Column_Type is (Col_Numeric, Col_String);
+   procedure Add_Column (Name : String; Col_Type : Column_Type);
    function Get_Column_Names return GNAT.Strings.String_List_Access;
    function Has_Column (Name : String) return Boolean;
    function Column_Count return Natural;
@@ -21,12 +22,15 @@ package SData.Table is
    -- To be replaced by a proper iterator later
    procedure Set_Current_Record_Index (Index : Natural);
    function Get_Current_Record_Index return Natural;
+   
+   Type_Mismatch_Error : exception;
 
 private
    package Value_Vectors is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Value);
 
    type Column is record
       Name : String (1 .. 32);
+      Typ  : Column_Type;
       Data : Value_Vectors.Vector;
    end record;
    
