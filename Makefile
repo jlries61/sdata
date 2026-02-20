@@ -17,12 +17,12 @@ build:
 	fi
 
 run: build
-	./bin/sdata_main tests/test1.sdata
+	./bin/sdata_main tests/test1.cmd
 
 check: build
 	@echo "Running tests..."
-	@for f in tests/*.sdata; do \
-		base=$$(basename $$f .sdata); \
+	@for f in tests/*.cmd; do \
+		base=$$(basename $$f .cmd); \
 		exp="tests/expected/$$base.out"; \
 		echo -n "Testing $$f... "; \
 		./bin/sdata_main $$f > tests/$$base.tmp 2>&1; \
