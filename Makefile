@@ -1,20 +1,14 @@
 # Makefile for SData
 
-GNATMAKE = gnatmake
-GPRBUILD = gprbuild
 GPR_FILE = sdata.gpr
+GPRBUILD_ALIRE_PATH := /home/jries/.local/share/alire/toolchains/gprbuild_25.0.1_9a2e6cfb/bin/gprbuild
 
 .PHONY: all build clean run check
 
 all: build
 
 build:
-	@if command -v $(GPRBUILD) >/dev/null 2>&1; then \
-		$(GPRBUILD) -P $(GPR_FILE); \
-	else \
-		mkdir -p obj bin; \
-		$(GNATMAKE) -gnat2012 -Isrc -Isrc/lexer -Isrc/parser -Isrc/ast src/sdata_main.adb -D obj -o bin/sdata_main; \
-	fi
+	$(GPRBUILD_ALIRE_PATH) -P $(GPR_FILE)
 
 run: build
 	./bin/sdata_main tests/test1.cmd
