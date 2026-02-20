@@ -1,8 +1,12 @@
+with "/home/jries/Develop/zipada_61.0.0_54fc9836/zipada.gpr";
+with "/home/jries/Develop/xmlada_26.0.0_b140ed4a/dom/xmlada_dom.gpr";
+with "/home/jries/Develop/xmlada_26.0.0_b140ed4a/input_sources/xmlada_input.gpr";
+
 project SData is
    for Source_Dirs use ("src/**");
    for Object_Dir use "obj";
    for Exec_Dir use "bin";
-   for Main use ("sdata.adb");
+   for Main use ("sdata_main.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use ("-gnat2012", "-gnatwa", "-gnatwl", "-gnatwu", "-g");
