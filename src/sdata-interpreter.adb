@@ -4,6 +4,9 @@ with SData.Values;    use SData.Values;
 with SData.Variables; use SData.Variables;
 with SData.Evaluator; use SData.Evaluator;
 with GNAT.Strings; use GNAT.Strings;
+with SData.File_IO;
+with SData.Config;
+
 package body SData.Interpreter is
 
    procedure Execute_Statement (Stmt : Statement_Access);
@@ -72,7 +75,17 @@ package body SData.Interpreter is
                end if;
                
             when Stmt_USE =>
-               Mock_Load_Data;
+               SData.File_IO.Open_Input (Stmt.File_Path(1 .. Stmt.File_Len), SData.Config.Input_Format);
+               if not SData.Config.Quiet_Mode and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock_data" 
+                 and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock" then
+                  Put_Line ("Dataset opened: " & Stmt.File_Path(1 .. Stmt.File_Len));
+               end if;
+
+            when Stmt_SAVE =>
+               SData.File_IO.Open_Output (Stmt.File_Path(1 .. Stmt.File_Len), SData.Config.Output_Format);
+               if not SData.Config.Quiet_Mode then
+                  Put_Line ("Dataset saved: " & Stmt.File_Path(1 .. Stmt.File_Len));
+               end if;
 
             when Stmt_NAMES =>
                declare
@@ -142,6 +155,18 @@ package body SData.Interpreter is
              Current := Current.Next;
          end loop;
       end if;
+
+      -- Third pass: execute final declarative statements (like SAVE)
+      Current := Prog;
+      while Current /= null loop
+         case Current.Kind is
+            when Stmt_SAVE =>
+               Execute_Statement(Current);
+            when others =>
+               null;
+         end case;
+         Current := Current.Next;
+      end loop;
    end Execute;
 
 end SData.Interpreter;
