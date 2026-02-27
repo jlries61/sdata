@@ -6,12 +6,37 @@ with SData.Evaluator; use SData.Evaluator;
 with GNAT.Strings; use GNAT.Strings;
 with SData.File_IO;
 with SData.Config;
+with SData.Parser;
+with Ada.Streams.Stream_IO;
 
 package body SData.Interpreter is
 
-   --  Forward declaration for the internal statement dispatcher.
+   --  Forward declarations for the internal statement dispatchers.
    procedure Execute_Statement (Stmt : Statement_Access);
+   procedure Execute_List (List : Statement_Access);
    
+   --  Recursion level for SUBMIT to avoid infinite loops.
+   Max_Submit_Level : constant := 10;
+   Submit_Level     : Natural := 0;
+
+   ------------------
+   -- Execute_List --
+   ------------------
+   --  Executes a sequence of statements until the end of the list or a QUIT/END.
+   procedure Execute_List (List : Statement_Access) is
+      Current : Statement_Access := List;
+   begin
+      while Current /= null loop
+         Execute_Statement (Current);
+         if Current.Kind = Stmt_QUIT then
+            return;
+         elsif Current.Kind = Stmt_END then
+            exit;
+         end if;
+         Current := Current.Next;
+      end loop;
+   end Execute_List;
+
    -----------------------
    -- Execute_Statement --
    -----------------------
@@ -29,7 +54,6 @@ package body SData.Interpreter is
                begin
                   --  Assignment Rule: If we are in a Data Step and the variable matches
                   --  a column name, update the table cell for the current record.
-                  --  Otherwise, update the global symbol table.
                   if Row_Count > 0 and then Get_Current_Record_Index > 0 
                     and then Has_Column (Var_Name_Str) 
                   then
@@ -38,12 +62,13 @@ package body SData.Interpreter is
                      Set (Var_Name_Str, Result);
                   end if;
                exception
-                  when E : Type_Mismatch_Error =>
+                  when Type_Mismatch_Error =>
                      Put_Line ("Error: Type mismatch for variable " & Var_Name_Str);
+                  when others =>
+                     Put_Line ("Error: Assignment failed for " & Var_Name_Str);
                end;
             
             when Stmt_PRINT =>
-               --  Handle output: PRINT [EXPR]
                if Stmt.Print_Expr = null then
                   --  If no expression, print all columns for the current record.
                   declare
@@ -83,21 +108,86 @@ package body SData.Interpreter is
                end if;
 
             when Stmt_NAMES =>
-               --  Display list of all column names in the current table.
                declare
                   Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
                begin
                   if Col_Names /= null then
-                     for I in Col_Names'Range loop
-                        Put(Col_Names(I).all & " ");
-                     end loop;
+                     for I in Col_Names'Range loop Put(Col_Names(I).all & " "); end loop;
                      New_Line;
                      GNAT.Strings.Free(Col_Names);
                   end if;
                end;
 
+            when Stmt_IF =>
+               if Is_True (Evaluate (Stmt.Condition)) then
+                  Execute_Statement (Stmt.Then_Branch);
+               elsif Stmt.Else_Branch /= null then
+                  Execute_Statement (Stmt.Else_Branch);
+               end if;
+
+            when Stmt_WHILE =>
+               while Is_True (Evaluate (Stmt.While_Cond)) loop
+                  Execute_List (Stmt.While_Body);
+               end loop;
+
+            when Stmt_FOR =>
+               declare
+                  Start_Val : constant Value := Evaluate (Stmt.Start_Expr);
+                  End_Val   : constant Value := Evaluate (Stmt.End_Expr);
+                  Step_Val  : Value := (Kind => Val_Numeric, Num_Val => 1.0);
+                  Current_I : Float;
+               begin
+                  if Stmt.Step_Expr /= null then
+                     Step_Val := Evaluate (Stmt.Step_Expr);
+                  end if;
+
+                  if Start_Val.Kind = Val_Numeric and End_Val.Kind = Val_Numeric and Step_Val.Kind = Val_Numeric then
+                     Current_I := Start_Val.Num_Val;
+                     loop
+                        if Step_Val.Num_Val >= 0.0 then
+                           exit when Current_I > End_Val.Num_Val;
+                        else
+                           exit when Current_I < End_Val.Num_Val;
+                        end if;
+
+                        Set (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
+                        Execute_List (Stmt.For_Body);
+                        Current_I := Current_I + Step_Val.Num_Val;
+                     end loop;
+                  end if;
+               end;
+
+            when Stmt_SUBMIT =>
+               if Submit_Level >= Max_Submit_Level then
+                  Put_Line ("Error: Maximum SUBMIT recursion level reached.");
+               else
+                  Submit_Level := Submit_Level + 1;
+                  declare
+                     Filename : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
+                     File : Ada.Streams.Stream_IO.File_Type;
+                     Stream : Ada.Streams.Stream_IO.Stream_Access;
+                  begin
+                     Ada.Streams.Stream_IO.Open (File, Ada.Streams.Stream_IO.In_File, Filename);
+                     Stream := Ada.Streams.Stream_IO.Stream (File);
+                     declare
+                        Source : String (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
+                        Ctx : SData.Parser.Parser_Context;
+                        Prog : Statement_Access;
+                     begin
+                        String'Read (Stream, Source);
+                        Ada.Streams.Stream_IO.Close (File);
+                        SData.Parser.Initialize (Ctx, Source);
+                        Prog := SData.Parser.Parse_Program (Ctx);
+                        Execute (Prog);
+                     end;
+                  exception
+                     when others =>
+                        Put_Line ("Error: Failed to SUBMIT file " & Filename);
+                  end;
+                  Submit_Level := Submit_Level - 1;
+               end if;
+
             when Stmt_END | Stmt_QUIT =>
-               --  Termination commands.
                null;
 
             when others =>
@@ -108,13 +198,11 @@ package body SData.Interpreter is
    -------------
    -- Execute --
    -------------
-   --  The main execution loop for the AST program.
    procedure Execute (Prog : Statement_Access) is
       Current : Statement_Access := Prog;
       Data_Step_Active : Boolean := False;
    begin
-      --  PASS 1: Declarative Setup.
-      --  Identify if a dataset is being loaded (USE), which activates the implicit Data Step.
+      --  PASS 1: Identify Data Step.
       while Current /= null loop
          case Current.Kind is
             when Stmt_USE =>
@@ -128,41 +216,27 @@ package body SData.Interpreter is
          Current := Current.Next;
       end loop;
       
-      --  PASS 2: Record Processing (The "Data Step").
+      --  PASS 2: Execution.
       if Data_Step_Active then
-         --  Iterate through every row in the loaded Data Table.
          for I in 1 .. Row_Count loop
             Set_Current_Record_Index(I);
             Current := Prog;
-            --  Run all non-declarative statements for the current record.
             while Current /= null loop
                case Current.Kind is
-                  when Stmt_LET | Stmt_PRINT | Stmt_NAMES =>
+                  when Stmt_LET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT =>
                      Execute_Statement(Current);
-                  when Stmt_END =>
-                     exit;
-                  when Stmt_QUIT =>
-                     return;
-                  when others =>
-                     null;
+                  when Stmt_END => exit;
+                  when Stmt_QUIT => return;
+                  when others => null;
                end case;
                Current := Current.Next;
             end loop;
          end loop;
       else
-         --  Simple procedural execution (no dataset loaded).
-         Current := Prog;
-         while Current /= null loop
-             Execute_Statement(Current);
-             if Current.Kind in Stmt_END | Stmt_QUIT then
-                exit;
-             end if;
-             Current := Current.Next;
-         end loop;
+         Execute_List (Prog);
       end if;
 
-      --  PASS 3: Final Declarative Operations.
-      --  Execute commands that should happen AFTER all records have been processed (like SAVE).
+      --  PASS 3: Finalize.
       Current := Prog;
       while Current /= null loop
          case Current.Kind is

@@ -34,7 +34,7 @@ procedure SData_Main is
    --  Displays available command-line options.
    procedure Print_Usage is
    begin
-      Put_Line ("Usage: sdata_main [options] <filename>");
+      Put_Line ("Usage: sdata_main [options] [filename]");
       Put_Line ("Options:");
       Put_Line ("  -h, --help    Show this help message");
       Put_Line ("  -m <size>     Set max in-memory table size (not yet implemented)");
@@ -48,6 +48,39 @@ procedure SData_Main is
       Put_Line ("  -p            Pager specification (not yet implemented)");
    end Print_Usage;
 
+   --  Runs the Interactive REPL.
+   procedure Run_REPL is
+      Line : String (1 .. 4096);
+      Last : Natural;
+      Ctx  : Parser_Context;
+      Prog : Statement_Access;
+   begin
+      Put_Line ("SData Interactive Console. Type QUIT to exit.");
+      loop
+         Put ("sdata> ");
+         Flush;
+         begin
+            Get_Line (Line, Last);
+            if Last > 0 then
+               Initialize (Ctx, Line (1 .. Last));
+               Prog := Parse_Program (Ctx);
+               if Prog /= null then
+                  Execute (Prog);
+                  if Prog.Kind = Stmt_QUIT then
+                     exit;
+                  end if;
+               end if;
+            end if;
+         exception
+            when End_Error =>
+               New_Line;
+               exit;
+            when E : others =>
+               Put_Line ("Error: " & Exception_Message (E));
+         end;
+      end loop;
+   end Run_REPL;
+
    Ctx      : Parser_Context;
    Prog     : Statement_Access;
    Filename : String (1 .. 1024);
@@ -55,8 +88,8 @@ procedure SData_Main is
    Idx      : Positive := 1;
 begin
    --  Initial argument check.
-   if Argument_Count < 1 then
-      Print_Usage;
+   if Argument_Count = 0 then
+      Run_REPL;
       return;
    end if;
 
@@ -113,7 +146,6 @@ begin
             Filename_Len := Arg'Length;
             
             --  AUTO-DETECT FORMAT based on the extension of the command file itself.
-            --  Note: This logic typically applies to datasets, but we also apply it here.
             declare
                Ext_Idx : Natural := 0;
             begin
@@ -141,7 +173,7 @@ begin
 
    --  Verify that a command file was provided.
    if Filename_Len = 0 then
-      Print_Usage;
+      Run_REPL;
       return;
    end if;
 

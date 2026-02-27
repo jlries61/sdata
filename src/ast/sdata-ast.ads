@@ -81,13 +81,15 @@ package SData.AST is
       Stmt_SAVE,   -- Save dataset
       Stmt_KEEP,   -- Keep specific columns
       Stmt_DROP,   -- Drop specific columns
-      Stmt_IF,     -- Conditional execution (placeholder)
-      Stmt_FOR,    -- Loop (placeholder)
-      Stmt_WHILE,  -- Loop (placeholder)
-      Stmt_REPEAT, -- Loop (placeholder)
+      Stmt_IF,     -- Conditional execution
+      Stmt_FOR,    -- Loop
+      Stmt_WHILE,  -- Loop
+      Stmt_REPEAT, -- Loop
       Stmt_END,    -- Terminate program
       Stmt_QUIT,   -- Terminate program
-      Stmt_NAMES   -- List column names
+      Stmt_NAMES,  -- List column names
+      Stmt_SUBMIT, -- Recursive script execution
+      Stmt_RSEED   -- Set random seed
    );
 
    type Statement;
@@ -103,11 +105,30 @@ package SData.AST is
             Expr     : Expression_Access;
          when Stmt_PRINT =>
             Print_Expr : Expression_Access; -- null means "PRINT all columns"
-         when Stmt_USE | Stmt_SAVE =>
+         when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT =>
             File_Path : String (1 .. 1024);
             File_Len  : Natural;
          when Stmt_KEEP | Stmt_DROP =>
             Vars : Variable_List;
+         when Stmt_IF =>
+            Condition    : Expression_Access;
+            Then_Branch  : Statement_Access;
+            Else_Branch  : Statement_Access;
+         when Stmt_FOR =>
+            For_Var      : String (1 .. 32);
+            For_Var_Len  : Natural;
+            Start_Expr   : Expression_Access;
+            End_Expr     : Expression_Access;
+            Step_Expr    : Expression_Access;
+            For_Body     : Statement_Access;
+         when Stmt_WHILE =>
+            While_Cond   : Expression_Access;
+            While_Body   : Statement_Access;
+         when Stmt_REPEAT =>
+            Repeat_Body  : Statement_Access;
+            Until_Cond   : Expression_Access; -- null for data manage REPEAT
+         when Stmt_RSEED =>
+            Seed_Expr    : Expression_Access;
          when others =>
             null;
       end case;

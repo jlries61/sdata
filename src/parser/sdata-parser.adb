@@ -11,21 +11,49 @@ package body SData.Parser is
       Initialize (Ctx.Lex_Ctx, Source);
    end Initialize;
 
-   --  Forward declaration for mutual recursion with Parse_Primary.
+   --  Forward declarations for mutual recursion.
    function Parse_Expression (Ctx : in out Parser_Context) return Expression_Access;
+   function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access;
+
+   -----------------
+   -- Parse_Block --
+   -----------------
+   --  Parses a sequence of statements until a specific terminating token is reached.
+   function Parse_Block (Ctx : in out Parser_Context; End_Tok : Token_Kind) return Statement_Access is
+      First, Current, New_Stmt : Statement_Access := null;
+   begin
+      loop
+         --  Check if we've reached the end of the block or EOF.
+         if Peek_Next_Token (Ctx.Lex_Ctx).Kind = End_Tok then
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+            exit;
+         elsif Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_EOF then
+            exit;
+         end if;
+
+         New_Stmt := Parse_Statement (Ctx);
+         if New_Stmt = null then exit; end if;
+
+         if First = null then
+            First := New_Stmt;
+            Current := New_Stmt;
+         else
+            Current.Next := New_Stmt;
+            Current := New_Stmt;
+         end if;
+      end loop;
+      return First;
+   end Parse_Block;
 
    -------------------
    -- Parse_Primary --
    -------------------
-   --  Parses the most basic units of an expression: literals, variables, 
-   --  function calls, and parenthesized expressions.
    function Parse_Primary (Ctx : in out Parser_Context) return Expression_Access is
       Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
       Node : Expression_Access;
    begin
       case Tok.Kind is
          when Token_Minus =>
-            --  Handle unary negation: -X
             declare
                Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
@@ -40,7 +68,6 @@ package body SData.Parser is
             begin
                case Actual_Tok.Kind is
                   when Token_Numeric_Literal =>
-                     --  Convert string to float for internal storage.
                      Node := new Expression (Expr_Numeric_Literal);
                      Node.Value := Float'Value (Actual_Tok.Text (1 .. Actual_Tok.Length));
                      return Node;
@@ -52,7 +79,6 @@ package body SData.Parser is
                      return Node;
 
                   when Token_Identifier =>
-                     --  Peek to see if this is a function call: FUNC_NAME(...)
                      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren then
                         Node := new Expression (Expr_Function_Call);
                         Node.Func_Len := Actual_Tok.Length;
@@ -61,7 +87,6 @@ package body SData.Parser is
                            Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- Consume '('
                            Last_Arg : Expression_List := null;
                         begin
-                           --  Parse comma-separated argument list.
                            if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
                               loop
                                  declare
@@ -79,9 +104,7 @@ package body SData.Parser is
                                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
                                     declare
                                        Comma : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                                    begin
-                                       null; -- Consume comma and continue loop.
-                                    end;
+                                    begin null; end;
                                  else
                                     exit;
                                  end if;
@@ -94,7 +117,6 @@ package body SData.Parser is
                         end;
                         return Node;
                      else
-                        --  Just a simple variable reference.
                         Node := new Expression (Expr_Variable);
                         Node.Var_Len := Actual_Tok.Length;
                         Node.Var_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
@@ -102,7 +124,6 @@ package body SData.Parser is
                      end if;
 
                   when Token_Left_Paren =>
-                     --  Handle grouping: (EXPR)
                      Node := Parse_Expression (Ctx);
                      if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
                         Put_Line ("Error: Expected ')'");
@@ -120,7 +141,6 @@ package body SData.Parser is
    --------------------
    -- Get_Precedence --
    --------------------
-   --  Defines the operator precedence levels for the expression parser.
    function Get_Precedence (Kind : Token_Kind) return Integer is
    begin
       case Kind is
@@ -156,8 +176,6 @@ package body SData.Parser is
    ------------------------
    -- Parse_Expression_1 --
    ------------------------
-   --  Implements the "Precedence Climbing" algorithm to correctly parse 
-   --  binary operations with varying levels of precedence.
    function Parse_Expression_1 (Ctx : in out Parser_Context; Min_Precedence : Integer) return Expression_Access is
       Left : Expression_Access := Parse_Primary (Ctx);
    begin
@@ -166,14 +184,12 @@ package body SData.Parser is
             Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
             Prec : constant Integer := Get_Precedence (Tok.Kind);
          begin
-            --  If next operator has lower precedence, we're done with this sub-expression.
             if Prec < Min_Precedence then
                exit;
             end if;
             
             declare
-               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- Consume operator.
-               --  Recursively parse the right side with higher precedence.
+               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                Right : Expression_Access := Parse_Expression_1 (Ctx, Prec + 1);
                New_Node : Expression_Access := new Expression (Expr_Binary_Op);
             begin
@@ -198,8 +214,6 @@ package body SData.Parser is
    -------------------------
    -- Parse_Variable_List --
    -------------------------
-   --  Parses a list of variables or ranges for KEEP/DROP. 
-   --  Handles formats like: NAME1, NAME2, NAME3-NAME5
    function Parse_Variable_List (Ctx : in out Parser_Context) return Variable_List is
       First : Variable_List := null;
       Last  : Variable_List := null;
@@ -216,7 +230,6 @@ package body SData.Parser is
             Node.Var.Start_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
             Node.Var.Start_Len := Tok.Length;
             
-            --  Check for range indicator: '-' or ':'
             if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Minus or else Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon then
                declare
                   Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
@@ -232,7 +245,6 @@ package body SData.Parser is
                end;
             end if;
             
-            --  Append to list.
             if First = null then
                First := Node;
             else
@@ -241,13 +253,8 @@ package body SData.Parser is
             Last := Node;
          end;
          
-         -- Optional comma between variables.
          if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
-            declare
-               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-            begin
-               null;
-            end;
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
          end if;
       end loop;
       return First;
@@ -256,12 +263,10 @@ package body SData.Parser is
    ---------------------
    -- Parse_Statement --
    ---------------------
-   --  Identifies and parses a single SData command.
    function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access is
       Tok : Token := Get_Next_Token (Ctx.Lex_Ctx);
       Stmt : Statement_Access;
    begin
-      --  Skip whitespace/separators between statements.
       while Tok.Kind = Token_Colon or else Tok.Kind = Token_Newline loop
          Tok := Get_Next_Token (Ctx.Lex_Ctx);
       end loop;
@@ -272,17 +277,10 @@ package body SData.Parser is
 
       case Tok.Kind is
          when Token_LET =>
-            --  Format: LET <identifier> = <expression>
             declare
                Var_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
-               if Var_Tok.Kind /= Token_Identifier then
-                  Put_Line ("Error: Expected identifier after LET");
-               end if;
-               if Eq_Tok.Kind /= Token_Equal then
-                  Put_Line ("Error: Expected '=' after identifier");
-               end if;
                Stmt := new Statement (Stmt_LET);
                Stmt.Var_Len := Var_Tok.Length;
                Stmt.Var_Name (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);
@@ -290,88 +288,84 @@ package body SData.Parser is
             end;
 
          when Token_PRINT =>
-            --  Format: PRINT [<expression>]
             Stmt := new Statement (Stmt_PRINT);
             declare
                Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
             begin
-               --  If something follows on the same line, parse it as an expression.
                if Peeked.Kind /= Token_Newline and then Peeked.Kind /= Token_Colon and then Peeked.Kind /= Token_EOF then
                   Stmt.Print_Expr := Parse_Expression (Ctx);
                else
-                  --  Null Print_Expr signifies "print all columns for current record".
                   Stmt.Print_Expr := null;
                end if;
             end;
 
-         when Token_USE | Token_SAVE =>
-            --  Format: USE/SAVE "<filepath>"
+         when Token_USE | Token_SAVE | Token_SUBMIT =>
             declare
                File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
-               if File_Tok.Kind /= Token_String_Literal then
-                  Put_Line ("Error: Expected string literal after " & Tok.Kind'Image & " at line " & Tok.Line'Image);
-               end if;
-               if Tok.Kind = Token_USE then
-                  Stmt := new Statement (Stmt_USE);
-               else
-                  Stmt := new Statement (Stmt_SAVE);
-               end if;
+               if Tok.Kind = Token_USE then Stmt := new Statement (Stmt_USE);
+               elsif Tok.Kind = Token_SAVE then Stmt := new Statement (Stmt_SAVE);
+               else Stmt := new Statement (Stmt_SUBMIT); end if;
                Stmt.File_Len := File_Tok.Length;
                Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
-               
-               --  Skip any additional optional arguments for these commands for now.
                loop
-                  declare
-                     Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                  declare Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin
-                     if Peeked.Kind = Token_Slash then
-                        declare
-                           Slash : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                           Option : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                        begin
-                           if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Equal then
-                              declare
-                                 Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                                 Val : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                              begin
-                                 null;
-                              end;
-                           end if;
-                        end;
-                     elsif Peeked.Kind = Token_String_Literal then
-                        declare
-                           Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                        begin
-                           null;
-                        end;
-                     else
-                        exit;
-                     end if;
+                     if Peeked.Kind = Token_Slash or else Peeked.Kind = Token_String_Literal then
+                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                     else exit; end if;
                   end;
                end loop;
             end;
 
          when Token_KEEP | Token_DROP =>
-            --  Format: KEEP/DROP <var_list>
-            if Tok.Kind = Token_KEEP then
-               Stmt := new Statement (Stmt_KEEP);
-            else
-               Stmt := new Statement (Stmt_DROP);
-            end if;
+            Stmt := new Statement ((if Tok.Kind = Token_KEEP then Stmt_KEEP else Stmt_DROP));
             Stmt.Vars := Parse_Variable_List (Ctx);
 
-         when Token_END =>
-            Stmt := new Statement (Stmt_END);
+         when Token_IF =>
+            Stmt := new Statement (Stmt_IF);
+            Stmt.Condition := Parse_Expression (Ctx);
+            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_THEN then
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+            end if;
+            --  A block for IF usually ends with ELSE or END IF in some BASICs.
+            --  But BW BASIC often allows single-line IF.
+            --  We'll support a single statement for now.
+            Stmt.Then_Branch := Parse_Statement (Ctx);
+            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_ELSE then
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               Stmt.Else_Branch := Parse_Statement (Ctx);
+            end if;
 
-         when Token_QUIT =>
-            Stmt := new Statement (Stmt_QUIT);
+         when Token_WHILE =>
+            Stmt := new Statement (Stmt_WHILE);
+            Stmt.While_Cond := Parse_Expression (Ctx);
+            Stmt.While_Body := Parse_Block (Ctx, Token_WEND);
 
-         when Token_NAMES =>
-            Stmt := new Statement (Stmt_NAMES);
+         when Token_FOR =>
+            Stmt := new Statement (Stmt_FOR);
+            declare
+               Var_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               Stmt.For_Var_Len := Var_Tok.Length;
+               Stmt.For_Var (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);
+               Stmt.Start_Expr := Parse_Expression (Ctx);
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_TO then
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               end if;
+               Stmt.End_Expr := Parse_Expression (Ctx);
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_STEP then
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                  Stmt.Step_Expr := Parse_Expression (Ctx);
+               end if;
+               Stmt.For_Body := Parse_Block (Ctx, Token_NEXT);
+            end;
+
+         when Token_END | Token_QUIT | Token_NAMES =>
+            Stmt := new Statement ((if Tok.Kind = Token_END then Stmt_END elsif Tok.Kind = Token_QUIT then Stmt_QUIT else Stmt_NAMES));
 
          when Token_REM =>
-            --  REM is handled in the Lexer; skip it and find the next statement.
             return Parse_Statement (Ctx);
 
          when others =>
@@ -379,13 +373,8 @@ package body SData.Parser is
             return null;
       end case;
 
-      --  Consume optional statement separators.
       if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon or else Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline then
-         declare
-            Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-         begin
-            null;
-         end;
+         declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
       end if;
 
       return Stmt;
@@ -394,23 +383,14 @@ package body SData.Parser is
    -------------------
    -- Parse_Program --
    -------------------
-   --  Parses the entire command file into a linked list of statements.
    function Parse_Program (Ctx : in out Parser_Context) return Statement_Access is
-      First : Statement_Access := null;
-      Current : Statement_Access := null;
-      New_Stmt : Statement_Access;
+      First, Current, New_Stmt : Statement_Access := null;
    begin
       loop
          New_Stmt := Parse_Statement (Ctx);
          exit when New_Stmt = null;
-         
-         if First = null then
-            First := New_Stmt;
-            Current := New_Stmt;
-         else
-            Current.Next := New_Stmt;
-            Current := New_Stmt;
-         end if;
+         if First = null then First := New_Stmt; Current := New_Stmt;
+         else Current.Next := New_Stmt; Current := New_Stmt; end if;
       end loop;
       return First;
    end Parse_Program;
