@@ -1,18 +1,24 @@
+--  Package SData.File_IO implements the File I/O Layer. It provides the capability 
+--  to read from and write to various dataset formats: CSV, ODS, and XLSX.
+--  It supports automatic format detection and utilizes external utilities (ssconvert)
+--  or native logic for specific file types.
+
 with SData.Table; use SData.Table;
 with SData.Config; use SData.Config;
 
 package SData.File_IO is
 
-   -- Open a dataset for reading, populating the given Table.
+   --  Loads a dataset into the global Data Table.
+   --  The 'Fmt' parameter serves as a default if format cannot be detected from the extension.
    procedure Open_Input (File_Name : String; Fmt : Format_Type);
 
-   -- Open a dataset for writing – creates/overwrites the file.
+   --  Writes the current Data Table to a file.
    procedure Open_Output (File_Name : String; Fmt : Format_Type);
 
-   -- Minimal implementation supporting a single worksheet.
+   --  Individual parsers and writers for supported formats.
    procedure Parse_CSV   (File_Name : String);
-   procedure Parse_ODF   (File_Name : String);
-   procedure Parse_OOXML (File_Name : String);
+   procedure Parse_ODF   (File_Name : String); -- Handles .ods files
+   procedure Parse_OOXML (File_Name : String); -- Handles .xlsx files
    
    procedure Write_CSV   (File_Name : String);
    procedure Write_ODF   (File_Name : String);

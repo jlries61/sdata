@@ -1,17 +1,20 @@
+--  SData Main Entry Point.
+--  This procedure handles command-line argument parsing, reads the source command file,
+--  invokes the parser to build the AST, and finally runs the interpreter.
+
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Streams.Stream_IO;
 with Ada.Exceptions; use Ada.Exceptions;
-with SData.Lexer; use SData.Lexer;
 with SData.Parser; use SData.Parser;
 with SData.AST; use SData.AST;
 
 with SData.Interpreter; use SData.Interpreter;
 with SData.Config; use SData.Config;
-with SData.File_IO; use SData.File_IO;
 
 procedure SData_Main is
    
+   --  Helper to read the entire contents of a file into a single String buffer.
    function Read_File (Filename : String) return String is
       File : Ada.Streams.Stream_IO.File_Type;
       Stream : Ada.Streams.Stream_IO.Stream_Access;
@@ -19,6 +22,7 @@ procedure SData_Main is
       Ada.Streams.Stream_IO.Open (File, Ada.Streams.Stream_IO.In_File, Filename);
       Stream := Ada.Streams.Stream_IO.Stream (File);
       declare
+         -- Create a string of the exact size needed.
          Result : String (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
       begin
          String'Read (Stream, Result);
@@ -27,6 +31,7 @@ procedure SData_Main is
       end;
    end Read_File;
 
+   --  Displays available command-line options.
    procedure Print_Usage is
    begin
       Put_Line ("Usage: sdata_main [options] <filename>");
@@ -35,25 +40,27 @@ procedure SData_Main is
       Put_Line ("  -m <size>     Set max in-memory table size (not yet implemented)");
       Put_Line ("  --clen <len>  Set max character variable length (not yet implemented)");
       Put_Line ("  --noshell     Disable SHELL command (not yet implemented)");
-      Put_Line ("  -u, --infmt   Input dataset and format (not yet implemented)");
-      Put_Line ("  -s, --outfmt  Output dataset and format (not yet implemented)");
-      Put_Line ("  -o            Console output file (not yet implemented)");
-      Put_Line ("  -q            Suppress console output (not yet implemented)");
+      Put_Line ("  -u, --infmt   Input dataset and format");
+      Put_Line ("  -s, --outfmt  Output dataset and format");
+      Put_Line ("  -o <file>     Console output file");
+      Put_Line ("  -q            Suppress console output (Quiet Mode)");
       Put_Line ("  -t            Max temporary variable memory (not yet implemented)");
       Put_Line ("  -p            Pager specification (not yet implemented)");
    end Print_Usage;
 
-   Ctx : Parser_Context;
-   Prog : Statement_Access;
+   Ctx      : Parser_Context;
+   Prog     : Statement_Access;
    Filename : String (1 .. 1024);
    Filename_Len : Natural := 0;
-   Idx : Positive := 1;
+   Idx      : Positive := 1;
 begin
+   --  Initial argument check.
    if Argument_Count < 1 then
       Print_Usage;
       return;
    end if;
 
+   --  Manual command-line argument parsing loop.
    while Idx <= Argument_Count loop
       declare
          Arg : constant String := Argument (Idx);
@@ -64,6 +71,7 @@ begin
          elsif Arg = "-q" then
             Quiet_Mode := True;
          elsif Arg = "-o" then
+            -- Handle output file redirection.
             if Idx < Argument_Count then
                Idx := Idx + 1;
                declare
@@ -74,33 +82,38 @@ begin
                end;
             end if;
          elsif Arg = "-u" or Arg = "--infmt" then
+            -- Set the global input format.
             if Idx < Argument_Count then
                Idx := Idx + 1;
                declare
                   Val : constant String := Argument (Idx);
                begin
                   if Val = "csv" then Input_Format := CSV;
-                  elsif Val = "odf" then Input_Format := ODF;
-                  elsif Val = "ooxml" then Input_Format := OOXML;
+                  elsif Val = "ods" or Val = "odf" then Input_Format := ODF;
+                  elsif Val = "xlsx" or Val = "ooxml" then Input_Format := OOXML;
                   end if;
                end;
             end if;
          elsif Arg = "-s" or Arg = "--outfmt" then
+            -- Set the global output format.
             if Idx < Argument_Count then
                Idx := Idx + 1;
                declare
                   Val : constant String := Argument (Idx);
                begin
                   if Val = "csv" then Output_Format := CSV;
-                  elsif Val = "odf" then Output_Format := ODF;
-                  elsif Val = "ooxml" then Output_Format := OOXML;
+                  elsif Val = "ods" or Val = "odf" then Output_Format := ODF;
+                  elsif Val = "xlsx" or Val = "ooxml" then Output_Format := OOXML;
                   end if;
                end;
             end if;
          elsif Arg(1) /= '-' then
+            -- This is the main command file to execute.
             Filename (1 .. Arg'Length) := Arg;
             Filename_Len := Arg'Length;
-            -- Auto-detect format from extension
+            
+            --  AUTO-DETECT FORMAT based on the extension of the command file itself.
+            --  Note: This logic typically applies to datasets, but we also apply it here.
             declare
                Ext_Idx : Natural := 0;
             begin
@@ -126,37 +139,29 @@ begin
       Idx := Idx + 1;
    end loop;
 
+   --  Verify that a command file was provided.
    if Filename_Len = 0 then
       Print_Usage;
       return;
    end if;
 
+   --  MAIN EXECUTION FLOW.
    declare
+      -- 1. Read the command file into memory.
       Source : constant String := Read_File (Filename (1 .. Filename_Len));
    begin
+      -- 2. Initialize the parser.
       Initialize (Ctx, Source);
-      
-      -- Debug: Print all tokens
-      -- Put_Line ("Tokens:");
-      -- declare
-      --    T : Token;
-      --    L : Lexer_Context := Ctx.Lex_Ctx;
-      -- begin
-      --    loop
-      --       T := Get_Next_Token (L);
-      --       Put_Line (T.Kind'Image & ": '" & T.Text (1 .. T.Length) & "' (Line:" & T.Line'Image & ", Col:" & T.Column'Image & ")");
-      --       exit when T.Kind = Token_EOF;
-      --    end loop;
-      -- end;
 
-      Initialize (Ctx, Source);
+      -- 3. Parse the source into an AST program (linked list of statements).
       Prog := Parse_Program (Ctx);
       
-      -- Put_Line ("Execution Output:");
+      -- 4. Execute the program using the interpreter.
       Execute (Prog);
    end;
 
 exception
+   -- Catch all exceptions and provide detailed error reporting.
    when E : others =>
       Put_Line ("An error occurred: " & Exception_Name (E) & ": " & Exception_Message (E));
 end SData_Main;
