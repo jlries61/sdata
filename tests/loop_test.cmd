@@ -1,0 +1,14 @@
+LET I = 1
+WHILE I <= 3
+  PRINT "WHILE" I
+  LET I = I + 1
+WEND
+
+FOR J = 1 TO 3
+  PRINT "FOR" J
+NEXT
+
+FOR K = 5 TO 1 STEP -2
+  PRINT "FOR STEP" K
+NEXT
+END

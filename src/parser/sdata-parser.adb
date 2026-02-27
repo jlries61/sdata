@@ -23,6 +23,12 @@ package body SData.Parser is
       First, Current, New_Stmt : Statement_Access := null;
    begin
       loop
+         --  Skip separators.
+         while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline or else 
+               Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon loop
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+         end loop;
+
          --  Check if we've reached the end of the block or EOF.
          if Peek_Next_Token (Ctx.Lex_Ctx).Kind = End_Tok then
             declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
@@ -131,7 +137,7 @@ package body SData.Parser is
                      return Node;
 
                   when others =>
-                     Put_Line ("Error: Unexpected token in expression: " & Actual_Tok.Kind'Image);
+                     --  Quietly return null and let parent handle the unexpected token.
                      return null;
                end case;
             end;
@@ -179,6 +185,8 @@ package body SData.Parser is
    function Parse_Expression_1 (Ctx : in out Parser_Context; Min_Precedence : Integer) return Expression_Access is
       Left : Expression_Access := Parse_Primary (Ctx);
    begin
+      if Left = null then return null; end if;
+
       loop
          declare
             Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
@@ -190,9 +198,14 @@ package body SData.Parser is
             
             declare
                Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Right : Expression_Access := Parse_Expression_1 (Ctx, Prec + 1);
-               New_Node : Expression_Access := new Expression (Expr_Binary_Op);
+               Right : constant Expression_Access := Parse_Expression_1 (Ctx, Prec + 1);
+               New_Node : Expression_Access;
             begin
+               if Right = null then
+                  Put_Line ("Error: Expected expression after operator");
+                  exit;
+               end if;
+               New_Node := new Expression (Expr_Binary_Op);
                New_Node.Left := Left;
                New_Node.Right := Right;
                New_Node.Op := To_Binary_Op (Tok.Kind);
@@ -289,14 +302,37 @@ package body SData.Parser is
 
          when Token_PRINT =>
             Stmt := new Statement (Stmt_PRINT);
+            Stmt.Print_Args := null;
             declare
-               Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+               Last_Arg : Expression_List := null;
+               Expr : Expression_Access;
             begin
-               if Peeked.Kind /= Token_Newline and then Peeked.Kind /= Token_Colon and then Peeked.Kind /= Token_EOF then
-                  Stmt.Print_Expr := Parse_Expression (Ctx);
-               else
-                  Stmt.Print_Expr := null;
-               end if;
+               loop
+                  --  Check if we've reached the end of the line/statement.
+                  declare
+                     P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     exit when P.Kind = Token_Newline or else P.Kind = Token_Colon or else P.Kind = Token_EOF;
+                     --  Optional separator.
+                     if P.Kind = Token_Comma or else P.Kind = Token_Semicolon then
+                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                     end if;
+                  end;
+
+                  Expr := Parse_Expression (Ctx);
+                  exit when Expr = null;
+
+                  declare
+                     New_Arg : constant Expression_List := new Expression_List_Node'(Expr => Expr, Next => null);
+                  begin
+                     if Stmt.Print_Args = null then
+                        Stmt.Print_Args := New_Arg;
+                     else
+                        Last_Arg.Next := New_Arg;
+                     end if;
+                     Last_Arg := New_Arg;
+                  end;
+               end loop;
             end;
 
          when Token_USE | Token_SAVE | Token_SUBMIT =>
@@ -328,9 +364,6 @@ package body SData.Parser is
             if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_THEN then
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
             end if;
-            --  A block for IF usually ends with ELSE or END IF in some BASICs.
-            --  But BW BASIC often allows single-line IF.
-            --  We'll support a single statement for now.
             Stmt.Then_Branch := Parse_Statement (Ctx);
             if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_ELSE then
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
@@ -346,7 +379,7 @@ package body SData.Parser is
             Stmt := new Statement (Stmt_FOR);
             declare
                Var_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Eq_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
                Stmt.For_Var_Len := Var_Tok.Length;
                Stmt.For_Var (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);

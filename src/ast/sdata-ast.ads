@@ -104,7 +104,7 @@ package SData.AST is
             Var_Len  : Natural;
             Expr     : Expression_Access;
          when Stmt_PRINT =>
-            Print_Expr : Expression_Access; -- null means "PRINT all columns"
+            Print_Args : Expression_List; -- null means "PRINT all columns"
          when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT =>
             File_Path : String (1 .. 1024);
             File_Len  : Natural;

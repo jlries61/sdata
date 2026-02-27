@@ -199,7 +199,7 @@ package body SData.Lexer is
 
          --  Identify Identifiers or Keywords.
          elsif Is_Letter (C) then
-            while not Is_End_Of_Source (Ctx) and then (Is_Alphanumeric (Current_Char (Ctx)) or Current_Char (Ctx) = '_' or Current_Char (Ctx) = '$') loop
+            while not Is_End_Of_Source (Ctx) and then (Is_Alphanumeric (Current_Char (Ctx)) or Current_Char (Ctx) = '_' or Current_Char (Ctx) = '$' or Current_Char (Ctx) = '%') loop
                T.Length := T.Length + 1;
                T.Text (T.Length) := Current_Char (Ctx);
                Advance (Ctx);

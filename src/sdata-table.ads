@@ -16,7 +16,7 @@ package SData.Table is
    procedure Clear;
 
    --  Kinds of data allowed in a column.
-   type Column_Type is (Col_Numeric, Col_String);
+   type Column_Type is (Col_Numeric, Col_Integer, Col_String);
 
    --  Defines a new column. If the table already has rows, they are padded with missing values.
    procedure Add_Column (Name : String; Col_Type : Column_Type);

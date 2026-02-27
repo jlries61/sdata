@@ -19,10 +19,21 @@ package body SData.Interpreter is
    Max_Submit_Level : constant := 10;
    Submit_Level     : Natural := 0;
 
+   function Get_Expected_Kind (Name : String) return Value_Kind is
+   begin
+      if Name'Length > 0 then
+         if Name (Name'Last) = '$' then
+            return Val_String;
+         elsif Name (Name'Last) = '%' then
+            return Val_Integer;
+         end if;
+      end if;
+      return Val_Numeric;
+   end Get_Expected_Kind;
+
    ------------------
    -- Execute_List --
    ------------------
-   --  Executes a sequence of statements until the end of the list or a QUIT/END.
    procedure Execute_List (List : Statement_Access) is
       Current : Statement_Access := List;
    begin
@@ -40,7 +51,6 @@ package body SData.Interpreter is
    -----------------------
    -- Execute_Statement --
    -----------------------
-   --  The central dispatcher that implements the logic for each SData command.
    procedure Execute_Statement (Stmt : Statement_Access) is
    begin
        if Stmt = null then return; end if;
@@ -50,8 +60,22 @@ package body SData.Interpreter is
                --  Handle assignment: LET VAR = EXPR
                declare
                   Var_Name_Str : constant String := Stmt.Var_Name(1 .. Stmt.Var_Len);
-                  Result : constant Value := Evaluate (Stmt.Expr);
+                  Expected     : constant Value_Kind := Get_Expected_Kind (Var_Name_Str);
+                  Result       : Value := Evaluate (Stmt.Expr);
                begin
+                  --  Enforce type conversion based on suffix.
+                  if Result.Kind /= Val_Missing then
+                     if Expected = Val_Integer and Result.Kind /= Val_Integer then
+                        -- Truncate float to integer.
+                        Result := (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Result.Num_Val)));
+                     elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
+                        -- Promote integer to float.
+                        Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
+                     elsif Expected /= Result.Kind then
+                        raise Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+                     end if;
+                  end if;
+
                   --  Assignment Rule: If we are in a Data Step and the variable matches
                   --  a column name, update the table cell for the current record.
                   if Row_Count > 0 and then Get_Current_Record_Index > 0 
@@ -69,8 +93,8 @@ package body SData.Interpreter is
                end;
             
             when Stmt_PRINT =>
-               if Stmt.Print_Expr = null then
-                  --  If no expression, print all columns for the current record.
+               if Stmt.Print_Args = null then
+                  --  Print all columns for the current record.
                   declare
                      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
                   begin
@@ -88,12 +112,22 @@ package body SData.Interpreter is
                      end if;
                   end;
                else
-                  --  Evaluate and print the specific expression.
-                  Put_Line (To_String (Evaluate (Stmt.Print_Expr)));
+                  --  Evaluate and print each argument in the list.
+                  declare
+                     Current_Arg : Expression_List := Stmt.Print_Args;
+                  begin
+                     while Current_Arg /= null loop
+                        Put (To_String (Evaluate (Current_Arg.Expr)));
+                        if Current_Arg.Next /= null then
+                           Put (" "); -- space between args
+                        end if;
+                        Current_Arg := Current_Arg.Next;
+                     end loop;
+                     New_Line;
+                  end;
                end if;
                
             when Stmt_USE =>
-               --  Load dataset into memory (handled by File_IO layer).
                SData.File_IO.Open_Input (Stmt.File_Path(1 .. Stmt.File_Len), SData.Config.Input_Format);
                if not SData.Config.Quiet_Mode and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock_data" 
                  and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock" then
@@ -101,7 +135,6 @@ package body SData.Interpreter is
                end if;
 
             when Stmt_SAVE =>
-               --  Save current Data Table to disk.
                SData.File_IO.Open_Output (Stmt.File_Path(1 .. Stmt.File_Len), SData.Config.Output_Format);
                if not SData.Config.Quiet_Mode then
                   Put_Line ("Dataset saved: " & Stmt.File_Path(1 .. Stmt.File_Len));

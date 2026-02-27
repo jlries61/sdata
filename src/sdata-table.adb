@@ -152,9 +152,11 @@ package body SData.Table is
          --  Perform type checking against column definition.
          if Val.Kind /= Val_Missing then
             if Col.Typ = Col_Numeric and Val.Kind /= Val_Numeric then
-               raise Type_Mismatch_Error with "Expected Numeric, got String";
+               raise Type_Mismatch_Error with "Expected Numeric, got " & Val.Kind'Image;
+            elsif Col.Typ = Col_Integer and Val.Kind /= Val_Integer then
+               raise Type_Mismatch_Error with "Expected Integer, got " & Val.Kind'Image;
             elsif Col.Typ = Col_String and Val.Kind /= Val_String then
-               raise Type_Mismatch_Error with "Expected String, got Numeric";
+               raise Type_Mismatch_Error with "Expected String, got " & Val.Kind'Image;
             end if;
          end if;
 
