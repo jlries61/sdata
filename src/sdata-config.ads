@@ -19,4 +19,10 @@ package SData.Config is
    Output_File   : String (1 .. 1024) := (others => ' ');
    Output_File_Len : Natural := 0;
 
+   --  Pending SAVE operation for the next RUN.
+   Save_File_Path  : String (1 .. 1024) := (others => ' ');
+   Save_File_Len   : Natural := 0;
+   Save_File_Active : Boolean := False;
+   Save_File_Fmt    : Format_Type := CSV;
+
 end SData.Config;

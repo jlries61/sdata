@@ -43,6 +43,12 @@ package SData.Table is
    --  Updates the value at a specific row and column. 
    --  Raises Type_Mismatch_Error if the value kind doesn't match the column type.
    procedure Set_Value (Row : Positive; Column_Name : String; Val : Value);
+
+   --  Renames an existing column.
+   procedure Rename_Column (Old_Name, New_Name : String);
+
+   --  Removes a column from the table.
+   procedure Drop_Column (Name : String);
    
    --  Sets/Gets the pointer to the current record during data step iteration.
    procedure Set_Current_Record_Index (Index : Natural);

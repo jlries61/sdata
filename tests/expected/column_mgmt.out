@@ -1,0 +1,16 @@
+Original Names:
+IDENT SALARY_NEW NAME 
+After Rename:
+IDENT SALARY_NEW NAME 
+Original Names:
+IDENT SALARY_NEW NAME 
+After Rename:
+IDENT SALARY_NEW NAME 
+Original Names:
+IDENT SALARY_NEW NAME 
+After Rename:
+IDENT SALARY_NEW NAME 
+After Keep IDENT, NAME and RUN:
+IDENT NAME 
+After Drop NAME and RUN:
+IDENT 

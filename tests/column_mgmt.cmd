@@ -1,0 +1,19 @@
+USE "mock"
+PRINT "Original Names:"
+NAMES
+
+RENAME ID=IDENT, SALARY=SALARY_NEW
+PRINT "After Rename:"
+NAMES
+
+KEEP IDENT, NAME
+RUN
+PRINT "After Keep IDENT, NAME and RUN:"
+NAMES
+
+DROP NAME
+RUN
+PRINT "After Drop NAME and RUN:"
+NAMES
+
+END

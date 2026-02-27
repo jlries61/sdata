@@ -11,4 +11,7 @@ package SData.Evaluator is
    --  Handles missing value propagation automatically.
    function Evaluate (Expr : Expression_Access) return Value;
 
+   --  Utility to convert a Value to a Float (handles Integer promotion).
+   function Convert_To_Float (V : Value) return Float;
+
 end SData.Evaluator;

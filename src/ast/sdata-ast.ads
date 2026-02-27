@@ -73,6 +73,17 @@ package SData.AST is
       Next : Variable_List;
    end record;
 
+   --  List for RENAME command pairs.
+   type Rename_Pair_Node;
+   type Rename_List is access Rename_Pair_Node;
+   type Rename_Pair_Node is record
+      Old_Name : String (1 .. 32);
+      Old_Len  : Natural;
+      New_Name : String (1 .. 32);
+      New_Len  : Natural;
+      Next     : Rename_List;
+   end record;
+
    --  Types of statements (commands) available in SData.
    type Statement_Kind is (
       Stmt_LET,    -- Variable assignment
@@ -81,6 +92,7 @@ package SData.AST is
       Stmt_SAVE,   -- Save dataset
       Stmt_KEEP,   -- Keep specific columns
       Stmt_DROP,   -- Drop specific columns
+      Stmt_RENAME, -- Rename variables
       Stmt_IF,     -- Conditional execution
       Stmt_FOR,    -- Loop
       Stmt_WHILE,  -- Loop
@@ -89,7 +101,8 @@ package SData.AST is
       Stmt_QUIT,   -- Terminate program
       Stmt_NAMES,  -- List column names
       Stmt_SUBMIT, -- Recursive script execution
-      Stmt_RSEED   -- Set random seed
+      Stmt_RSEED,  -- Set random seed
+      Stmt_RUN     -- Execute and export
    );
 
    type Statement;
@@ -104,12 +117,14 @@ package SData.AST is
             Var_Len  : Natural;
             Expr     : Expression_Access;
          when Stmt_PRINT =>
-            Print_Args : Expression_List; -- null means "PRINT all columns"
+            Print_Args : Expression_List;
          when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT =>
             File_Path : String (1 .. 1024);
             File_Len  : Natural;
          when Stmt_KEEP | Stmt_DROP =>
             Vars : Variable_List;
+         when Stmt_RENAME =>
+            Rename_Pairs : Rename_List;
          when Stmt_IF =>
             Condition    : Expression_Access;
             Then_Branch  : Statement_Access;
@@ -117,16 +132,16 @@ package SData.AST is
          when Stmt_FOR =>
             For_Var      : String (1 .. 32);
             For_Var_Len  : Natural;
-            Start_Expr   : Expression_Access;
-            End_Expr     : Expression_Access;
-            Step_Expr    : Expression_Access;
+            For_Start    : Expression_Access;
+            For_End      : Expression_Access;
+            For_Step     : Expression_Access;
             For_Body     : Statement_Access;
          when Stmt_WHILE =>
             While_Cond   : Expression_Access;
             While_Body   : Statement_Access;
          when Stmt_REPEAT =>
             Repeat_Body  : Statement_Access;
-            Until_Cond   : Expression_Access; -- null for data manage REPEAT
+            Until_Cond   : Expression_Access;
          when Stmt_RSEED =>
             Seed_Expr    : Expression_Access;
          when others =>
