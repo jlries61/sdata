@@ -5,6 +5,7 @@
 
 with Ada.Strings.Hash;
 with GNAT.Strings;
+with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Containers.Vectors;
 with SData.Values; use SData.Values;
@@ -76,6 +77,10 @@ private
       
    --  The global data table state.
    Data_Table : Column_Maps.Map;
+
+   --  Maintains the insertion order of column names for range expansion.
+   package Name_Vectors is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
+   Column_Order : Name_Vectors.Vector;
    
    --  Current record pointer for the interpreter.
    Current_Record : Natural := 0;

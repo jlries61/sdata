@@ -14,6 +14,7 @@ package body SData.Parser is
    --  Forward declarations for mutual recursion.
    function Parse_Expression (Ctx : in out Parser_Context) return Expression_Access;
    function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access;
+   function Parse_Rename_List (Ctx : in out Parser_Context) return Rename_List;
 
    -----------------
    -- Parse_Block --
@@ -137,7 +138,6 @@ package body SData.Parser is
                      return Node;
 
                   when others =>
-                     --  Quietly return null and let parent handle the unexpected token.
                      return null;
                end case;
             end;
@@ -273,6 +273,49 @@ package body SData.Parser is
       return First;
    end Parse_Variable_List;
 
+   -----------------------
+   -- Parse_Rename_List --
+   -----------------------
+   function Parse_Rename_List (Ctx : in out Parser_Context) return Rename_List is
+      First : Rename_List := null;
+      Last  : Rename_List := null;
+      Tok   : Token;
+   begin
+      loop
+         Tok := Get_Next_Token (Ctx.Lex_Ctx);
+         exit when Tok.Kind /= Token_Identifier;
+
+         declare
+            Pair : constant Rename_List := new Rename_Pair_Node;
+         begin
+            Pair.Old_Len := Tok.Length;
+            Pair.Old_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
+            
+            if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+               Put_Line ("Error: Expected '=' in RENAME list");
+            end if;
+            
+            Tok := Get_Next_Token (Ctx.Lex_Ctx);
+            if Tok.Kind /= Token_Identifier then
+               Put_Line ("Error: Expected identifier after '=' in RENAME list");
+            end if;
+            
+            Pair.New_Len := Tok.Length;
+            Pair.New_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
+            
+            if First = null then First := Pair; else Last.Next := Pair; end if;
+            Last := Pair;
+         end;
+
+         if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+         else
+            exit;
+         end if;
+      end loop;
+      return First;
+   end Parse_Rename_List;
+
    ---------------------
    -- Parse_Statement --
    ---------------------
@@ -308,12 +351,10 @@ package body SData.Parser is
                Expr : Expression_Access;
             begin
                loop
-                  --  Check if we've reached the end of the line/statement.
                   declare
                      P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin
                      exit when P.Kind = Token_Newline or else P.Kind = Token_Colon or else P.Kind = Token_EOF;
-                     --  Optional separator.
                      if P.Kind = Token_Comma or else P.Kind = Token_Semicolon then
                         declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                      end if;
@@ -325,11 +366,8 @@ package body SData.Parser is
                   declare
                      New_Arg : constant Expression_List := new Expression_List_Node'(Expr => Expr, Next => null);
                   begin
-                     if Stmt.Print_Args = null then
-                        Stmt.Print_Args := New_Arg;
-                     else
-                        Last_Arg.Next := New_Arg;
-                     end if;
+                     if Stmt.Print_Args = null then Stmt.Print_Args := New_Arg;
+                     else Last_Arg.Next := New_Arg; end if;
                      Last_Arg := New_Arg;
                   end;
                end loop;
@@ -358,6 +396,13 @@ package body SData.Parser is
             Stmt := new Statement ((if Tok.Kind = Token_KEEP then Stmt_KEEP else Stmt_DROP));
             Stmt.Vars := Parse_Variable_List (Ctx);
 
+         when Token_RENAME =>
+            Stmt := new Statement (Stmt_RENAME);
+            Stmt.Rename_Pairs := Parse_Rename_List (Ctx);
+
+         when Token_RUN =>
+            Stmt := new Statement (Stmt_RUN);
+
          when Token_IF =>
             Stmt := new Statement (Stmt_IF);
             Stmt.Condition := Parse_Expression (Ctx);
@@ -383,14 +428,14 @@ package body SData.Parser is
             begin
                Stmt.For_Var_Len := Var_Tok.Length;
                Stmt.For_Var (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);
-               Stmt.Start_Expr := Parse_Expression (Ctx);
+               Stmt.For_Start := Parse_Expression (Ctx);
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_TO then
                   declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                end if;
-               Stmt.End_Expr := Parse_Expression (Ctx);
+               Stmt.For_End := Parse_Expression (Ctx);
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_STEP then
                   declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                  Stmt.Step_Expr := Parse_Expression (Ctx);
+                  Stmt.For_Step := Parse_Expression (Ctx);
                end if;
                Stmt.For_Body := Parse_Block (Ctx, Token_NEXT);
             end;

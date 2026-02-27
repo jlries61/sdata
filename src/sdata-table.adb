@@ -1,5 +1,6 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers;         use Ada.Containers;
+with Ada.Strings.Unbounded;  use Ada.Strings.Unbounded;
 
 package body SData.Table is
 
@@ -9,6 +10,7 @@ package body SData.Table is
    procedure Clear is
    begin
       Data_Table.Clear;
+      Column_Order.Clear;
       Current_Record := 0;
    end Clear;
 
@@ -37,23 +39,19 @@ package body SData.Table is
       end loop;
       
       Data_Table.Insert (Upper_Name, New_Col);
+      Column_Order.Append (To_Unbounded_String (Upper_Name));
    end Add_Column;
 
    ----------------------
    -- Get_Column_Names --
    ----------------------
    function Get_Column_Names return GNAT.Strings.String_List_Access is
-      Count : constant Natural := Column_Count;
+      Count : constant Natural := Natural (Column_Order.Length);
       List : constant GNAT.Strings.String_List_Access := new GNAT.Strings.String_List (1 .. Count);
-      Index : Positive := 1;
-      
-      procedure Add_To_List (Position : Column_Maps.Cursor) is
-      begin
-         List (Index) := new String'(Column_Maps.Key (Position));
-         Index := Index + 1;
-      end Add_To_List;
    begin
-      Data_Table.Iterate (Add_To_List'Access);
+      for I in 1 .. Count loop
+         List (I) := new String'(To_String (Column_Order.Element (I)));
+      end loop;
       return List;
    end Get_Column_Names;
 
@@ -166,9 +164,21 @@ package body SData.Table is
             Col : Column := Data_Table.Element (Upper_Old);
          begin
             Col.Name := (others => ' ');
-            Col.Name (1 .. Upper_New'Length) := Upper_New;
+            if Upper_New'Length > 32 then
+               Col.Name := Upper_New (Upper_New'First .. Upper_New'First + 31);
+            else
+               Col.Name (1 .. Upper_New'Length) := Upper_New;
+            end if;
             Data_Table.Delete (Upper_Old);
             Data_Table.Insert (Upper_New, Col);
+            
+            -- Update Order Vector
+            for I in 1 .. Natural (Column_Order.Length) loop
+               if To_String (Column_Order.Element (I)) = Upper_Old then
+                  Column_Order.Replace_Element (I, To_Unbounded_String (Upper_New));
+                  exit;
+               end if;
+            end loop;
          end;
       end if;
    end Rename_Column;
@@ -181,6 +191,13 @@ package body SData.Table is
    begin
       if Data_Table.Contains (Upper_Name) then
          Data_Table.Delete (Upper_Name);
+         -- Update Order Vector
+         for I in 1 .. Natural (Column_Order.Length) loop
+            if To_String (Column_Order.Element (I)) = Upper_Name then
+               Column_Order.Delete (I);
+               exit;
+            end if;
+         end loop;
       end if;
    end Drop_Column;
    

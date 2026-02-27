@@ -12,4 +12,5 @@ let b1 = a < b
 print b1
 let b2 = a > b
 print b2
+RUN
 end

@@ -15,5 +15,5 @@ DROP NAME
 RUN
 PRINT "After Drop NAME and RUN:"
 NAMES
-
+RUN
 END

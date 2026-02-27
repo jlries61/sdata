@@ -8,6 +8,7 @@ with SData.File_IO;
 with SData.Config;
 with SData.Parser;
 with Ada.Streams.Stream_IO;
+with Ada.Characters.Handling; use Ada.Characters.Handling;
 
 package body SData.Interpreter is
 
@@ -31,12 +32,48 @@ package body SData.Interpreter is
 
    Pending_Mods : Column_Mod_List := null;
 
+   --  Global program for REPL mode.
+   Active_Program_Head : Statement_Access := null;
+   Active_Program_Tail : Statement_Access := null;
+
+   procedure Add_To_Active_Program (Stmt : Statement_Access) is
+   begin
+      if Stmt = null then return; end if;
+      Stmt.Next := null;
+      if Active_Program_Head = null then
+         Active_Program_Head := Stmt;
+         Active_Program_Tail := Stmt;
+      else
+         Active_Program_Tail.Next := Stmt;
+         Active_Program_Tail := Stmt;
+      end if;
+   end Add_To_Active_Program;
+
+   procedure Clear_Active_Program is
+   begin
+      Active_Program_Head := null;
+      Active_Program_Tail := null;
+   end Clear_Active_Program;
+
+   procedure Run_Active_Program is
+   begin
+      if Active_Program_Head /= null then
+         declare
+            Prog : constant Statement_Access := Active_Program_Head;
+         begin
+            Clear_Active_Program;
+            Execute (Prog);
+         end;
+      end if;
+   end Run_Active_Program;
+
    procedure Add_Pending_Mod (Kind : Column_Mod_Kind; Name : String) is
       New_Mod : constant Column_Mod_List := new Column_Mod_Node;
       Last : Column_Mod_List := Pending_Mods;
+      Upper : constant String := To_Upper (Name);
    begin
-      New_Mod.Kind := Kind; New_Mod.Len := Name'Length;
-      New_Mod.Name (1 .. Name'Length) := Name; New_Mod.Next := null;
+      New_Mod.Kind := Kind; New_Mod.Len := Upper'Length;
+      New_Mod.Name (1 .. Upper'Length) := Upper; New_Mod.Next := null;
       if Pending_Mods = null then Pending_Mods := New_Mod;
       else
          while Last.Next /= null loop Last := Last.Next; end loop;
@@ -79,6 +116,33 @@ package body SData.Interpreter is
       end if;
       Pending_Mods := null; GNAT.Strings.Free (Col_Names);
    end Apply_Pending_Mods;
+
+   procedure Expand_Range (Kind : Column_Mod_Kind; Range_Spec : Variable_Range) is
+      use SData.Table;
+      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+      Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+      End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+      Start_Idx  : Natural := 0;
+      End_Idx    : Natural := 0;
+   begin
+      if not Range_Spec.Is_Range then
+         Add_Pending_Mod (Kind, Start_Name); return;
+      end if;
+      if Col_Names = null then return; end if;
+      for I in Col_Names'Range loop
+         if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
+         if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+      end loop;
+      if Start_Idx > 0 and End_Idx > 0 then
+         if Start_Idx > End_Idx then
+            declare Temp : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := Temp; end;
+         end if;
+         for I in Start_Idx .. End_Idx loop Add_Pending_Mod (Kind, Col_Names (I).all); end loop;
+      else
+         Add_Pending_Mod (Kind, Start_Name); Add_Pending_Mod (Kind, End_Name);
+      end if;
+      GNAT.Strings.Free (Col_Names);
+   end Expand_Range;
 
    function Get_Expected_Kind (Name : String) return Value_Kind is
    begin
@@ -165,7 +229,7 @@ package body SData.Interpreter is
                        K : constant Column_Mod_Kind := (if Stmt.Kind = Stmt_KEEP then Mod_Keep else Mod_Drop);
                begin
                   while Curr_Var /= null loop
-                     Add_Pending_Mod (K, Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
+                     Expand_Range (K, Curr_Var.Var);
                      Curr_Var := Curr_Var.Next;
                   end loop;
                end;
@@ -233,6 +297,8 @@ package body SData.Interpreter is
                   exception when others => Put_Line ("Error: Failed to SUBMIT file " & Filename); end;
                   Submit_Level := Submit_Level - 1;
                end if;
+            when Stmt_RUN =>
+               Run_Active_Program;
             when others => null;
          end case;
    end Execute_Statement;
@@ -257,7 +323,8 @@ package body SData.Interpreter is
          end loop;
          if Data_Step_Active then
             for I in 1 .. Row_Count loop
-               Set_Current_Record_Index (I); Iter := Start;
+               Set_Current_Record_Index (I);
+               Iter := Start;
                while Iter /= null and then Iter /= Boundary loop
                   case Iter.Kind is
                      when Stmt_LET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT =>
@@ -268,7 +335,9 @@ package body SData.Interpreter is
                end loop;
             end loop;
             Set_Current_Record_Index (0);
-         else Execute_List (Start, Boundary); end if;
+         else
+            Execute_List (Start, Boundary);
+         end if;
          Apply_Pending_Mods;
          if SData.Config.Save_File_Active then
             SData.File_IO.Open_Output (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), SData.Config.Save_File_Fmt);
@@ -286,7 +355,8 @@ package body SData.Interpreter is
          end if;
          Current := Current.Next;
       end loop;
-      if Step_Start /= null then Run_One_Step (Step_Start, null); end if;
+      
+      --  REMOVED Auto-Run logic here. Scripts must end with RUN to execute final block.
    end Execute;
 
 end SData.Interpreter;

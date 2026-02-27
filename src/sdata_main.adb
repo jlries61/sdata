@@ -64,12 +64,33 @@ procedure SData_Main is
             if Last > 0 then
                Initialize (Ctx, Line (1 .. Last));
                Prog := Parse_Program (Ctx);
-               if Prog /= null then
-                  Execute (Prog);
-                  if Prog.Kind = Stmt_QUIT then
-                     exit;
-                  end if;
-               end if;
+               
+               while Prog /= null loop
+                  declare
+                     -- Determine if the statement is declarative.
+                     -- Note: This is a simplified check for now.
+                     Is_Declarative : constant Boolean := 
+                        Prog.Kind in Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP | 
+                                     Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END;
+                  begin
+                     if Is_Declarative then
+                        -- Declarative statements execute immediately in REPL.
+                        if Prog.Kind = Stmt_RUN then
+                           Run_Active_Program;
+                        else
+                           Execute (Prog);
+                        end if;
+                        
+                        if Prog.Kind = Stmt_QUIT then
+                           exit;
+                        end if;
+                     else
+                        -- Non-declarative statements are queued until RUN.
+                        Add_To_Active_Program (Prog);
+                     end if;
+                  end;
+                  Prog := Prog.Next;
+               end loop;
             end if;
          exception
             when End_Error =>
@@ -78,6 +99,7 @@ procedure SData_Main is
             when E : others =>
                Put_Line ("Error: " & Exception_Message (E));
          end;
+         exit when not Is_Open (Standard_Input);
       end loop;
    end Run_REPL;
 

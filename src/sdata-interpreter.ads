@@ -8,10 +8,15 @@ with SData.AST; use SData.AST;
 package SData.Interpreter is
 
    --  Executes the provided AST program.
-   --  This process involves multiple passes:
-   --  1.  Declarative load pass (USE).
-   --  2.  Data step iteration (implicit loop over all records in the Data Table).
-   --  3.  Declarative save pass (SAVE).
    procedure Execute (Prog : Statement_Access);
+
+   --  Adds a statement to the global active program (for REPL deferred execution).
+   procedure Add_To_Active_Program (Stmt : Statement_Access);
+
+   --  Clears the global active program.
+   procedure Clear_Active_Program;
+
+   --  Executes the global active program.
+   procedure Run_Active_Program;
 
 end SData.Interpreter;
