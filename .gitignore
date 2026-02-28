@@ -1,0 +1,12 @@
+# Build artifacts
+/obj/
+/bin/
+
+# Test outputs
+*.tmp
+*.diff
+*.actual
+
+# Other temp files
+*.swp
+*~
