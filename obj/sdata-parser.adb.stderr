@@ -1,5 +1,0 @@
-sdata-parser.adb:2:20: warning: no entities of "Ada.Characters.Handling" are referenced [-gnatwu]
-sdata-parser.adb:113:40: warning: constant "Comma" is not referenced [-gnatwu]
-sdata-parser.adb:241:13: warning: "Node" is not modified, could be declared constant [-gnatwk]
-sdata-parser.adb:338:16: warning: constant "Eq_Tok" is not referenced [-gnatwu]
-sdata-parser.adb:435:16: warning: constant "Eq_Tok" is not referenced [-gnatwu]

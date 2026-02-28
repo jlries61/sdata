@@ -1,2 +1,0 @@
-sdata-lexer.adb:2:17: warning: no entities of "Ada.Strings.Fixed" are referenced [-gnatwu]
-sdata-lexer.adb:189:10: warning: "C" is not modified, could be declared constant [-gnatwk]

@@ -1,3 +1,0 @@
-sdata-evaluator.adb:6:09: warning: no entities of "Ada.Text_IO" are referenced [-gnatwu]
-sdata-evaluator.adb:7:09: warning: unit "Ada.Exceptions" is not referenced [-gnatwu]
-sdata-evaluator.adb:26:13: warning: function "Convert_To_Integer" is not referenced [-gnatwu]
