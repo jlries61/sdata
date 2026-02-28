@@ -1,0 +1,2 @@
+sdata-table.adb:3:06: warning: redundant with clause in body [-gnatwr]
+sdata-table.adb:3:30: warning: "Unbounded" is already use-visible through previous use_clause at sdata-table.ads:8 [-gnatwr]

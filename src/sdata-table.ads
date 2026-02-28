@@ -82,6 +82,9 @@ private
    package Name_Vectors is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
    Column_Order : Name_Vectors.Vector;
    
+   --  Explicit row count (to handle cases where columns haven't been added yet).
+   Table_Row_Count : Natural := 0;
+
    --  Current record pointer for the interpreter.
    Current_Record : Natural := 0;
 

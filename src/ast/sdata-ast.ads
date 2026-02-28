@@ -87,6 +87,7 @@ package SData.AST is
    --  Types of statements (commands) available in SData.
    type Statement_Kind is (
       Stmt_LET,    -- Variable assignment
+      Stmt_SET,    -- Temporary assignment
       Stmt_PRINT,  -- Output to console
       Stmt_USE,    -- Load dataset
       Stmt_SAVE,   -- Save dataset
@@ -96,13 +97,15 @@ package SData.AST is
       Stmt_IF,     -- Conditional execution
       Stmt_FOR,    -- Loop
       Stmt_WHILE,  -- Loop
-      Stmt_REPEAT, -- Loop
+      Stmt_REPEAT, -- Loop (Data Step creation)
+      Stmt_LOOP_REPEAT, -- REPEAT/UNTIL loop
       Stmt_END,    -- Terminate program
       Stmt_QUIT,   -- Terminate program
       Stmt_NAMES,  -- List column names
       Stmt_SUBMIT, -- Recursive script execution
       Stmt_RSEED,  -- Set random seed
-      Stmt_RUN     -- Execute and export
+      Stmt_RUN,    -- Execute and export
+      Stmt_NEW     -- Reset environment
    );
 
    type Statement;
@@ -112,7 +115,7 @@ package SData.AST is
    type Statement (Kind : Statement_Kind) is record
       Next : Statement_Access; -- Pointer to the next statement in sequence.
       case Kind is
-         when Stmt_LET =>
+         when Stmt_LET | Stmt_SET =>
             Var_Name : String (1 .. 32);
             Var_Len  : Natural;
             Expr     : Expression_Access;
@@ -121,6 +124,8 @@ package SData.AST is
          when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT =>
             File_Path : String (1 .. 1024);
             File_Len  : Natural;
+         when Stmt_REPEAT =>
+            Count : Natural;
          when Stmt_KEEP | Stmt_DROP =>
             Vars : Variable_List;
          when Stmt_RENAME =>
@@ -139,7 +144,7 @@ package SData.AST is
          when Stmt_WHILE =>
             While_Cond   : Expression_Access;
             While_Body   : Statement_Access;
-         when Stmt_REPEAT =>
+         when Stmt_LOOP_REPEAT =>
             Repeat_Body  : Statement_Access;
             Until_Cond   : Expression_Access;
          when Stmt_RSEED =>

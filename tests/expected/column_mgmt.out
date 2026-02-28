@@ -12,5 +12,13 @@ After Rename:
 IDENT NAME SALARY_NEW 
 After Keep IDENT, NAME and RUN:
 IDENT NAME 
+After Keep IDENT, NAME and RUN:
+IDENT NAME 
+After Keep IDENT, NAME and RUN:
+IDENT NAME 
+After Drop NAME and RUN:
+IDENT 
+After Drop NAME and RUN:
+IDENT 
 After Drop NAME and RUN:
 IDENT 

@@ -25,4 +25,8 @@ package SData.Config is
    Save_File_Active : Boolean := False;
    Save_File_Fmt    : Format_Type := CSV;
 
+   --  REPEAT state.
+   Repeat_Count  : Natural := 0;
+   Repeat_Active : Boolean := False;
+
 end SData.Config;

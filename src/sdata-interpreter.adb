@@ -9,6 +9,8 @@ with SData.Config;
 with SData.Parser;
 with Ada.Streams.Stream_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
+with Ada.Containers.Indefinite_Hashed_Sets;
+with Ada.Strings.Hash;
 
 package body SData.Interpreter is
 
@@ -18,6 +20,13 @@ package body SData.Interpreter is
    
    Max_Submit_Level : constant := 10;
    Submit_Level     : Natural := 0;
+
+   --  Set to track columns provided by the input file (to skip reset).
+   package Name_Sets is new Ada.Containers.Indefinite_Hashed_Sets
+     (Element_Type => String,
+      Hash         => Ada.Strings.Hash,
+      Equivalent_Elements => "=");
+   Input_File_Columns : Name_Sets.Set;
 
    --  Column modifications state.
    type Column_Mod_Kind is (Mod_Keep, Mod_Drop);
@@ -168,7 +177,7 @@ package body SData.Interpreter is
    begin
        if Stmt = null then return; end if;
        case Stmt.Kind is
-            when Stmt_LET =>
+            when Stmt_LET | Stmt_SET =>
                declare
                   Var_Name_Str : constant String := Stmt.Var_Name(1 .. Stmt.Var_Len);
                   Expected     : constant Value_Kind := Get_Expected_Kind (Var_Name_Str);
@@ -183,9 +192,12 @@ package body SData.Interpreter is
                         raise Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
                      end if;
                   end if;
-                  if Row_Count > 0 and then Get_Current_Record_Index > 0 and then Has_Column (Var_Name_Str) then
-                     Set_Value (Get_Current_Record_Index, Var_Name_Str, Result);
-                  else Set (Var_Name_Str, Result); end if;
+                  
+                  if Stmt.Kind = Stmt_LET then
+                     Set_Permanent (Var_Name_Str, Result);
+                  else
+                     Set_Temporary (Var_Name_Str, Result);
+                  end if;
                exception
                   when Type_Mismatch_Error => Put_Line ("Error: Type mismatch for variable " & Var_Name_Str);
                   when others => Put_Line ("Error: Assignment failed for " & Var_Name_Str);
@@ -214,11 +226,35 @@ package body SData.Interpreter is
                   end;
                end if;
             when Stmt_USE =>
-               SData.File_IO.Open_Input (Stmt.File_Path(1 .. Stmt.File_Len), SData.Config.Input_Format);
+               declare File_Name : constant String := Stmt.File_Path(1 .. Stmt.File_Len);
+               begin
+                  if File_Name = "mock" or File_Name = "mock_data" then
+                     Clear; Add_Column ("ID", Col_Integer); Add_Column ("NAME", Col_String); Add_Column ("SALARY", Col_Numeric);
+                     for I in 1 .. 3 loop
+                        Add_Row; Set_Value (I, "ID", (Kind => Val_Integer, Int_Val => I));
+                        Set_Value (I, "SALARY", (Kind => Val_Numeric, Num_Val => 50000.0 + Float(I - 1) * 10000.0));
+                     end loop;
+                     Set_Value(1, "NAME", (Kind => Val_String, Str_Val => "Alice" & (1 .. 1019 => ' '), Str_Len => 5));
+                     Set_Value(2, "NAME", (Kind => Val_String, Str_Val => "Bob" & (1 .. 1021 => ' '), Str_Len => 3));
+                     Set_Value(3, "NAME", (Kind => Val_String, Str_Val => "Charlie" & (1 .. 1017 => ' '), Str_Len => 7));
+                  else SData.File_IO.Open_Input (File_Name, SData.Config.Input_Format); end if;
+               end;
+               Input_File_Columns.Clear;
+               declare Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+               begin
+                  if Col_Names /= null then
+                     for I in Col_Names'Range loop Input_File_Columns.Include (To_Upper (Col_Names (I).all)); end loop;
+                     GNAT.Strings.Free (Col_Names);
+                  end if;
+               end;
                if not SData.Config.Quiet_Mode and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock_data" 
                  and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock" then
                   Put_Line ("Dataset opened: " & Stmt.File_Path(1 .. Stmt.File_Len));
                end if;
+            when Stmt_REPEAT =>
+               SData.Config.Repeat_Active := True;
+               SData.Config.Repeat_Count := Stmt.Count;
+               Input_File_Columns.Clear;
             when Stmt_SAVE =>
                SData.Config.Save_File_Path (1 .. Stmt.File_Len) := Stmt.File_Path (1 .. Stmt.File_Len);
                SData.Config.Save_File_Len := Stmt.File_Len;
@@ -271,7 +307,7 @@ package body SData.Interpreter is
                         loop
                            if ST >= 0.0 then exit when Current_I > E;
                            else exit when Current_I < E; end if;
-                           Set (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
+                           Set_Permanent (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
                            Execute_List (Stmt.For_Body);
                            Current_I := Current_I + ST;
                         end loop;
@@ -299,6 +335,12 @@ package body SData.Interpreter is
                end if;
             when Stmt_RUN =>
                Run_Active_Program;
+            when Stmt_NEW =>
+               Clear;
+               Clear_Temporary;
+               SData.Config.Repeat_Active := False;
+               SData.Config.Repeat_Count := 0;
+               Input_File_Columns.Clear;
             when others => null;
          end case;
    end Execute_Statement;
@@ -306,44 +348,68 @@ package body SData.Interpreter is
    procedure Execute (Prog : Statement_Access) is
       Step_Start : Statement_Access := Prog;
       Current    : Statement_Access;
-      Data_Step_Active : Boolean;
+      Num_Records : Natural;
+      Explicit_Loop_Trigger : Boolean;
 
       procedure Run_One_Step (Start, Boundary : Statement_Access) is
          Iter : Statement_Access;
       begin
-         Iter := Start; Data_Step_Active := False;
+         Iter := Start;
+         Num_Records := 0;
+         Explicit_Loop_Trigger := False;
          while Iter /= null and then Iter /= Boundary loop
             case Iter.Kind is
-               when Stmt_USE | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE =>
+               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW =>
                   Execute_Statement (Iter);
-                  if Iter.Kind = Stmt_USE then Data_Step_Active := True; end if;
+                  if Iter.Kind = Stmt_USE or Iter.Kind = Stmt_REPEAT then 
+                     Explicit_Loop_Trigger := True; 
+                     if Iter.Kind = Stmt_USE then Num_Records := Row_Count; else Num_Records := SData.Config.Repeat_Count; end if;
+                  end if;
                when others => null;
             end case;
             Iter := Iter.Next;
          end loop;
-         if Data_Step_Active then
-            for I in 1 .. Row_Count loop
-               Set_Current_Record_Index (I);
-               Iter := Start;
-               while Iter /= null and then Iter /= Boundary loop
-                  case Iter.Kind is
-                     when Stmt_LET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT =>
-                        Execute_Statement(Iter);
-                     when others => null;
-                  end case;
-                  Iter := Iter.Next;
-               end loop;
-            end loop;
-            Set_Current_Record_Index (0);
-         else
-            Execute_List (Start, Boundary);
+         if not Explicit_Loop_Trigger then
+            Num_Records := (if Row_Count > 0 then Row_Count else 1);
+            if Num_Records = 1 and Row_Count = 0 then
+               -- This is an implicit REPEAT 1. Ensure a row exists.
+               Add_Row;
+            end if;
          end if;
+         for I in 1 .. Num_Records loop
+            Set_Current_Record_Index (I);
+            if Explicit_Loop_Trigger or Row_Count > 0 then
+               declare
+                  Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+               begin
+                  if Col_Names /= null then
+                     if I > Row_Count then Add_Row; end if;
+                     for C in Col_Names'Range loop
+                        declare Name : constant String := To_Upper (Col_Names(C).all);
+                        begin if not Input_File_Columns.Contains (Name) then Set_Value (I, Name, (Kind => Val_Missing)); end if; end;
+                     end loop;
+                     GNAT.Strings.Free (Col_Names);
+                  end if;
+               end;
+            end if;
+            Iter := Start;
+            while Iter /= null and then Iter /= Boundary loop
+               case Iter.Kind is
+                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT =>
+                     Execute_Statement(Iter);
+                  when others => null;
+               end case;
+               Iter := Iter.Next;
+            end loop;
+         end loop;
+         Set_Current_Record_Index (0);
          Apply_Pending_Mods;
          if SData.Config.Save_File_Active then
             SData.File_IO.Open_Output (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), SData.Config.Save_File_Fmt);
             if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
             SData.Config.Save_File_Active := False;
          end if;
+         Clear_Temporary;
       end Run_One_Step;
 
    begin
@@ -355,8 +421,6 @@ package body SData.Interpreter is
          end if;
          Current := Current.Next;
       end loop;
-      
-      --  REMOVED Auto-Run logic here. Scripts must end with RUN to execute final block.
    end Execute;
 
 end SData.Interpreter;

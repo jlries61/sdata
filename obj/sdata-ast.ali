@@ -1,0 +1,145 @@
+V "GNAT Lib v15"
+A -gnatA
+A -g
+A -gnat2012
+A -gnatwa
+A -gnatwl
+A -gnatwu
+A -g
+A -mtune=generic
+A -march=x86-64
+P ZX
+
+RN
+RV NO_FLOATING_POINT
+RV NO_IMPLICIT_CONDITIONALS
+RV NO_STANDARD_STORAGE_POOLS
+RV NO_DYNAMIC_SIZED_OBJECTS
+RV NO_IMPLEMENTATION_PRAGMAS
+RV NO_IMPLICIT_LOOPS
+
+U sdata.ast%s		sdata-ast.ads		60d37d52 NE OO PK
+W sdata%s		sdata.ads		sdata.ali
+
+D sdata.ads		20260217010305 80fa9d3c sdata%s
+D sdata-ast.ads		20260228000447 e029e06e sdata.ast%s
+D system.ads		20260202094243 14286b0f system%s
+G a e
+G c Z s s [expressionIP sdata__ast 35 9 none]
+G c Z s s [expression_list_nodeIP sdata__ast 29 9 none]
+G c Z s s [variable_rangeIP sdata__ast 60 9 none]
+G c Z s s [variable_list_nodeIP sdata__ast 71 9 none]
+G c Z s s [rename_pair_nodeIP sdata__ast 79 9 none]
+G c Z s s [statementIP sdata__ast 115 9 none]
+X 1 sdata.ads
+1K9*SData 2e10 2|5r9 157r5
+X 2 sdata-ast.ads
+5K15*AST 1|1k9 2|157l11 157e14
+8E9*Expression_Kind 15e5 35r28
+9n7*Expr_Numeric_Literal{8E9} 37r15
+10n7*Expr_String_Literal{8E9} 39r15
+11n7*Expr_Variable{8E9} 42r15
+12n7*Expr_Binary_Op{8E9} 45r15
+13n7*Expr_Unary_Op{8E9} 49r15
+14n7*Expr_Function_Call{8E9} 52r15
+18E9*Binary_Op 18e104 48r21
+18n23*Op_Add{18E9}
+18n31*Op_Sub{18E9}
+18n39*Op_Mul{18E9}
+18n47*Op_Div{18E9}
+18n55*Op_Pow{18E9}
+18n63*Op_Eq{18E9}
+18n70*Op_Ne{18E9}
+18n77*Op_Lt{18E9}
+18n84*Op_Le{18E9}
+18n91*Op_Gt{18E9}
+18n98*Op_Ge{18E9}
+21E9*Unary_Op 21e29 51r23
+21n22*Op_Neg{21E9}
+23R9*Expression 24r37 35c9 35d21 57e14
+24P9*Expression_Access(23R9) 30r14 46r21 47r21 50r23 121r24 134r28 140r28
+. 141r28 142r28 145r28 149r28 151r28
+27R9*Expression_List_Node 28r35 29c9 32e14
+28P9*Expression_List(27R9) 31r14 55r25 123r26
+30p7*Expr{24P9}
+31p7*Next{28P9}
+35e21*Kind{8E9} 36r12
+38f13*Value{float}
+40a13*Str_Value{string}
+41i13*Str_Length{natural}
+43a13*Var_Name{string}
+44i13*Var_Len{natural}
+46p13*Left{24P9}
+47p13*Right{24P9}
+48e13*Op{18E9}
+50p13*Operand{24P9}
+51e13*UOp{21E9}
+53a13*Func_Name{string}
+54i13*Func_Len{natural}
+55p13*Arguments{28P9}
+60R9*Variable_Range 66e14 72r14
+61a7*Start_Name{string}
+62i7*Start_Len{natural}
+63a7*End_Name{string}
+64i7*End_Len{natural}
+65b7*Is_Range{boolean}
+69R9*Variable_List_Node 70r33 71c9 74e14
+70P9*Variable_List(69R9) 73r14 130r20
+72r7*Var{60R9}
+73p7*Next{70P9}
+77R9*Rename_Pair_Node 78r31 79c9 85e14
+78P9*Rename_List(77R9) 84r18 132r28
+80a7*Old_Name{string}
+81i7*Old_Len{natural}
+82a7*New_Name{string}
+83i7*New_Len{natural}
+84p7*Next{78P9}
+88E9*Statement_Kind 109e5 115r27
+89n7*Stmt_LET{88E9} 118r15
+90n7*Stmt_SET{88E9} 118r26
+91n7*Stmt_PRINT{88E9} 122r15
+92n7*Stmt_USE{88E9} 124r15
+93n7*Stmt_SAVE{88E9} 124r26
+94n7*Stmt_KEEP{88E9} 129r15
+95n7*Stmt_DROP{88E9} 129r27
+96n7*Stmt_RENAME{88E9} 131r15
+97n7*Stmt_IF{88E9} 133r15
+98n7*Stmt_FOR{88E9} 137r15
+99n7*Stmt_WHILE{88E9} 144r15
+100n7*Stmt_REPEAT{88E9} 127r15
+101n7*Stmt_LOOP_REPEAT{88E9} 147r15
+102n7*Stmt_END{88E9}
+103n7*Stmt_QUIT{88E9}
+104n7*Stmt_NAMES{88E9}
+105n7*Stmt_SUBMIT{88E9} 124r38
+106n7*Stmt_RSEED{88E9} 150r15
+107n7*Stmt_RUN{88E9}
+108n7*Stmt_NEW{88E9}
+111R9*Statement 112r36 115c9 115d20 155e14
+112P9*Statement_Access(111R9) 116r14 135r28 136r28 143r28 146r28 148r28
+115e20*Kind{88E9} 117r12
+116p7*Next{112P9}
+119a13*Var_Name{string}
+120i13*Var_Len{natural}
+121p13*Expr{24P9}
+123p13*Print_Args{28P9}
+125a13*File_Path{string}
+126i13*File_Len{natural}
+128i13*Count{natural}
+130p13*Vars{70P9}
+132p13*Rename_Pairs{78P9}
+134p13*Condition{24P9}
+135p13*Then_Branch{112P9}
+136p13*Else_Branch{112P9}
+138a13*For_Var{string}
+139i13*For_Var_Len{natural}
+140p13*For_Start{24P9}
+141p13*For_End{24P9}
+142p13*For_Step{24P9}
+143p13*For_Body{112P9}
+145p13*While_Cond{24P9}
+146p13*While_Body{112P9}
+148p13*Repeat_Body{112P9}
+149p13*Until_Cond{24P9}
+151p13*Seed_Expr{24P9}
+

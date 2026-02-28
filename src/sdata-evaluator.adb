@@ -2,6 +2,7 @@ with SData.Variables; use SData.Variables;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData.Statistics;
+with SData.Table;
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Exceptions;
 
@@ -68,6 +69,10 @@ package body SData.Evaluator is
          else
             return Num_Result (abs Convert_To_Float (Arg_Vals (1)));
          end if;
+      elsif Name = "RECNO" then
+         return (Kind => Val_Integer, Int_Val => Integer (SData.Table.Get_Current_Record_Index));
+      elsif Name = "MISSING" and then Count >= 1 then
+         return (Kind => Val_Integer, Int_Val => (if Arg_Vals (1).Kind = Val_Missing then 1 else 0));
       elsif Name = "SQRT" and then Has_Args (1) then
          declare
             V : constant Float := Convert_To_Float (Arg_Vals (1));

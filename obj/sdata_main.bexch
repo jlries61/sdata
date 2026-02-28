@@ -1,0 +1,72 @@
+[GENERATED OBJECT FILE]
+b__sdata_main.o
+[PROJECT FILES]
+/home/jries/Develop/sdata/sdata.gpr
+20260227181907 f35c902b4d9b61156136ae028e4a0473
+/home/jries/Develop/sciada_0.4.0_af24740d/sciada_config.gpr
+20260227181426 92db08060ce900d1cad51ea8746579fd
+/home/jries/Develop/sciada_0.4.0_af24740d/sciada.gpr
+20260227181426 3f7b6dfa0b99357867726b44ef4bb201
+/home/jries/Develop/mathpaqs_20260205.0.0_abed7ef9/mathpaqs.gpr
+20260204121052 bba44cb2a043e659a54a369774619a6d
+/home/jries/Develop/xmlada_26.0.0_b140ed4a/input_sources/xmlada_input.gpr
+20250218114115 55651802e262761b59f8e304fd62f2ac
+/home/jries/Develop/xmlada_26.0.0_b140ed4a/unicode/xmlada_unicode.gpr
+20250218114115 8825bba9dc685ebbbeeec33c08fd5be0
+/home/jries/Develop/xmlada_26.0.0_b140ed4a/sax/xmlada_sax.gpr
+20250218114115 4b3c6587cb28a563498e2b4899c04f38
+/home/jries/Develop/xmlada_26.0.0_b140ed4a/xmlada_shared.gpr
+20260220221647 09c84a43e626e2be5d066580cc86f283
+/home/jries/Develop/xmlada_26.0.0_b140ed4a/dom/xmlada_dom.gpr
+20250218114115 20bb79de142ede8d25b8175848f4c526
+/home/jries/Develop/zipada_61.0.0_54fc9836/zipada.gpr
+20241210012554 d756dd7486b8cc7fb2193c24b56cb0b9
+[BOUND OBJECT FILES]
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/bzip2.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/bzip2-decoding.o
+/home/jries/Develop/mathpaqs_20260205.0.0_abed7ef9/obj_fast/error_function.o
+/home/jries/Develop/mathpaqs_20260205.0.0_abed7ef9/obj_fast/gamma_function.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/lzma.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/lzma-decoding.o
+/home/jries/Develop/mathpaqs_20260205.0.0_abed7ef9/obj_fast/phi_function.o
+/home/jries/Develop/mathpaqs_20260205.0.0_abed7ef9/obj_fast/beta_function.o
+/home/jries/Develop/mathpaqs_20260205.0.0_abed7ef9/obj_fast/generic_random_functions.o
+/home/jries/Develop/sdata/obj/sdata.o
+/home/jries/Develop/sdata/obj/sdata-ast.o
+/home/jries/Develop/sdata/obj/sdata-config.o
+/home/jries/Develop/sdata/obj/sdata-lexer.o
+/home/jries/Develop/sdata/obj/sdata-parser.o
+/home/jries/Develop/sdata/obj/sdata-statistics.o
+/home/jries/Develop/sdata/obj/sdata-values.o
+/home/jries/Develop/sdata/obj/sdata-table.o
+/home/jries/Develop/sdata/obj/sdata-variables.o
+/home/jries/Develop/sdata/obj/sdata-evaluator.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/zip_streams.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/zip-headers.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/zip.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/zip-crc_crypto.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/unzip.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/unzip-decompress-huffman.o
+/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/unzip-decompress.o
+/home/jries/Develop/sdata/obj/sdata-file_io.o
+/home/jries/Develop/sdata/obj/sdata-interpreter.o
+/home/jries/Develop/sdata/obj/sdata_main.o
+[GENERATED SOURCE FILES]
+b__sdata_main.ads
+b__sdata_main.adb
+b__sdata_main.ali
+[RESULTING OPTIONS]
+-L/home/jries/Develop/sdata/obj/
+-L/home/jries/Develop/sdata/obj/
+-L/home/jries/Develop/zipada_61.0.0_54fc9836/obj/fast/
+-L/home/jries/Develop/xmlada_26.0.0_b140ed4a/dom/lib/static/
+-L/home/jries/Develop/xmlada_26.0.0_b140ed4a/sax/lib/static/
+-L/home/jries/Develop/xmlada_26.0.0_b140ed4a/unicode/lib/static/
+-L/home/jries/Develop/xmlada_26.0.0_b140ed4a/input_sources/lib/static/
+-L/home/jries/Develop/mathpaqs_20260205.0.0_abed7ef9/obj_fast/
+-L/home/jries/Develop/sciada_0.4.0_af24740d/lib/sciada/static/
+-L/usr/lib64/gcc/x86_64-suse-linux/15/adalib/
+-static
+/usr/lib64/gcc/x86_64-suse-linux/15/adalib/libgnat.a
+-lm
+-ldl

@@ -1,0 +1,2 @@
+sdata-values.adb:13:16: warning: "Img" is not modified, could be declared constant [-gnatwk]
+sdata-values.adb:19:16: warning: "Img" is not modified, could be declared constant [-gnatwk]

@@ -332,15 +332,23 @@ package body SData.Parser is
       end if;
 
       case Tok.Kind is
-         when Token_LET =>
+         when Token_LET | Token_SET =>
             declare
                Var_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
-               Stmt := new Statement (Stmt_LET);
+               Stmt := new Statement ((if Tok.Kind = Token_LET then Stmt_LET else Stmt_SET));
                Stmt.Var_Len := Var_Tok.Length;
                Stmt.Var_Name (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);
                Stmt.Expr := Parse_Expression (Ctx);
+            end;
+
+         when Token_REPEAT =>
+            declare
+               Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               Stmt := new Statement (Stmt_REPEAT);
+               Stmt.Count := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
             end;
 
          when Token_PRINT =>
@@ -440,8 +448,11 @@ package body SData.Parser is
                Stmt.For_Body := Parse_Block (Ctx, Token_NEXT);
             end;
 
-         when Token_END | Token_QUIT | Token_NAMES =>
-            Stmt := new Statement ((if Tok.Kind = Token_END then Stmt_END elsif Tok.Kind = Token_QUIT then Stmt_QUIT else Stmt_NAMES));
+         when Token_END | Token_QUIT | Token_NAMES | Token_NEW =>
+            Stmt := new Statement ((if Tok.Kind = Token_END then Stmt_END 
+                                     elsif Tok.Kind = Token_QUIT then Stmt_QUIT 
+                                     elsif Tok.Kind = Token_NEW then Stmt_NEW
+                                     else Stmt_NAMES));
 
          when Token_REM =>
             return Parse_Statement (Ctx);

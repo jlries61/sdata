@@ -1,0 +1,42 @@
+V "GNAT Lib v15"
+A -gnatA
+A -g
+A -gnat2012
+A -gnatwa
+A -gnatwl
+A -gnatwu
+A -g
+A -mtune=generic
+A -march=x86-64
+P ZX
+
+RN
+RV NO_IMPLEMENTATION_PRAGMAS
+
+U sdata.config%s	sdata-config.ads	2d53346d NE OO PK
+W sdata%s		sdata.ads		sdata.ali
+
+D sdata.ads		20260217010305 80fa9d3c sdata%s
+D sdata-config.ads	20260227223924 ada9a951 sdata.config%s
+D system.ads		20260202094243 14286b0f system%s
+G a e
+X 1 sdata.ads
+1K9*SData 2e10 2|4r9 32r5
+X 2 sdata-config.ads
+4K15*Config 1|1k9 2|32l11 32e17
+7E9*Format_Type 7e41 10r20 13r20 26r23
+7n25*CSV{7E9} 10r35 13r35 26r38
+7n30*ODF{7E9}
+7n35*OOXML{7E9}
+10e4*Input_Format{7E9}
+13e4*Output_Format{7E9}
+16b4*Quiet_Mode{boolean}
+19a4*Output_File{string}
+20i4*Output_File_Len{natural}
+23a4*Save_File_Path{string}
+24i4*Save_File_Len{natural}
+25b4*Save_File_Active{boolean}
+26e4*Save_File_Fmt{7E9}
+29i4*Repeat_Count{natural}
+30b4*Repeat_Active{boolean}
+

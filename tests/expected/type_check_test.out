@@ -1,28 +1,28 @@
 ID BEFORE:
-1.00000E+00
+1
 Error: Type mismatch for variable ID
 ID AFTER (Should match BEFORE):
-1.00000E+00
+1
 NAME BEFORE:
 Alice
 Error: Type mismatch for variable NAME
 NAME AFTER (Should match BEFORE):
 Alice
 ID BEFORE:
-2.00000E+00
+2
 Error: Type mismatch for variable ID
 ID AFTER (Should match BEFORE):
-2.00000E+00
+2
 NAME BEFORE:
 Bob
 Error: Type mismatch for variable NAME
 NAME AFTER (Should match BEFORE):
 Bob
 ID BEFORE:
-3.00000E+00
+3
 Error: Type mismatch for variable ID
 ID AFTER (Should match BEFORE):
-3.00000E+00
+3
 NAME BEFORE:
 Charlie
 Error: Type mismatch for variable NAME

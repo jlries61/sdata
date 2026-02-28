@@ -1,0 +1,2 @@
+sdata-interpreter.adb:94:16: warning: "Table" is already use-visible through previous use_clause at line 2 [-gnatwr]
+sdata-interpreter.adb:130:16: warning: "Table" is already use-visible through previous use_clause at line 2 [-gnatwr]

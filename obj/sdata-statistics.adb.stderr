@@ -1,0 +1,4 @@
+sdata-statistics.adb:2:06: warning: redundant with clause in body [-gnatwr]
+sdata-statistics.adb:311:07: warning: "A" is not modified, could be declared constant [-gnatwk]
+sdata-statistics.adb:312:07: warning: "B" is not modified, could be declared constant [-gnatwk]
+sdata-statistics.ads:2:18: warning: unit "Ada.Numerics.Elementary_Functions" is not referenced [-gnatwu]

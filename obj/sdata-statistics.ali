@@ -1,0 +1,1073 @@
+V "GNAT Lib v15"
+A -gnatA
+A -g
+A -gnat2012
+A -gnatwa
+A -gnatwl
+A -gnatwu
+A -g
+A -mtune=generic
+A -march=x86-64
+P ZX
+
+RN
+RV NO_DIRECT_BOOLEAN_OPERATORS
+RV NO_EXCEPTION_HANDLERS
+RV NO_EXCEPTIONS
+RV NO_FLOATING_POINT
+RV NO_IMPLICIT_CONDITIONALS
+RV NO_RECURSION
+RV NO_STANDARD_STORAGE_POOLS
+RV NO_DEFAULT_INITIALIZATION
+RV NO_IMPLEMENTATION_ASPECT_SPECIFICATIONS
+RV NO_IMPLEMENTATION_PRAGMAS
+RV NO_ELABORATION_CODE
+
+U sdata.statistics%b	sdata-statistics.adb	b7cdd69e NE OO PK IU
+W ada%s			ada.ads			ada.ali
+Z ada.exceptions%s	a-except.adb		a-except.ali
+W ada.numerics%s	a-numeri.ads		a-numeri.ali
+Z ada.numerics.aux_float%s  a-nuaufl.ads	a-nuaufl.ali
+Z ada.numerics.aux_generic_float%s
+Z ada.numerics.aux_long_float%s  a-nalofl.ads	a-nalofl.ali
+Z ada.numerics.aux_long_long_float%s  a-nallfl.ads  a-nallfl.ali
+Z ada.numerics.aux_short_float%s  a-nashfl.ads	a-nashfl.ali
+W ada.numerics.float_random%s  a-nuflra.adb	a-nuflra.ali
+W ada.numerics.generic_elementary_functions%s
+Z ada.strings.text_buffers%s  a-sttebu.adb	a-sttebu.ali
+W beta_function%s	beta_function.adb	beta_function.ali  ED
+Z error_function%s	error_function.adb	error_function.ali  ED
+W gamma_function%s	gamma_function.adb	gamma_function.ali  ED
+W generic_random_functions%s  generic_random_functions.adb  generic_random_functions.ali  ED
+W phi_function%s	phi_function.adb	phi_function.ali  ED
+W sdata%s		sdata.ads		sdata.ali
+Z system.exn_lflt%s	s-exnlfl.ads		s-exnlfl.ali
+Z system.fat_flt%s	s-fatflt.ads		s-fatflt.ali
+Z system.fat_lflt%s	s-fatlfl.ads		s-fatlfl.ali
+
+U sdata.statistics%s	sdata-statistics.ads	862d334c EE OO PK IU
+W ada%s			ada.ads			ada.ali
+W ada.numerics%s	a-numeri.ads		a-numeri.ali
+W ada.numerics.elementary_functions%s  a-nuelfu.ads  a-nuelfu.ali
+W ada.numerics.float_random%s  a-nuflra.adb	a-nuflra.ali
+W sdata%s		sdata.ads		sdata.ali
+
+D ada.ads		20260202094243 76789da1 ada%s
+D a-except.ads		20260202094243 e7970cd9 ada.exceptions%s
+D a-numeri.ads		20260202094243 84bea7a3 ada.numerics%s
+D a-nuaufl.ads		20260202094243 d3e63031 ada.numerics.aux_float%s
+D a-nagefl.ads		20260202094243 53f456a7 ada.numerics.aux_generic_float%s
+D a-naliop.ads		20260202094243 6b421e5f ada.numerics.aux_linker_options%s
+D a-nalofl.ads		20260202094243 d6c95180 ada.numerics.aux_long_float%s
+D a-nallfl.ads		20260202094243 6ccf65a3 ada.numerics.aux_long_long_float%s
+D a-nashfl.ads		20260202094243 b54ed4fb ada.numerics.aux_short_float%s
+D a-nuelfu.ads		20260202094243 03e83d1c ada.numerics.elementary_functions%s
+D a-nuflra.ads		20260202094243 4056ab7a ada.numerics.float_random%s
+D a-ngelfu.ads		20260202094243 324808ac ada.numerics.generic_elementary_functions%s
+D a-ngelfu.adb		20260202094243 356d3cf7 ada.numerics.generic_elementary_functions%b
+D a-string.ads		20260202094243 90ac6797 ada.strings%s
+D a-sttebu.ads		20260202094243 f1ad67a2 ada.strings.text_buffers%s
+D a-stuten.ads		20260202094243 c6ced0ae ada.strings.utf_encoding%s
+D a-tags.ads		20260202094243 fbca0ad5 ada.tags%s
+D a-unccon.ads		20260202094243 0e9b276f ada.unchecked_conversion%s
+D beta_function.ads	20240522033810 e068f4c0 beta_function%s
+D beta_function.adb	20240522033810 b8ed8f4d beta_function%b
+D error_function.ads	20200601163040 ad5ebe90 error_function%s
+D error_function.adb	20200601163040 a8a33a00 error_function%b
+D gamma_function.ads	20240522033810 6b2c4e9c gamma_function%s
+D gamma_function.adb	20240522033810 d4f02776 gamma_function%b
+D generic_random_functions.ads  20230123042924 cec06b1d generic_random_functions%s
+D generic_random_functions.adb  20180311143956 64c60d9e generic_random_functions%b
+D interfac.ads		20260202094243 9111f9c1 interfaces%s
+D phi_function.ads	20240522033810 acb54ff8 phi_function%s
+D phi_function.adb	20240522033810 982ea3bf phi_function%b
+D sdata.ads		20260217010305 80fa9d3c sdata%s
+D sdata-statistics.ads	20260227182320 c1d79fb5 sdata.statistics%s
+D sdata-statistics.adb	20260227182349 ed357444 sdata.statistics%b
+D system.ads		20260202094243 14286b0f system%s
+D s-exctab.ads		20260202094243 91bef6ef system.exception_table%s
+D s-exnlfl.ads		20260202094243 3a76fe2b system.exn_lflt%s
+D s-exponr.ads		20260202094243 2127300b system.exponr%s
+D s-fatflt.ads		20260202094243 11beb392 system.fat_flt%s
+D s-fatgen.ads		20260202094243 d28c6cfe system.fat_gen%s
+D s-fatlfl.ads		20260202094243 378cba9f system.fat_lflt%s
+D s-parame.ads		20260202094243 3597fc11 system.parameters%s
+D s-rannum.ads		20260202094243 95815eca system.random_numbers%s
+D s-secsta.ads		20260202094243 578279f5 system.secondary_stack%s
+D s-soflin.ads		20260202094243 5d88fdea system.soft_links%s
+D s-stache.ads		20260202094243 0b81c1fe system.stack_checking%s
+D s-stalib.ads		20260202094243 1c9580f6 system.standard_library%s
+D s-stoele.ads		20260202094243 ccded4e8 system.storage_elements%s
+D s-traent.ads		20260202094243 c81cbf8c system.traceback_entries%s
+G a e
+G c b b b [b sdata__statistics 8 1 none]
+G c Z s b [z_pdf sdata__statistics 12 13 none]
+G c Z s b [z_cdf sdata__statistics 13 13 none]
+G c Z s b [z_idf sdata__statistics 14 13 none]
+G c Z s b [normal_pdf sdata__statistics 17 13 none]
+G c Z s b [normal_cdf sdata__statistics 18 13 none]
+G c Z s b [normal_idf sdata__statistics 19 13 none]
+G c Z s b [normal_rn sdata__statistics 20 13 none]
+G c Z s b [uniform_pdf sdata__statistics 23 13 none]
+G c Z s b [uniform_cdf sdata__statistics 24 13 none]
+G c Z s b [uniform_idf sdata__statistics 25 13 none]
+G c Z s b [uniform_rn sdata__statistics 26 13 none]
+G c Z s b [exponential_pdf sdata__statistics 29 13 none]
+G c Z s b [exponential_cdf sdata__statistics 30 13 none]
+G c Z s b [exponential_idf sdata__statistics 31 13 none]
+G c Z s b [exponential_rn sdata__statistics 32 13 none]
+G c Z s b [beta_pdf sdata__statistics 35 13 none]
+G c Z s b [beta_cdf sdata__statistics 36 13 none]
+G c Z s b [beta_idf sdata__statistics 37 13 none]
+G c Z s b [poisson_pmf sdata__statistics 40 13 none]
+G c Z s b [poisson_cdf sdata__statistics 41 13 none]
+G c Z s b [poisson_rn sdata__statistics 42 13 none]
+G c Z s b [gamma_pdf sdata__statistics 45 13 none]
+G c Z s b [gamma_cdf sdata__statistics 46 13 none]
+G c Z s b [gamma_rn sdata__statistics 47 13 none]
+G c Z s b [chi_square_pdf sdata__statistics 50 13 none]
+G c Z s b [chi_square_cdf sdata__statistics 51 13 none]
+G c Z s b [student_t_pdf sdata__statistics 54 13 none]
+G c Z s b [student_t_cdf sdata__statistics 55 13 none]
+G c Z s b [f_pdf sdata__statistics 58 13 none]
+G c Z s b [f_cdf sdata__statistics 59 13 none]
+G c Z s b [ensure_random_init sdata__statistics 68 14 none]
+G c Z b b [sqrt sdata__statistics__ref 53 13 10_4]
+G c Z b b [log sdata__statistics__ref 77 13 10_4]
+G c Z b b [log sdata__statistics__ref 82 13 10_4]
+G c Z b b [exp sdata__statistics__ref 87 13 10_4]
+G c Z b b [Oexpon sdata__statistics__ref 91 13 10_4]
+G c Z b b [sin sdata__statistics__ref 100 13 10_4]
+G c Z b b [sin sdata__statistics__ref 106 13 10_4]
+G c Z b b [cos sdata__statistics__ref 112 13 10_4]
+G c Z b b [cos sdata__statistics__ref 118 13 10_4]
+G c Z b b [tan sdata__statistics__ref 124 13 10_4]
+G c Z b b [tan sdata__statistics__ref 128 13 10_4]
+G c Z b b [cot sdata__statistics__ref 134 13 10_4]
+G c Z b b [cot sdata__statistics__ref 138 13 10_4]
+G c Z b b [arcsin sdata__statistics__ref 145 13 10_4]
+G c Z b b [arcsin sdata__statistics__ref 150 13 10_4]
+G c Z b b [arccos sdata__statistics__ref 155 13 10_4]
+G c Z b b [arccos sdata__statistics__ref 160 13 10_4]
+G c Z b b [arctan sdata__statistics__ref 165 13 10_4]
+G c Z b b [arctan sdata__statistics__ref 173 13 10_4]
+G c Z b b [arccot sdata__statistics__ref 182 13 10_4]
+G c Z b b [arccot sdata__statistics__ref 190 13 10_4]
+G c Z b b [sinh sdata__statistics__ref 199 13 10_4]
+G c Z b b [cosh sdata__statistics__ref 202 13 10_4]
+G c Z b b [tanh sdata__statistics__ref 207 13 10_4]
+G c Z b b [coth sdata__statistics__ref 212 13 10_4]
+G c Z b b [arcsinh sdata__statistics__ref 217 13 10_4]
+G c Z b b [arccosh sdata__statistics__ref 221 13 10_4]
+G c Z b b [arctanh sdata__statistics__ref 227 13 10_4]
+G c Z b b [arccoth sdata__statistics__ref 232 13 10_4]
+G c Z b b [sin sdata__statistics__ref__aux 54 13 45_4_10_4]
+G c Z b b [cos sdata__statistics__ref__aux 63 13 45_4_10_4]
+G c Z b b [tan sdata__statistics__ref__aux 72 13 45_4_10_4]
+G c Z b b [exp sdata__statistics__ref__aux 81 13 45_4_10_4]
+G c Z b b [sqrt sdata__statistics__ref__aux 90 13 45_4_10_4]
+G c Z b b [log sdata__statistics__ref__aux 99 13 45_4_10_4]
+G c Z b b [acos sdata__statistics__ref__aux 108 13 45_4_10_4]
+G c Z b b [asin sdata__statistics__ref__aux 117 13 45_4_10_4]
+G c Z b b [atan sdata__statistics__ref__aux 126 13 45_4_10_4]
+G c Z b b [sinh sdata__statistics__ref__aux 135 13 45_4_10_4]
+G c Z b b [cosh sdata__statistics__ref__aux 144 13 45_4_10_4]
+G c Z b b [tanh sdata__statistics__ref__aux 153 13 45_4_10_4]
+G c Z b b [pow sdata__statistics__ref__aux 162 13 45_4_10_4]
+G c Z b b [exp_strict sdata__statistics__ref 65 13 10_4]
+G c Z b b [local_atan sdata__statistics__ref 69 13 10_4]
+G c Z b b [phi sdata__statistics__long_phi 48 12 13_4]
+G c Z b b [inverse_phi sdata__statistics__long_phi 50 12 13_4]
+G c Z b b [sqrt sdata__statistics__long_phi__gef 53 13 21_3_13_4]
+G c Z b b [log sdata__statistics__long_phi__gef 77 13 21_3_13_4]
+G c Z b b [log sdata__statistics__long_phi__gef 82 13 21_3_13_4]
+G c Z b b [exp sdata__statistics__long_phi__gef 87 13 21_3_13_4]
+G c Z b b [Oexpon sdata__statistics__long_phi__gef 91 13 21_3_13_4]
+G c Z b b [sin sdata__statistics__long_phi__gef 100 13 21_3_13_4]
+G c Z b b [sin sdata__statistics__long_phi__gef 106 13 21_3_13_4]
+G c Z b b [cos sdata__statistics__long_phi__gef 112 13 21_3_13_4]
+G c Z b b [cos sdata__statistics__long_phi__gef 118 13 21_3_13_4]
+G c Z b b [tan sdata__statistics__long_phi__gef 124 13 21_3_13_4]
+G c Z b b [tan sdata__statistics__long_phi__gef 128 13 21_3_13_4]
+G c Z b b [cot sdata__statistics__long_phi__gef 134 13 21_3_13_4]
+G c Z b b [cot sdata__statistics__long_phi__gef 138 13 21_3_13_4]
+G c Z b b [arcsin sdata__statistics__long_phi__gef 145 13 21_3_13_4]
+G c Z b b [arcsin sdata__statistics__long_phi__gef 150 13 21_3_13_4]
+G c Z b b [arccos sdata__statistics__long_phi__gef 155 13 21_3_13_4]
+G c Z b b [arccos sdata__statistics__long_phi__gef 160 13 21_3_13_4]
+G c Z b b [arctan sdata__statistics__long_phi__gef 165 13 21_3_13_4]
+G c Z b b [arctan sdata__statistics__long_phi__gef 173 13 21_3_13_4]
+G c Z b b [arccot sdata__statistics__long_phi__gef 182 13 21_3_13_4]
+G c Z b b [arccot sdata__statistics__long_phi__gef 190 13 21_3_13_4]
+G c Z b b [sinh sdata__statistics__long_phi__gef 199 13 21_3_13_4]
+G c Z b b [cosh sdata__statistics__long_phi__gef 202 13 21_3_13_4]
+G c Z b b [tanh sdata__statistics__long_phi__gef 207 13 21_3_13_4]
+G c Z b b [coth sdata__statistics__long_phi__gef 212 13 21_3_13_4]
+G c Z b b [arcsinh sdata__statistics__long_phi__gef 217 13 21_3_13_4]
+G c Z b b [arccosh sdata__statistics__long_phi__gef 221 13 21_3_13_4]
+G c Z b b [arctanh sdata__statistics__long_phi__gef 227 13 21_3_13_4]
+G c Z b b [arccoth sdata__statistics__long_phi__gef 232 13 21_3_13_4]
+G c Z b b [sin sdata__statistics__long_phi__gef__aux 54 13 45_4_21_3_13_4]
+G c Z b b [cos sdata__statistics__long_phi__gef__aux 63 13 45_4_21_3_13_4]
+G c Z b b [tan sdata__statistics__long_phi__gef__aux 72 13 45_4_21_3_13_4]
+G c Z b b [exp sdata__statistics__long_phi__gef__aux 81 13 45_4_21_3_13_4]
+G c Z b b [sqrt sdata__statistics__long_phi__gef__aux 90 13 45_4_21_3_13_4]
+G c Z b b [log sdata__statistics__long_phi__gef__aux 99 13 45_4_21_3_13_4]
+G c Z b b [acos sdata__statistics__long_phi__gef__aux 108 13 45_4_21_3_13_4]
+G c Z b b [asin sdata__statistics__long_phi__gef__aux 117 13 45_4_21_3_13_4]
+G c Z b b [atan sdata__statistics__long_phi__gef__aux 126 13 45_4_21_3_13_4]
+G c Z b b [sinh sdata__statistics__long_phi__gef__aux 135 13 45_4_21_3_13_4]
+G c Z b b [cosh sdata__statistics__long_phi__gef__aux 144 13 45_4_21_3_13_4]
+G c Z b b [tanh sdata__statistics__long_phi__gef__aux 153 13 45_4_21_3_13_4]
+G c Z b b [pow sdata__statistics__long_phi__gef__aux 162 13 45_4_21_3_13_4]
+G c Z b b [exp_strict sdata__statistics__long_phi__gef 65 13 21_3_13_4]
+G c Z b b [local_atan sdata__statistics__long_phi__gef 69 13 21_3_13_4]
+G c Z b b [phi_single_precision sdata__statistics__long_phi 28 12 13_4]
+G c Z b b [erf sdata__statistics__long_phi__erf_pkg 60 12 50_3_13_4]
+G c Z b b [erfc sdata__statistics__long_phi__erf_pkg 64 12 50_3_13_4]
+G c Z b b [sign sdata__statistics__long_phi__erf_pkg 20 12 50_3_13_4]
+G c Z b b [sqrt sdata__statistics__long_phi__erf_pkg__gef 53 13 31_3_50_3_13_4]
+G c Z b b [log sdata__statistics__long_phi__erf_pkg__gef 77 13 31_3_50_3_13_4]
+G c Z b b [log sdata__statistics__long_phi__erf_pkg__gef 82 13 31_3_50_3_13_4]
+G c Z b b [exp sdata__statistics__long_phi__erf_pkg__gef 87 13 31_3_50_3_13_4]
+G c Z b b [Oexpon sdata__statistics__long_phi__erf_pkg__gef 91 13 31_3_50_3_13_4]
+G c Z b b [sin sdata__statistics__long_phi__erf_pkg__gef 100 13 31_3_50_3_13_4]
+G c Z b b [sin sdata__statistics__long_phi__erf_pkg__gef 106 13 31_3_50_3_13_4]
+G c Z b b [cos sdata__statistics__long_phi__erf_pkg__gef 112 13 31_3_50_3_13_4]
+G c Z b b [cos sdata__statistics__long_phi__erf_pkg__gef 118 13 31_3_50_3_13_4]
+G c Z b b [tan sdata__statistics__long_phi__erf_pkg__gef 124 13 31_3_50_3_13_4]
+G c Z b b [tan sdata__statistics__long_phi__erf_pkg__gef 128 13 31_3_50_3_13_4]
+G c Z b b [cot sdata__statistics__long_phi__erf_pkg__gef 134 13 31_3_50_3_13_4]
+G c Z b b [cot sdata__statistics__long_phi__erf_pkg__gef 138 13 31_3_50_3_13_4]
+G c Z b b [arcsin sdata__statistics__long_phi__erf_pkg__gef 145 13 31_3_50_3_13_4]
+G c Z b b [arcsin sdata__statistics__long_phi__erf_pkg__gef 150 13 31_3_50_3_13_4]
+G c Z b b [arccos sdata__statistics__long_phi__erf_pkg__gef 155 13 31_3_50_3_13_4]
+G c Z b b [arccos sdata__statistics__long_phi__erf_pkg__gef 160 13 31_3_50_3_13_4]
+G c Z b b [arctan sdata__statistics__long_phi__erf_pkg__gef 165 13 31_3_50_3_13_4]
+G c Z b b [arctan sdata__statistics__long_phi__erf_pkg__gef 173 13 31_3_50_3_13_4]
+G c Z b b [arccot sdata__statistics__long_phi__erf_pkg__gef 182 13 31_3_50_3_13_4]
+G c Z b b [arccot sdata__statistics__long_phi__erf_pkg__gef 190 13 31_3_50_3_13_4]
+G c Z b b [sinh sdata__statistics__long_phi__erf_pkg__gef 199 13 31_3_50_3_13_4]
+G c Z b b [cosh sdata__statistics__long_phi__erf_pkg__gef 202 13 31_3_50_3_13_4]
+G c Z b b [tanh sdata__statistics__long_phi__erf_pkg__gef 207 13 31_3_50_3_13_4]
+G c Z b b [coth sdata__statistics__long_phi__erf_pkg__gef 212 13 31_3_50_3_13_4]
+G c Z b b [arcsinh sdata__statistics__long_phi__erf_pkg__gef 217 13 31_3_50_3_13_4]
+G c Z b b [arccosh sdata__statistics__long_phi__erf_pkg__gef 221 13 31_3_50_3_13_4]
+G c Z b b [arctanh sdata__statistics__long_phi__erf_pkg__gef 227 13 31_3_50_3_13_4]
+G c Z b b [arccoth sdata__statistics__long_phi__erf_pkg__gef 232 13 31_3_50_3_13_4]
+G c Z b b [sin sdata__statistics__long_phi__erf_pkg__gef__aux 54 13 45_4_31_3_50_3_13_4]
+G c Z b b [cos sdata__statistics__long_phi__erf_pkg__gef__aux 63 13 45_4_31_3_50_3_13_4]
+G c Z b b [tan sdata__statistics__long_phi__erf_pkg__gef__aux 72 13 45_4_31_3_50_3_13_4]
+G c Z b b [exp sdata__statistics__long_phi__erf_pkg__gef__aux 81 13 45_4_31_3_50_3_13_4]
+G c Z b b [sqrt sdata__statistics__long_phi__erf_pkg__gef__aux 90 13 45_4_31_3_50_3_13_4]
+G c Z b b [log sdata__statistics__long_phi__erf_pkg__gef__aux 99 13 45_4_31_3_50_3_13_4]
+G c Z b b [acos sdata__statistics__long_phi__erf_pkg__gef__aux 108 13 45_4_31_3_50_3_13_4]
+G c Z b b [asin sdata__statistics__long_phi__erf_pkg__gef__aux 117 13 45_4_31_3_50_3_13_4]
+G c Z b b [atan sdata__statistics__long_phi__erf_pkg__gef__aux 126 13 45_4_31_3_50_3_13_4]
+G c Z b b [sinh sdata__statistics__long_phi__erf_pkg__gef__aux 135 13 45_4_31_3_50_3_13_4]
+G c Z b b [cosh sdata__statistics__long_phi__erf_pkg__gef__aux 144 13 45_4_31_3_50_3_13_4]
+G c Z b b [tanh sdata__statistics__long_phi__erf_pkg__gef__aux 153 13 45_4_31_3_50_3_13_4]
+G c Z b b [pow sdata__statistics__long_phi__erf_pkg__gef__aux 162 13 45_4_31_3_50_3_13_4]
+G c Z b b [exp_strict sdata__statistics__long_phi__erf_pkg__gef 65 13 31_3_50_3_13_4]
+G c Z b b [local_atan sdata__statistics__long_phi__erf_pkg__gef 69 13 31_3_50_3_13_4]
+G c Z b b [beta sdata__statistics__long_beta 75 12 14_4]
+G c Z b b [beta sdata__statistics__long_beta 86 12 14_4]
+G c Z b b [regularized_beta sdata__statistics__long_beta 94 12 14_4]
+G c Z b b [inverse_beta sdata__statistics__long_beta 98 12 14_4]
+G c Z b b [inverse_regularized_beta sdata__statistics__long_beta 104 12 14_4]
+G c Z b b [sqrt sdata__statistics__long_beta__ref 53 13 10_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__ref 77 13 10_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__ref 82 13 10_3_14_4]
+G c Z b b [exp sdata__statistics__long_beta__ref 87 13 10_3_14_4]
+G c Z b b [Oexpon sdata__statistics__long_beta__ref 91 13 10_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__ref 100 13 10_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__ref 106 13 10_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__ref 112 13 10_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__ref 118 13 10_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__ref 124 13 10_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__ref 128 13 10_3_14_4]
+G c Z b b [cot sdata__statistics__long_beta__ref 134 13 10_3_14_4]
+G c Z b b [cot sdata__statistics__long_beta__ref 138 13 10_3_14_4]
+G c Z b b [arcsin sdata__statistics__long_beta__ref 145 13 10_3_14_4]
+G c Z b b [arcsin sdata__statistics__long_beta__ref 150 13 10_3_14_4]
+G c Z b b [arccos sdata__statistics__long_beta__ref 155 13 10_3_14_4]
+G c Z b b [arccos sdata__statistics__long_beta__ref 160 13 10_3_14_4]
+G c Z b b [arctan sdata__statistics__long_beta__ref 165 13 10_3_14_4]
+G c Z b b [arctan sdata__statistics__long_beta__ref 173 13 10_3_14_4]
+G c Z b b [arccot sdata__statistics__long_beta__ref 182 13 10_3_14_4]
+G c Z b b [arccot sdata__statistics__long_beta__ref 190 13 10_3_14_4]
+G c Z b b [sinh sdata__statistics__long_beta__ref 199 13 10_3_14_4]
+G c Z b b [cosh sdata__statistics__long_beta__ref 202 13 10_3_14_4]
+G c Z b b [tanh sdata__statistics__long_beta__ref 207 13 10_3_14_4]
+G c Z b b [coth sdata__statistics__long_beta__ref 212 13 10_3_14_4]
+G c Z b b [arcsinh sdata__statistics__long_beta__ref 217 13 10_3_14_4]
+G c Z b b [arccosh sdata__statistics__long_beta__ref 221 13 10_3_14_4]
+G c Z b b [arctanh sdata__statistics__long_beta__ref 227 13 10_3_14_4]
+G c Z b b [arccoth sdata__statistics__long_beta__ref 232 13 10_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__ref__aux 54 13 45_4_10_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__ref__aux 63 13 45_4_10_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__ref__aux 72 13 45_4_10_3_14_4]
+G c Z b b [exp sdata__statistics__long_beta__ref__aux 81 13 45_4_10_3_14_4]
+G c Z b b [sqrt sdata__statistics__long_beta__ref__aux 90 13 45_4_10_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__ref__aux 99 13 45_4_10_3_14_4]
+G c Z b b [acos sdata__statistics__long_beta__ref__aux 108 13 45_4_10_3_14_4]
+G c Z b b [asin sdata__statistics__long_beta__ref__aux 117 13 45_4_10_3_14_4]
+G c Z b b [atan sdata__statistics__long_beta__ref__aux 126 13 45_4_10_3_14_4]
+G c Z b b [sinh sdata__statistics__long_beta__ref__aux 135 13 45_4_10_3_14_4]
+G c Z b b [cosh sdata__statistics__long_beta__ref__aux 144 13 45_4_10_3_14_4]
+G c Z b b [tanh sdata__statistics__long_beta__ref__aux 153 13 45_4_10_3_14_4]
+G c Z b b [pow sdata__statistics__long_beta__ref__aux 162 13 45_4_10_3_14_4]
+G c Z b b [exp_strict sdata__statistics__long_beta__ref 65 13 10_3_14_4]
+G c Z b b [local_atan sdata__statistics__long_beta__ref 69 13 10_3_14_4]
+G c Z b b [phi sdata__statistics__long_beta__rphf 48 12 11_3_14_4]
+G c Z b b [inverse_phi sdata__statistics__long_beta__rphf 50 12 11_3_14_4]
+G c Z b b [sqrt sdata__statistics__long_beta__rphf__gef 53 13 21_3_11_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__rphf__gef 77 13 21_3_11_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__rphf__gef 82 13 21_3_11_3_14_4]
+G c Z b b [exp sdata__statistics__long_beta__rphf__gef 87 13 21_3_11_3_14_4]
+G c Z b b [Oexpon sdata__statistics__long_beta__rphf__gef 91 13 21_3_11_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__rphf__gef 100 13 21_3_11_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__rphf__gef 106 13 21_3_11_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__rphf__gef 112 13 21_3_11_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__rphf__gef 118 13 21_3_11_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__rphf__gef 124 13 21_3_11_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__rphf__gef 128 13 21_3_11_3_14_4]
+G c Z b b [cot sdata__statistics__long_beta__rphf__gef 134 13 21_3_11_3_14_4]
+G c Z b b [cot sdata__statistics__long_beta__rphf__gef 138 13 21_3_11_3_14_4]
+G c Z b b [arcsin sdata__statistics__long_beta__rphf__gef 145 13 21_3_11_3_14_4]
+G c Z b b [arcsin sdata__statistics__long_beta__rphf__gef 150 13 21_3_11_3_14_4]
+G c Z b b [arccos sdata__statistics__long_beta__rphf__gef 155 13 21_3_11_3_14_4]
+G c Z b b [arccos sdata__statistics__long_beta__rphf__gef 160 13 21_3_11_3_14_4]
+G c Z b b [arctan sdata__statistics__long_beta__rphf__gef 165 13 21_3_11_3_14_4]
+G c Z b b [arctan sdata__statistics__long_beta__rphf__gef 173 13 21_3_11_3_14_4]
+G c Z b b [arccot sdata__statistics__long_beta__rphf__gef 182 13 21_3_11_3_14_4]
+G c Z b b [arccot sdata__statistics__long_beta__rphf__gef 190 13 21_3_11_3_14_4]
+G c Z b b [sinh sdata__statistics__long_beta__rphf__gef 199 13 21_3_11_3_14_4]
+G c Z b b [cosh sdata__statistics__long_beta__rphf__gef 202 13 21_3_11_3_14_4]
+G c Z b b [tanh sdata__statistics__long_beta__rphf__gef 207 13 21_3_11_3_14_4]
+G c Z b b [coth sdata__statistics__long_beta__rphf__gef 212 13 21_3_11_3_14_4]
+G c Z b b [arcsinh sdata__statistics__long_beta__rphf__gef 217 13 21_3_11_3_14_4]
+G c Z b b [arccosh sdata__statistics__long_beta__rphf__gef 221 13 21_3_11_3_14_4]
+G c Z b b [arctanh sdata__statistics__long_beta__rphf__gef 227 13 21_3_11_3_14_4]
+G c Z b b [arccoth sdata__statistics__long_beta__rphf__gef 232 13 21_3_11_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__rphf__gef__aux 54 13 45_4_21_3_11_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__rphf__gef__aux 63 13 45_4_21_3_11_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__rphf__gef__aux 72 13 45_4_21_3_11_3_14_4]
+G c Z b b [exp sdata__statistics__long_beta__rphf__gef__aux 81 13 45_4_21_3_11_3_14_4]
+G c Z b b [sqrt sdata__statistics__long_beta__rphf__gef__aux 90 13 45_4_21_3_11_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__rphf__gef__aux 99 13 45_4_21_3_11_3_14_4]
+G c Z b b [acos sdata__statistics__long_beta__rphf__gef__aux 108 13 45_4_21_3_11_3_14_4]
+G c Z b b [asin sdata__statistics__long_beta__rphf__gef__aux 117 13 45_4_21_3_11_3_14_4]
+G c Z b b [atan sdata__statistics__long_beta__rphf__gef__aux 126 13 45_4_21_3_11_3_14_4]
+G c Z b b [sinh sdata__statistics__long_beta__rphf__gef__aux 135 13 45_4_21_3_11_3_14_4]
+G c Z b b [cosh sdata__statistics__long_beta__rphf__gef__aux 144 13 45_4_21_3_11_3_14_4]
+G c Z b b [tanh sdata__statistics__long_beta__rphf__gef__aux 153 13 45_4_21_3_11_3_14_4]
+G c Z b b [pow sdata__statistics__long_beta__rphf__gef__aux 162 13 45_4_21_3_11_3_14_4]
+G c Z b b [exp_strict sdata__statistics__long_beta__rphf__gef 65 13 21_3_11_3_14_4]
+G c Z b b [local_atan sdata__statistics__long_beta__rphf__gef 69 13 21_3_11_3_14_4]
+G c Z b b [phi_single_precision sdata__statistics__long_beta__rphf 28 12 11_3_14_4]
+G c Z b b [erf sdata__statistics__long_beta__rphf__erf_pkg 60 12 50_3_11_3_14_4]
+G c Z b b [erfc sdata__statistics__long_beta__rphf__erf_pkg 64 12 50_3_11_3_14_4]
+G c Z b b [sign sdata__statistics__long_beta__rphf__erf_pkg 20 12 50_3_11_3_14_4]
+G c Z b b [sqrt sdata__statistics__long_beta__rphf__erf_pkg__gef 53 13 31_3_50_3_11_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__rphf__erf_pkg__gef 77 13 31_3_50_3_11_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__rphf__erf_pkg__gef 82 13 31_3_50_3_11_3_14_4]
+G c Z b b [exp sdata__statistics__long_beta__rphf__erf_pkg__gef 87 13 31_3_50_3_11_3_14_4]
+G c Z b b [Oexpon sdata__statistics__long_beta__rphf__erf_pkg__gef 91 13 31_3_50_3_11_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__rphf__erf_pkg__gef 100 13 31_3_50_3_11_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__rphf__erf_pkg__gef 106 13 31_3_50_3_11_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__rphf__erf_pkg__gef 112 13 31_3_50_3_11_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__rphf__erf_pkg__gef 118 13 31_3_50_3_11_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__rphf__erf_pkg__gef 124 13 31_3_50_3_11_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__rphf__erf_pkg__gef 128 13 31_3_50_3_11_3_14_4]
+G c Z b b [cot sdata__statistics__long_beta__rphf__erf_pkg__gef 134 13 31_3_50_3_11_3_14_4]
+G c Z b b [cot sdata__statistics__long_beta__rphf__erf_pkg__gef 138 13 31_3_50_3_11_3_14_4]
+G c Z b b [arcsin sdata__statistics__long_beta__rphf__erf_pkg__gef 145 13 31_3_50_3_11_3_14_4]
+G c Z b b [arcsin sdata__statistics__long_beta__rphf__erf_pkg__gef 150 13 31_3_50_3_11_3_14_4]
+G c Z b b [arccos sdata__statistics__long_beta__rphf__erf_pkg__gef 155 13 31_3_50_3_11_3_14_4]
+G c Z b b [arccos sdata__statistics__long_beta__rphf__erf_pkg__gef 160 13 31_3_50_3_11_3_14_4]
+G c Z b b [arctan sdata__statistics__long_beta__rphf__erf_pkg__gef 165 13 31_3_50_3_11_3_14_4]
+G c Z b b [arctan sdata__statistics__long_beta__rphf__erf_pkg__gef 173 13 31_3_50_3_11_3_14_4]
+G c Z b b [arccot sdata__statistics__long_beta__rphf__erf_pkg__gef 182 13 31_3_50_3_11_3_14_4]
+G c Z b b [arccot sdata__statistics__long_beta__rphf__erf_pkg__gef 190 13 31_3_50_3_11_3_14_4]
+G c Z b b [sinh sdata__statistics__long_beta__rphf__erf_pkg__gef 199 13 31_3_50_3_11_3_14_4]
+G c Z b b [cosh sdata__statistics__long_beta__rphf__erf_pkg__gef 202 13 31_3_50_3_11_3_14_4]
+G c Z b b [tanh sdata__statistics__long_beta__rphf__erf_pkg__gef 207 13 31_3_50_3_11_3_14_4]
+G c Z b b [coth sdata__statistics__long_beta__rphf__erf_pkg__gef 212 13 31_3_50_3_11_3_14_4]
+G c Z b b [arcsinh sdata__statistics__long_beta__rphf__erf_pkg__gef 217 13 31_3_50_3_11_3_14_4]
+G c Z b b [arccosh sdata__statistics__long_beta__rphf__erf_pkg__gef 221 13 31_3_50_3_11_3_14_4]
+G c Z b b [arctanh sdata__statistics__long_beta__rphf__erf_pkg__gef 227 13 31_3_50_3_11_3_14_4]
+G c Z b b [arccoth sdata__statistics__long_beta__rphf__erf_pkg__gef 232 13 31_3_50_3_11_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 54 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 63 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 72 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [exp sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 81 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [sqrt sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 90 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 99 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [acos sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 108 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [asin sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 117 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [atan sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 126 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [sinh sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 135 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [cosh sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 144 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [tanh sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 153 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [pow sdata__statistics__long_beta__rphf__erf_pkg__gef__aux 162 13 45_4_31_3_50_3_11_3_14_4]
+G c Z b b [exp_strict sdata__statistics__long_beta__rphf__erf_pkg__gef 65 13 31_3_50_3_11_3_14_4]
+G c Z b b [local_atan sdata__statistics__long_beta__rphf__erf_pkg__gef 69 13 31_3_50_3_11_3_14_4]
+G c Z b b [gamma sdata__statistics__long_beta__rgf 45 12 12_3_14_4]
+G c Z b b [log_gamma sdata__statistics__long_beta__rgf 48 12 12_3_14_4]
+G c Z b b [log_gamma sdata__statistics__long_beta__rgf 49 13 12_3_14_4]
+G c Z b b [sqrt sdata__statistics__long_beta__rgf__ref 53 13 9_3_12_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__rgf__ref 77 13 9_3_12_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__rgf__ref 82 13 9_3_12_3_14_4]
+G c Z b b [exp sdata__statistics__long_beta__rgf__ref 87 13 9_3_12_3_14_4]
+G c Z b b [Oexpon sdata__statistics__long_beta__rgf__ref 91 13 9_3_12_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__rgf__ref 100 13 9_3_12_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__rgf__ref 106 13 9_3_12_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__rgf__ref 112 13 9_3_12_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__rgf__ref 118 13 9_3_12_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__rgf__ref 124 13 9_3_12_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__rgf__ref 128 13 9_3_12_3_14_4]
+G c Z b b [cot sdata__statistics__long_beta__rgf__ref 134 13 9_3_12_3_14_4]
+G c Z b b [cot sdata__statistics__long_beta__rgf__ref 138 13 9_3_12_3_14_4]
+G c Z b b [arcsin sdata__statistics__long_beta__rgf__ref 145 13 9_3_12_3_14_4]
+G c Z b b [arcsin sdata__statistics__long_beta__rgf__ref 150 13 9_3_12_3_14_4]
+G c Z b b [arccos sdata__statistics__long_beta__rgf__ref 155 13 9_3_12_3_14_4]
+G c Z b b [arccos sdata__statistics__long_beta__rgf__ref 160 13 9_3_12_3_14_4]
+G c Z b b [arctan sdata__statistics__long_beta__rgf__ref 165 13 9_3_12_3_14_4]
+G c Z b b [arctan sdata__statistics__long_beta__rgf__ref 173 13 9_3_12_3_14_4]
+G c Z b b [arccot sdata__statistics__long_beta__rgf__ref 182 13 9_3_12_3_14_4]
+G c Z b b [arccot sdata__statistics__long_beta__rgf__ref 190 13 9_3_12_3_14_4]
+G c Z b b [sinh sdata__statistics__long_beta__rgf__ref 199 13 9_3_12_3_14_4]
+G c Z b b [cosh sdata__statistics__long_beta__rgf__ref 202 13 9_3_12_3_14_4]
+G c Z b b [tanh sdata__statistics__long_beta__rgf__ref 207 13 9_3_12_3_14_4]
+G c Z b b [coth sdata__statistics__long_beta__rgf__ref 212 13 9_3_12_3_14_4]
+G c Z b b [arcsinh sdata__statistics__long_beta__rgf__ref 217 13 9_3_12_3_14_4]
+G c Z b b [arccosh sdata__statistics__long_beta__rgf__ref 221 13 9_3_12_3_14_4]
+G c Z b b [arctanh sdata__statistics__long_beta__rgf__ref 227 13 9_3_12_3_14_4]
+G c Z b b [arccoth sdata__statistics__long_beta__rgf__ref 232 13 9_3_12_3_14_4]
+G c Z b b [sin sdata__statistics__long_beta__rgf__ref__aux 54 13 45_4_9_3_12_3_14_4]
+G c Z b b [cos sdata__statistics__long_beta__rgf__ref__aux 63 13 45_4_9_3_12_3_14_4]
+G c Z b b [tan sdata__statistics__long_beta__rgf__ref__aux 72 13 45_4_9_3_12_3_14_4]
+G c Z b b [exp sdata__statistics__long_beta__rgf__ref__aux 81 13 45_4_9_3_12_3_14_4]
+G c Z b b [sqrt sdata__statistics__long_beta__rgf__ref__aux 90 13 45_4_9_3_12_3_14_4]
+G c Z b b [log sdata__statistics__long_beta__rgf__ref__aux 99 13 45_4_9_3_12_3_14_4]
+G c Z b b [acos sdata__statistics__long_beta__rgf__ref__aux 108 13 45_4_9_3_12_3_14_4]
+G c Z b b [asin sdata__statistics__long_beta__rgf__ref__aux 117 13 45_4_9_3_12_3_14_4]
+G c Z b b [atan sdata__statistics__long_beta__rgf__ref__aux 126 13 45_4_9_3_12_3_14_4]
+G c Z b b [sinh sdata__statistics__long_beta__rgf__ref__aux 135 13 45_4_9_3_12_3_14_4]
+G c Z b b [cosh sdata__statistics__long_beta__rgf__ref__aux 144 13 45_4_9_3_12_3_14_4]
+G c Z b b [tanh sdata__statistics__long_beta__rgf__ref__aux 153 13 45_4_9_3_12_3_14_4]
+G c Z b b [pow sdata__statistics__long_beta__rgf__ref__aux 162 13 45_4_9_3_12_3_14_4]
+G c Z b b [exp_strict sdata__statistics__long_beta__rgf__ref 65 13 9_3_12_3_14_4]
+G c Z b b [local_atan sdata__statistics__long_beta__rgf__ref 69 13 9_3_12_3_14_4]
+G c Z b b [gammastirf sdata__statistics__long_beta__rgf 15 12 12_3_14_4]
+G c Z b b [almost_zero sdata__statistics__long_beta__rgf 38 12 12_3_14_4]
+G c Z b b [almost_zero sdata__statistics__long_beta 67 12 14_4]
+G c Z b b [incompletebetafe sdata__statistics__long_beta 79 12 14_4]
+G c Z b b [incompletebetafe2 sdata__statistics__long_beta 158 12 14_4]
+G c Z b b [incompletebetaps sdata__statistics__long_beta 238 12 14_4]
+G c Z b b [gamma sdata__statistics__long_gamma 45 12 15_4]
+G c Z b b [log_gamma sdata__statistics__long_gamma 48 12 15_4]
+G c Z b b [log_gamma sdata__statistics__long_gamma 49 13 15_4]
+G c Z b b [sqrt sdata__statistics__long_gamma__ref 53 13 9_3_15_4]
+G c Z b b [log sdata__statistics__long_gamma__ref 77 13 9_3_15_4]
+G c Z b b [log sdata__statistics__long_gamma__ref 82 13 9_3_15_4]
+G c Z b b [exp sdata__statistics__long_gamma__ref 87 13 9_3_15_4]
+G c Z b b [Oexpon sdata__statistics__long_gamma__ref 91 13 9_3_15_4]
+G c Z b b [sin sdata__statistics__long_gamma__ref 100 13 9_3_15_4]
+G c Z b b [sin sdata__statistics__long_gamma__ref 106 13 9_3_15_4]
+G c Z b b [cos sdata__statistics__long_gamma__ref 112 13 9_3_15_4]
+G c Z b b [cos sdata__statistics__long_gamma__ref 118 13 9_3_15_4]
+G c Z b b [tan sdata__statistics__long_gamma__ref 124 13 9_3_15_4]
+G c Z b b [tan sdata__statistics__long_gamma__ref 128 13 9_3_15_4]
+G c Z b b [cot sdata__statistics__long_gamma__ref 134 13 9_3_15_4]
+G c Z b b [cot sdata__statistics__long_gamma__ref 138 13 9_3_15_4]
+G c Z b b [arcsin sdata__statistics__long_gamma__ref 145 13 9_3_15_4]
+G c Z b b [arcsin sdata__statistics__long_gamma__ref 150 13 9_3_15_4]
+G c Z b b [arccos sdata__statistics__long_gamma__ref 155 13 9_3_15_4]
+G c Z b b [arccos sdata__statistics__long_gamma__ref 160 13 9_3_15_4]
+G c Z b b [arctan sdata__statistics__long_gamma__ref 165 13 9_3_15_4]
+G c Z b b [arctan sdata__statistics__long_gamma__ref 173 13 9_3_15_4]
+G c Z b b [arccot sdata__statistics__long_gamma__ref 182 13 9_3_15_4]
+G c Z b b [arccot sdata__statistics__long_gamma__ref 190 13 9_3_15_4]
+G c Z b b [sinh sdata__statistics__long_gamma__ref 199 13 9_3_15_4]
+G c Z b b [cosh sdata__statistics__long_gamma__ref 202 13 9_3_15_4]
+G c Z b b [tanh sdata__statistics__long_gamma__ref 207 13 9_3_15_4]
+G c Z b b [coth sdata__statistics__long_gamma__ref 212 13 9_3_15_4]
+G c Z b b [arcsinh sdata__statistics__long_gamma__ref 217 13 9_3_15_4]
+G c Z b b [arccosh sdata__statistics__long_gamma__ref 221 13 9_3_15_4]
+G c Z b b [arctanh sdata__statistics__long_gamma__ref 227 13 9_3_15_4]
+G c Z b b [arccoth sdata__statistics__long_gamma__ref 232 13 9_3_15_4]
+G c Z b b [sin sdata__statistics__long_gamma__ref__aux 54 13 45_4_9_3_15_4]
+G c Z b b [cos sdata__statistics__long_gamma__ref__aux 63 13 45_4_9_3_15_4]
+G c Z b b [tan sdata__statistics__long_gamma__ref__aux 72 13 45_4_9_3_15_4]
+G c Z b b [exp sdata__statistics__long_gamma__ref__aux 81 13 45_4_9_3_15_4]
+G c Z b b [sqrt sdata__statistics__long_gamma__ref__aux 90 13 45_4_9_3_15_4]
+G c Z b b [log sdata__statistics__long_gamma__ref__aux 99 13 45_4_9_3_15_4]
+G c Z b b [acos sdata__statistics__long_gamma__ref__aux 108 13 45_4_9_3_15_4]
+G c Z b b [asin sdata__statistics__long_gamma__ref__aux 117 13 45_4_9_3_15_4]
+G c Z b b [atan sdata__statistics__long_gamma__ref__aux 126 13 45_4_9_3_15_4]
+G c Z b b [sinh sdata__statistics__long_gamma__ref__aux 135 13 45_4_9_3_15_4]
+G c Z b b [cosh sdata__statistics__long_gamma__ref__aux 144 13 45_4_9_3_15_4]
+G c Z b b [tanh sdata__statistics__long_gamma__ref__aux 153 13 45_4_9_3_15_4]
+G c Z b b [pow sdata__statistics__long_gamma__ref__aux 162 13 45_4_9_3_15_4]
+G c Z b b [exp_strict sdata__statistics__long_gamma__ref 65 13 9_3_15_4]
+G c Z b b [local_atan sdata__statistics__long_gamma__ref 69 13 9_3_15_4]
+G c Z b b [gammastirf sdata__statistics__long_gamma 15 12 15_4]
+G c Z b b [almost_zero sdata__statistics__long_gamma 38 12 15_4]
+G c Z b b [beta_inverse_cdf sdata__statistics__long_rand_funcs 69 12 16_4]
+G c Z b b [normal_inverse_cdf sdata__statistics__long_rand_funcs 75 12 16_4]
+G c Z b b [box_muller sdata__statistics__long_rand_funcs 82 13 16_4]
+G c Z b b [pareto_inverse_cdf sdata__statistics__long_rand_funcs 89 12 16_4]
+G c Z b b [beta_cdf sdata__statistics__long_rand_funcs 130 12 16_4]
+G c Z b b [normal_cdf sdata__statistics__long_rand_funcs 136 12 16_4]
+G c Z b b [pareto_cdf sdata__statistics__long_rand_funcs 143 12 16_4]
+G c Z b b [almost_zero sdata__statistics__long_rand_funcs 21 12 16_4]
+G c Z b b [phi sdata__statistics__long_rand_funcs__rphf 48 12 26_3_16_4]
+G c Z b b [inverse_phi sdata__statistics__long_rand_funcs__rphf 50 12 26_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rphf__gef 53 13 21_3_26_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rphf__gef 77 13 21_3_26_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rphf__gef 82 13 21_3_26_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rphf__gef 87 13 21_3_26_3_16_4]
+G c Z b b [Oexpon sdata__statistics__long_rand_funcs__rphf__gef 91 13 21_3_26_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rphf__gef 100 13 21_3_26_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rphf__gef 106 13 21_3_26_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rphf__gef 112 13 21_3_26_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rphf__gef 118 13 21_3_26_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rphf__gef 124 13 21_3_26_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rphf__gef 128 13 21_3_26_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rphf__gef 134 13 21_3_26_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rphf__gef 138 13 21_3_26_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rphf__gef 145 13 21_3_26_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rphf__gef 150 13 21_3_26_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rphf__gef 155 13 21_3_26_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rphf__gef 160 13 21_3_26_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rphf__gef 165 13 21_3_26_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rphf__gef 173 13 21_3_26_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rphf__gef 182 13 21_3_26_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rphf__gef 190 13 21_3_26_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rphf__gef 199 13 21_3_26_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rphf__gef 202 13 21_3_26_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rphf__gef 207 13 21_3_26_3_16_4]
+G c Z b b [coth sdata__statistics__long_rand_funcs__rphf__gef 212 13 21_3_26_3_16_4]
+G c Z b b [arcsinh sdata__statistics__long_rand_funcs__rphf__gef 217 13 21_3_26_3_16_4]
+G c Z b b [arccosh sdata__statistics__long_rand_funcs__rphf__gef 221 13 21_3_26_3_16_4]
+G c Z b b [arctanh sdata__statistics__long_rand_funcs__rphf__gef 227 13 21_3_26_3_16_4]
+G c Z b b [arccoth sdata__statistics__long_rand_funcs__rphf__gef 232 13 21_3_26_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rphf__gef__aux 54 13 45_4_21_3_26_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rphf__gef__aux 63 13 45_4_21_3_26_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rphf__gef__aux 72 13 45_4_21_3_26_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rphf__gef__aux 81 13 45_4_21_3_26_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rphf__gef__aux 90 13 45_4_21_3_26_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rphf__gef__aux 99 13 45_4_21_3_26_3_16_4]
+G c Z b b [acos sdata__statistics__long_rand_funcs__rphf__gef__aux 108 13 45_4_21_3_26_3_16_4]
+G c Z b b [asin sdata__statistics__long_rand_funcs__rphf__gef__aux 117 13 45_4_21_3_26_3_16_4]
+G c Z b b [atan sdata__statistics__long_rand_funcs__rphf__gef__aux 126 13 45_4_21_3_26_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rphf__gef__aux 135 13 45_4_21_3_26_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rphf__gef__aux 144 13 45_4_21_3_26_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rphf__gef__aux 153 13 45_4_21_3_26_3_16_4]
+G c Z b b [pow sdata__statistics__long_rand_funcs__rphf__gef__aux 162 13 45_4_21_3_26_3_16_4]
+G c Z b b [exp_strict sdata__statistics__long_rand_funcs__rphf__gef 65 13 21_3_26_3_16_4]
+G c Z b b [local_atan sdata__statistics__long_rand_funcs__rphf__gef 69 13 21_3_26_3_16_4]
+G c Z b b [phi_single_precision sdata__statistics__long_rand_funcs__rphf 28 12 26_3_16_4]
+G c Z b b [erf sdata__statistics__long_rand_funcs__rphf__erf_pkg 60 12 50_3_26_3_16_4]
+G c Z b b [erfc sdata__statistics__long_rand_funcs__rphf__erf_pkg 64 12 50_3_26_3_16_4]
+G c Z b b [sign sdata__statistics__long_rand_funcs__rphf__erf_pkg 20 12 50_3_26_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 53 13 31_3_50_3_26_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 77 13 31_3_50_3_26_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 82 13 31_3_50_3_26_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 87 13 31_3_50_3_26_3_16_4]
+G c Z b b [Oexpon sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 91 13 31_3_50_3_26_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 100 13 31_3_50_3_26_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 106 13 31_3_50_3_26_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 112 13 31_3_50_3_26_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 118 13 31_3_50_3_26_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 124 13 31_3_50_3_26_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 128 13 31_3_50_3_26_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 134 13 31_3_50_3_26_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 138 13 31_3_50_3_26_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 145 13 31_3_50_3_26_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 150 13 31_3_50_3_26_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 155 13 31_3_50_3_26_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 160 13 31_3_50_3_26_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 165 13 31_3_50_3_26_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 173 13 31_3_50_3_26_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 182 13 31_3_50_3_26_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 190 13 31_3_50_3_26_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 199 13 31_3_50_3_26_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 202 13 31_3_50_3_26_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 207 13 31_3_50_3_26_3_16_4]
+G c Z b b [coth sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 212 13 31_3_50_3_26_3_16_4]
+G c Z b b [arcsinh sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 217 13 31_3_50_3_26_3_16_4]
+G c Z b b [arccosh sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 221 13 31_3_50_3_26_3_16_4]
+G c Z b b [arctanh sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 227 13 31_3_50_3_26_3_16_4]
+G c Z b b [arccoth sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 232 13 31_3_50_3_26_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 54 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 63 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 72 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 81 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 90 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 99 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [acos sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 108 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [asin sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 117 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [atan sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 126 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 135 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 144 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 153 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [pow sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef__aux 162 13 45_4_31_3_50_3_26_3_16_4]
+G c Z b b [exp_strict sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 65 13 31_3_50_3_26_3_16_4]
+G c Z b b [local_atan sdata__statistics__long_rand_funcs__rphf__erf_pkg__gef 69 13 31_3_50_3_26_3_16_4]
+G c Z b b [beta sdata__statistics__long_rand_funcs__rbf 75 12 30_3_16_4]
+G c Z b b [beta sdata__statistics__long_rand_funcs__rbf 86 12 30_3_16_4]
+G c Z b b [regularized_beta sdata__statistics__long_rand_funcs__rbf 94 12 30_3_16_4]
+G c Z b b [inverse_beta sdata__statistics__long_rand_funcs__rbf 98 12 30_3_16_4]
+G c Z b b [inverse_regularized_beta sdata__statistics__long_rand_funcs__rbf 104 12 30_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rbf__ref 53 13 10_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__ref 77 13 10_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__ref 82 13 10_3_30_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rbf__ref 87 13 10_3_30_3_16_4]
+G c Z b b [Oexpon sdata__statistics__long_rand_funcs__rbf__ref 91 13 10_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__ref 100 13 10_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__ref 106 13 10_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__ref 112 13 10_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__ref 118 13 10_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__ref 124 13 10_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__ref 128 13 10_3_30_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rbf__ref 134 13 10_3_30_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rbf__ref 138 13 10_3_30_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rbf__ref 145 13 10_3_30_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rbf__ref 150 13 10_3_30_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rbf__ref 155 13 10_3_30_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rbf__ref 160 13 10_3_30_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rbf__ref 165 13 10_3_30_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rbf__ref 173 13 10_3_30_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rbf__ref 182 13 10_3_30_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rbf__ref 190 13 10_3_30_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rbf__ref 199 13 10_3_30_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rbf__ref 202 13 10_3_30_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rbf__ref 207 13 10_3_30_3_16_4]
+G c Z b b [coth sdata__statistics__long_rand_funcs__rbf__ref 212 13 10_3_30_3_16_4]
+G c Z b b [arcsinh sdata__statistics__long_rand_funcs__rbf__ref 217 13 10_3_30_3_16_4]
+G c Z b b [arccosh sdata__statistics__long_rand_funcs__rbf__ref 221 13 10_3_30_3_16_4]
+G c Z b b [arctanh sdata__statistics__long_rand_funcs__rbf__ref 227 13 10_3_30_3_16_4]
+G c Z b b [arccoth sdata__statistics__long_rand_funcs__rbf__ref 232 13 10_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__ref__aux 54 13 45_4_10_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__ref__aux 63 13 45_4_10_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__ref__aux 72 13 45_4_10_3_30_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rbf__ref__aux 81 13 45_4_10_3_30_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rbf__ref__aux 90 13 45_4_10_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__ref__aux 99 13 45_4_10_3_30_3_16_4]
+G c Z b b [acos sdata__statistics__long_rand_funcs__rbf__ref__aux 108 13 45_4_10_3_30_3_16_4]
+G c Z b b [asin sdata__statistics__long_rand_funcs__rbf__ref__aux 117 13 45_4_10_3_30_3_16_4]
+G c Z b b [atan sdata__statistics__long_rand_funcs__rbf__ref__aux 126 13 45_4_10_3_30_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rbf__ref__aux 135 13 45_4_10_3_30_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rbf__ref__aux 144 13 45_4_10_3_30_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rbf__ref__aux 153 13 45_4_10_3_30_3_16_4]
+G c Z b b [pow sdata__statistics__long_rand_funcs__rbf__ref__aux 162 13 45_4_10_3_30_3_16_4]
+G c Z b b [exp_strict sdata__statistics__long_rand_funcs__rbf__ref 65 13 10_3_30_3_16_4]
+G c Z b b [local_atan sdata__statistics__long_rand_funcs__rbf__ref 69 13 10_3_30_3_16_4]
+G c Z b b [phi sdata__statistics__long_rand_funcs__rbf__rphf 48 12 11_3_30_3_16_4]
+G c Z b b [inverse_phi sdata__statistics__long_rand_funcs__rbf__rphf 50 12 11_3_30_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rbf__rphf__gef 53 13 21_3_11_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__rphf__gef 77 13 21_3_11_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__rphf__gef 82 13 21_3_11_3_30_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rbf__rphf__gef 87 13 21_3_11_3_30_3_16_4]
+G c Z b b [Oexpon sdata__statistics__long_rand_funcs__rbf__rphf__gef 91 13 21_3_11_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__rphf__gef 100 13 21_3_11_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__rphf__gef 106 13 21_3_11_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__rphf__gef 112 13 21_3_11_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__rphf__gef 118 13 21_3_11_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__rphf__gef 124 13 21_3_11_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__rphf__gef 128 13 21_3_11_3_30_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rbf__rphf__gef 134 13 21_3_11_3_30_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rbf__rphf__gef 138 13 21_3_11_3_30_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rbf__rphf__gef 145 13 21_3_11_3_30_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rbf__rphf__gef 150 13 21_3_11_3_30_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rbf__rphf__gef 155 13 21_3_11_3_30_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rbf__rphf__gef 160 13 21_3_11_3_30_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rbf__rphf__gef 165 13 21_3_11_3_30_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rbf__rphf__gef 173 13 21_3_11_3_30_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rbf__rphf__gef 182 13 21_3_11_3_30_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rbf__rphf__gef 190 13 21_3_11_3_30_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rbf__rphf__gef 199 13 21_3_11_3_30_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rbf__rphf__gef 202 13 21_3_11_3_30_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rbf__rphf__gef 207 13 21_3_11_3_30_3_16_4]
+G c Z b b [coth sdata__statistics__long_rand_funcs__rbf__rphf__gef 212 13 21_3_11_3_30_3_16_4]
+G c Z b b [arcsinh sdata__statistics__long_rand_funcs__rbf__rphf__gef 217 13 21_3_11_3_30_3_16_4]
+G c Z b b [arccosh sdata__statistics__long_rand_funcs__rbf__rphf__gef 221 13 21_3_11_3_30_3_16_4]
+G c Z b b [arctanh sdata__statistics__long_rand_funcs__rbf__rphf__gef 227 13 21_3_11_3_30_3_16_4]
+G c Z b b [arccoth sdata__statistics__long_rand_funcs__rbf__rphf__gef 232 13 21_3_11_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 54 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 63 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 72 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 81 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 90 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 99 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [acos sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 108 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [asin sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 117 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [atan sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 126 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 135 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 144 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 153 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [pow sdata__statistics__long_rand_funcs__rbf__rphf__gef__aux 162 13 45_4_21_3_11_3_30_3_16_4]
+G c Z b b [exp_strict sdata__statistics__long_rand_funcs__rbf__rphf__gef 65 13 21_3_11_3_30_3_16_4]
+G c Z b b [local_atan sdata__statistics__long_rand_funcs__rbf__rphf__gef 69 13 21_3_11_3_30_3_16_4]
+G c Z b b [phi_single_precision sdata__statistics__long_rand_funcs__rbf__rphf 28 12 11_3_30_3_16_4]
+G c Z b b [erf sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg 60 12 50_3_11_3_30_3_16_4]
+G c Z b b [erfc sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg 64 12 50_3_11_3_30_3_16_4]
+G c Z b b [sign sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg 20 12 50_3_11_3_30_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 53 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 77 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 82 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 87 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [Oexpon sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 91 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 100 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 106 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 112 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 118 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 124 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 128 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 134 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 138 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 145 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 150 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 155 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 160 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 165 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 173 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 182 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 190 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 199 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 202 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 207 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [coth sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 212 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arcsinh sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 217 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arccosh sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 221 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arctanh sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 227 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [arccoth sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 232 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 54 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 63 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 72 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 81 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 90 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 99 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [acos sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 108 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [asin sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 117 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [atan sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 126 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 135 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 144 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 153 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [pow sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef__aux 162 13 45_4_31_3_50_3_11_3_30_3_16_4]
+G c Z b b [exp_strict sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 65 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [local_atan sdata__statistics__long_rand_funcs__rbf__rphf__erf_pkg__gef 69 13 31_3_50_3_11_3_30_3_16_4]
+G c Z b b [gamma sdata__statistics__long_rand_funcs__rbf__rgf 45 12 12_3_30_3_16_4]
+G c Z b b [log_gamma sdata__statistics__long_rand_funcs__rbf__rgf 48 12 12_3_30_3_16_4]
+G c Z b b [log_gamma sdata__statistics__long_rand_funcs__rbf__rgf 49 13 12_3_30_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rbf__rgf__ref 53 13 9_3_12_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__rgf__ref 77 13 9_3_12_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__rgf__ref 82 13 9_3_12_3_30_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rbf__rgf__ref 87 13 9_3_12_3_30_3_16_4]
+G c Z b b [Oexpon sdata__statistics__long_rand_funcs__rbf__rgf__ref 91 13 9_3_12_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__rgf__ref 100 13 9_3_12_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__rgf__ref 106 13 9_3_12_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__rgf__ref 112 13 9_3_12_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__rgf__ref 118 13 9_3_12_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__rgf__ref 124 13 9_3_12_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__rgf__ref 128 13 9_3_12_3_30_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rbf__rgf__ref 134 13 9_3_12_3_30_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__rbf__rgf__ref 138 13 9_3_12_3_30_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rbf__rgf__ref 145 13 9_3_12_3_30_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__rbf__rgf__ref 150 13 9_3_12_3_30_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rbf__rgf__ref 155 13 9_3_12_3_30_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__rbf__rgf__ref 160 13 9_3_12_3_30_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rbf__rgf__ref 165 13 9_3_12_3_30_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__rbf__rgf__ref 173 13 9_3_12_3_30_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rbf__rgf__ref 182 13 9_3_12_3_30_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__rbf__rgf__ref 190 13 9_3_12_3_30_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rbf__rgf__ref 199 13 9_3_12_3_30_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rbf__rgf__ref 202 13 9_3_12_3_30_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rbf__rgf__ref 207 13 9_3_12_3_30_3_16_4]
+G c Z b b [coth sdata__statistics__long_rand_funcs__rbf__rgf__ref 212 13 9_3_12_3_30_3_16_4]
+G c Z b b [arcsinh sdata__statistics__long_rand_funcs__rbf__rgf__ref 217 13 9_3_12_3_30_3_16_4]
+G c Z b b [arccosh sdata__statistics__long_rand_funcs__rbf__rgf__ref 221 13 9_3_12_3_30_3_16_4]
+G c Z b b [arctanh sdata__statistics__long_rand_funcs__rbf__rgf__ref 227 13 9_3_12_3_30_3_16_4]
+G c Z b b [arccoth sdata__statistics__long_rand_funcs__rbf__rgf__ref 232 13 9_3_12_3_30_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 54 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 63 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 72 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 81 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 90 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 99 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [acos sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 108 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [asin sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 117 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [atan sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 126 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 135 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 144 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 153 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [pow sdata__statistics__long_rand_funcs__rbf__rgf__ref__aux 162 13 45_4_9_3_12_3_30_3_16_4]
+G c Z b b [exp_strict sdata__statistics__long_rand_funcs__rbf__rgf__ref 65 13 9_3_12_3_30_3_16_4]
+G c Z b b [local_atan sdata__statistics__long_rand_funcs__rbf__rgf__ref 69 13 9_3_12_3_30_3_16_4]
+G c Z b b [gammastirf sdata__statistics__long_rand_funcs__rbf__rgf 15 12 12_3_30_3_16_4]
+G c Z b b [almost_zero sdata__statistics__long_rand_funcs__rbf__rgf 38 12 12_3_30_3_16_4]
+G c Z b b [almost_zero sdata__statistics__long_rand_funcs__rbf 67 12 30_3_16_4]
+G c Z b b [incompletebetafe sdata__statistics__long_rand_funcs__rbf 79 12 30_3_16_4]
+G c Z b b [incompletebetafe2 sdata__statistics__long_rand_funcs__rbf 158 12 30_3_16_4]
+G c Z b b [incompletebetaps sdata__statistics__long_rand_funcs__rbf 238 12 30_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__gef 53 13 34_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__gef 77 13 34_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__gef 82 13 34_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__gef 87 13 34_3_16_4]
+G c Z b b [Oexpon sdata__statistics__long_rand_funcs__gef 91 13 34_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__gef 100 13 34_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__gef 106 13 34_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__gef 112 13 34_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__gef 118 13 34_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__gef 124 13 34_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__gef 128 13 34_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__gef 134 13 34_3_16_4]
+G c Z b b [cot sdata__statistics__long_rand_funcs__gef 138 13 34_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__gef 145 13 34_3_16_4]
+G c Z b b [arcsin sdata__statistics__long_rand_funcs__gef 150 13 34_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__gef 155 13 34_3_16_4]
+G c Z b b [arccos sdata__statistics__long_rand_funcs__gef 160 13 34_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__gef 165 13 34_3_16_4]
+G c Z b b [arctan sdata__statistics__long_rand_funcs__gef 173 13 34_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__gef 182 13 34_3_16_4]
+G c Z b b [arccot sdata__statistics__long_rand_funcs__gef 190 13 34_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__gef 199 13 34_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__gef 202 13 34_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__gef 207 13 34_3_16_4]
+G c Z b b [coth sdata__statistics__long_rand_funcs__gef 212 13 34_3_16_4]
+G c Z b b [arcsinh sdata__statistics__long_rand_funcs__gef 217 13 34_3_16_4]
+G c Z b b [arccosh sdata__statistics__long_rand_funcs__gef 221 13 34_3_16_4]
+G c Z b b [arctanh sdata__statistics__long_rand_funcs__gef 227 13 34_3_16_4]
+G c Z b b [arccoth sdata__statistics__long_rand_funcs__gef 232 13 34_3_16_4]
+G c Z b b [sin sdata__statistics__long_rand_funcs__gef__aux 54 13 45_4_34_3_16_4]
+G c Z b b [cos sdata__statistics__long_rand_funcs__gef__aux 63 13 45_4_34_3_16_4]
+G c Z b b [tan sdata__statistics__long_rand_funcs__gef__aux 72 13 45_4_34_3_16_4]
+G c Z b b [exp sdata__statistics__long_rand_funcs__gef__aux 81 13 45_4_34_3_16_4]
+G c Z b b [sqrt sdata__statistics__long_rand_funcs__gef__aux 90 13 45_4_34_3_16_4]
+G c Z b b [log sdata__statistics__long_rand_funcs__gef__aux 99 13 45_4_34_3_16_4]
+G c Z b b [acos sdata__statistics__long_rand_funcs__gef__aux 108 13 45_4_34_3_16_4]
+G c Z b b [asin sdata__statistics__long_rand_funcs__gef__aux 117 13 45_4_34_3_16_4]
+G c Z b b [atan sdata__statistics__long_rand_funcs__gef__aux 126 13 45_4_34_3_16_4]
+G c Z b b [sinh sdata__statistics__long_rand_funcs__gef__aux 135 13 45_4_34_3_16_4]
+G c Z b b [cosh sdata__statistics__long_rand_funcs__gef__aux 144 13 45_4_34_3_16_4]
+G c Z b b [tanh sdata__statistics__long_rand_funcs__gef__aux 153 13 45_4_34_3_16_4]
+G c Z b b [pow sdata__statistics__long_rand_funcs__gef__aux 162 13 45_4_34_3_16_4]
+G c Z b b [exp_strict sdata__statistics__long_rand_funcs__gef 65 13 34_3_16_4]
+G c Z b b [local_atan sdata__statistics__long_rand_funcs__gef 69 13 34_3_16_4]
+G c Z b b [incomplete_gamma_p sdata__statistics 33 13 none]
+G r i none [b sdata__statistics 8 1 none] [error_function standard 42 9 none]
+G r i none [b sdata__statistics 8 1 none] [phi_function standard 42 9 none]
+G r i none [b sdata__statistics 8 1 none] [gamma_function standard 42 9 none]
+G r i none [b sdata__statistics 8 1 none] [beta_function standard 64 9 none]
+G r i none [b sdata__statistics 8 1 none] [generic_random_functions standard 53 9 none]
+X 1 ada.ads
+18K9*Ada 22e8 31|1r6 2r6 3r6 65r16 32|1r6 2r6 10r23 24r10 89r64 145r47 145r106
+. 182r22 219r31 280r29 319r67 326r37 331r27 360r112
+X 3 a-numeri.ads
+20K13*Numerics 36e17 31|1w10 2r10 3r10 65r20 32|1r10 2r10 10r27 24r14 89r68
+. 145r51 145r110 182r26 219r35 280r33 319r71 326r41 331r31 360r116
+28N4*Pi 32|89r77 360r125
+X 10 a-nuelfu.ads
+18K22*Elementary_Functions[12|39] 31|2w19
+X 11 a-nuflra.ads
+41K22*Float_Random 74e30 31|3w19 65r29 32|2w19 24r23 145r60 145r119 182r35
+. 219r44 280r42 319r80 326r50 331r40
+47R9*Generator<41|65R9> 31|65r42
+49F12*Uniformly_Distributed{float}
+51V13*Random{49F12}<41|73p13> 32|145s73 145s132 182s48 219s57 280s55 319s93
+. 326s63 331s53
+53U14*Reset<41|103p14> 32|24s36
+X 12 a-ngelfu.ads
+39k22*Generic_Elementary_Functions 236e46 32|1w19 10r36
+53V13 Sqrt{long_float} 32|89s52[10] 323s18[10] 360s102[10] 388s21[10]
+77V13 Log{long_float} 32|50s37[10] 73s31[10] 210s22[10] 257s52[10] 294s47[10]
+. 294s102[10] 332s54[10] 332s94[10]
+87V13 Exp{long_float} 32|50s23[10] 73s17[10] 91s37[10] 191s67[10] 200s53[10]
+. 257s21[10] 294s21[10] 360s21[10]
+91V14 "**"{long_float} 32|229s36[10] 229s89[10] 319s113[10] 360s149[10] 388s37[10]
+. 388s46[10] 388s68[10]
+X 19 beta_function.ads
+64k9*Beta_function 106e18 32|4w6 14r29
+75V12 Beta{long_float} 32|229s130[14] 388s99[14]
+94V12 Regularized_Beta{long_float} 32|238s31[14] 373s46[14] 375s40[14] 402s31[14]
+104V12 Inverse_Regularized_Beta{long_float} 32|246s31[14]
+X 23 gamma_function.ads
+42k9*Gamma_function 51e19 32|5w6 15r30
+48V12 Log_Gamma{long_float} 32|50s58[15] 73s52[15] 257s89[15] 294s173[15]
+. 360s37[15] 360s78[15]
+X 25 generic_random_functions.ads
+53k9*Generic_Random_Functions 145e29 32|6w6 16r35
+82U13 Box_Muller 32|145s23[16]
+113v12*Poisson 32|282r52[16]
+X 28 phi_function.ads
+42k9*Phi_function 52e17 32|3w6 13r28
+48V12 Phi{long_float} 32|99s30[13]
+50V12 Inverse_Phi{long_float} 32|108s30[13]
+X 30 sdata.ads
+1K9*SData 2e10 31|5r9 70r5 32|8r14 405r5
+X 31 sdata-statistics.ads
+5K15*Statistics 30|1k9 31|63E9 70l11 70e21 32|8b20 405l11 405t21
+12V13*Z_PDF{float} 12>20 32|88b13 92l8 92t13 117s14
+12f20 Z{float} 32|88b20 91r62
+13V13*Z_CDF{float} 13>20 32|97b13 100l8 100t13 126s14
+13f20 Z{float} 32|97b20 99r47
+14V13*Z_IDF{float} 14>20 32|105b13 109l8 109t13 135s21 326s30
+14f20 P{float} 32|105b20 107r10 107r22 108r55
+17V13*Normal_PDF{float} 17>25 17>28 17>34 32|114b13 118l8 118t18
+17f25 X{float} 32|114b25 117r22
+17f28 Mean{float} 32|114b28 117r26
+17f34 Std_Dev{float} 32|114b34 116r10 117r34 117r45
+18V13*Normal_CDF{float} 18>25 18>28 18>34 32|123b13 127l8 127t18
+18f25 X{float} 32|123b25 126r22
+18f28 Mean{float} 32|123b28 126r26
+18f34 Std_Dev{float} 32|123b34 125r10 126r34
+19V13*Normal_IDF{float} 19>25 19>28 19>34 32|132b13 136l8 136t18
+19f25 P{float} 32|132b25 135r28
+19f28 Mean{float} 32|132b28 135r14
+19f34 Std_Dev{float} 32|132b34 134r10 135r33
+20V13*Normal_RN{float} 20>25 20>31 32|141b13 147l8 147t17
+20f25 Mean{float} 32|141b24 146r33
+20f31 Std_Dev{float} 32|141b30 146r58
+23V13*Uniform_PDF{float} 23>26 23>29 23>36 32|152b13 156l8 156t19
+23f26 X{float} 32|152b26 155r18 155r33
+23f29 Lower{float} 32|152b29 154r10 155r23 155r64
+23f36 Upper{float} 32|152b36 154r19 155r38 155r56
+24V13*Uniform_CDF{float} 24>26 24>29 24>36 32|161b13 165l8 165t19
+24f26 X{float} 32|161b26 164r10 164r43 164r83
+24f29 Lower{float} 32|161b29 163r10 164r14 164r87 164r105
+24f36 Upper{float} 32|161b36 163r19 164r47 164r97
+25V13*Uniform_IDF{float} 25>26 25>29 25>36 32|170b13 174l8 174t19
+25f26 P{float} 32|170b26 173r22
+25f29 Lower{float} 32|170b29 172r10 173r14 173r35
+25f36 Upper{float} 32|170b36 172r19 173r27
+26V13*Uniform_RN{float} 26>26 26>33 32|179b13 183l8 183t18
+26f26 Lower{float} 32|179b25 182r14 182r78
+26f33 Upper{float} 32|179b32 182r70
+29V13*Exponential_PDF{float} 29>30 29>33 32|188b13 192l8 192t23
+29f30 X{float} 32|188b30 191r18 191r105
+29f33 Rate{float} 32|188b33 190r10 191r59 191r85
+30V13*Exponential_CDF{float} 30>30 30>33 32|197b13 201l8 201t23
+30f30 X{float} 32|197b30 200r18 200r91
+30f33 Rate{float} 32|197b33 199r10 200r71
+31V13*Exponential_IDF{float} 31>30 31>33 32|206b13 211l8 211t23 219s14
+31f30 P{float} 32|206b30 209r10 209r21 210r45
+31f33 Rate{float} 32|206b33 208r10 210r63
+32V13*Exponential_RN{float} 32>30 32|216b13 220l8 220t22
+32f30 Rate{float} 32|216b29 219r77
+35V13*Beta_PDF{float} 35>23 35>26 35>33 32|225b13 230l8 230t16
+35f23 X{float} 32|225b23 228r10 228r21 229r34 229r86
+35f26 Alpha{float} 32|225b26 227r10 229r51 229r148
+35f33 Beta{float} 32|225b33 227r26 229r104 229r168
+36V13*Beta_CDF{float} 36>23 36>26 36>33 32|235b13 239l8 239t16
+36f23 X{float} 32|235b23 237r10 237r42 238r61
+36f26 Alpha{float} 32|235b26 238r77
+36f33 Beta{float} 32|235b33 238r97
+37V13*Beta_IDF{float} 37>23 37>26 37>33 32|244b13 247l8 247t16
+37f23 P{float} 32|244b23 246r69
+37f26 Alpha{float} 32|244b26 246r85
+37f33 Beta{float} 32|244b33 246r105
+40V13*Poisson_PMF{float} 40>26 40>29 32|252b13 258l8 258t19 269s54
+40f26 K{float} 32|252b26 253r60 256r10
+40f29 Mean{float} 32|252b29 255r10 257r39 257r69
+41V13*Poisson_CDF{float} 41>26 41>29 32|263b13 271l8 271t19
+41f26 K{float} 32|263b26 264r54 268r10
+41f29 Mean{float} 32|263b29 267r10 269r78
+42V13*Poisson_RN{float} 42>26 32|276b13 285l8 285t18
+42f26 Mean{float} 32|276b25 284r59
+45V13*Gamma_PDF{float} 45>24 45>27 45>34 32|290b13 295l8 295t17 342s14
+45f24 X{float} 32|290b24 293r10 294r119 294r157
+45f27 Alpha{float} 32|290b27 292r10 294r38 294r86 294r196
+45f34 Beta{float} 32|290b34 292r26 294r64 294r137
+46V13*Gamma_CDF{float} 46>24 46>27 46>34 32|300b13 304l8 304t17 350s14
+46f24 X{float} 32|300b24 302r10 303r93
+46f27 Alpha{float} 32|300b27 303r53
+46f34 Beta{float} 32|300b34 303r73
+47V13*Gamma_RN{float} 47>24 47>31 32|310b13 319s17 335l8 335t16
+47f24 Alpha{float} 32|310b23 311r37 319r27
+47f31 Beta{float} 32|310b30 312r37 319r40
+50V13*Chi_Square_PDF{float} 50>29 50>32 32|340b13 343l8 343t22
+50f29 X{float} 32|340b29 342r25
+50f32 DF{float} 32|340b32 342r28
+51V13*Chi_Square_CDF{float} 51>29 51>32 32|348b13 351l8 351t22
+51f29 X{float} 32|348b29 350r25
+51f32 DF{float} 32|348b32 350r28
+54V13*Student_T_PDF{float} 54>28 54>31 32|356b13 361l8 361t21
+54f28 T{float} 32|356b28 358r46
+54f31 DF{float} 32|356b31 357r46
+55V13*Student_T_CDF{float} 55>28 55>31 32|366b13 377l8 377t21
+55f28 T{float} 32|366b28 368r46
+55f31 DF{float} 32|366b31 367r46
+58V13*F_PDF{float} 58>20 58>23 58>28 32|382b13 389l8 389t13
+58f20 X{float} 32|382b20 385r47
+58f23 DF1{float} 32|382b23 383r47
+58f28 DF2{float} 32|382b28 384r47
+59V13*F_CDF{float} 59>20 59>23 59>28 32|394b13 403l8 403t13
+59f20 X{float} 32|394b20 397r47
+59f23 DF1{float} 32|394b23 395r47
+59f28 DF2{float} 32|394b28 396r47
+63F9 Internal_Float<long_float>
+65r4 Generator{11|47R9} 32|24r43 145r81 145r140 182r56 219r65 280r63 319r101
+. 326r71 331r61
+66b4 Initialized{boolean} 32|23r14 25m10
+68U14 Ensure_Random_Init 32|21b14 27l8 27t26 144s7 181s7 218s7 279s10 315s7
+X 32 sdata-statistics.adb
+10K12 REF[12|39] 11r8
+13K12 Long_Phi[28|42] 99r21 108r21
+14K12 Long_Beta[19|64] 229r120 238r21 246r21 373r36 375r30 388r89 402r21
+15K12 Long_Gamma[23|42] 50r47 73r41 257r78 294r162 360r26 360r67
+16K12 Long_Rand_Funcs[25|53] 145r7 282r36
+33V13 Incomplete_Gamma_P{long_float} 33b13 33>33 33>36 83l8 83t26 303s21
+33f33 A{long_float} 77r21 78r14 79r27 81r29
+33f36 X{long_float} 77r10 78r10 79r30 81r32
+34N7 ITMAX 44r24 61r24
+35N7 EPS 48r47 71r41
+36N7 FPMIN 58r21 65r26 65r42 67r26 67r42
+38V16 G_Series{long_float} 38b16 38>26 38>29 51l11 51t19 79s17
+38f26 A{long_float} 41r16 42r23 50r33 50r69
+38f29 X{long_float} 46r26 50r29 50r42
+39f10 Sum{long_float} 42m10 43r17 47m13 47r20 48r40 50r17
+39f15 Del{long_float} 43m10 46m13 46r20 47r26 48r28
+39f20 AP{long_float} 41m10 45m13 45r19 46r30
+44i14 I{integer}
+53V16 G_CF{long_float} 53b16 53>22 53>25 74l11 74t15 81s23
+53f22 A{long_float} 57r25 62r55 73r27 73r63
+53f25 X{long_float} 57r15 73r23 73r36
+54f10 B{long_float} 57m10 59r21 63m13 63r18 64r27 66r18
+54f13 C{long_float} 58m10 66m13 66r27 67r21 67m37 69r24
+54f16 D{long_float} 59m10 60r15 64m13 64r23 65r21 65m37 68m13 68r24 69r20
+54f19 Del{long_float} 69m13 70r22 71r28
+54f24 H{long_float} 60m10 70m13 70r18 73r69
+55f10 AN{long_float} 62m13 64r18 66r22
+61i14 I{integer} 62r32 62r50
+89f7 Constant_Part{long_float} 91r21
+142f7 N1{long_float} 145m153 146r41
+142f11 N2{long_float} 145m157
+253f7 KI{long_float} 257r47 257r100
+264i7 KI{integer} 269r21
+265f7 Sum{long_float} 269m29 269r36 270r21
+269i11 I{integer} 269r74
+277V16 U{long_float} 277b16 281l11 281t12 282r61
+282V16 Poisson_Func[25|113]{natural} 284s33
+311f7 A{long_float} 316r10 319r123 322r12
+312f7 B{long_float} 334r29
+313f7 D{long_float} 322m7 323r30 332r79 334r21
+313f10 C{long_float} 323m7 327r24
+313f13 X{long_float} 326m13 327r28 332r40 332r71
+313f16 V{long_float} 327m13 328r23 330m10 330r15 332r90 332r99 334r25
+313f19 U{long_float} 331m10 332r20 332r59
+357f7 V{long_float} 360r49 360r89 360r108 360r147 360r153
+358f7 X{long_float} 360r139
+367f7 V{long_float} 371r12 371r17 373r67 375r61
+368f7 X{long_float} 371r21 372r10
+369f7 W{long_float} 371m7 373r64 375r58
+383f7 V1{long_float} 388r29 388r39 388r55 388r71 388r105
+384f7 V2{long_float} 388r44 388r48 388r65 388r76 388r115
+385f7 XV{long_float} 387r10 388r34 388r60 388r84
+395f7 V1{long_float} 401r13 401r25 402r52
+396f7 V2{long_float} 401r35 402r62
+397f7 XV{long_float} 400r10 401r18 401r30
+398f7 W{long_float} 401m7 402r49
+

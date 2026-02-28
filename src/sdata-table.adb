@@ -11,6 +11,7 @@ package body SData.Table is
    begin
       Data_Table.Clear;
       Column_Order.Clear;
+      Table_Row_Count := 0;
       Current_Record := 0;
    end Clear;
 
@@ -20,12 +21,7 @@ package body SData.Table is
    procedure Add_Column (Name : String; Col_Type : Column_Type) is
       Upper_Name : constant String := To_Upper (Name);
       New_Col : Column;
-      Num_Rows : Natural := 0;
    begin
-      if not Data_Table.Is_Empty then
-         Num_Rows := Natural (Column_Maps.Element (Data_Table.First).Data.Length);
-      end if;
-
       if Data_Table.Contains (Upper_Name) then
          return; 
       end if;
@@ -34,7 +30,8 @@ package body SData.Table is
       New_Col.Name (1 .. Upper_Name'Length) := Upper_Name;
       New_Col.Typ := Col_Type;
       
-      for I in 1 .. Num_Rows loop
+      --  Rule: New columns must match the existing table height.
+      for I in 1 .. Table_Row_Count loop
          New_Col.Data.Append ((Kind => Val_Missing));
       end loop;
       
@@ -76,10 +73,7 @@ package body SData.Table is
    ---------------
    function Row_Count return Natural is
    begin
-      if Data_Table.Is_Empty then
-         return 0;
-      end if;
-      return Natural (Column_Maps.Element (Data_Table.First).Data.Length);
+      return Table_Row_Count;
    end Row_Count;
 
    -------------
@@ -88,6 +82,7 @@ package body SData.Table is
    procedure Add_Row is
       Position : Column_Maps.Cursor := Data_Table.First;
    begin
+      Table_Row_Count := Table_Row_Count + 1;
       while Column_Maps.Has_Element (Position) loop
          declare
             Col : Column := Column_Maps.Element (Position);
@@ -133,8 +128,12 @@ package body SData.Table is
          Position : constant Column_Maps.Cursor := Data_Table.Find (Upper_Name);
          Col : Column := Column_Maps.Element (Position);
       begin
+         --  Safety check: Ensure the row actually exists in this column's data vector.
          if Count_Type (Row) > Col.Data.Length then
-            return;
+            --  Auto-extend if necessary (though Add_Row should handle this).
+            for I in Positive (Col.Data.Length) + 1 .. Row loop
+               Col.Data.Append ((Kind => Val_Missing));
+            end loop;
          end if;
 
          if Val.Kind /= Val_Missing then
