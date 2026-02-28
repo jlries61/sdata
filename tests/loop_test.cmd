@@ -1,15 +1,15 @@
-LET I = 1
-WHILE I <= 3
-  PRINT "WHILE" I
-  LET I = I + 1
+let i = 1
+WHILE i <= 3
+  PRINT "WHILE" i
+  let i = i + 1
 WEND
 
-FOR J = 1 TO 3
-  PRINT "FOR" J
+FOR j = 1 TO 3
+  PRINT "FOR" j
 NEXT
 
-FOR K = 5 TO 1 STEP -2
-  PRINT "FOR STEP" K
+FOR k = 5 TO 1 STEP -2
+  PRINT "FOR STEP" k
 NEXT
 RUN
 END

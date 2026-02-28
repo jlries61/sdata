@@ -187,8 +187,9 @@ package body SData.Interpreter is
                      if Expected = Val_Integer and Result.Kind /= Val_Integer then
                         Result := (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Convert_To_Float(Result))));
                      elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
+                        -- Promote integer to float.
                         Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
-                     elsif Expected /= Result.Kind then
+                     elsif Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
                         raise Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
                      end if;
                   end if;
