@@ -10,13 +10,13 @@ package body SData.Values is
       case V.Kind is
          when Val_Numeric =>
             declare
-               Img : String := Float'Image (V.Num_Val);
+               Img : constant String := Float'Image (V.Num_Val);
             begin
                return Trim (Img, Ada.Strings.Both);
             end;
          when Val_Integer =>
             declare
-               Img : String := Integer'Image (V.Int_Val);
+               Img : constant String := Integer'Image (V.Int_Val);
             begin
                return Trim (Img, Ada.Strings.Both);
             end;

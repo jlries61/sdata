@@ -91,7 +91,6 @@ package body SData.Interpreter is
    end Add_Pending_Mod;
 
    procedure Apply_Pending_Mods is
-      use SData.Table;
       Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
       Current : Column_Mod_List;
       Keep_List_Exists : Boolean := False;
@@ -127,7 +126,6 @@ package body SData.Interpreter is
    end Apply_Pending_Mods;
 
    procedure Expand_Range (Kind : Column_Mod_Kind; Range_Spec : Variable_Range) is
-      use SData.Table;
       Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
       Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
       End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");

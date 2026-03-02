@@ -1,5 +1,4 @@
 with Ada.Numerics.Generic_Elementary_Functions;
-with Ada.Numerics.Float_Random;
 with Phi_function;
 with Beta_function;
 with Gamma_function;
@@ -308,8 +307,8 @@ package body SData.Statistics is
    --------------
    --  Using Marsaglia and Tsang's method (2000)
    function Gamma_RN (Alpha, Beta : Float) return Float is
-      A : Long_Float := Long_Float (Alpha);
-      B : Long_Float := Long_Float (Beta);
+      A : constant Long_Float := Long_Float (Alpha);
+      B : constant Long_Float := Long_Float (Beta);
       D, C, X, V, U : Long_Float;
    begin
       Ensure_Random_Init;

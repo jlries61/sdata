@@ -1,6 +1,5 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers;         use Ada.Containers;
-with Ada.Strings.Unbounded;  use Ada.Strings.Unbounded;
 
 package body SData.Table is
 

@@ -3,7 +3,6 @@
 --  It supports automatic format detection and utilizes external utilities (ssconvert)
 --  or native logic for specific file types.
 
-with SData.Table; use SData.Table;
 with SData.Config; use SData.Config;
 
 package SData.File_IO is

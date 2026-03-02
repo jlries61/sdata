@@ -3,8 +3,6 @@ with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData.Statistics;
 with SData.Table;
-with Ada.Text_IO; use Ada.Text_IO;
-with Ada.Exceptions;
 
 package body SData.Evaluator is
 
@@ -19,18 +17,6 @@ package body SData.Evaluator is
          when others      => raise Constraint_Error with "Cannot convert " & V.Kind'Image & " to Float";
       end case;
    end Convert_To_Float;
-
-   -------------------------
-   -- Convert_To_Integer --
-   -------------------------
-   function Convert_To_Integer (V : Value) return Integer is
-   begin
-      case V.Kind is
-         when Val_Integer => return V.Int_Val;
-         when Val_Numeric => return Integer (Float'Truncation (V.Num_Val));
-         when others      => raise Constraint_Error with "Cannot convert " & V.Kind'Image & " to Integer";
-      end case;
-   end Convert_To_Integer;
 
    ----------------------
    -- Evaluate_Function --

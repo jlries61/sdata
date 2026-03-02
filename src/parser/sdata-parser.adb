@@ -1,5 +1,4 @@
 with Ada.Text_IO; use Ada.Text_IO;
-with Ada.Characters.Handling; use Ada.Characters.Handling;
 
 package body SData.Parser is
 
@@ -110,7 +109,7 @@ package body SData.Parser is
 
                                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
                                     declare
-                                       Comma : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                       Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                                     begin null; end;
                                  else
                                     exit;
@@ -238,7 +237,7 @@ package body SData.Parser is
          
          Tok := Get_Next_Token (Ctx.Lex_Ctx);
          declare
-            Node : Variable_List := new Variable_List_Node;
+            Node : constant Variable_List := new Variable_List_Node;
          begin
             Node.Var.Start_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
             Node.Var.Start_Len := Tok.Length;
@@ -335,7 +334,7 @@ package body SData.Parser is
          when Token_LET | Token_SET =>
             declare
                Var_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- '='
             begin
                Stmt := new Statement ((if Tok.Kind = Token_LET then Stmt_LET else Stmt_SET));
                Stmt.Var_Len := Var_Tok.Length;
@@ -432,7 +431,7 @@ package body SData.Parser is
             Stmt := new Statement (Stmt_FOR);
             declare
                Var_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Eq_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- '='
             begin
                Stmt.For_Var_Len := Var_Tok.Length;
                Stmt.For_Var (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);

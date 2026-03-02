@@ -1,5 +1,4 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
-with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 
 package body SData.Lexer is
 
@@ -186,7 +185,7 @@ package body SData.Lexer is
       end if;
 
       declare
-         C : Character := Current_Char (Ctx);
+         C : constant Character := Current_Char (Ctx);
       begin
          --  Identify Numeric Literals.
          if Is_Digit (C) then

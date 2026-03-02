@@ -1,5 +1,4 @@
 with Ada.Numerics;
-with Ada.Numerics.Elementary_Functions;
 with Ada.Numerics.Float_Random;
 
 package SData.Statistics is

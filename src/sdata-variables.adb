@@ -1,6 +1,5 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData.Table;           use SData.Table;
-with Ada.Text_IO;           use Ada.Text_IO;
 
 package body SData.Variables is
 
