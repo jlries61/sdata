@@ -248,7 +248,8 @@ package body SData.Interpreter is
                end;
                if not SData.Config.Quiet_Mode and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock_data" 
                  and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock" then
-                  Put_Line ("Dataset opened: " & Stmt.File_Path(1 .. Stmt.File_Len));
+                  --  Open_Input already prints success for some formats.
+                  null;
                end if;
             when Stmt_REPEAT =>
                SData.Config.Repeat_Active := True;

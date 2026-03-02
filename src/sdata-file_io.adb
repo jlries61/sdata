@@ -1,12 +1,39 @@
 with Ada.Text_IO;   use Ada.Text_IO;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with Ada.Containers.Vectors;
 with SData.Table;     use SData.Table;
 with SData.Values;    use SData.Values;
 with GNAT.Strings; use GNAT.Strings;
 with GNAT.OS_Lib;
+with Zip;
+with UnZip;
+with DOM.Core;
+with DOM.Core.Nodes;
+with DOM.Core.Elements;
+with DOM.Core.Documents;
+with DOM.Readers;
+with Input_Sources.File;
 
 package body SData.File_IO is
+
+   --  Helper for DOM node traversal
+   function Get_Text (N : DOM.Core.Node) return String is
+      use DOM.Core;
+      use DOM.Core.Nodes;
+      Child : Node := First_Child (N);
+      Res : Unbounded_String := Null_Unbounded_String;
+   begin
+      while Child /= null loop
+         if Node_Type (Child) = Text_Node then
+            Append (Res, Node_Value (Child));
+         elsif Node_Type (Child) = Element_Node then
+            Append (Res, Get_Text (Child));
+         end if;
+         Child := Next_Sibling (Child);
+      end loop;
+      return To_String (Res);
+   end Get_Text;
 
    -------------------
    -- Run_SSConvert --
@@ -68,7 +95,7 @@ package body SData.File_IO is
       case Actual_Fmt is
          when CSV =>
             Parse_CSV (File_Name);
-         when ODF | OOXML =>
+         when ODF =>
             declare
                Temp_CSV : constant String := File_Name & ".tmp.csv";
                OK : Boolean;
@@ -77,7 +104,13 @@ package body SData.File_IO is
                Parse_CSV (Temp_CSV);
                GNAT.OS_Lib.Delete_File (Temp_CSV, OK);
             end;
+         when OOXML =>
+            Parse_OOXML (File_Name);
       end case;
+
+      if not SData.Config.Quiet_Mode then
+         Put_Line ("Dataset opened: " & File_Name);
+      end if;
    end Open_Input;
 
    -----------------
@@ -289,14 +322,174 @@ package body SData.File_IO is
          raise;
    end Write_CSV;
 
+   ------------------
+   -- Parse_ODF --
+   ------------------
    procedure Parse_ODF (File_Name : String) is
    begin
       Open_Input (File_Name, ODF);
    end Parse_ODF;
 
+   -----------------
+   -- Parse_OOXML --
+   -----------------
    procedure Parse_OOXML (File_Name : String) is
+      use DOM.Core;
+      use DOM.Core.Nodes;
+      use DOM.Core.Elements;
+
+      Temp_Shared : constant String := File_Name & ".sharedStrings.xml";
+      Temp_Sheet  : constant String := File_Name & ".sheet1.xml";
+      
+      package String_Vectors is new Ada.Containers.Vectors (Index_Type => Natural, Element_Type => Unbounded_String);
+      Shared_Strings : String_Vectors.Vector;
+
+      procedure Load_Shared_Strings (Zip_Info : Zip.Zip_Info) is
+         Reader : DOM.Readers.Tree_Reader;
+         Input  : Input_Sources.File.File_Input;
+         Doc    : DOM.Core.Document;
+         SI_Nodes, T_Nodes : Node_List;
+         Success : Boolean;
+      begin
+         begin
+            UnZip.Extract (from => Zip_Info, what => "xl/sharedStrings.xml", rename => Temp_Shared);
+         exception
+            when others => return; -- No shared strings file
+         end;
+
+         Input_Sources.File.Open (Temp_Shared, Input);
+         DOM.Readers.Parse (Reader, Input);
+         Doc := DOM.Readers.Get_Tree (Reader);
+         Input_Sources.File.Close (Input);
+
+         SI_Nodes := DOM.Core.Documents.Get_Elements_By_Tag_Name (Doc, "si");
+         for I in 0 .. Length (SI_Nodes) - 1 loop
+            T_Nodes := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (SI_Nodes, I)), "t");
+            if Length (T_Nodes) > 0 then
+               Shared_Strings.Append (To_Unbounded_String (Get_Text (Item (T_Nodes, 0))));
+            else
+               Shared_Strings.Append (Null_Unbounded_String);
+            end if;
+            Free (T_Nodes);
+         end loop;
+
+         Free (SI_Nodes);
+         DOM.Readers.Free (Reader);
+         GNAT.OS_Lib.Delete_File (Temp_Shared, Success);
+      exception
+         when others => null;
+      end Load_Shared_Strings;
+
+      procedure Load_Sheet (Zip_Info : Zip.Zip_Info) is
+         Reader : DOM.Readers.Tree_Reader;
+         Input  : Input_Sources.File.File_Input;
+         Doc    : DOM.Core.Document;
+         Rows, Cells : Node_List;
+         Success : Boolean;
+         Header_Names : GNAT.Strings.String_List_Access;
+
+         function Get_Cell_Value (Cell_Node : Node) return Value is
+            T_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell_Node), "t");
+            V_List : Node_List := Get_Elements_By_Tag_Name (DOM.Core.Element (Cell_Node), "v");
+            IS_List : Node_List := Get_Elements_By_Tag_Name (DOM.Core.Element (Cell_Node), "is");
+         begin
+            if Length (V_List) > 0 then
+               declare
+                  Val_Str : constant String := Get_Text (Item (V_List, 0));
+               begin
+                  Free (V_List); Free (IS_List);
+                  if T_Attr = "s" then
+                     declare
+                        Idx : constant Natural := Natural'Value (Val_Str);
+                     begin
+                        if Idx < Natural (Shared_Strings.Length) then
+                           declare S : constant String := To_String (Shared_Strings.Element (Idx));
+                           begin return (Kind => Val_String, Str_Val => S & (1 .. 1024 - S'Length => ' '), Str_Len => S'Length); end;
+                        end if;
+                     end;
+                  elsif T_Attr = "str" then
+                     return (Kind => Val_String, Str_Val => Val_Str & (1 .. 1024 - Val_Str'Length => ' '), Str_Len => Val_Str'Length);
+                  else
+                     begin return (Kind => Val_Numeric, Num_Val => Float'Value (Val_Str)); exception when others => null; end;
+                  end if;
+               end;
+            elsif Length (IS_List) > 0 then
+               declare
+                  T_Nodes : Node_List := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (IS_List, 0)), "t");
+               begin
+                  if Length (T_Nodes) > 0 then
+                     declare S : constant String := Get_Text (Item (T_Nodes, 0));
+                     begin Free (T_Nodes); Free (V_List); Free (IS_List);
+                           return (Kind => Val_String, Str_Val => S & (1 .. 1024 - S'Length => ' '), Str_Len => S'Length); end;
+                  end if;
+                  Free (T_Nodes);
+               end;
+            end if;
+            Free (V_List); Free (IS_List);
+            return (Kind => Val_Missing);
+         end Get_Cell_Value;
+
+      begin
+         UnZip.Extract (from => Zip_Info, what => "xl/worksheets/sheet1.xml", rename => Temp_Sheet);
+         Input_Sources.File.Open (Temp_Sheet, Input);
+         DOM.Readers.Parse (Reader, Input);
+         Doc := DOM.Readers.Get_Tree (Reader);
+         Input_Sources.File.Close (Input);
+
+         Rows := DOM.Core.Documents.Get_Elements_By_Tag_Name (Doc, "row");
+         Clear;
+
+         if Length (Rows) > 0 then
+            -- Headers
+            Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 0)), "c");
+            for I in 0 .. Length (Cells) - 1 loop
+               declare
+                  V : constant Value := Get_Cell_Value (Item (Cells, I));
+                  Name : constant String := (if V.Kind = Val_String then V.Str_Val (1 .. V.Str_Len) else "COL" & Trim (Integer (I + 1)'Img, Ada.Strings.Both));
+               begin
+                  Add_Column (Safe_Name (Name, "COL" & Trim (Integer (I + 1)'Img, Ada.Strings.Both)), (if V.Kind = Val_Numeric then Col_Numeric else Col_String));
+               end;
+            end loop;
+            Free (Cells);
+            Header_Names := Get_Column_Names;
+
+            -- Data Rows
+            for I in 1 .. Length (Rows) - 1 loop
+               Add_Row;
+               Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, I)), "c");
+               for J in 0 .. Length (Cells) - 1 loop
+                  if J < Header_Names'Length then
+                     declare
+                        V : constant Value := Get_Cell_Value (Item (Cells, J));
+                     begin
+                        if V.Kind /= Val_Missing then
+                           Set_Value (Row_Count, Header_Names (J + 1).all, V);
+                        end if;
+                     exception
+                        when others => null; -- Handle type mismatch or other errors gracefully
+                     end;
+                  end if;
+               end loop;
+               Free (Cells);
+            end loop;
+            GNAT.Strings.Free (Header_Names);
+         end if;
+
+         Free (Rows);
+         DOM.Readers.Free (Reader);
+         GNAT.OS_Lib.Delete_File (Temp_Sheet, Success);
+      end Load_Sheet;
+
+      Zip_Info : Zip.Zip_Info;
    begin
-      Open_Input (File_Name, OOXML);
+      Zip.Load (Zip_Info, File_Name);
+      Load_Shared_Strings (Zip_Info);
+      Load_Sheet (Zip_Info);
+   exception
+      when others =>
+         if GNAT.OS_Lib.Is_Regular_File (Temp_Shared) then declare OK : Boolean; begin GNAT.OS_Lib.Delete_File (Temp_Shared, OK); end; end if;
+         if GNAT.OS_Lib.Is_Regular_File (Temp_Sheet) then declare OK : Boolean; begin GNAT.OS_Lib.Delete_File (Temp_Sheet, OK); end; end if;
+         raise Program_Error with "Failed to parse OOXML file: " & File_Name;
    end Parse_OOXML;
 
    procedure Write_ODF (File_Name : String) is
