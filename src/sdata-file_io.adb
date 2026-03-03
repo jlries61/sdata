@@ -96,14 +96,7 @@ package body SData.File_IO is
          when CSV =>
             Parse_CSV (File_Name);
          when ODF =>
-            declare
-               Temp_CSV : constant String := File_Name & ".tmp.csv";
-               OK : Boolean;
-            begin
-               Run_SSConvert (File_Name, Temp_CSV);
-               Parse_CSV (Temp_CSV);
-               GNAT.OS_Lib.Delete_File (Temp_CSV, OK);
-            end;
+            Parse_ODF (File_Name);
          when OOXML =>
             Parse_OOXML (File_Name);
       end case;
@@ -323,11 +316,154 @@ package body SData.File_IO is
    end Write_CSV;
 
    ------------------
-   -- Parse_ODF --
+   --  Parse_ODF  --
    ------------------
    procedure Parse_ODF (File_Name : String) is
+      use DOM.Core;
+      use DOM.Core.Nodes;
+      use DOM.Core.Elements;
+
+      Temp_XML : constant String := File_Name & ".content.xml";
+
+      procedure Load_Content (Zip_Info : Zip.Zip_Info) is
+         Reader : DOM.Readers.Tree_Reader;
+         Input  : Input_Sources.File.File_Input;
+         Doc    : DOM.Core.Document;
+         Tables, Rows, Cells : Node_List;
+         Success : Boolean;
+         Header_Names : GNAT.Strings.String_List_Access;
+
+         function Get_Cell_Value (Cell_Node : Node) return Value is
+            Val_Type : constant String := Get_Attribute (DOM.Core.Element (Cell_Node), "office:value-type");
+            P_List   : Node_List := Get_Elements_By_Tag_Name (DOM.Core.Element (Cell_Node), "text:p");
+         begin
+            if Val_Type = "float" or Val_Type = "currency" or Val_Type = "percentage" then
+               declare
+                  V_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell_Node), "office:value");
+               begin
+                  Free (P_List);
+                  begin
+                     return (Kind => Val_Numeric, Num_Val => Float'Value (V_Attr));
+                  exception
+                     when others => return (Kind => Val_Missing);
+                  end;
+               end;
+            elsif Length (P_List) > 0 then
+               declare
+                  S : constant String := Get_Text (Item (P_List, 0));
+               begin
+                  Free (P_List);
+                  return (Kind => Val_String, Str_Val => S & (1 .. 1024 - S'Length => ' '), Str_Len => S'Length);
+               end;
+            end if;
+            Free (P_List);
+            return (Kind => Val_Missing);
+         end Get_Cell_Value;
+
+      begin
+         UnZip.Extract (from => Zip_Info, what => "content.xml", rename => Temp_XML);
+         Input_Sources.File.Open (Temp_XML, Input);
+         DOM.Readers.Parse (Reader, Input);
+         Doc := DOM.Readers.Get_Tree (Reader);
+         Input_Sources.File.Close (Input);
+
+         Tables := DOM.Core.Documents.Get_Elements_By_Tag_Name (Doc, "table:table");
+         if Length (Tables) = 0 then
+            Free (Tables); DOM.Readers.Free (Reader);
+            raise Program_Error with "No tables found in ODS file";
+         end if;
+
+         -- We parse the first table found
+         Rows := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Tables, 0)), "table:table-row");
+         Clear;
+
+         if Length (Rows) > 0 then
+            -- Headers from the first row
+            Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 0)), "table:table-cell");
+            for I in 0 .. Length (Cells) - 1 loop
+               declare
+                  Cell : constant Node := Item (Cells, I);
+                  Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
+                  Repeat_Count : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
+                  P_Nodes_Local : Node_List := Get_Elements_By_Tag_Name (DOM.Core.Element (Cell), "text:p");
+                  Base_Name : constant String := (if Length (P_Nodes_Local) > 0 then Get_Text (Item (P_Nodes_Local, 0)) else "");
+               begin
+                  Free (P_Nodes_Local);
+                  for K in 1 .. Repeat_Count loop
+                     -- Stop if we hit too many empty columns (ODS often has thousands)
+                     exit when Base_Name = "" and K > 1;
+                     declare
+                        Idx : constant String := Trim (Natural (Column_Count + 1)'Img, Ada.Strings.Both);
+                        Final_Name : constant String := (if Base_Name = "" then "COL" & Idx else Base_Name & (if Repeat_Count > 1 then "_" & Trim (K'Img, Ada.Strings.Both) else ""));
+                     begin
+                        Add_Column (Safe_Name (Final_Name, "COL" & Idx), Col_String);
+                     end;
+                  end loop;
+               end;
+            end loop;
+            Free (Cells);
+            Header_Names := Get_Column_Names;
+
+            -- Data Rows
+            for I in 1 .. Length (Rows) - 1 loop
+               declare
+                  Row_Node : constant Node := Item (Rows, I);
+                  Row_Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Row_Node), "table:number-rows-repeated");
+                  Row_Repeat_Count : constant Positive := (if Row_Repeat_Attr = "" then 1 else Positive'Value (Row_Repeat_Attr));
+               begin
+                  -- Heuristic: If we see a huge number of repeated rows, it's usually just empty padding at the end of the sheet
+                  exit when Row_Repeat_Count > 1000; 
+
+                  for R_Count in 1 .. Row_Repeat_Count loop
+                     Add_Row;
+                     Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Row_Node), "table:table-cell");
+                     declare
+                        Col_Idx : Positive := 1;
+                     begin
+                        for J in 0 .. Length (Cells) - 1 loop
+                           declare
+                              Cell : constant Node := Item (Cells, J);
+                              Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
+                              Repeat_Count : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
+                              Val : constant Value := Get_Cell_Value (Cell);
+                           begin
+                              for K in 1 .. Repeat_Count loop
+                                 if Col_Idx <= Header_Names'Length then
+                                    if Val.Kind /= Val_Missing then
+                                       begin
+                                          Set_Value (Row_Count, Header_Names (Col_Idx).all, Val);
+                                       exception
+                                          when others => null;
+                                       end;
+                                    end if;
+                                    Col_Idx := Col_Idx + 1;
+                                 end if;
+                              end loop;
+                           end;
+                           exit when Col_Idx > Header_Names'Length;
+                        end loop;
+                     end;
+                     Free (Cells);
+                  end loop;
+               end;
+            end loop;
+            GNAT.Strings.Free (Header_Names);
+         end if;
+
+         Free (Rows);
+         Free (Tables);
+         DOM.Readers.Free (Reader);
+         GNAT.OS_Lib.Delete_File (Temp_XML, Success);
+      end Load_Content;
+
+      Zip_Info : Zip.Zip_Info;
    begin
-      Open_Input (File_Name, ODF);
+      Zip.Load (Zip_Info, File_Name);
+      Load_Content (Zip_Info);
+   exception
+      when others =>
+         if GNAT.OS_Lib.Is_Regular_File (Temp_XML) then declare OK : Boolean; begin GNAT.OS_Lib.Delete_File (Temp_XML, OK); end; end if;
+         raise Program_Error with "Failed to parse ODS file: " & File_Name;
    end Parse_ODF;
 
    -----------------
