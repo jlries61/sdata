@@ -122,6 +122,19 @@ package body SData.Parser is
                            end if;
                         end;
                         return Node;
+                     elsif Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
+                        Node := new Expression (Expr_Array_Access);
+                        Node.Arr_Len := Actual_Tok.Length;
+                        Node.Arr_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                        declare
+                           Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- Consume '{'
+                        begin
+                           Node.Arr_Idx := Parse_Expression (Ctx);
+                           if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Brace then
+                              Put_Line ("Error: Expected '}' after array index");
+                           end if;
+                        end;
+                        return Node;
                      else
                         Node := new Expression (Expr_Variable);
                         Node.Var_Len := Actual_Tok.Length;
@@ -334,11 +347,28 @@ package body SData.Parser is
          when Token_LET | Token_SET =>
             declare
                Var_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- '='
+               Is_Arr  : Boolean := False;
+               A_Idx   : Expression_Access := null;
             begin
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
+                  Is_Arr := True;
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin
+                     A_Idx := Parse_Expression (Ctx);
+                     if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Brace then
+                        Put_Line ("Error: Expected '}' in array assignment");
+                     end if;
+                  end;
+               end if;
+               
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  Put_Line ("Error: Expected '=' in assignment");
+               end if;
+
                Stmt := new Statement ((if Tok.Kind = Token_LET then Stmt_LET else Stmt_SET));
                Stmt.Var_Len := Var_Tok.Length;
                Stmt.Var_Name (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);
+               Stmt.Is_Array := Is_Arr;
+               Stmt.Arr_Idx := A_Idx;
                Stmt.Expr := Parse_Expression (Ctx);
             end;
 
@@ -399,9 +429,40 @@ package body SData.Parser is
                end loop;
             end;
 
-         when Token_KEEP | Token_DROP =>
-            Stmt := new Statement ((if Tok.Kind = Token_KEEP then Stmt_KEEP else Stmt_DROP));
+         when Token_KEEP | Token_DROP | Token_HOLD | Token_UNHOLD =>
+            if Tok.Kind = Token_KEEP then Stmt := new Statement (Stmt_KEEP);
+            elsif Tok.Kind = Token_DROP then Stmt := new Statement (Stmt_DROP);
+            elsif Tok.Kind = Token_HOLD then Stmt := new Statement (Stmt_HOLD);
+            else Stmt := new Statement (Stmt_UNHOLD); end if;
             Stmt.Vars := Parse_Variable_List (Ctx);
+
+         when Token_ARRAY | Token_DIM =>
+            declare
+               New_Kind : constant Statement_Kind := (if Tok.Kind = Token_ARRAY then Stmt_ARRAY else Stmt_DIM);
+            begin
+               Stmt := new Statement (New_Kind);
+               declare
+                  Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  Dim_Tok  : Token;
+               begin
+                  Stmt.Arr_Name_Len := Name_Tok.Length;
+                  Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
+                  
+                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
+                     declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin
+                        Dim_Tok := Get_Next_Token (Ctx.Lex_Ctx);
+                        Stmt.Arr_Dim := Positive'Value (Dim_Tok.Text (1 .. Dim_Tok.Length));
+                        if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Brace then
+                           Put_Line ("Error: Expected '}' in array definition");
+                        end if;
+                     end;
+                  else
+                     Put_Line ("Error: Expected '{dim}' in array definition");
+                  end if;
+                  
+                  Stmt.Arr_Vars := Parse_Variable_List (Ctx);
+               end;
+            end;
 
          when Token_RENAME =>
             Stmt := new Statement (Stmt_RENAME);

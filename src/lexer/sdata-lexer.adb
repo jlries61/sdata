@@ -316,6 +316,8 @@ package body SData.Lexer is
                   end if;
                when '(' => T.Kind := Token_Left_Paren; Advance (Ctx);
                when ')' => T.Kind := Token_Right_Paren; Advance (Ctx);
+               when '{' => T.Kind := Token_Left_Brace; Advance (Ctx);
+               when '}' => T.Kind := Token_Right_Brace; Advance (Ctx);
                when ',' => T.Kind := Token_Comma; Advance (Ctx);
                when ';' => T.Kind := Token_Semicolon; Advance (Ctx);
                when ':' => T.Kind := Token_Colon; Advance (Ctx);

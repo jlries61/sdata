@@ -1,5 +1,6 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData.Table;           use SData.Table;
+with Ada.Strings.Unbounded;  use Ada.Strings.Unbounded;
 
 package body SData.Variables is
 
@@ -84,5 +85,133 @@ package body SData.Variables is
    begin
       Temp_Symbols.Clear;
    end Clear_Temporary;
+
+   ------------------
+   -- Define_Array --
+   ------------------
+   procedure Define_Array (Name : String; Constituents : GNAT.Strings.String_List) is
+      Upper_Name : constant String := To_Upper (Name);
+      V : Name_Vectors.Vector;
+   begin
+      for I in Constituents'Range loop
+         Name_Vectors.Append (V, To_Unbounded_String (To_Upper (Constituents (I).all)));
+      end loop;
+      if Array_Symbols.Contains (Upper_Name) then
+         Array_Symbols.Replace (Upper_Name, V);
+      else
+         Array_Symbols.Insert (Upper_Name, V);
+      end if;
+   end Define_Array;
+
+   ------------------
+   -- Define_Array --
+   ------------------
+   procedure Define_Array (Name : String; Constituents : Name_Vectors.Vector) is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if Array_Symbols.Contains (Upper_Name) then
+         Array_Symbols.Replace (Upper_Name, Constituents);
+      else
+         Array_Symbols.Insert (Upper_Name, Constituents);
+      end if;
+   end Define_Array;
+
+   -------------------------
+   -- Define_Array_Access --
+   -------------------------
+   procedure Define_Array_Access (Name : String; Constituents : GNAT.Strings.String_List_Access) is
+      use GNAT.Strings;
+   begin
+      if Constituents /= null then
+         Define_Array (Name, Constituents.all);
+      end if;
+   end Define_Array_Access;
+
+   -----------------------
+   -- Get_Array_Element --
+   -----------------------
+   function Get_Array_Element (Name : String; Index : Positive) return Value is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if not Array_Symbols.Contains (Upper_Name) then
+         return (Kind => Val_Missing);
+      end if;
+      
+      declare
+         V : constant Name_Vectors.Vector := Array_Symbols.Element (Upper_Name);
+      begin
+         if Index > Natural (V.Length) then
+            return (Kind => Val_Missing);
+         end if;
+         return Get (Ada.Strings.Unbounded.To_String (V.Element (Index)));
+      end;
+   end Get_Array_Element;
+
+   -----------------------
+   -- Set_Array_Element --
+   -----------------------
+   procedure Set_Array_Element (Name : String; Index : Positive; Val : Value) is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if not Array_Symbols.Contains (Upper_Name) then
+         return;
+      end if;
+
+      declare
+         V : constant Name_Vectors.Vector := Array_Symbols.Element (Upper_Name);
+         Actual_Val : Value := Val;
+      begin
+         if Index > Natural (V.Length) then
+            return;
+         end if;
+         
+         declare
+            Var_Name : constant String := Ada.Strings.Unbounded.To_String (V.Element (Index));
+         begin
+            -- Promotion logic similar to LET
+            if Has_Column (Var_Name) then
+               -- We'd need to know the column type. Variables.ads doesn't see Table's internal types easily.
+               -- Actually, Set_Permanent handles column creation.
+               -- But it doesn't handle type matching.
+               null;
+            end if;
+            Set_Permanent (Var_Name, Actual_Val);
+         end;
+      end;
+   end Set_Array_Element;
+
+   ---------------
+   -- Has_Array --
+   ---------------
+   function Has_Array (Name : String) return Boolean is
+   begin
+      return Array_Symbols.Contains (To_Upper (Name));
+   end Has_Array;
+
+   --------------
+   -- Set_Hold --
+   --------------
+   procedure Set_Hold (Name : String; State : Boolean) is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if Hold_Symbols.Contains (Upper_Name) then
+         Hold_Symbols.Replace (Upper_Name, State);
+      else
+         Hold_Symbols.Insert (Upper_Name, State);
+      end if;
+   end Set_Hold;
+
+   -------------
+   -- Is_Held --
+   -------------
+   function Is_Held (Name : String) return Boolean is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if Hold_Symbols.Contains (Upper_Name) then
+         return Hold_Symbols.Element (Upper_Name);
+      else
+         return False;
+      end if;
+   end Is_Held;
 
 end SData.Variables;

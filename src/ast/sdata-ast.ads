@@ -11,7 +11,8 @@ package SData.AST is
       Expr_Variable,        -- e.g., SALARY
       Expr_Binary_Op,       -- e.g., A + B
       Expr_Unary_Op,        -- e.g., -A
-      Expr_Function_Call    -- e.g., SQRT(X)
+      Expr_Function_Call,   -- e.g., SQRT(X)
+      Expr_Array_Access     -- e.g., ARR{1}
    );
 
    --  Arithmetic and logical binary operators.
@@ -53,6 +54,10 @@ package SData.AST is
             Func_Name : String (1 .. 32);
             Func_Len  : Natural;
             Arguments : Expression_List;
+         when Expr_Array_Access =>
+            Arr_Name : String (1 .. 32);
+            Arr_Len  : Natural;
+            Arr_Idx  : Expression_Access;
       end case;
    end record;
 
@@ -104,6 +109,10 @@ package SData.AST is
       Stmt_NAMES,  -- List column names
       Stmt_SUBMIT, -- Recursive script execution
       Stmt_RSEED,  -- Set random seed
+      Stmt_HOLD,   -- Retain variable values across records
+      Stmt_UNHOLD, -- Reset variables normally
+      Stmt_ARRAY,  -- Define a group of variables
+      Stmt_DIM,    -- Synonym for ARRAY
       Stmt_RUN,    -- Execute and export
       Stmt_NEW     -- Reset environment
    );
@@ -113,12 +122,13 @@ package SData.AST is
 
    --  Variant record for statements. Linked via the 'Next' pointer to form a program.
    type Statement (Kind : Statement_Kind) is record
-      Next : Statement_Access; -- Pointer to the next statement in sequence.
+      Next     : Statement_Access; -- Pointer to the next statement in sequence.
+      Var_Name : String (1 .. 32);
+      Var_Len  : Natural;
+      Is_Array : Boolean := False;
+      Arr_Idx  : Expression_Access;
+      Expr     : Expression_Access;
       case Kind is
-         when Stmt_LET | Stmt_SET =>
-            Var_Name : String (1 .. 32);
-            Var_Len  : Natural;
-            Expr     : Expression_Access;
          when Stmt_PRINT =>
             Print_Args : Expression_List;
          when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT =>
@@ -126,8 +136,12 @@ package SData.AST is
             File_Len  : Natural;
          when Stmt_REPEAT =>
             Count : Natural;
-         when Stmt_KEEP | Stmt_DROP =>
-            Vars : Variable_List;
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM =>
+            Vars         : Variable_List;
+            Arr_Name     : String (1 .. 32);
+            Arr_Name_Len : Natural;
+            Arr_Dim      : Positive;
+            Arr_Vars     : Variable_List;
          when Stmt_RENAME =>
             Rename_Pairs : Rename_List;
          when Stmt_IF =>

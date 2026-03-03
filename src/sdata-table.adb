@@ -137,8 +137,18 @@ package body SData.Table is
 
          if Val.Kind /= Val_Missing then
             if Col.Typ = Col_Numeric and Val.Kind /= Val_Numeric then
+               if Val.Kind = Val_Integer then
+                  Col.Data.Replace_Element (Row, (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val)));
+                  Data_Table.Replace_Element (Position, Col);
+                  return;
+               end if;
                raise Type_Mismatch_Error with "Expected Numeric, got " & Val.Kind'Image;
             elsif Col.Typ = Col_Integer and Val.Kind /= Val_Integer then
+               if Val.Kind = Val_Numeric then
+                  Col.Data.Replace_Element (Row, (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val))));
+                  Data_Table.Replace_Element (Position, Col);
+                  return;
+               end if;
                raise Type_Mismatch_Error with "Expected Integer, got " & Val.Kind'Image;
             elsif Col.Typ = Col_String and Val.Kind /= Val_String then
                raise Type_Mismatch_Error with "Expected String, got " & Val.Kind'Image;

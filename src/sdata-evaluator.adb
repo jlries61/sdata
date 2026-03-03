@@ -193,6 +193,26 @@ package body SData.Evaluator is
 
          when Expr_Variable => return Get (Expr.Var_Name (1 .. Expr.Var_Len));
 
+         when Expr_Array_Access =>
+            declare
+               Index_Val : constant Value := Evaluate (Expr.Arr_Idx);
+               Idx : Natural;
+            begin
+               if Index_Val.Kind = Val_Integer then
+                  Idx := Index_Val.Int_Val;
+               elsif Index_Val.Kind = Val_Numeric then
+                  Idx := Natural (Float'Floor (Index_Val.Num_Val));
+               else
+                  return (Kind => Val_Missing);
+               end if;
+               
+               if Idx > 0 then
+                  return Get_Array_Element (Expr.Arr_Name (1 .. Expr.Arr_Len), Idx);
+               else
+                  return (Kind => Val_Missing);
+               end if;
+            end;
+
          when Expr_Unary_Op =>
             declare Operand_Val : constant Value := Evaluate (Expr.Operand);
             begin

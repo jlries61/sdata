@@ -5,6 +5,7 @@
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Streams.Stream_IO;
+with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Exceptions; use Ada.Exceptions;
 with SData.Parser; use SData.Parser;
 with SData.AST; use SData.AST;
@@ -50,10 +51,11 @@ procedure SData_Main is
 
    --  Runs the Interactive REPL.
    procedure Run_REPL is
-      Line : String (1 .. 4096);
+      Line : String (1 .. 16384);
       Last : Natural;
       Ctx  : Parser_Context;
       Prog : Statement_Access;
+      Full_Source : Unbounded_String := Null_Unbounded_String;
    begin
       Put_Line ("SData Interactive Console. Type QUIT to exit.");
       loop
@@ -62,6 +64,9 @@ procedure SData_Main is
          begin
             Get_Line (Line, Last);
             if Last > 0 then
+               -- Check for continuation: if the line ends with a comma or we are inside a block.
+               -- Simplification: for now, just process line by line.
+               -- But FOR/WHILE need multiple lines.
                Initialize (Ctx, Line (1 .. Last));
                Prog := Parse_Program (Ctx);
                
@@ -71,7 +76,8 @@ procedure SData_Main is
                      -- Note: This is a simplified check for now.
                      Is_Declarative : constant Boolean := 
                         Prog.Kind in Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP | 
-                                     Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END;
+                                     Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END |
+                                     Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW;
                   begin
                      if Is_Declarative then
                         -- Declarative statements execute immediately in REPL.

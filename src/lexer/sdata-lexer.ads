@@ -25,7 +25,8 @@ package SData.Lexer is
       -- Operators and Punctuation
       Token_Plus, Token_Minus, Token_Star, Token_Slash, Token_Caret, -- +, -, *, /, ^
       Token_Equal, Token_Not_Equal, Token_Less, Token_Less_Equal, Token_Greater, Token_Greater_Equal, -- =, <>, <, <=, >, >=
-      Token_Left_Paren, Token_Right_Paren, Token_Comma, Token_Semicolon, Token_Colon, -- (, ), ,, ;, :
+      Token_Left_Paren, Token_Right_Paren, Token_Left_Brace, Token_Right_Brace, -- (, ), {, }
+      Token_Comma, Token_Semicolon, Token_Colon, -- ,, ;, :
       Token_Newline,         -- Explicit newline tracking
       Token_Range_Dash       -- Used in variable ranges: NAME1-NAME5
    );

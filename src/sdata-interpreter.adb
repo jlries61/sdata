@@ -11,6 +11,7 @@ with Ada.Streams.Stream_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Strings.Hash;
+with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 package body SData.Interpreter is
 
@@ -178,24 +179,40 @@ package body SData.Interpreter is
             when Stmt_LET | Stmt_SET =>
                declare
                   Var_Name_Str : constant String := Stmt.Var_Name(1 .. Stmt.Var_Len);
-                  Expected     : constant Value_Kind := Get_Expected_Kind (Var_Name_Str);
+                  Expected     : Value_Kind;
                   Result       : Value := Evaluate (Stmt.Expr);
                begin
-                  if Result.Kind /= Val_Missing then
-                     if Expected = Val_Integer and Result.Kind /= Val_Integer then
-                        Result := (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Convert_To_Float(Result))));
-                     elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
-                        -- Promote integer to float.
-                        Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
-                     elsif Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
-                        raise Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
-                     end if;
-                  end if;
-                  
-                  if Stmt.Kind = Stmt_LET then
-                     Set_Permanent (Var_Name_Str, Result);
+                  if Stmt.Is_Array then
+                     declare
+                        Idx_Val : constant Value := Evaluate (Stmt.Arr_Idx);
+                        Idx : Natural;
+                     begin
+                        if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
+                        elsif Idx_Val.Kind = Val_Numeric then Idx := Natural (Float'Floor (Idx_Val.Num_Val));
+                        else Idx := 0; end if;
+
+                        if Idx > 0 then
+                           Set_Array_Element (Var_Name_Str, Idx, Result);
+                        end if;
+                     end;
                   else
-                     Set_Temporary (Var_Name_Str, Result);
+                     Expected := Get_Expected_Kind (Var_Name_Str);
+                     if Result.Kind /= Val_Missing then
+                        if Expected = Val_Integer and Result.Kind /= Val_Integer then
+                           Result := (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Convert_To_Float(Result))));
+                        elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
+                           -- Promote integer to float.
+                           Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
+                        elsif Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
+                           raise Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+                        end if;
+                     end if;
+                     
+                     if Stmt.Kind = Stmt_LET then
+                        Set_Permanent (Var_Name_Str, Result);
+                     else
+                        Set_Temporary (Var_Name_Str, Result);
+                     end if;
                   end if;
                exception
                   when Type_Mismatch_Error => Put_Line ("Error: Type mismatch for variable " & Var_Name_Str);
@@ -276,6 +293,83 @@ package body SData.Interpreter is
                      Rename_Column (Curr.Old_Name (1 .. Curr.Old_Len), Curr.New_Name (1 .. Curr.New_Len));
                      Curr := Curr.Next;
                   end loop;
+               end;
+            when Stmt_HOLD | Stmt_UNHOLD =>
+               declare
+                  Curr_Var : Variable_List := Stmt.Vars;
+                  State    : constant Boolean := (Stmt.Kind = Stmt_HOLD);
+                  
+                  procedure Set_Hold_For_Range (Range_Spec : Variable_Range) is
+                     Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+                     Start_Name : constant String := (if Range_Spec.Start_Len > 0 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                     End_Name   : constant String := (if Range_Spec.End_Len > 0 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                     Start_Idx, End_Idx : Natural := 0;
+                  begin
+                     if not Range_Spec.Is_Range then
+                        Set_Hold (Start_Name, State);
+                     elsif Col_Names /= null then
+                        for I in Col_Names'Range loop
+                           if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
+                           if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+                        end loop;
+                        if Start_Idx > 0 and End_Idx > 0 then
+                           if Start_Idx > End_Idx then
+                              declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                           end if;
+                           for I in Start_Idx .. End_Idx loop Set_Hold (Col_Names (I).all, State); end loop;
+                        end if;
+                        GNAT.Strings.Free (Col_Names);
+                     end if;
+                  end Set_Hold_For_Range;
+
+               begin
+                  while Curr_Var /= null loop
+                     Set_Hold_For_Range (Curr_Var.Var);
+                     Curr_Var := Curr_Var.Next;
+                  end loop;
+               end;
+            when Stmt_ARRAY | Stmt_DIM =>
+               declare
+                  S : constant Statement_Access := Stmt;
+                  V : Name_Vectors.Vector;
+                  Curr_Var : Variable_List := S.Arr_Vars;
+               begin
+                  while Curr_Var /= null loop
+                     declare
+                        Range_Spec : Variable_Range renames Curr_Var.Var;
+                     begin
+                        if not Range_Spec.Is_Range then
+                           V.Append (To_Unbounded_String (To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len))));
+                        else
+                           declare
+                              Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+                              Start_Name : constant String := To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len));
+                              End_Name   : constant String := To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len));
+                              Start_Idx, End_Idx : Natural := 0;
+                           begin
+                              if Col_Names /= null then
+                                 for I in Col_Names'Range loop
+                                    if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
+                                    if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+                                 end loop;
+                                 if Start_Idx > 0 and End_Idx > 0 then
+                                    if Start_Idx > End_Idx then
+                                       declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                                    end if;
+                                    for I in Start_Idx .. End_Idx loop
+                                       V.Append (To_Unbounded_String (Col_Names (I).all));
+                                    end loop;
+                                 end if;
+                                 GNAT.Strings.Free (Col_Names);
+                              end if;
+                           end;
+                        end if;
+                     end;
+                     Curr_Var := Curr_Var.Next;
+                  end loop;
+                  Define_Array (S.Arr_Name (1 .. S.Arr_Name_Len), V);
+               exception
+                  when others => Put_Line ("Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len)); raise;
                end;
             when Stmt_NAMES =>
                declare Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
@@ -359,7 +453,7 @@ package body SData.Interpreter is
          Explicit_Loop_Trigger := False;
          while Iter /= null and then Iter /= Boundary loop
             case Iter.Kind is
-               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW =>
+               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM =>
                   Execute_Statement (Iter);
                   if Iter.Kind = Stmt_USE or Iter.Kind = Stmt_REPEAT then 
                      Explicit_Loop_Trigger := True; 
@@ -386,7 +480,13 @@ package body SData.Interpreter is
                      if I > Row_Count then Add_Row; end if;
                      for C in Col_Names'Range loop
                         declare Name : constant String := To_Upper (Col_Names(C).all);
-                        begin if not Input_File_Columns.Contains (Name) then Set_Value (I, Name, (Kind => Val_Missing)); end if; end;
+                        begin 
+                           if not Input_File_Columns.Contains (Name) and then not Is_Held (Name) then 
+                              Set_Value (I, Name, (Kind => Val_Missing)); 
+                           elsif Is_Held (Name) and then I > 1 then
+                              Set_Value (I, Name, Get_Value (I - 1, Name));
+                           end if; 
+                        end;
                      end loop;
                      GNAT.Strings.Free (Col_Names);
                   end if;
