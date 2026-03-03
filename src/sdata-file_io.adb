@@ -8,6 +8,7 @@ with GNAT.Strings; use GNAT.Strings;
 with GNAT.OS_Lib;
 with Zip;
 with UnZip;
+with Zip.Create;
 with DOM.Core;
 with DOM.Core.Nodes;
 with DOM.Core.Elements;
@@ -35,28 +36,6 @@ package body SData.File_IO is
       return To_String (Res);
    end Get_Text;
 
-   -------------------
-   -- Run_SSConvert --
-   -------------------
-   procedure Run_SSConvert (In_File, Out_File : String) is
-      Args : GNAT.OS_Lib.Argument_List (1 .. 2);
-      Success : Boolean;
-      Executable : GNAT.OS_Lib.String_Access := GNAT.OS_Lib.Locate_Exec_On_Path ("ssconvert");
-   begin
-      if Executable = null then
-         raise Program_Error with "ssconvert executable not found on PATH";
-      end if;
-      Args (1) := new String'(In_File);
-      Args (2) := new String'(Out_File);
-      GNAT.OS_Lib.Spawn (Executable.all, Args, Success);
-      GNAT.OS_Lib.Free (Args (1));
-      GNAT.OS_Lib.Free (Args (2));
-      GNAT.OS_Lib.Free (Executable);
-      if not Success then
-         raise Program_Error with "ssconvert failed to convert " & In_File & " to " & Out_File;
-      end if;
-   end Run_SSConvert;
-
    ---------------
    -- Safe_Name --
    ---------------
@@ -67,6 +46,41 @@ package body SData.File_IO is
       if T'Length > 32 then return T (T'First .. T'First + 31); end if;
       return T;
    end Safe_Name;
+
+   -- Helper to convert column index (1-based) to Excel letters (A, B, ..., Z, AA, ...)
+   function Col_To_Letters (Col : Positive) return String is
+      C : Natural := Col;
+      Res : String (1 .. 10);
+      Idx : Natural := 10;
+   begin
+      while C > 0 loop
+         declare
+            Remm : constant Natural := (C - 1) mod 26;
+         begin
+            Res (Idx) := Character'Val (Character'Pos ('A') + Remm);
+            C := (C - 1) / 26;
+            Idx := Idx - 1;
+         end;
+      end loop;
+      return Res (Idx + 1 .. 10);
+   end Col_To_Letters;
+
+   -- Helper to escape XML special characters
+   function Escape_XML (S : String) return String is
+      Res : Unbounded_String := Null_Unbounded_String;
+   begin
+      for I in S'Range loop
+         case S (I) is
+            when '&'  => Append (Res, "&amp;");
+            when '<'  => Append (Res, "&lt;");
+            when '>'  => Append (Res, "&gt;");
+            when '"'  => Append (Res, "&quot;");
+            when '''  => Append (Res, "&apos;");
+            when others => Append (Res, S (I));
+         end case;
+      end loop;
+      return To_String (Res);
+   end Escape_XML;
 
    ----------------
    -- Open_Input --
@@ -133,15 +147,10 @@ package body SData.File_IO is
       case Actual_Fmt is
          when CSV =>
             Write_CSV (File_Name);
-         when ODF | OOXML =>
-            declare
-               Temp_CSV : constant String := File_Name & ".tmp.csv";
-               OK : Boolean;
-            begin
-               Write_CSV (Temp_CSV);
-               Run_SSConvert (Temp_CSV, File_Name);
-               GNAT.OS_Lib.Delete_File (Temp_CSV, OK);
-            end;
+         when ODF =>
+            Write_ODF (File_Name);
+         when OOXML =>
+            Write_OOXML (File_Name);
       end case;
    end Open_Output;
 
@@ -628,14 +637,188 @@ package body SData.File_IO is
          raise Program_Error with "Failed to parse OOXML file: " & File_Name;
    end Parse_OOXML;
 
-   procedure Write_ODF (File_Name : String) is
-   begin
-      Open_Output (File_Name, ODF);
-   end Write_ODF;
-
+   -----------------
+   -- Write_OOXML --
+   -----------------
    procedure Write_OOXML (File_Name : String) is
+      use Zip.Create;
+      Info : Zip_Create_Info;
+      Z_File_Stream : aliased Zip_File_Stream;
+      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
    begin
-      Open_Output (File_Name, OOXML);
+      if Col_Names = null then return; end if;
+      
+      Create_Archive (Info, Z_File_Stream'Unchecked_Access, File_Name);
+
+      -- 1. [Content_Types].xml
+      Add_String (Info,
+         "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>" &
+         "<Types xmlns=""http://schemas.openxmlformats.org/package/2006/content-types"">" &
+         "<Default Extension=""rels"" ContentType=""application/vnd.openxmlformats-package.relationships+xml""/>" &
+         "<Default Extension=""xml"" ContentType=""application/xml""/>" &
+         "<Override PartName=""/xl/workbook.xml"" ContentType=""application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml""/>" &
+         "<Override PartName=""/xl/worksheets/sheet1.xml"" ContentType=""application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml""/>" &
+         "</Types>",
+         "[Content_Types].xml");
+
+      -- 2. _rels/.rels
+      Add_String (Info,
+         "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>" &
+         "<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">" &
+         "<Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"" Target=""xl/workbook.xml""/>" &
+         "</Relationships>",
+         "_rels/.rels");
+      
+      -- 3. xl/workbook.xml
+      Add_String (Info,
+         "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>" &
+         "<workbook xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"">" &
+         "<sheets><sheet name=""Sheet1"" sheetId=""1"" r:id=""rId1""/></sheets>" &
+         "</workbook>",
+         "xl/workbook.xml");
+
+      -- 4. xl/_rels/workbook.xml.rels
+      Add_String (Info,
+         "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>" &
+         "<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">" &
+         "<Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"" Target=""worksheets/sheet1.xml""/>" &
+         "</Relationships>",
+         "xl/_rels/workbook.xml.rels");
+
+      -- 5. xl/worksheets/sheet1.xml
+      declare
+         S1 : Unbounded_String;
+      begin
+         Append (S1, "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>" & ASCII.LF);
+         Append (S1, "<worksheet xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"">" & ASCII.LF);
+         Append (S1, "<sheetData>" & ASCII.LF);
+         
+         -- Header Row
+         Append (S1, "<row r=""1"">");
+         for C in Col_Names'Range loop
+            declare
+               Ref : constant String := Col_To_Letters (C) & "1";
+               Val : constant String := Escape_XML (Col_Names (C).all);
+            begin
+               Append (S1, "<c r=""" & Ref & """ t=""inlineStr""><is><t>" & Val & "</t></is></c>");
+            end;
+         end loop;
+         Append (S1, "</row>" & ASCII.LF);
+
+         -- Data Rows
+         for R in 1 .. Row_Count loop
+            Append (S1, "<row r=""" & Trim (Integer (R + 1)'Img, Ada.Strings.Both) & """>");
+            for C in Col_Names'Range loop
+               declare
+                  Ref : constant String := Col_To_Letters (C) & Trim (Integer (R + 1)'Img, Ada.Strings.Both);
+                  V   : constant Value := Get_Value (R, Col_Names (C).all);
+               begin
+                  case V.Kind is
+                     when Val_Numeric =>
+                        Append (S1, "<c r=""" & Ref & """><v>" & Trim (V.Num_Val'Img, Ada.Strings.Both) & "</v></c>");
+                     when Val_Integer =>
+                        Append (S1, "<c r=""" & Ref & """><v>" & Trim (V.Int_Val'Img, Ada.Strings.Both) & "</v></c>");
+                     when Val_String =>
+                        Append (S1, "<c r=""" & Ref & """ t=""inlineStr""><is><t>" & Escape_XML (V.Str_Val (1 .. V.Str_Len)) & "</t></is></c>");
+                     when Val_Missing =>
+                        null; -- Skip empty cells
+                  end case;
+               end;
+            end loop;
+            Append (S1, "</row>" & ASCII.LF);
+         end loop;
+
+         Append (S1, "</sheetData>" & ASCII.LF);
+         Append (S1, "</worksheet>");
+         Add_String (Info, S1, "xl/worksheets/sheet1.xml");
+      end;
+
+      Finish (Info);
+      GNAT.Strings.Free (Col_Names);
+   exception
+      when others =>
+         if Col_Names /= null then GNAT.Strings.Free (Col_Names); end if;
+         raise;
    end Write_OOXML;
+
+   ---------------
+   -- Write_ODF --
+   ---------------
+   procedure Write_ODF (File_Name : String) is
+      use Zip.Create;
+      Info : Zip_Create_Info;
+      Z_File_Stream : aliased Zip_File_Stream;
+      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+   begin
+      if Col_Names = null then return; end if;
+
+      Create_Archive (Info, Z_File_Stream'Unchecked_Access, File_Name);
+
+      -- 1. mimetype (Store only, no compression)
+      Add_String (Info, "application/vnd.oasis.opendocument.spreadsheet", "mimetype");
+
+      -- 2. META-INF/manifest.xml
+      Add_String (Info,
+         "<?xml version=""1.0"" encoding=""UTF-8""?>" &
+         "<manifest:manifest xmlns:manifest=""urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"" manifest:version=""1.2"">" &
+         "<manifest:file-entry manifest:full-path=""/"" manifest:version=""1.2"" manifest:media-type=""application/vnd.oasis.opendocument.spreadsheet""/>" &
+         "<manifest:file-entry manifest:full-path=""content.xml"" manifest:media-type=""text/xml""/>" &
+         "</manifest:manifest>",
+         "META-INF/manifest.xml");
+
+      -- 3. content.xml
+      declare
+         S1 : Unbounded_String;
+      begin
+         Append (S1, "<?xml version=""1.0"" encoding=""UTF-8""?>" & ASCII.LF);
+         Append (S1, "<office:document-content xmlns:office=""urn:oasis:names:tc:opendocument:xmlns:office:1.0"" " &
+                      "xmlns:table=""urn:oasis:names:tc:opendocument:xmlns:table:1.0"" " &
+                      "xmlns:text=""urn:oasis:names:tc:opendocument:xmlns:text:1.0"" " &
+                      "office:version=""1.2"">" & ASCII.LF);
+         Append (S1, "<office:body><office:spreadsheet>" & ASCII.LF);
+         Append (S1, "<table:table table:name=""Sheet1"">" & ASCII.LF);
+
+         -- Header Row
+         Append (S1, "<table:table-row>");
+         for C in Col_Names'Range loop
+            Append (S1, "<table:table-cell office:value-type=""string""><text:p>" & Escape_XML (Col_Names (C).all) & "</text:p></table:table-cell>");
+         end loop;
+         Append (S1, "</table:table-row>" & ASCII.LF);
+
+         -- Data Rows
+         for R in 1 .. Row_Count loop
+            Append (S1, "<table:table-row>");
+            for C in Col_Names'Range loop
+               declare
+                  V : constant Value := Get_Value (R, Col_Names (C).all);
+               begin
+                  case V.Kind is
+                     when Val_Numeric =>
+                        Append (S1, "<table:table-cell office:value-type=""float"" office:value=""" & Trim (V.Num_Val'Img, Ada.Strings.Both) & """>" &
+                                "<text:p>" & Trim (V.Num_Val'Img, Ada.Strings.Both) & "</text:p></table:table-cell>");
+                     when Val_Integer =>
+                        Append (S1, "<table:table-cell office:value-type=""float"" office:value=""" & Trim (V.Int_Val'Img, Ada.Strings.Both) & """>" &
+                                "<text:p>" & Trim (V.Int_Val'Img, Ada.Strings.Both) & "</text:p></table:table-cell>");
+                     when Val_String =>
+                        Append (S1, "<table:table-cell office:value-type=""string""><text:p>" & Escape_XML (V.Str_Val (1 .. V.Str_Len)) & "</text:p></table:table-cell>");
+                     when Val_Missing =>
+                        Append (S1, "<table:table-cell/>");
+                  end case;
+               end;
+            end loop;
+            Append (S1, "</table:table-row>" & ASCII.LF);
+         end loop;
+
+         Append (S1, "</table:table></office:spreadsheet></office:body></office:document-content>");
+         Add_String (Info, S1, "content.xml");
+      end;
+
+      Finish (Info);
+      GNAT.Strings.Free (Col_Names);
+   exception
+      when others =>
+         if Col_Names /= null then GNAT.Strings.Free (Col_Names); end if;
+         raise;
+   end Write_ODF;
 
 end SData.File_IO;
