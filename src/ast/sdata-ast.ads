@@ -125,6 +125,8 @@ package SData.AST is
       Stmt_UNHOLD, -- Reset variables normally
       Stmt_ARRAY,  -- Define a group of variables
       Stmt_DIM,    -- Synonym for ARRAY
+      Stmt_SORT,   -- Sort the dataset
+      Stmt_BY,     -- Group processing
       Stmt_SELECT, -- Multi-way branch
       Stmt_DELETE, -- Drop current record
       Stmt_OUTPUT, -- Explicit record output
@@ -179,6 +181,8 @@ package SData.AST is
             Selector       : Expression_Access;
             Branches       : Case_Branch;
             Otherwise_Part : Statement_Access;
+         when Stmt_SORT | Stmt_BY =>
+            Sort_Vars      : Variable_List;
          when others =>
             null;
       end case;

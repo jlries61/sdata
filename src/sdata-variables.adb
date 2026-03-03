@@ -32,20 +32,31 @@ package body SData.Variables is
          declare
             Typ : Column_Type := Col_Numeric;
          begin
-            if Name (Name'Last) = '$' then Typ := Col_String;
-            elsif Name (Name'Last) = '%' then Typ := Col_Integer; end if;
+            if Name'Length > 0 then
+               if Name (Name'Last) = '$' then Typ := Col_String;
+               elsif Name (Name'Last) = '%' then Typ := Col_Integer; end if;
+            end if;
             Add_Column (Upper_Name, Typ);
          end;
       end if;
 
       --  If we were tracking this as a temporary variable, remove it from that pool (Promotion).
-      if Temp_Symbols.Contains (Upper_Name) then
+      --  EXCEPT if it is HELD.
+      if Temp_Symbols.Contains (Upper_Name) and then not Is_Held (Upper_Name) then
          Temp_Symbols.Delete (Upper_Name);
       end if;
 
       --  Update the table cell for the current record.
       if Get_Current_Record_Index > 0 then
          Set_Value (Get_Current_Record_Index, Upper_Name, Val);
+         -- If HELD, we also want to update the last value for the next record to pick up.
+         if Is_Held (Upper_Name) then
+            if Temp_Symbols.Contains (Upper_Name) then
+               Temp_Symbols.Replace (Upper_Name, Val);
+            else
+               Temp_Symbols.Insert (Upper_Name, Val);
+            end if;
+         end if;
       else
          --  Note: If not in a data step, LET creates the column structure but has no cell to write to.
          null;
@@ -196,6 +207,7 @@ package body SData.Variables is
    procedure Set_Hold (Name : String; State : Boolean) is
       Upper_Name : constant String := To_Upper (Name);
    begin
+      if Upper_Name = "" then return; end if;
       if Hold_Symbols.Contains (Upper_Name) then
          Hold_Symbols.Replace (Upper_Name, State);
       else

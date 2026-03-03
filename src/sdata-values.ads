@@ -29,4 +29,8 @@ package SData.Values is
    --  Determines the boolean truth of a value. 
    function Is_True (V : Value) return Boolean;
 
+   --  Comparison functions
+   function "=" (L, R : Value) return Boolean;
+   function "<" (L, R : Value) return Boolean;
+
 end SData.Values;

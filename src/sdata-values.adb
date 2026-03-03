@@ -42,4 +42,62 @@ package body SData.Values is
       end case;
    end Is_True;
 
+   ---------
+   -- "=" --
+   ---------
+   function "=" (L, R : Value) return Boolean is
+   begin
+      if L.Kind /= R.Kind then
+         -- Promotion logic for comparison
+         if L.Kind = Val_Numeric and R.Kind = Val_Integer then
+            return L.Num_Val = Float (R.Int_Val);
+         elsif L.Kind = Val_Integer and R.Kind = Val_Numeric then
+            return Float (L.Int_Val) = R.Num_Val;
+         end if;
+         return False;
+      end if;
+
+      case L.Kind is
+         when Val_Numeric => return L.Num_Val = R.Num_Val;
+         when Val_Integer => return L.Int_Val = R.Int_Val;
+         when Val_String  =>
+            if L.Str_Len /= R.Str_Len then return False; end if;
+            return L.Str_Val (1 .. L.Str_Len) = R.Str_Val (1 .. R.Str_Len);
+         when Val_Missing => return True;
+      end case;
+   end "=";
+
+   ---------
+   -- "<" --
+   ---------
+   function "<" (L, R : Value) return Boolean is
+   begin
+      -- Missing is always smallest
+      if L.Kind = Val_Missing then
+         return R.Kind /= Val_Missing;
+      elsif R.Kind = Val_Missing then
+         return False;
+      end if;
+
+      if L.Kind = Val_Numeric or L.Kind = Val_Integer then
+         declare
+            FL : constant Float := (if L.Kind = Val_Numeric then L.Num_Val else Float (L.Int_Val));
+            FR : constant Float := (if R.Kind = Val_Numeric then R.Num_Val else Float (R.Int_Val));
+         begin
+            if R.Kind = Val_Numeric or R.Kind = Val_Integer then
+               return FL < FR;
+            else
+               return True; -- Numeric < String (arbitrary but consistent)
+            end if;
+         end;
+      elsif L.Kind = Val_String then
+         if R.Kind = Val_String then
+            return L.Str_Val (1 .. L.Str_Len) < R.Str_Val (1 .. R.Str_Len);
+         else
+            return False; -- String > Numeric
+         end if;
+      end if;
+      return False;
+   end "<";
+
 end SData.Values;

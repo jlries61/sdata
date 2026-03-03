@@ -229,7 +229,7 @@ package body SData.Table is
          Column_Maps.Next (Position);
       end loop;
    end Drop_Row;
-   
+
    ------------------------------
    -- Set_Current_Record_Index --
    ------------------------------
@@ -238,6 +238,86 @@ package body SData.Table is
       Current_Record := Index;
    end Set_Current_Record_Index;
    
+   ----------
+   -- Sort --
+   ----------
+   procedure Sort (Criteria : Sort_Criteria_Array) is
+      -- To sort a table, we sort an array of record indices (1..Table_Row_Count)
+      -- based on the values in the table, then reconstruct the data vectors.
+      
+      package Index_Vectors is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Positive);
+      
+      function Compare_Rows (L, R : Positive) return Boolean is
+      begin
+         for I in Criteria'Range loop
+            declare
+               Col_Name : constant String := To_Upper (Criteria (I).Name (1 .. Criteria (I).Len));
+               VL : constant Value := Get_Value (L, Col_Name);
+               VR : constant Value := Get_Value (R, Col_Name);
+            begin
+               if VL /= VR then
+                  if Criteria (I).Dir = Ascending then
+                     return VL < VR;
+                  else
+                     return VR < VL;
+                  end if;
+               end if;
+            end;
+         end loop;
+         return False; -- Equal
+      end Compare_Rows;
+      
+      -- package Index_Sort is new Index_Vectors.Generic_Sorting;
+      -- Manual sorting to avoid ambiguous compiler versions of Generic_Sorting
+      procedure Manual_Sort (V : in out Index_Vectors.Vector) is
+         Changed : Boolean;
+      begin
+         loop
+            Changed := False;
+            for I in 1 .. Integer(V.Length) - 1 loop
+               if Compare_Rows (V.Element (I + 1), V.Element (I)) then
+                  declare
+                     T : constant Positive := V.Element (I);
+                  begin
+                     V.Replace_Element (I, V.Element (I + 1));
+                     V.Replace_Element (I + 1, T);
+                     Changed := True;
+                  end;
+               end if;
+            end loop;
+            exit when not Changed;
+         end loop;
+      end Manual_Sort;
+      
+      Indices : Index_Vectors.Vector;
+      
+   begin
+      if Table_Row_Count <= 1 or Criteria'Length = 0 then return; end if;
+      
+      for I in 1 .. Table_Row_Count loop Indices.Append (I); end loop;
+      
+      Manual_Sort (Indices);
+      
+      -- Reorder all columns
+      declare
+         Position : Column_Maps.Cursor := Data_Table.First;
+      begin
+         while Column_Maps.Has_Element (Position) loop
+            declare
+               Col : Column := Column_Maps.Element (Position);
+               New_Data : Value_Vectors.Vector;
+            begin
+               for I in 1 .. Table_Row_Count loop
+                  New_Data.Append (Col.Data.Element (Indices.Element (I)));
+               end loop;
+               Col.Data := New_Data;
+               Data_Table.Replace_Element (Position, Col);
+            end;
+            Column_Maps.Next (Position);
+         end loop;
+      end;
+   end Sort;
+
    ------------------------------
    -- Get_Current_Record_Index --
    ------------------------------

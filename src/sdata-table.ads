@@ -53,6 +53,18 @@ package SData.Table is
    
    --  Removes a specific row from the table.
    procedure Drop_Row (Index : Positive);
+
+   --  Sorting support
+   type Sort_Direction is (Ascending, Descending);
+   type Sort_Criteria is record
+      Name : String (1 .. 32);
+      Len  : Natural;
+      Dir  : Sort_Direction;
+   end record;
+   type Sort_Criteria_Array is array (Positive range <>) of Sort_Criteria;
+
+   -- Sorts the table based on the given criteria.
+   procedure Sort (Criteria : Sort_Criteria_Array);
    
    --  Sets/Gets the pointer to the current record during data step iteration.
    procedure Set_Current_Record_Index (Index : Natural);

@@ -50,7 +50,11 @@ package body SData.Interpreter is
    package Deletion_Lists is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Positive);
    Pending_Deletions : Deletion_Lists.Vector;
 
-   --  Global program for REPL mode.
+   -- For BY statement processing
+   package By_Group_Names is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
+   Current_By_Vars : By_Group_Names.Vector;
+   
+   -- Global program for REPL mode.
    Active_Program_Head : Statement_Access := null;
    Active_Program_Tail : Statement_Access := null;
 
@@ -276,6 +280,40 @@ package body SData.Interpreter is
                   --  Open_Input already prints success for some formats.
                   null;
                end if;
+            when Stmt_SORT =>
+               declare
+                  Curr_Var : Variable_List := Stmt.Sort_Vars;
+                  -- Count vars
+                  Count : Natural := 0;
+                  Tmp : Variable_List := Curr_Var;
+               begin
+                  while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
+                  if Count > 0 then
+                     declare
+                        Crit : Sort_Criteria_Array (1 .. Count);
+                        Idx : Positive := 1;
+                     begin
+                        while Curr_Var /= null loop
+                           Crit (Idx).Name := (others => ' ');
+                           Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
+                           Crit (Idx).Len := Curr_Var.Var.Start_Len;
+                           Crit (Idx).Dir := Ascending; -- For now, all ascending.
+                           Idx := Idx + 1; Curr_Var := Curr_Var.Next;
+                        end loop;
+                        Sort (Crit);
+                     end;
+                  end if;
+               end;
+            when Stmt_BY =>
+               declare
+                  Curr_Var : Variable_List := Stmt.Sort_Vars;
+               begin
+                  Current_By_Vars.Clear;
+                  while Curr_Var /= null loop
+                     Current_By_Vars.Append (To_Unbounded_String (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len))));
+                     Curr_Var := Curr_Var.Next;
+                  end loop;
+               end;
             when Stmt_REPEAT =>
                SData.Config.Repeat_Active := True;
                SData.Config.Repeat_Count := Stmt.Count;
@@ -285,14 +323,50 @@ package body SData.Interpreter is
                SData.Config.Save_File_Len := Stmt.File_Len;
                SData.Config.Save_File_Fmt := SData.Config.Output_Format;
                SData.Config.Save_File_Active := True;
-            when Stmt_KEEP | Stmt_DROP =>
-               declare Curr_Var : Variable_List := Stmt.Vars;
-                       K : constant Column_Mod_Kind := (if Stmt.Kind = Stmt_KEEP then Mod_Keep else Mod_Drop);
+            when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD =>
+               declare
+                  Curr_Var : Variable_List := Stmt.Vars;
                begin
-                  while Curr_Var /= null loop
-                     Expand_Range (K, Curr_Var.Var);
-                     Curr_Var := Curr_Var.Next;
-                  end loop;
+                  if Stmt.Kind = Stmt_KEEP or Stmt.Kind = Stmt_DROP then
+                     declare K : constant Column_Mod_Kind := (if Stmt.Kind = Stmt_KEEP then Mod_Keep else Mod_Drop);
+                     begin
+                        while Curr_Var /= null loop
+                           Expand_Range (K, Curr_Var.Var);
+                           Curr_Var := Curr_Var.Next;
+                        end loop;
+                     end;
+                  else
+                     declare
+                        State : constant Boolean := (Stmt.Kind = Stmt_HOLD);
+                        procedure Set_Hold_For_Range (Range_Spec : Variable_Range) is
+                           Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+                           Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                           End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                           Start_Idx, End_Idx : Natural := 0;
+                        begin
+                           if not Range_Spec.Is_Range then
+                              Set_Hold (Start_Name, State);
+                           elsif Col_Names /= null then
+                              for I in Col_Names'Range loop
+                                 if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
+                                 if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+                              end loop;
+                              if Start_Idx > 0 and End_Idx > 0 then
+                                 if Start_Idx > End_Idx then
+                                    declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                                 end if;
+                                 for I in Start_Idx .. End_Idx loop Set_Hold (Col_Names (I).all, State); end loop;
+                              end if;
+                              GNAT.Strings.Free (Col_Names);
+                           end if;
+                        end Set_Hold_For_Range;
+                     begin
+                        while Curr_Var /= null loop
+                           Set_Hold_For_Range (Curr_Var.Var);
+                           Curr_Var := Curr_Var.Next;
+                        end loop;
+                     end;
+                  end if;
                end;
             when Stmt_RENAME =>
                declare Curr : Rename_List := Stmt.Rename_Pairs;
@@ -302,19 +376,20 @@ package body SData.Interpreter is
                      Curr := Curr.Next;
                   end loop;
                end;
-            when Stmt_HOLD | Stmt_UNHOLD =>
+            when Stmt_ARRAY | Stmt_DIM =>
                declare
-                  Curr_Var : Variable_List := Stmt.Vars;
-                  State    : constant Boolean := (Stmt.Kind = Stmt_HOLD);
-                  
-                  procedure Set_Hold_For_Range (Range_Spec : Variable_Range) is
+                  S : constant Statement_Access := Stmt;
+                  V : Name_Vectors.Vector;
+                  Curr_Var : Variable_List := S.Arr_Vars;
+
+                  procedure Resolve_Range (Range_Spec : Variable_Range) is
                      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-                     Start_Name : constant String := (if Range_Spec.Start_Len > 0 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
-                     End_Name   : constant String := (if Range_Spec.End_Len > 0 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                     Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                     End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
                      Start_Idx, End_Idx : Natural := 0;
                   begin
                      if not Range_Spec.Is_Range then
-                        Set_Hold (Start_Name, State);
+                        V.Append (To_Unbounded_String (Start_Name));
                      elsif Col_Names /= null then
                         for I in Col_Names'Range loop
                            if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
@@ -324,55 +399,16 @@ package body SData.Interpreter is
                            if Start_Idx > End_Idx then
                               declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
                            end if;
-                           for I in Start_Idx .. End_Idx loop Set_Hold (Col_Names (I).all, State); end loop;
+                           for I in Start_Idx .. End_Idx loop
+                              V.Append (To_Unbounded_String (Col_Names (I).all));
+                           end loop;
                         end if;
                         GNAT.Strings.Free (Col_Names);
                      end if;
-                  end Set_Hold_For_Range;
-
+                  end Resolve_Range;
                begin
                   while Curr_Var /= null loop
-                     Set_Hold_For_Range (Curr_Var.Var);
-                     Curr_Var := Curr_Var.Next;
-                  end loop;
-               end;
-            when Stmt_ARRAY | Stmt_DIM =>
-               declare
-                  S : constant Statement_Access := Stmt;
-                  V : Name_Vectors.Vector;
-                  Curr_Var : Variable_List := S.Arr_Vars;
-               begin
-                  while Curr_Var /= null loop
-                     declare
-                        Range_Spec : Variable_Range renames Curr_Var.Var;
-                     begin
-                        if not Range_Spec.Is_Range then
-                           V.Append (To_Unbounded_String (To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len))));
-                        else
-                           declare
-                              Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-                              Start_Name : constant String := To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len));
-                              End_Name   : constant String := To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len));
-                              Start_Idx, End_Idx : Natural := 0;
-                           begin
-                              if Col_Names /= null then
-                                 for I in Col_Names'Range loop
-                                    if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
-                                    if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
-                                 end loop;
-                                 if Start_Idx > 0 and End_Idx > 0 then
-                                    if Start_Idx > End_Idx then
-                                       declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
-                                    end if;
-                                    for I in Start_Idx .. End_Idx loop
-                                       V.Append (To_Unbounded_String (Col_Names (I).all));
-                                    end loop;
-                                 end if;
-                                 GNAT.Strings.Free (Col_Names);
-                              end if;
-                           end;
-                        end if;
-                     end;
+                     Resolve_Range (Curr_Var.Var);
                      Curr_Var := Curr_Var.Next;
                   end loop;
                   Define_Array (S.Arr_Name (1 .. S.Arr_Name_Len), V);
@@ -514,13 +550,41 @@ package body SData.Interpreter is
 
       procedure Run_One_Step (Start, Boundary : Statement_Access) is
          Iter : Statement_Access;
+
+         function Is_First_In_Group (Idx : Positive) return Boolean is
+         begin
+            if Idx = 1 or Current_By_Vars.Is_Empty then return True; end if;
+            for V of Current_By_Vars loop
+               declare
+                  Name : constant String := To_String (V);
+               begin
+                  if not (Get_Value (Idx, Name) = Get_Value (Idx - 1, Name)) then return True; end if;
+               end;
+            end loop;
+            return False;
+         end Is_First_In_Group;
+
+         function Is_Last_In_Group (Idx : Positive) return Boolean is
+         begin
+            if Idx = Num_Records or Current_By_Vars.Is_Empty then return True; end if;
+            for V of Current_By_Vars loop
+               declare
+                  Name : constant String := To_String (V);
+               begin
+                  if not (Get_Value (Idx, Name) = Get_Value (Idx + 1, Name)) then return True; end if;
+               end;
+            end loop;
+            return False;
+         end Is_Last_In_Group;
+
       begin
          Iter := Start;
          Num_Records := 0;
          Explicit_Loop_Trigger := False;
+         Current_By_Vars.Clear;
          while Iter /= null and then Iter /= Boundary loop
             case Iter.Kind is
-               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM =>
+               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY =>
                   Execute_Statement (Iter);
                   if Iter.Kind = Stmt_USE or Iter.Kind = Stmt_REPEAT then 
                      Explicit_Loop_Trigger := True; 
@@ -540,6 +604,19 @@ package body SData.Interpreter is
          Pending_Deletions.Clear;
          for I in 1 .. Num_Records loop
             Set_Current_Record_Index (I);
+            
+            -- Set First. and Last. indicators
+            if not Current_By_Vars.Is_Empty then
+               for V of Current_By_Vars loop
+                  declare
+                     Name : constant String := To_String (V);
+                  begin
+                     Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if Is_First_In_Group (I) then 1 else 0)));
+                     Set_Temporary ("LAST." & Name, (Kind => Val_Integer, Int_Val => (if Is_Last_In_Group (I) then 1 else 0)));
+                  end;
+               end loop;
+            end if;
+
             if Explicit_Loop_Trigger or Row_Count > 0 then
                declare
                   Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
@@ -549,10 +626,14 @@ package body SData.Interpreter is
                      for C in Col_Names'Range loop
                         declare Name : constant String := To_Upper (Col_Names(C).all);
                         begin 
-                           if not Input_File_Columns.Contains (Name) and then not Is_Held (Name) then 
-                              Set_Value (I, Name, (Kind => Val_Missing)); 
-                           elsif Is_Held (Name) and then I > 1 then
-                              Set_Value (I, Name, Get_Value (I - 1, Name));
+                           if not Input_File_Columns.Contains (Name) then
+                              if Is_Held (Name) then
+                                 if I > 1 then
+                                    Set_Value (I, Name, Get (Name));
+                                 end if;
+                              else
+                                 Set_Value (I, Name, (Kind => Val_Missing));
+                              end if;
                            end if; 
                         end;
                      end loop;
@@ -566,7 +647,7 @@ package body SData.Interpreter is
 
             while Iter /= null and then Iter /= Boundary loop
                case Iter.Kind is
-                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_OUTPUT =>
+                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_OUTPUT | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY =>
                      Execute_Statement(Iter);
                   when others => null;
                end case;

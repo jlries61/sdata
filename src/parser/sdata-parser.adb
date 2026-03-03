@@ -523,6 +523,10 @@ package body SData.Parser is
                Stmt.Branches := First_Branch;
             end;
 
+         when Token_SORT | Token_BY =>
+            Stmt := new Statement ((if Tok.Kind = Token_SORT then Stmt_SORT else Stmt_BY));
+            Stmt.Sort_Vars := Parse_Variable_List (Ctx);
+
          when Token_DELETE | Token_OUTPUT =>
             Stmt := new Statement ((if Tok.Kind = Token_DELETE then Stmt_DELETE else Stmt_OUTPUT));
 
