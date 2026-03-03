@@ -401,4 +401,88 @@ package body SData.Statistics is
       return Float (Long_Beta.Regularized_Beta (W, V1 / 2.0, V2 / 2.0));
    end F_CDF;
 
+   ------------------
+   -- Binomial_PMF --
+   ------------------
+   function Binomial_PMF (K, N, P : Float) return Float is
+      KI : constant Long_Float := Long_Float (Float'Floor (K));
+      NI : constant Long_Float := Long_Float (Float'Floor (N));
+      PF : constant Long_Float := Long_Float (P);
+   begin
+      if PF < 0.0 or PF > 1.0 or NI < 0.0 then raise Constraint_Error with "Invalid Binomial parameters"; end if;
+      if KI < 0.0 or KI > NI then return 0.0; end if;
+      if PF = 0.0 then return (if KI = 0.0 then 1.0 else 0.0); end if;
+      if PF = 1.0 then return (if KI = NI then 1.0 else 0.0); end if;
+      
+      return Float (Exp (Long_Gamma.Log_Gamma (NI + 1.0) - Long_Gamma.Log_Gamma (KI + 1.0) - Long_Gamma.Log_Gamma (NI - KI + 1.0) +
+                         KI * Log (PF) + (NI - KI) * Log (1.0 - PF)));
+   end Binomial_PMF;
+
+   ------------------
+   -- Binomial_CDF --
+   ------------------
+   function Binomial_CDF (K, N, P : Float) return Float is
+      KI : constant Long_Float := Long_Float (Float'Floor (K));
+      NI : constant Long_Float := Long_Float (Float'Floor (N));
+      PF : constant Long_Float := Long_Float (P);
+   begin
+      if PF < 0.0 or PF > 1.0 or NI < 0.0 then raise Constraint_Error with "Invalid Binomial parameters"; end if;
+      if KI < 0.0 then return 0.0; elsif KI >= NI then return 1.0; end if;
+      return Float (Long_Beta.Regularized_Beta (1.0 - PF, NI - KI, KI + 1.0));
+   end Binomial_CDF;
+
+   -----------------
+   -- Binomial_RN --
+   -----------------
+   function Binomial_RN (N, P : Float) return Float is
+      NI : constant Integer := Integer (Float'Floor (N));
+      PF : constant Float := P;
+      Res : Integer := 0;
+   begin
+      Ensure_Random_Init;
+      for I in 1 .. NI loop
+         if Ada.Numerics.Float_Random.Random (Generator) <= PF then
+            Res := Res + 1;
+         end if;
+      end loop;
+      return Float (Res);
+   end Binomial_RN;
+
+   -----------------
+   -- Weibull_PDF --
+   -----------------
+   function Weibull_PDF (X, Scale, Shape : Float) return Float is
+      XF : constant Long_Float := Long_Float (X);
+      L  : constant Long_Float := Long_Float (Scale);
+      K  : constant Long_Float := Long_Float (Shape);
+   begin
+      if L <= 0.0 or K <= 0.0 then raise Constraint_Error with "Scale and Shape must be positive"; end if;
+      if XF < 0.0 then return 0.0; end if;
+      return Float ((K / L) * (XF / L)**(K - 1.0) * Exp (-(XF / L)**K));
+   end Weibull_PDF;
+
+   -----------------
+   -- Weibull_CDF --
+   -----------------
+   function Weibull_CDF (X, Scale, Shape : Float) return Float is
+      XF : constant Long_Float := Long_Float (X);
+      L  : constant Long_Float := Long_Float (Scale);
+      K  : constant Long_Float := Long_Float (Shape);
+   begin
+      if L <= 0.0 or K <= 0.0 then raise Constraint_Error with "Scale and Shape must be positive"; end if;
+      if XF < 0.0 then return 0.0; end if;
+      return Float (1.0 - Exp (-(XF / L)**K));
+   end Weibull_CDF;
+
+   ----------------
+   -- Weibull_RN --
+   ----------------
+   function Weibull_RN (Scale, Shape : Float) return Float is
+      U : Float;
+   begin
+      Ensure_Random_Init;
+      U := Ada.Numerics.Float_Random.Random (Generator);
+      return Scale * Float ((-Log (1.0 - Long_Float (U)))**(1.0 / Long_Float (Shape)));
+   end Weibull_RN;
+
 end SData.Statistics;

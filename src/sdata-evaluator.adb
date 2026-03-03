@@ -194,6 +194,22 @@ package body SData.Evaluator is
       elsif Name = "FCF" and then Has_Args (3) then
          return Num_Result (SData.Statistics.F_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
 
+      --  Binomial
+      elsif Name = "MDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Binomial_PMF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
+      elsif Name = "MCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Binomial_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
+      elsif Name = "MRN" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Binomial_RN (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
+
+      --  Weibull
+      elsif Name = "WDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Weibull_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
+      elsif Name = "WCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Weibull_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
+      elsif Name = "WRN" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Weibull_RN (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
+
       end if;
 
       return (Kind => Val_Missing);

@@ -57,6 +57,16 @@ package SData.Statistics is
    function F_PDF (X, DF1, DF2 : Float) return Float;
    function F_CDF (X, DF1, DF2 : Float) return Float;
 
+   --  Binomial
+   function Binomial_PMF (K, N, P : Float) return Float;
+   function Binomial_CDF (K, N, P : Float) return Float;
+   function Binomial_RN  (N, P : Float) return Float;
+
+   --  Weibull
+   function Weibull_PDF (X, Scale, Shape : Float) return Float;
+   function Weibull_CDF (X, Scale, Shape : Float) return Float;
+   function Weibull_RN  (Scale, Shape : Float) return Float;
+
 private
    --  Use Long_Float internally for better precision
    type Internal_Float is new Long_Float;
