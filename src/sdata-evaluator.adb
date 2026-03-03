@@ -55,6 +55,40 @@ package body SData.Evaluator is
          else
             return Num_Result (abs Convert_To_Float (Arg_Vals (1)));
          end if;
+      elsif Name = "LOG" and then Has_Args (1) then
+         declare V : constant Float := Convert_To_Float (Arg_Vals (1));
+         begin return (if V > 0.0 then Num_Result (Log (V)) else (Kind => Val_Missing)); end;
+      elsif Name = "LOG10" and then Has_Args (1) then
+         declare V : constant Float := Convert_To_Float (Arg_Vals (1));
+         begin return (if V > 0.0 then Num_Result (Log (V, 10.0)) else (Kind => Val_Missing)); end;
+      elsif Name = "EXP" and then Has_Args (1) then
+         return Num_Result (Exp (Convert_To_Float (Arg_Vals (1))));
+      elsif Name = "ROUND" and then Has_Args (1) then
+         declare
+            V : constant Float := Convert_To_Float (Arg_Vals (1));
+            Decimals : Float := 0.0;
+            Factor : Float;
+         begin
+            if Count >= 2 and then Arg_Vals (2).Kind /= Val_Missing then
+               Decimals := Convert_To_Float (Arg_Vals (2));
+            end if;
+            Factor := 10.0 ** Decimals;
+            return Num_Result (Float'Rounding (V * Factor) / Factor);
+         end;
+      elsif Name = "CEIL" and then Has_Args (1) then
+         return Num_Result (Float'Ceiling (Convert_To_Float (Arg_Vals (1))));
+      elsif Name = "FLOOR" and then Has_Args (1) then
+         return Num_Result (Float'Floor (Convert_To_Float (Arg_Vals (1))));
+      elsif Name = "INT" and then Has_Args (1) then
+         return Num_Result (Float'Truncation (Convert_To_Float (Arg_Vals (1))));
+      elsif Name = "MOD" and then Has_Args (2) then
+         declare
+            V1 : constant Float := Convert_To_Float (Arg_Vals (1));
+            V2 : constant Float := Convert_To_Float (Arg_Vals (2));
+         begin
+            if V2 /= 0.0 then return Num_Result (V1 - Float'Floor(V1/V2) * V2);
+            else return (Kind => Val_Missing); end if;
+         end;
       elsif Name = "RECNO" then
          return (Kind => Val_Integer, Int_Val => Integer (SData.Table.Get_Current_Record_Index));
       elsif Name = "MISSING" and then Count >= 1 then
