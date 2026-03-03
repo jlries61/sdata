@@ -10,6 +10,7 @@ with SData.Parser;
 with Ada.Streams.Stream_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Sets;
+with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
@@ -41,6 +42,13 @@ package body SData.Interpreter is
    end record;
 
    Pending_Mods : Column_Mod_List := null;
+
+   --  State for Data Step record processing.
+   Current_Record_Deleted : Boolean := False;
+   Explicit_Output_Count  : Natural := 0;
+
+   package Deletion_Lists is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Positive);
+   Pending_Deletions : Deletion_Lists.Vector;
 
    --  Global program for REPL mode.
    Active_Program_Head : Statement_Access := null;
@@ -379,6 +387,65 @@ package body SData.Interpreter is
                      New_Line; GNAT.Strings.Free(Col_Names);
                   end if;
                end;
+            when Stmt_SELECT =>
+               declare
+                  Selector_Val : Value := (Kind => Val_Missing);
+                  Has_Selector : constant Boolean := Stmt.Selector /= null;
+                  Matched      : Boolean := False;
+                  Branch       : Case_Branch := Stmt.Branches;
+               begin
+                  if Has_Selector then
+                     Selector_Val := Evaluate (Stmt.Selector);
+                  end if;
+                  
+                  while Branch /= null loop
+                     Matched := False;
+                     if Has_Selector then
+                        -- Match selector against condition list
+                        declare
+                           Cond_Node : Expression_List := Branch.Conditions;
+                        begin
+                           while Cond_Node /= null loop
+                              if Evaluate (Cond_Node.Expr) = Selector_Val then
+                                 Matched := True; exit;
+                              end if;
+                              Cond_Node := Cond_Node.Next;
+                           end loop;
+                        end;
+                     else
+                        -- Case where SELECT has no expression: conditions are boolean tests
+                        if Is_True (Evaluate (Branch.Conditions.Expr)) then
+                           Matched := True;
+                        end if;
+                     end if;
+                     
+                     if Matched then
+                        Execute_Statement (Branch.Branch_Body);
+                        exit;
+                     end if;
+                     Branch := Branch.Next;
+                  end loop;
+                  
+                  if not Matched and then Stmt.Otherwise_Part /= null then
+                     Execute_Statement (Stmt.Otherwise_Part);
+                  end if;
+               end;
+            when Stmt_DELETE =>
+               Current_Record_Deleted := True;
+            when Stmt_OUTPUT =>
+               Explicit_Output_Count := Explicit_Output_Count + 1;
+               declare
+                  Idx : constant Natural := Row_Count + 1;
+                  Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+               begin
+                  Add_Row;
+                  if Col_Names /= null then
+                     for C in Col_Names'Range loop
+                        Set_Value (Idx, Col_Names (C).all, Get (Col_Names (C).all));
+                     end loop;
+                     GNAT.Strings.Free (Col_Names);
+                  end if;
+               end;
             when Stmt_IF =>
                if Is_True (Evaluate (Stmt.Condition)) then Execute_Statement (Stmt.Then_Branch);
                elsif Stmt.Else_Branch /= null then Execute_Statement (Stmt.Else_Branch); end if;
@@ -470,6 +537,7 @@ package body SData.Interpreter is
                Add_Row;
             end if;
          end if;
+         Pending_Deletions.Clear;
          for I in 1 .. Num_Records loop
             Set_Current_Record_Index (I);
             if Explicit_Loop_Trigger or Row_Count > 0 then
@@ -493,15 +561,29 @@ package body SData.Interpreter is
                end;
             end if;
             Iter := Start;
+            Current_Record_Deleted := False;
+            Explicit_Output_Count  := 0;
+
             while Iter /= null and then Iter /= Boundary loop
                case Iter.Kind is
-                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT =>
+                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_OUTPUT =>
                      Execute_Statement(Iter);
                   when others => null;
                end case;
+               exit when Current_Record_Deleted;
                Iter := Iter.Next;
             end loop;
+            
+            if Current_Record_Deleted then
+               Pending_Deletions.Append (I);
+            end if;
          end loop;
+         
+         -- Handle deletions in reverse order to keep indices valid.
+         for I in reverse 1 .. Integer (Pending_Deletions.Length) loop
+            Drop_Row (Pending_Deletions.Element (I));
+         end loop;
+         Pending_Deletions.Clear;
          Set_Current_Record_Index (0);
          Apply_Pending_Mods;
          if SData.Config.Save_File_Active then

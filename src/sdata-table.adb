@@ -208,6 +208,27 @@ package body SData.Table is
          end loop;
       end if;
    end Drop_Column;
+
+   --------------
+   -- Drop_Row --
+   --------------
+   procedure Drop_Row (Index : Positive) is
+      Position : Column_Maps.Cursor := Data_Table.First;
+   begin
+      if Index > Table_Row_Count then return; end if;
+      Table_Row_Count := Table_Row_Count - 1;
+      while Column_Maps.Has_Element (Position) loop
+         declare
+            Col : Column := Column_Maps.Element (Position);
+         begin
+            if Index <= Positive (Col.Data.Length) then
+               Col.Data.Delete (Index);
+               Data_Table.Replace_Element (Position, Col);
+            end if;
+         end;
+         Column_Maps.Next (Position);
+      end loop;
+   end Drop_Row;
    
    ------------------------------
    -- Set_Current_Record_Index --

@@ -51,6 +51,9 @@ package SData.Table is
    --  Removes a column from the table.
    procedure Drop_Column (Name : String);
    
+   --  Removes a specific row from the table.
+   procedure Drop_Row (Index : Positive);
+   
    --  Sets/Gets the pointer to the current record during data step iteration.
    procedure Set_Current_Record_Index (Index : Natural);
    function Get_Current_Record_Index return Natural;

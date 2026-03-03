@@ -89,6 +89,18 @@ package SData.AST is
       Next     : Rename_List;
    end record;
 
+   type Statement;
+   type Statement_Access is access Statement;
+
+   --  Branches for the SELECT statement.
+   type Case_Branch_Node;
+   type Case_Branch is access Case_Branch_Node;
+   type Case_Branch_Node is record
+      Conditions : Expression_List; -- List of values to match against selector
+      Branch_Body : Statement_Access;
+      Next       : Case_Branch;
+   end record;
+
    --  Types of statements (commands) available in SData.
    type Statement_Kind is (
       Stmt_LET,    -- Variable assignment
@@ -113,12 +125,12 @@ package SData.AST is
       Stmt_UNHOLD, -- Reset variables normally
       Stmt_ARRAY,  -- Define a group of variables
       Stmt_DIM,    -- Synonym for ARRAY
+      Stmt_SELECT, -- Multi-way branch
+      Stmt_DELETE, -- Drop current record
+      Stmt_OUTPUT, -- Explicit record output
       Stmt_RUN,    -- Execute and export
       Stmt_NEW     -- Reset environment
    );
-
-   type Statement;
-   type Statement_Access is access Statement;
 
    --  Variant record for statements. Linked via the 'Next' pointer to form a program.
    type Statement (Kind : Statement_Kind) is record
@@ -163,6 +175,10 @@ package SData.AST is
             Until_Cond   : Expression_Access;
          when Stmt_RSEED =>
             Seed_Expr    : Expression_Access;
+         when Stmt_SELECT =>
+            Selector       : Expression_Access;
+            Branches       : Case_Branch;
+            Otherwise_Part : Statement_Access;
          when others =>
             null;
       end case;

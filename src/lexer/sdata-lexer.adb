@@ -226,6 +226,8 @@ package body SData.Lexer is
                elsif Upper = "UNTIL" then T.Kind := Token_UNTIL;
                elsif Upper = "SELECT" then T.Kind := Token_SELECT;
                elsif Upper = "CASE" then T.Kind := Token_CASE;
+               elsif Upper = "WHEN" then T.Kind := Token_WHEN;
+               elsif Upper = "OTHERWISE" then T.Kind := Token_OTHERWISE;
                elsif Upper = "SUBMIT" then T.Kind := Token_SUBMIT;
                elsif Upper = "LET" then T.Kind := Token_LET;
                elsif Upper = "SET" then T.Kind := Token_SET;
