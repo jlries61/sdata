@@ -1,6 +1,5 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
-with SData.Table;           use SData.Table;
-with Ada.Strings.Unbounded;  use Ada.Strings.Unbounded;
+with Ada.Strings.Unbounded;
 
 package body SData.Variables is
 
@@ -90,6 +89,7 @@ package body SData.Variables is
    -- Define_Array --
    ------------------
    procedure Define_Array (Name : String; Constituents : GNAT.Strings.String_List) is
+      use Ada.Strings.Unbounded;
       Upper_Name : constant String := To_Upper (Name);
       V : Name_Vectors.Vector;
    begin
@@ -131,6 +131,7 @@ package body SData.Variables is
    -- Get_Array_Element --
    -----------------------
    function Get_Array_Element (Name : String; Index : Positive) return Value is
+      use Ada.Strings.Unbounded;
       Upper_Name : constant String := To_Upper (Name);
    begin
       if not Array_Symbols.Contains (Upper_Name) then
@@ -143,7 +144,7 @@ package body SData.Variables is
          if Index > Natural (V.Length) then
             return (Kind => Val_Missing);
          end if;
-         return Get (Ada.Strings.Unbounded.To_String (V.Element (Index)));
+         return Get (To_String (V.Element (Index)));
       end;
    end Get_Array_Element;
 
@@ -151,6 +152,7 @@ package body SData.Variables is
    -- Set_Array_Element --
    -----------------------
    procedure Set_Array_Element (Name : String; Index : Positive; Val : Value) is
+      use Ada.Strings.Unbounded;
       Upper_Name : constant String := To_Upper (Name);
    begin
       if not Array_Symbols.Contains (Upper_Name) then
@@ -159,14 +161,14 @@ package body SData.Variables is
 
       declare
          V : constant Name_Vectors.Vector := Array_Symbols.Element (Upper_Name);
-         Actual_Val : Value := Val;
+         Actual_Val : constant Value := Val;
       begin
          if Index > Natural (V.Length) then
             return;
          end if;
          
          declare
-            Var_Name : constant String := Ada.Strings.Unbounded.To_String (V.Element (Index));
+            Var_Name : constant String := To_String (V.Element (Index));
          begin
             -- Promotion logic similar to LET
             if Has_Column (Var_Name) then
