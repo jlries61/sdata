@@ -5,7 +5,6 @@
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Streams.Stream_IO;
-with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Exceptions; use Ada.Exceptions;
 with SData.Parser; use SData.Parser;
 with SData.AST; use SData.AST;
@@ -55,7 +54,6 @@ procedure SData_Main is
       Last : Natural;
       Ctx  : Parser_Context;
       Prog : Statement_Access;
-      Full_Source : Unbounded_String := Null_Unbounded_String;
    begin
       Put_Line ("SData Interactive Console. Type QUIT to exit.");
       loop
