@@ -1,4 +1,5 @@
 with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Characters.Handling; use Ada.Characters.Handling;
 
 package body SData.Parser is
 
@@ -586,7 +587,17 @@ package body SData.Parser is
                   declare
                      Next_T : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin
-                     if Next_T.Kind = Token_Identifier or else
+                     if Next_T.Kind = Token_Slash then
+                        declare
+                           Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Arg_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           if To_Upper(Arg_Tok.Text(1..Arg_Tok.Length)) = "ALL" then
+                              Stmt.Var_Len := 4;
+                              Stmt.Var_Name (1 .. 4) := "/ALL";
+                           end if;
+                        end;
+                     elsif Next_T.Kind = Token_Identifier or else
                         Next_T.Kind = Token_LET or else
                         Next_T.Kind = Token_SET or else
                         Next_T.Kind = Token_USE or else

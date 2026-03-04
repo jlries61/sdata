@@ -494,6 +494,10 @@ package body SData.Interpreter is
          elsif T = "SET" then
             Put_Line ("Command: SET variable = expression");
             Put_Line ("Creates a temporary variable that persists only during the Data Step.");
+         elsif T = "ARRAY" or T = "DIM" then
+            Put_Line ("Command: ARRAY array_name variable(s)");
+            Put_Line ("Command: DIM array_name variable(s)");
+            Put_Line ("Groups variables into an array for indexed access using {index}.");
          elsif T = "BY" then
             Put_Line ("Command: BY variable(s)");
             Put_Line ("Groups data by variables. Enables FIRST. and LAST. indicators.");
@@ -506,12 +510,102 @@ package body SData.Interpreter is
          elsif T = "SUM" then
             Put_Line ("Function: SUM(variable)");
             Put_Line ("Returns the sum of the variable. Group-aware if BY is used.");
+         elsif T = "ABS" then
+            Put_Line ("Function: ABS(x)");
+            Put_Line ("Returns the absolute value of x.");
+         elsif T = "SQRT" then
+            Put_Line ("Function: SQRT(x)");
+            Put_Line ("Returns the square root of x.");
+         elsif T = "LOG" then
+            Put_Line ("Function: LOG(x)");
+            Put_Line ("Returns the natural logarithm of x.");
+         elsif T = "LOG10" then
+            Put_Line ("Function: LOG10(x)");
+            Put_Line ("Returns the base-10 logarithm of x.");
+         elsif T = "EXP" then
+            Put_Line ("Function: EXP(x)");
+            Put_Line ("Returns e raised to the power of x.");
+         elsif T = "ROUND" then
+            Put_Line ("Function: ROUND(x, [n])");
+            Put_Line ("Rounds x to n decimal places (default: 0).");
+         elsif T = "CEIL" then
+            Put_Line ("Function: CEIL(x)");
+            Put_Line ("Returns the smallest integer greater than or equal to x.");
+         elsif T = "FLOOR" then
+            Put_Line ("Function: FLOOR(x)");
+            Put_Line ("Returns the largest integer less than or equal to x.");
+         elsif T = "INT" then
+            Put_Line ("Function: INT(x)");
+            Put_Line ("Returns the integer part of x (truncation).");
+         elsif T = "MOD" then
+            Put_Line ("Function: MOD(x, y)");
+            Put_Line ("Returns the remainder of x divided by y.");
+         elsif T = "STD" then
+            Put_Line ("Function: STD(variable)");
+            Put_Line ("Returns the standard deviation of the variable.");
+         elsif T = "VAR" then
+            Put_Line ("Function: VAR(variable)");
+            Put_Line ("Returns the variance of the variable.");
+         elsif T = "N" then
+            Put_Line ("Function: N(variable)");
+            Put_Line ("Returns the count of non-missing values for the variable.");
+         elsif T = "NMISS" then
+            Put_Line ("Function: NMISS(variable)");
+            Put_Line ("Returns the count of missing values for the variable.");
+         elsif T = "MAX" then
+            Put_Line ("Function: MAX(variable)  OR  MAX(x, y)");
+            Put_Line ("As aggregate: Returns the maximum value of a column.");
+            Put_Line ("As scalar: Returns the larger of two values.");
+         elsif T = "MIN" then
+            Put_Line ("Function: MIN(variable)  OR  MIN(x, y)");
+            Put_Line ("As aggregate: Returns the minimum value of a column.");
+            Put_Line ("As scalar: Returns the smaller of two values.");
          elsif T = "HOLD" then
             Put_Line ("Command: HOLD variable(s)");
             Put_Line ("Prevents variables from being reset to missing between records.");
          elsif T = "UNHOLD" then
             Put_Line ("Command: UNHOLD variable(s)");
             Put_Line ("Restores the default behavior of resetting variables to missing between records.");
+         elsif T = "/ALL" then
+            declare
+               type Topic_Array is array (Positive range <>) of GNAT.Strings.String_Access;
+               Cmds : constant Topic_Array := (
+                  new String'("USE"), new String'("SAVE"), new String'("RUN"), 
+                  new String'("NEW"), new String'("NAMES"), new String'("LET"),
+                  new String'("SET"), new String'("ARRAY"), new String'("DIM"),
+                  new String'("HOLD"), new String'("UNHOLD"), new String'("DIGITS"),
+                  new String'("KEEP"), new String'("DROP"), new String'("RENAME"),
+                  new String'("IF"), new String'("SELECT"), new String'("DELETE"),
+                  new String'("OUTPUT"), new String'("FOR"), new String'("WHILE"),
+                  new String'("REPEAT"), new String'("SUBMIT"), new String'("QUIT")
+               );
+               Funcs : constant Topic_Array := (
+                  new String'("ABS"), new String'("SQRT"), new String'("LOG"),
+                  new String'("LOG10"), new String'("EXP"), new String'("ROUND"),
+                  new String'("CEIL"), new String'("FLOOR"), new String'("INT"),
+                  new String'("MOD"), new String'("SUM"), new String'("MEAN"),
+                  new String'("STD"), new String'("VAR"), new String'("MIN"),
+                  new String'("MAX"), new String'("N"), new String'("NMISS")
+               );
+            begin
+               Put_Line ("========================================");
+               Put_Line ("COMMAND REFERENCE");
+               Put_Line ("========================================");
+               for I in Cmds'Range loop
+                  Print_Help (Cmds (I).all);
+                  Put_Line ("========================================");
+               end loop;
+               New_Line;
+               Put_Line ("========================================");
+               Put_Line ("FUNCTION REFERENCE");
+               Put_Line ("========================================");
+               for I in Funcs'Range loop
+                  Print_Help (Funcs (I).all);
+                  Put_Line ("========================================");
+               end loop;
+               for I in Cmds'Range loop declare Old : GNAT.Strings.String_Access := Cmds (I); begin GNAT.Strings.Free (Old); end; end loop;
+               for I in Funcs'Range loop declare Old : GNAT.Strings.String_Access := Funcs (I); begin GNAT.Strings.Free (Old); end; end loop;
+            end;
          elsif T = "NAMES" then
             Put_Line ("Command: NAMES");
             Put_Line ("Displays the names of all columns currently in the Data Table.");
