@@ -3,7 +3,7 @@
 GPR_FILE = sdata.gpr
 GPRBUILD_ALIRE_PATH := /home/jries/.local/share/alire/toolchains/gprbuild_25.0.1_9a2e6cfb/bin/gprbuild
 
-.PHONY: all build clean run check
+.PHONY: all build clean run check install
 
 all: build
 
@@ -11,7 +11,7 @@ build:
 	$(GPRBUILD_ALIRE_PATH) -P $(GPR_FILE)
 
 run: build
-	./bin/sdata_main tests/test1.cmd
+	./bin/sdata tests/test1.cmd
 
 check: build
 	@echo "Running tests..."
@@ -19,7 +19,7 @@ check: build
 		base=$$(basename $$f .cmd); \
 		exp="tests/expected/$$base.out"; \
 		echo -n "Testing $$f... "; \
-		./bin/sdata_main $$f > tests/$$base.tmp 2>&1; \
+		./bin/sdata $$f > tests/$$base.tmp 2>&1; \
 		if [ $$? -ne 0 ]; then \
 			echo "FAILED (Execution Error)"; \
 			rm tests/$$base.tmp; \

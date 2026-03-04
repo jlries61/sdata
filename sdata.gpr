@@ -16,5 +16,6 @@ project SData is
 
    package Builder is
       for Default_Switches ("Ada") use ("-g");
+      for Executable ("sdata_main.adb") use "sdata";
    end Builder;
 end SData;
