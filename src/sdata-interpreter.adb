@@ -509,6 +509,9 @@ package body SData.Interpreter is
          elsif T = "HOLD" then
             Put_Line ("Command: HOLD variable(s)");
             Put_Line ("Prevents variables from being reset to missing between records.");
+         elsif T = "UNHOLD" then
+            Put_Line ("Command: UNHOLD variable(s)");
+            Put_Line ("Restores the default behavior of resetting variables to missing between records.");
          elsif T = "NAMES" then
             Put_Line ("Command: NAMES");
             Put_Line ("Displays the names of all columns currently in the Data Table.");

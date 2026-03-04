@@ -596,6 +596,7 @@ package body SData.Parser is
                         Next_T.Kind = Token_BY or else
                         Next_T.Kind = Token_SORT or else
                         Next_T.Kind = Token_HOLD or else
+                        Next_T.Kind = Token_UNHOLD or else
                         Next_T.Kind = Token_REPEAT or else
                         Next_T.Kind = Token_NAMES or else
                         Next_T.Kind = Token_KEEP or else
