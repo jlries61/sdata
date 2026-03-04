@@ -130,6 +130,7 @@ package SData.AST is
       Stmt_SELECT, -- Multi-way branch
       Stmt_DELETE, -- Drop current record
       Stmt_OUTPUT, -- Explicit record output
+      Stmt_DIGITS, -- Set precision
       Stmt_RUN,    -- Execute and export
       Stmt_NEW     -- Reset environment
    );
@@ -183,6 +184,8 @@ package SData.AST is
             Otherwise_Part : Statement_Access;
          when Stmt_SORT | Stmt_BY =>
             Sort_Vars      : Variable_List;
+         when Stmt_DIGITS =>
+            Digits_Count   : Natural;
          when others =>
             null;
       end case;

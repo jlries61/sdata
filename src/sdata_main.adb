@@ -75,7 +75,8 @@ procedure SData_Main is
                      Is_Declarative : constant Boolean := 
                         Prog.Kind in Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP | 
                                      Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END |
-                                     Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW;
+                                     Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
+                                     Stmt_DIGITS;
                   begin
                      if Is_Declarative then
                         -- Declarative statements execute immediately in REPL.

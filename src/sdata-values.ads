@@ -26,6 +26,9 @@ package SData.Values is
    --  Integers are formatted without decimals or scientific notation.
    function To_String (V : Value) return String;
 
+   --  Like To_String, but respects global precision settings for Floats.
+   function To_String_Formatted (V : Value) return String;
+
    --  Determines the boolean truth of a value. 
    function Is_True (V : Value) return Boolean;
 

@@ -5,7 +5,7 @@ with SData.Variables; use SData.Variables;
 with SData.Evaluator; use SData.Evaluator;
 with GNAT.Strings; use GNAT.Strings;
 with SData.File_IO;
-with SData.Config;
+with SData.Config;    use SData.Config;
 with SData.Parser;
 with Ada.Streams.Stream_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
@@ -460,6 +460,8 @@ package body SData.Interpreter is
    begin
        if Stmt = null then return; end if;
        case Stmt.Kind is
+            when Stmt_RUN =>
+               Run_Active_Program;
             when Stmt_LET | Stmt_SET =>
                declare
                   Var_Name_Str : constant String := Stmt.Var_Name(1 .. Stmt.Var_Len);
@@ -531,7 +533,7 @@ package body SData.Interpreter is
                               Name : constant String := To_Upper (Col_Names (I).all);
                               Val  : constant Value  := Get (Name);
                            begin
-                              Put (Name & ": " & To_String (Val) & "  ");
+                              Put (Name & ": " & To_String_Formatted (Val) & "  ");
                            end;
                         end loop;
                         New_Line;
@@ -546,7 +548,7 @@ package body SData.Interpreter is
                   declare Current_Arg : Expression_List := Stmt.Print_Args;
                   begin
                      while Current_Arg /= null loop
-                        Put (To_String (Evaluate (Current_Arg.Expr)));
+                        Put (To_String_Formatted (Evaluate (Current_Arg.Expr)));
                         if Current_Arg.Next /= null then Put (" "); end if;
                         Current_Arg := Current_Arg.Next;
                      end loop;
@@ -849,14 +851,15 @@ package body SData.Interpreter is
                   exception when others => Put_Line ("Error: Failed to SUBMIT file " & Filename); end;
                   Submit_Level := Submit_Level - 1;
                end if;
-            when Stmt_RUN =>
-               Run_Active_Program;
             when Stmt_NEW =>
                Clear;
                Clear_Temporary;
                SData.Config.Repeat_Active := False;
                SData.Config.Repeat_Count := 0;
+               SData.Config.Print_Digits := 5; -- Reset to default
                Input_File_Columns.Clear;
+            when Stmt_DIGITS =>
+               SData.Config.Print_Digits := Stmt.Digits_Count;
             when others => null;
          end case;
    end Execute_Statement;
@@ -907,7 +910,7 @@ package body SData.Interpreter is
          
          while Iter /= null and then Iter /= Boundary loop
             case Iter.Kind is
-               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY =>
+               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS =>
                   Execute_Statement (Iter);
                   if Iter.Kind = Stmt_USE or Iter.Kind = Stmt_REPEAT then 
                      Explicit_Loop_Trigger := True; 
@@ -972,7 +975,7 @@ package body SData.Interpreter is
 
             while Iter /= null and then Iter /= Boundary loop
                case Iter.Kind is
-                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_OUTPUT | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY =>
+                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_OUTPUT | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS =>
                      Execute_Statement(Iter);
                   when others => null;
                end case;

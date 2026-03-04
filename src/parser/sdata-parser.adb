@@ -521,6 +521,14 @@ package body SData.Parser is
          when Token_DELETE | Token_OUTPUT =>
             Stmt := new Statement ((if Tok.Kind = Token_DELETE then Stmt_DELETE else Stmt_OUTPUT));
 
+         when Token_DIGITS =>
+            declare
+               Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               Stmt := new Statement (Stmt_DIGITS);
+               Stmt.Digits_Count := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+            end;
+
          when Token_RENAME =>
             Stmt := new Statement (Stmt_RENAME);
             Stmt.Rename_Pairs := Parse_Rename_List (Ctx);

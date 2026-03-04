@@ -29,4 +29,7 @@ package SData.Config is
    Repeat_Count  : Natural := 0;
    Repeat_Active : Boolean := False;
 
+   --  DIGITS state (controlling float precision in output).
+   Print_Digits  : Natural := 5;
+
 end SData.Config;

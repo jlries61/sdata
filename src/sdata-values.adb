@@ -1,3 +1,5 @@
+with Ada.Text_IO;
+with SData.Config;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 
 package body SData.Values is
@@ -26,6 +28,28 @@ package body SData.Values is
             return ".";
       end case;
    end To_String;
+
+   -------------------------
+   -- To_String_Formatted --
+   -------------------------
+   function To_String_Formatted (V : Value) return String is
+   begin
+      case V.Kind is
+         when Val_Numeric =>
+            declare
+               package Float_IO is new Ada.Text_IO.Float_IO (Float);
+               Img : String (1 .. 100);
+               Aft_Count : constant Natural := SData.Config.Print_Digits;
+            begin
+               Float_IO.Put (Img, V.Num_Val, Aft => Aft_Count, Exp => 0);
+               return Trim (Img, Ada.Strings.Both);
+            exception
+               when others =>
+                  return Trim (Float'Image (V.Num_Val), Ada.Strings.Both);
+            end;
+         when others => return To_String (V);
+      end case;
+   end To_String_Formatted;
 
    -------------
    -- Is_True --
