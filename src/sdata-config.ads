@@ -32,4 +32,9 @@ package SData.Config is
    --  DIGITS state (controlling float precision in output).
    Print_Digits  : Natural := 5;
 
+   --  Version information
+   Version_Major : constant := 0;
+   Version_Minor : constant := 1;
+   Version_Str   : constant String := "0.1";
+
 end SData.Config;

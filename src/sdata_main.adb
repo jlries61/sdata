@@ -37,6 +37,7 @@ procedure SData_Main is
       Put_Line ("Usage: sdata_main [options] [filename]");
       Put_Line ("Options:");
       Put_Line ("  -h, --help    Show this help message");
+      Put_Line ("  -v, --version Show version information");
       Put_Line ("  -m <size>     Set max in-memory table size (not yet implemented)");
       Put_Line ("  --clen <len>  Set max character variable length (not yet implemented)");
       Put_Line ("  --noshell     Disable SHELL command (not yet implemented)");
@@ -55,7 +56,8 @@ procedure SData_Main is
       Ctx  : Parser_Context;
       Prog : Statement_Access;
    begin
-      Put_Line ("SData Interactive Console. Type QUIT to exit.");
+      Put_Line ("SData Statistical Interpreter version " & SData.Config.Version_Str);
+      Put_Line ("Interactive Console. Type QUIT to exit.");
       loop
          Put ("sdata> ");
          Flush;
@@ -127,6 +129,9 @@ begin
       begin
          if Arg = "-h" or Arg = "--help" then
             Print_Usage;
+            return;
+         elsif Arg = "-v" or Arg = "--version" then
+            Put_Line ("SData version " & Version_Str);
             return;
          elsif Arg = "-q" then
             Quiet_Mode := True;
