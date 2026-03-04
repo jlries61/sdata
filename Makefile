@@ -4,6 +4,7 @@ GPR_FILE = sdata.gpr
 GPRBUILD_ALIRE_PATH := /home/jries/.local/share/alire/toolchains/gprbuild_25.0.1_9a2e6cfb/bin/gprbuild
 PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
+INSTALL_DIR = $(DESTDIR)$(BINDIR)
 
 .PHONY: all build clean run check install
 
@@ -46,8 +47,8 @@ check: build
 	@echo "All tests passed."
 
 install: build
-	install -d $(BINDIR)
-	install -m 755 bin/sdata $(BINDIR)/sdata
+	install -d $(INSTALL_DIR)
+	install -m 755 bin/sdata $(INSTALL_DIR)/sdata
 
 clean:
 	rm -rf obj bin tests/*.tmp tests/*.diff
