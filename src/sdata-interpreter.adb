@@ -49,45 +49,6 @@ package body SData.Interpreter is
    Current_Record_Deleted : Boolean := False;
    Explicit_Output_Count  : Natural := 0;
 
-   package Snapshot_Collector_Alias renames SData.Variables.Snapshot_Collector;
-   Collector : Snapshot_Collector_Alias.Vector;
-
-   function Has_Output_Statement (Stmt : Statement_Access) return Boolean is
-      Curr : Statement_Access := Stmt;
-   begin
-      while Curr /= null loop
-         if Curr.Kind = Stmt_OUTPUT then return True; end if;
-         
-         case Curr.Kind is
-            when Stmt_IF =>
-               if Has_Output_Statement (Curr.Then_Branch) or else
-                  Has_Output_Statement (Curr.Else_Branch) then
-                  return True;
-               end if;
-            when Stmt_FOR =>
-               if Has_Output_Statement (Curr.For_Body) then return True; end if;
-            when Stmt_WHILE =>
-               if Has_Output_Statement (Curr.While_Body) then return True; end if;
-            when Stmt_LOOP_REPEAT =>
-               if Has_Output_Statement (Curr.Repeat_Body) then return True; end if;
-            when Stmt_SELECT =>
-               declare
-                  Branch : Case_Branch := Curr.Branches;
-               begin
-                  while Branch /= null loop
-                     if Has_Output_Statement (Branch.Branch_Body) then return True; end if;
-                     Branch := Branch.Next;
-                  end loop;
-               end;
-               if Has_Output_Statement (Curr.Otherwise_Part) then return True; end if;
-            when others => null;
-         end case;
-         
-         Curr := Curr.Next;
-      end loop;
-      return False;
-   end Has_Output_Statement;
-
    -- For BY statement processing
    package By_Group_Names is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
    Current_By_Vars : By_Group_Names.Vector;
@@ -210,6 +171,45 @@ package body SData.Interpreter is
       end if;
       return Val_Numeric;
    end Get_Expected_Kind;
+
+   package Snapshot_Collector_Alias renames SData.Variables.Snapshot_Collector;
+   Collector : Snapshot_Collector_Alias.Vector;
+
+   function Has_Output_Statement (Stmt : Statement_Access) return Boolean is
+      Curr : Statement_Access := Stmt;
+   begin
+      while Curr /= null loop
+         if Curr.Kind = Stmt_OUTPUT then return True; end if;
+         
+         case Curr.Kind is
+            when Stmt_IF =>
+               if Has_Output_Statement (Curr.Then_Branch) or else
+                  Has_Output_Statement (Curr.Else_Branch) then
+                  return True;
+               end if;
+            when Stmt_FOR =>
+               if Has_Output_Statement (Curr.For_Body) then return True; end if;
+            when Stmt_WHILE =>
+               if Has_Output_Statement (Curr.While_Body) then return True; end if;
+            when Stmt_LOOP_REPEAT =>
+               if Has_Output_Statement (Curr.Repeat_Body) then return True; end if;
+            when Stmt_SELECT =>
+               declare
+                  Branch : Case_Branch := Curr.Branches;
+               begin
+                  while Branch /= null loop
+                     if Has_Output_Statement (Branch.Branch_Body) then return True; end if;
+                     Branch := Branch.Next;
+                  end loop;
+               end;
+               if Has_Output_Statement (Curr.Otherwise_Part) then return True; end if;
+            when others => null;
+         end case;
+         
+         Curr := Curr.Next;
+      end loop;
+      return False;
+   end Has_Output_Statement;
 
    procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null) is
       Current : Statement_Access := List;
@@ -457,11 +457,36 @@ package body SData.Interpreter is
    end Calculate_Aggregates;
 
    procedure Execute_Statement (Stmt : Statement_Access) is
+      procedure Print_Help is
+      begin
+         Put_Line ("SData version " & SData.Config.Version_Str);
+         Put_Line ("Available Commands:");
+         Put_Line ("  Data:      USE, SAVE, RUN, NEW, NAMES, QUIT");
+         Put_Line ("  Variables: LET, SET, ARRAY (DIM), HOLD, UNHOLD, DIGITS");
+         Put_Line ("  Columns:   KEEP, DROP, RENAME");
+         Put_Line ("  Logic:     IF, SELECT (CASE/WHEN/OTHERWISE), DELETE, OUTPUT");
+         Put_Line ("  Loops:     FOR, WHILE, REPEAT");
+         Put_Line ("  System:    SUBMIT, HELP, REM");
+         New_Line;
+         Put_Line ("Available Functions:");
+         Put_Line ("  Math:      ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
+         Put_Line ("  Aggregate: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS");
+         Put_Line ("  Stat PDF:  ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF, MDF, WDF");
+         Put_Line ("  Stat CDF:  ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF, MCF, WCF");
+         Put_Line ("  Stat IDF:  ZIF, NIF, UIF, EIF, BIF");
+         Put_Line ("  Stat RN:   ZRN, NRN, URN, ERN, PRN, GRN, MRN, WRN");
+         New_Line;
+         Put_Line ("For detailed help on a specific command, use: HELP <command>");
+      end Print_Help;
    begin
        if Stmt = null then return; end if;
        case Stmt.Kind is
+            when Stmt_HELP =>
+               Print_Help;
             when Stmt_RUN =>
                Run_Active_Program;
+            when Stmt_QUIT | Stmt_END =>
+               null; -- Handled by loop termination
             when Stmt_LET | Stmt_SET =>
                declare
                   Var_Name_Str : constant String := Stmt.Var_Name(1 .. Stmt.Var_Len);
@@ -910,7 +935,7 @@ package body SData.Interpreter is
          
          while Iter /= null and then Iter /= Boundary loop
             case Iter.Kind is
-               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS =>
+               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                   Execute_Statement (Iter);
                   if Iter.Kind = Stmt_USE or Iter.Kind = Stmt_REPEAT then 
                      Explicit_Loop_Trigger := True; 
@@ -975,7 +1000,7 @@ package body SData.Interpreter is
 
             while Iter /= null and then Iter /= Boundary loop
                case Iter.Kind is
-                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_OUTPUT | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS =>
+                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_OUTPUT | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                      Execute_Statement(Iter);
                   when others => null;
                end case;
@@ -1005,6 +1030,8 @@ package body SData.Interpreter is
          if Current.Kind = Stmt_RUN then
             Run_One_Step (Step_Start, Current);
             Step_Start := Current.Next;
+         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT then
+            Execute_Statement (Current);
          end if;
          Current := Current.Next;
       end loop;

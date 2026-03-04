@@ -131,6 +131,7 @@ package SData.AST is
       Stmt_DELETE, -- Drop current record
       Stmt_OUTPUT, -- Explicit record output
       Stmt_DIGITS, -- Set precision
+      Stmt_HELP,   -- Display help
       Stmt_RUN,    -- Execute and export
       Stmt_NEW     -- Reset environment
    );

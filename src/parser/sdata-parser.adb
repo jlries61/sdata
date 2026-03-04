@@ -573,10 +573,11 @@ package body SData.Parser is
                Stmt.For_Body := Parse_Block (Ctx, Token_NEXT);
             end;
 
-         when Token_END | Token_QUIT | Token_NAMES | Token_NEW =>
+         when Token_END | Token_QUIT | Token_NAMES | Token_NEW | Token_HELP =>
             Stmt := new Statement ((if Tok.Kind = Token_END then Stmt_END 
                                      elsif Tok.Kind = Token_QUIT then Stmt_QUIT 
                                      elsif Tok.Kind = Token_NEW then Stmt_NEW
+                                     elsif Tok.Kind = Token_HELP then Stmt_HELP
                                      else Stmt_NAMES));
 
          when Token_REM =>
