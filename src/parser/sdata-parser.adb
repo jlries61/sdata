@@ -600,6 +600,8 @@ package body SData.Parser is
                      elsif Next_T.Kind = Token_Identifier or else
                         Next_T.Kind = Token_LET or else
                         Next_T.Kind = Token_SET or else
+                        Next_T.Kind = Token_ARRAY or else
+                        Next_T.Kind = Token_DIM or else
                         Next_T.Kind = Token_USE or else
                         Next_T.Kind = Token_SAVE or else
                         Next_T.Kind = Token_RUN or else
