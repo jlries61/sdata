@@ -443,22 +443,13 @@ package body SData.Parser is
                Stmt := new Statement (New_Kind);
                declare
                   Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                  Dim_Tok  : Token;
                begin
                   Stmt.Arr_Name_Len := Name_Tok.Length;
                   Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
                   
-                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
-                     declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin
-                        Dim_Tok := Get_Next_Token (Ctx.Lex_Ctx);
-                        Stmt.Arr_Dim := Positive'Value (Dim_Tok.Text (1 .. Dim_Tok.Length));
-                        if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Brace then
-                           Put_Line ("Error: Expected '}' in array definition");
-                        end if;
-                     end;
-                  else
-                     Put_Line ("Error: Expected '{dim}' in array definition");
-                  end if;
+                  --  In the new model, the dimension is implicit based on the length of the variable list.
+                  --  We initialize it to a placeholder; the interpreter will determine the true size.
+                  Stmt.Arr_Dim := 1; 
                   
                   Stmt.Arr_Vars := Parse_Variable_List (Ctx);
                end;
