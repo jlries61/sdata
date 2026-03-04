@@ -47,8 +47,44 @@ package body SData.Interpreter is
    Current_Record_Deleted : Boolean := False;
    Explicit_Output_Count  : Natural := 0;
 
-   package Deletion_Lists is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Positive);
-   Pending_Deletions : Deletion_Lists.Vector;
+   package Snapshot_Collector_Alias renames SData.Variables.Snapshot_Collector;
+   Collector : Snapshot_Collector_Alias.Vector;
+
+   function Has_Output_Statement (Stmt : Statement_Access) return Boolean is
+      Curr : Statement_Access := Stmt;
+   begin
+      while Curr /= null loop
+         if Curr.Kind = Stmt_OUTPUT then return True; end if;
+         
+         case Curr.Kind is
+            when Stmt_IF =>
+               if Has_Output_Statement (Curr.Then_Branch) or else
+                  Has_Output_Statement (Curr.Else_Branch) then
+                  return True;
+               end if;
+            when Stmt_FOR =>
+               if Has_Output_Statement (Curr.For_Body) then return True; end if;
+            when Stmt_WHILE =>
+               if Has_Output_Statement (Curr.While_Body) then return True; end if;
+            when Stmt_LOOP_REPEAT =>
+               if Has_Output_Statement (Curr.Repeat_Body) then return True; end if;
+            when Stmt_SELECT =>
+               declare
+                  Branch : Case_Branch := Curr.Branches;
+               begin
+                  while Branch /= null loop
+                     if Has_Output_Statement (Branch.Branch_Body) then return True; end if;
+                     Branch := Branch.Next;
+                  end loop;
+               end;
+               if Has_Output_Statement (Curr.Otherwise_Part) then return True; end if;
+            when others => null;
+         end case;
+         
+         Curr := Curr.Next;
+      end loop;
+      return False;
+   end Has_Output_Statement;
 
    -- For BY statement processing
    package By_Group_Names is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
@@ -209,6 +245,24 @@ package body SData.Interpreter is
                      end;
                   else
                      Expected := Get_Expected_Kind (Var_Name_Str);
+                     
+                     -- Check for existence and type if already permanent
+                     declare
+                        Existing_Kind : constant Value_Kind := Get_Type (Var_Name_Str);
+                     begin
+                        if Existing_Kind /= Val_Missing then
+                           if Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
+                              raise Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+                           end if;
+                           -- Double check actual kind for dynamic variables without suffixes
+                           if Existing_Kind = Val_String and Result.Kind /= Val_String then
+                              raise Type_Mismatch_Error with "Cannot assign numeric to string variable " & Var_Name_Str;
+                           elsif Existing_Kind /= Val_String and Result.Kind = Val_String then
+                              raise Type_Mismatch_Error with "Cannot assign string to numeric variable " & Var_Name_Str;
+                           end if;
+                        end if;
+                     end;
+
                      if Result.Kind /= Val_Missing then
                         if Expected = Val_Integer and Result.Kind /= Val_Integer then
                            Result := (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Convert_To_Float(Result))));
@@ -232,14 +286,24 @@ package body SData.Interpreter is
                end;
             when Stmt_PRINT =>
                if Stmt.Print_Args = null then
-                  declare Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+                  declare
+                     Col_Names : constant String_List_Access := Get_Column_Names;
                   begin
                      if Col_Names /= null then
                         for I in Col_Names'Range loop
-                           declare Name : constant String := Col_Names(I).all; Val : constant Value := Get_Value(Get_Current_Record_Index, Name);
-                           begin Put (Name & ": " & To_String(Val) & "  "); end;
+                           declare
+                              Name : constant String := To_Upper (Col_Names (I).all);
+                              Val  : constant Value  := Get (Name);
+                           begin
+                              Put (Name & ": " & To_String (Val) & "  ");
+                           end;
                         end loop;
-                        New_Line; GNAT.Strings.Free(Col_Names);
+                        New_Line;
+                        declare
+                           Old_List : String_List_Access := Col_Names;
+                        begin
+                           GNAT.Strings.Free (Old_List);
+                        end;
                      end if;
                   end;
                else
@@ -416,11 +480,41 @@ package body SData.Interpreter is
                   when others => Put_Line ("Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len)); raise;
                end;
             when Stmt_NAMES =>
-               declare Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+               declare
+                  -- Merge Table columns and Permanent PDV symbols
+                  T_Names : constant String_List_Access := Get_Column_Names;
+                  P_Names : constant String_List_Access := Get_PDV_Names;
                begin
-                  if Col_Names /= null then
-                     for I in Col_Names'Range loop Put(Col_Names(I).all & " "); end loop;
-                     New_Line; GNAT.Strings.Free(Col_Names);
+                  if T_Names /= null then
+                     for I in T_Names'Range loop
+                        Put (T_Names (I).all & " ");
+                     end loop;
+                  end if;
+                  
+                  if P_Names /= null then
+                     for I in P_Names'Range loop
+                        declare
+                           Name : constant String := P_Names (I).all;
+                           Found_In_Table : Boolean := False;
+                        begin
+                           if T_Names /= null then
+                              for J in T_Names'Range loop
+                                 if T_Names (J).all = Name then Found_In_Table := True; exit; end if;
+                              end loop;
+                           end if;
+                           if not Found_In_Table then
+                              Put (Name & " ");
+                           end if;
+                        end;
+                     end loop;
+                  end if;
+                  New_Line;
+
+                  if T_Names /= null then
+                     declare Old : String_List_Access := T_Names; begin GNAT.Strings.Free (Old); end;
+                  end if;
+                  if P_Names /= null then
+                     declare Old : String_List_Access := P_Names; begin GNAT.Strings.Free (Old); end;
                   end if;
                end;
             when Stmt_SELECT =>
@@ -470,18 +564,7 @@ package body SData.Interpreter is
                Current_Record_Deleted := True;
             when Stmt_OUTPUT =>
                Explicit_Output_Count := Explicit_Output_Count + 1;
-               declare
-                  Idx : constant Natural := Row_Count + 1;
-                  Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-               begin
-                  Add_Row;
-                  if Col_Names /= null then
-                     for C in Col_Names'Range loop
-                        Set_Value (Idx, Col_Names (C).all, Get (Col_Names (C).all));
-                     end loop;
-                     GNAT.Strings.Free (Col_Names);
-                  end if;
-               end;
+               Collector.Append (SData.Variables.Take_PDV_Snapshot);
             when Stmt_IF =>
                if Is_True (Evaluate (Stmt.Condition)) then Execute_Statement (Stmt.Then_Branch);
                elsif Stmt.Else_Branch /= null then Execute_Statement (Stmt.Else_Branch); end if;
@@ -550,6 +633,7 @@ package body SData.Interpreter is
 
       procedure Run_One_Step (Start, Boundary : Statement_Access) is
          Iter : Statement_Access;
+         Step_Has_Output : constant Boolean := Has_Output_Statement (Start);
 
          function Is_First_In_Group (Idx : Positive) return Boolean is
          begin
@@ -582,6 +666,9 @@ package body SData.Interpreter is
          Num_Records := 0;
          Explicit_Loop_Trigger := False;
          Current_By_Vars.Clear;
+         Initialize_PDV;
+         Collector.Clear;
+         
          while Iter /= null and then Iter /= Boundary loop
             case Iter.Kind is
                when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY =>
@@ -596,15 +683,23 @@ package body SData.Interpreter is
          end loop;
          if not Explicit_Loop_Trigger then
             Num_Records := (if Row_Count > 0 then Row_Count else 1);
-            if Num_Records = 1 and Row_Count = 0 then
-               -- This is an implicit REPEAT 1. Ensure a row exists.
-               Add_Row;
-            end if;
          end if;
-         Pending_Deletions.Clear;
+
          for I in 1 .. Num_Records loop
             Set_Current_Record_Index (I);
             
+            -- Step 1: Initialize PDV for this record
+            Reset_PDV_Non_Held;
+            if Explicit_Loop_Trigger or Row_Count > 0 then
+               if I <= Row_Count then
+                  Load_PDV_From_Table (I);
+               else
+                  -- Logic for REPEAT: ensure current columns are in PDV
+                  -- but they will be missing by default from Reset_PDV_Non_Held.
+                  null;
+               end if;
+            end if;
+
             -- Set First. and Last. indicators
             if not Current_By_Vars.Is_Empty then
                for V of Current_By_Vars loop
@@ -617,30 +712,6 @@ package body SData.Interpreter is
                end loop;
             end if;
 
-            if Explicit_Loop_Trigger or Row_Count > 0 then
-               declare
-                  Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-               begin
-                  if Col_Names /= null then
-                     if I > Row_Count then Add_Row; end if;
-                     for C in Col_Names'Range loop
-                        declare Name : constant String := To_Upper (Col_Names(C).all);
-                        begin 
-                           if not Input_File_Columns.Contains (Name) then
-                              if Is_Held (Name) then
-                                 if I > 1 then
-                                    Set_Value (I, Name, Get (Name));
-                                 end if;
-                              else
-                                 Set_Value (I, Name, (Kind => Val_Missing));
-                              end if;
-                           end if; 
-                        end;
-                     end loop;
-                     GNAT.Strings.Free (Col_Names);
-                  end if;
-               end;
-            end if;
             Iter := Start;
             Current_Record_Deleted := False;
             Explicit_Output_Count  := 0;
@@ -655,16 +726,12 @@ package body SData.Interpreter is
                Iter := Iter.Next;
             end loop;
             
-            if Current_Record_Deleted then
-               Pending_Deletions.Append (I);
+            if not Current_Record_Deleted and then (not Step_Has_Output) then
+               Collector.Append (SData.Variables.Take_PDV_Snapshot);
             end if;
          end loop;
          
-         -- Handle deletions in reverse order to keep indices valid.
-         for I in reverse 1 .. Integer (Pending_Deletions.Length) loop
-            Drop_Row (Pending_Deletions.Element (I));
-         end loop;
-         Pending_Deletions.Clear;
+         Commit_Snapshots_To_Table (Collector);
          Set_Current_Record_Index (0);
          Apply_Pending_Mods;
          if SData.Config.Save_File_Active then

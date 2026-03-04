@@ -1,5 +1,6 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
-with Ada.Strings.Unbounded;
+with Ada.Strings.Unbounded;  use Ada.Strings.Unbounded;
+with GNAT.Strings; use GNAT.Strings;
 
 package body SData.Variables is
 
@@ -10,7 +11,7 @@ package body SData.Variables is
       Upper_Name : constant String := To_Upper (Name);
    begin
       --  Rule: SET cannot overwrite a permanent variable (column).
-      if Has_Column (Upper_Name) then
+      if SData.Table.Has_Column (Upper_Name) then
          raise Program_Error with "Cannot SET permanent variable " & Upper_Name & " as temporary.";
       end if;
 
@@ -27,39 +28,26 @@ package body SData.Variables is
    procedure Set_Permanent (Name : String; Val : Value) is
       Upper_Name : constant String := To_Upper (Name);
    begin
-      --  Rule: If it doesn't exist in the table, create the column.
-      if not Has_Column (Upper_Name) then
-         declare
-            Typ : Column_Type := Col_Numeric;
-         begin
-            if Name'Length > 0 then
-               if Name (Name'Last) = '$' then Typ := Col_String;
-               elsif Name (Name'Last) = '%' then Typ := Col_Integer; end if;
-            end if;
-            Add_Column (Upper_Name, Typ);
-         end;
-      end if;
-
       --  If we were tracking this as a temporary variable, remove it from that pool (Promotion).
       --  EXCEPT if it is HELD.
       if Temp_Symbols.Contains (Upper_Name) and then not Is_Held (Upper_Name) then
          Temp_Symbols.Delete (Upper_Name);
       end if;
 
-      --  Update the table cell for the current record.
-      if Get_Current_Record_Index > 0 then
-         Set_Value (Get_Current_Record_Index, Upper_Name, Val);
-         -- If HELD, we also want to update the last value for the next record to pick up.
-         if Is_Held (Upper_Name) then
-            if Temp_Symbols.Contains (Upper_Name) then
-               Temp_Symbols.Replace (Upper_Name, Val);
-            else
-               Temp_Symbols.Insert (Upper_Name, Val);
-            end if;
-         end if;
+      --  Update the Permanent symbols PDV.
+      if Permanent_Symbols.Contains (Upper_Name) then
+         Permanent_Symbols.Replace (Upper_Name, Val);
       else
-         --  Note: If not in a data step, LET creates the column structure but has no cell to write to.
-         null;
+         Permanent_Symbols.Insert (Upper_Name, Val);
+      end if;
+      
+      -- If HELD, we must ensure it persists in the Temp_Symbols map for the next record
+      if Is_Held (Upper_Name) then
+         if Temp_Symbols.Contains (Upper_Name) then
+            Temp_Symbols.Replace (Upper_Name, Val);
+         else
+            Temp_Symbols.Insert (Upper_Name, Val);
+         end if;
       end if;
    end Set_Permanent;
 
@@ -69,13 +57,13 @@ package body SData.Variables is
    function Get (Name : String) return Value is
       Upper_Name : constant String := To_Upper (Name);
    begin
-      --  1. Check Data Table (Permanent).
-      if Get_Current_Record_Index > 0 then
+      --  1. Check Permanent PDV first.
+      if Permanent_Symbols.Contains (Upper_Name) then
          declare
-            Val : constant Value := Get_Value (Get_Current_Record_Index, Upper_Name);
+            V : constant Value := Permanent_Symbols.Element (Upper_Name);
          begin
-            if Val.Kind /= Val_Missing then
-               return Val;
+            if V.Kind /= Val_Missing then
+               return V;
             end if;
          end;
       end if;
@@ -94,13 +82,164 @@ package body SData.Variables is
    procedure Clear_Temporary is
    begin
       Temp_Symbols.Clear;
+      Permanent_Symbols.Clear;
    end Clear_Temporary;
+
+   --------------------
+   -- Initialize_PDV --
+   --------------------
+   procedure Initialize_PDV is
+   begin
+      Permanent_Symbols.Clear;
+   end Initialize_PDV;
+
+   -------------------------
+   -- Load_PDV_From_Table --
+   -------------------------
+   procedure Load_PDV_From_Table (Row : Positive) is
+      Col_Names : String_List_Access := SData.Table.Get_Column_Names;
+   begin
+      if Col_Names /= null then
+         for I in Col_Names'Range loop
+            declare
+               Name : constant String := To_Upper (Col_Names (I).all);
+               Val  : constant Value := SData.Table.Get_Value (Row, Name);
+            begin
+               if Permanent_Symbols.Contains (Name) then
+                  Permanent_Symbols.Replace (Name, Val);
+               else
+                  Permanent_Symbols.Insert (Name, Val);
+               end if;
+            end;
+         end loop;
+         GNAT.Strings.Free (Col_Names);
+      end if;
+   end Load_PDV_From_Table;
+
+   ------------------------
+   -- Reset_PDV_Non_Held --
+   ------------------------
+   procedure Reset_PDV_Non_Held is
+      Pos : Symbol_Table_Pkg.Cursor := Permanent_Symbols.First;
+   begin
+      while Symbol_Table_Pkg.Has_Element (Pos) loop
+         declare
+            Name : constant String := Symbol_Table_Pkg.Key (Pos);
+         begin
+            if not Is_Held (Name) then
+               Permanent_Symbols.Replace_Element (Pos, (Kind => Val_Missing));
+            else
+               -- If HELD, make sure the value is also in Temp_Symbols so Get finds it
+               if not Temp_Symbols.Contains (Name) then
+                  Temp_Symbols.Insert (Name, Symbol_Table_Pkg.Element (Pos));
+               else
+                  Temp_Symbols.Replace (Name, Symbol_Table_Pkg.Element (Pos));
+               end if;
+            end if;
+         end;
+         Symbol_Table_Pkg.Next (Pos);
+      end loop;
+   end Reset_PDV_Non_Held;
+
+   -----------------------
+   -- Take_PDV_Snapshot --
+   -----------------------
+   function Take_PDV_Snapshot return Symbol_Table_Pkg.Map is
+   begin
+      return Permanent_Symbols;
+   end Take_PDV_Snapshot;
+
+   -------------------------------
+   -- Commit_Snapshots_To_Table --
+   -------------------------------
+   procedure Commit_Snapshots_To_Table (Snapshots : Snapshot_Collector.Vector) is
+      use SData.Table;
+      package Ordered_Names is new Ada.Containers.Vectors (Positive, Unbounded_String);
+      Order : Ordered_Names.Vector;
+   begin
+      SData.Table.Clear;
+      if Snapshots.Is_Empty then return; end if;
+      
+      -- 1. Identify all columns from all snapshots and preserve order
+      for S of Snapshots loop
+         declare
+            Pos : Symbol_Table_Pkg.Cursor := S.First;
+         begin
+            while Symbol_Table_Pkg.Has_Element (Pos) loop
+               declare
+                  Name : constant String := Symbol_Table_Pkg.Key (Pos);
+                  V    : constant Value := Symbol_Table_Pkg.Element (Pos);
+                  Typ  : Column_Type := Col_Numeric;
+                  Found : Boolean := False;
+               begin
+                  for ON of Order loop
+                     if To_String (ON) = Name then Found := True; exit; end if;
+                  end loop;
+
+                  if not Found then
+                     Order.Append (To_Unbounded_String (Name));
+                     if Name'Length > 0 then
+                        if Name (Name'Last) = '$' then Typ := Col_String;
+                        elsif Name (Name'Last) = '%' then Typ := Col_Integer; end if;
+                     end if;
+                     
+                     if V.Kind = Val_Integer then Typ := Col_Integer;
+                     elsif V.Kind = Val_String then Typ := Col_String;
+                     end if;
+
+                     Add_Column (Name, Typ);
+                  end if;
+               end;
+               Symbol_Table_Pkg.Next (Pos);
+            end loop;
+         end;
+      end loop;
+      
+      -- 2. Add rows
+      for S of Snapshots loop
+         Add_Row;
+         declare
+            Pos : Symbol_Table_Pkg.Cursor := S.First;
+         begin
+            while Symbol_Table_Pkg.Has_Element (Pos) loop
+               Set_Value (Row_Count, Symbol_Table_Pkg.Key (Pos), Symbol_Table_Pkg.Element (Pos));
+               Symbol_Table_Pkg.Next (Pos);
+            end loop;
+         end;
+      end loop;
+   end Commit_Snapshots_To_Table;
+
+   function Get_Type (Name : String) return Value_Kind is
+      Upper : constant String := To_Upper (Name);
+   begin
+      if Permanent_Symbols.Contains (Upper) then
+         return Permanent_Symbols.Element (Upper).Kind;
+      end if;
+      return Val_Missing;
+   end Get_Type;
+
+   -------------------
+   -- Get_PDV_Names --
+   -------------------
+   function Get_PDV_Names return GNAT.Strings.String_List_Access is
+      use GNAT.Strings;
+      Count : constant Natural := Natural (Permanent_Symbols.Length);
+      List : constant String_List_Access := new String_List (1 .. Count);
+      Pos  : Symbol_Table_Pkg.Cursor := Permanent_Symbols.First;
+      Idx  : Positive := 1;
+   begin
+      while Symbol_Table_Pkg.Has_Element (Pos) loop
+         List (Idx) := new String'(Symbol_Table_Pkg.Key (Pos));
+         Idx := Idx + 1;
+         Symbol_Table_Pkg.Next (Pos);
+      end loop;
+      return List;
+   end Get_PDV_Names;
 
    ------------------
    -- Define_Array --
    ------------------
    procedure Define_Array (Name : String; Constituents : GNAT.Strings.String_List) is
-      use Ada.Strings.Unbounded;
       Upper_Name : constant String := To_Upper (Name);
       V : Name_Vectors.Vector;
    begin
@@ -131,7 +270,6 @@ package body SData.Variables is
    -- Define_Array_Access --
    -------------------------
    procedure Define_Array_Access (Name : String; Constituents : GNAT.Strings.String_List_Access) is
-      use GNAT.Strings;
    begin
       if Constituents /= null then
          Define_Array (Name, Constituents.all);
@@ -142,7 +280,6 @@ package body SData.Variables is
    -- Get_Array_Element --
    -----------------------
    function Get_Array_Element (Name : String; Index : Positive) return Value is
-      use Ada.Strings.Unbounded;
       Upper_Name : constant String := To_Upper (Name);
    begin
       if not Array_Symbols.Contains (Upper_Name) then
@@ -163,7 +300,6 @@ package body SData.Variables is
    -- Set_Array_Element --
    -----------------------
    procedure Set_Array_Element (Name : String; Index : Positive; Val : Value) is
-      use Ada.Strings.Unbounded;
       Upper_Name : constant String := To_Upper (Name);
    begin
       if not Array_Symbols.Contains (Upper_Name) then
@@ -181,13 +317,6 @@ package body SData.Variables is
          declare
             Var_Name : constant String := To_String (V.Element (Index));
          begin
-            -- Promotion logic similar to LET
-            if Has_Column (Var_Name) then
-               -- We'd need to know the column type. Variables.ads doesn't see Table's internal types easily.
-               -- Actually, Set_Permanent handles column creation.
-               -- But it doesn't handle type matching.
-               null;
-            end if;
             Set_Permanent (Var_Name, Actual_Val);
          end;
       end;

@@ -4,6 +4,7 @@
 with SData.Values; use SData.Values;
 with SData.Table;  use SData.Table;
 with Ada.Containers.Indefinite_Hashed_Maps;
+with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
 with GNAT.Strings;
 
@@ -21,6 +22,28 @@ package SData.Variables is
    --  Removes all temporary variables (called at the end of a RUN).
    procedure Clear_Temporary;
 
+   -- PDV Management (PDV stands for Program Data Vector)
+   procedure Initialize_PDV;
+   procedure Load_PDV_From_Table (Row : Positive);
+   procedure Reset_PDV_Non_Held;
+   
+   package Symbol_Table_Pkg is new Ada.Containers.Indefinite_Hashed_Maps
+     (Key_Type        => String,
+      Element_Type   => Value,
+      Hash           => Ada.Strings.Hash,
+      Equivalent_Keys => "=");
+
+   function Take_PDV_Snapshot return Symbol_Table_Pkg.Map;
+
+   package Snapshot_Collector is new Ada.Containers.Vectors (Positive, Symbol_Table_Pkg.Map, "=" => Symbol_Table_Pkg."=");
+
+   -- Reconstruct table from snapshots
+   procedure Commit_Snapshots_To_Table (Snapshots : Snapshot_Collector.Vector);
+
+   function Get_Type (Name : String) return Value_Kind;
+   
+   function Get_PDV_Names return GNAT.Strings.String_List_Access;
+
    -- Array Management
    procedure Define_Array (Name : String; Constituents : GNAT.Strings.String_List);
    procedure Define_Array (Name : String; Constituents : Name_Vectors.Vector);
@@ -34,12 +57,6 @@ package SData.Variables is
    function Is_Held (Name : String) return Boolean;
 
 private
-   package Symbol_Table_Pkg is new Ada.Containers.Indefinite_Hashed_Maps
-     (Key_Type        => String,
-      Element_Type   => Value,
-      Hash           => Ada.Strings.Hash,
-      Equivalent_Keys => "=");
-
    -- Holds only temporary variables created with SET.
    Temp_Symbols : Symbol_Table_Pkg.Map;
 
@@ -59,5 +76,8 @@ private
       Hash            => Ada.Strings.Hash,
       Equivalent_Keys => "=");
    Hold_Symbols : Hold_Table_Pkg.Map;
+
+   -- Holds permanent variables for the current record (PDV).
+   Permanent_Symbols : Symbol_Table_Pkg.Map;
 
 end SData.Variables;
