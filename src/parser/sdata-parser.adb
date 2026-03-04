@@ -574,11 +574,54 @@ package body SData.Parser is
             end;
 
          when Token_END | Token_QUIT | Token_NAMES | Token_NEW | Token_HELP =>
-            Stmt := new Statement ((if Tok.Kind = Token_END then Stmt_END 
-                                     elsif Tok.Kind = Token_QUIT then Stmt_QUIT 
-                                     elsif Tok.Kind = Token_NEW then Stmt_NEW
-                                     elsif Tok.Kind = Token_HELP then Stmt_HELP
-                                     else Stmt_NAMES));
+            declare
+               K : constant Statement_Kind := (if Tok.Kind = Token_END then Stmt_END 
+                                             elsif Tok.Kind = Token_QUIT then Stmt_QUIT 
+                                             elsif Tok.Kind = Token_NEW then Stmt_NEW
+                                             elsif Tok.Kind = Token_HELP then Stmt_HELP
+                                             else Stmt_NAMES);
+            begin
+               Stmt := new Statement (K);
+               if K = Stmt_HELP then
+                  declare
+                     Next_T : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if Next_T.Kind = Token_Identifier or else
+                        Next_T.Kind = Token_LET or else
+                        Next_T.Kind = Token_SET or else
+                        Next_T.Kind = Token_USE or else
+                        Next_T.Kind = Token_SAVE or else
+                        Next_T.Kind = Token_RUN or else
+                        Next_T.Kind = Token_IF or else
+                        Next_T.Kind = Token_BY or else
+                        Next_T.Kind = Token_SORT or else
+                        Next_T.Kind = Token_HOLD or else
+                        Next_T.Kind = Token_REPEAT or else
+                        Next_T.Kind = Token_NAMES or else
+                        Next_T.Kind = Token_KEEP or else
+                        Next_T.Kind = Token_DROP or else
+                        Next_T.Kind = Token_RENAME or else
+                        Next_T.Kind = Token_SELECT or else
+                        Next_T.Kind = Token_DELETE or else
+                        Next_T.Kind = Token_OUTPUT or else
+                        Next_T.Kind = Token_FOR or else
+                        Next_T.Kind = Token_WHILE or else
+                        Next_T.Kind = Token_DIGITS or else
+                        Next_T.Kind = Token_SUBMIT or else
+                        Next_T.Kind = Token_NEW or else
+                        Next_T.Kind = Token_QUIT then
+                        declare
+                           Arg_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           Stmt.Var_Len := Arg_Tok.Length;
+                           Stmt.Var_Name (1 .. Arg_Tok.Length) := Arg_Tok.Text (1 .. Arg_Tok.Length);
+                        end;
+                     else
+                        Stmt.Var_Len := 0;
+                     end if;
+                  end;
+               end if;
+            end;
 
          when Token_REM =>
             return Parse_Statement (Ctx);

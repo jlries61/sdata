@@ -136,7 +136,6 @@ package SData.AST is
       Stmt_NEW     -- Reset environment
    );
 
-   --  Variant record for statements. Linked via the 'Next' pointer to form a program.
    type Statement (Kind : Statement_Kind) is record
       Next     : Statement_Access; -- Pointer to the next statement in sequence.
       Var_Name : String (1 .. 32);
@@ -147,7 +146,7 @@ package SData.AST is
       case Kind is
          when Stmt_PRINT =>
             Print_Args : Expression_List;
-         when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT =>
+         when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_HELP =>
             File_Path : String (1 .. 1024);
             File_Len  : Natural;
          when Stmt_REPEAT =>

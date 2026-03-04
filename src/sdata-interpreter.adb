@@ -457,32 +457,112 @@ package body SData.Interpreter is
    end Calculate_Aggregates;
 
    procedure Execute_Statement (Stmt : Statement_Access) is
-      procedure Print_Help is
+      procedure Print_Help (Topic : String := "") is
+         T : constant String := To_Upper (Topic);
       begin
-         Put_Line ("SData version " & SData.Config.Version_Str);
-         Put_Line ("Available Commands:");
-         Put_Line ("  Data:      USE, SAVE, RUN, NEW, NAMES, QUIT");
-         Put_Line ("  Variables: LET, SET, ARRAY (DIM), HOLD, UNHOLD, DIGITS");
-         Put_Line ("  Columns:   KEEP, DROP, RENAME");
-         Put_Line ("  Logic:     IF, SELECT (CASE/WHEN/OTHERWISE), DELETE, OUTPUT");
-         Put_Line ("  Loops:     FOR, WHILE, REPEAT");
-         Put_Line ("  System:    SUBMIT, HELP, REM");
-         New_Line;
-         Put_Line ("Available Functions:");
-         Put_Line ("  Math:      ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
-         Put_Line ("  Aggregate: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS");
-         Put_Line ("  Stat PDF:  ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF, MDF, WDF");
-         Put_Line ("  Stat CDF:  ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF, MCF, WCF");
-         Put_Line ("  Stat IDF:  ZIF, NIF, UIF, EIF, BIF");
-         Put_Line ("  Stat RN:   ZRN, NRN, URN, ERN, PRN, GRN, MRN, WRN");
-         New_Line;
-         Put_Line ("For detailed help on a specific command or function, use: HELP <name>");
+         if T = "" then
+            Put_Line ("SData version " & SData.Config.Version_Str);
+            Put_Line ("Available Commands:");
+            Put_Line ("  Data:      USE, SAVE, RUN, NEW, NAMES, QUIT");
+            Put_Line ("  Variables: LET, SET, ARRAY, DIM, HOLD, UNHOLD, DIGITS");
+            Put_Line ("  Columns:   KEEP, DROP, RENAME");
+            Put_Line ("  Logic:     IF, SELECT, DELETE, OUTPUT");
+            Put_Line ("  Loops:     FOR, WHILE, REPEAT");
+            Put_Line ("  System:    SUBMIT, HELP, REM");
+            New_Line;
+            Put_Line ("Available Functions:");
+            Put_Line ("  Math:      ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
+            Put_Line ("  Aggregate: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS");
+            Put_Line ("  Stat PDF:  ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF, MDF, WDF");
+            Put_Line ("  Stat CDF:  ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF, MCF, WCF");
+            Put_Line ("  Stat IDF:  ZIF, NIF, UIF, EIF, BIF");
+            Put_Line ("  Stat RN:   ZRN, NRN, URN, ERN, PRN, GRN, MRN, WRN");
+            New_Line;
+            Put_Line ("For detailed help on a specific command or function, use: HELP <name>");
+         elsif T = "USE" then
+            Put_Line ("Command: USE ""filename""");
+            Put_Line ("Loads a dataset from CSV, ODS, or XLSX files into the Data Table.");
+         elsif T = "SAVE" then
+            Put_Line ("Command: SAVE ""filename""");
+            Put_Line ("Queues the current Data Table to be saved after the next RUN command.");
+         elsif T = "RUN" then
+            Put_Line ("Command: RUN");
+            Put_Line ("Triggers the execution of the Data Step and any deferred SAVE operations.");
+         elsif T = "LET" then
+            Put_Line ("Command: LET variable = expression");
+            Put_Line ("Creates a permanent column in the table or updates an existing one.");
+         elsif T = "SET" then
+            Put_Line ("Command: SET variable = expression");
+            Put_Line ("Creates a temporary variable that persists only during the Data Step.");
+         elsif T = "BY" then
+            Put_Line ("Command: BY variable(s)");
+            Put_Line ("Groups data by variables. Enables FIRST. and LAST. indicators.");
+         elsif T = "SORT" then
+            Put_Line ("Command: SORT variable(s)");
+            Put_Line ("Reorders the Data Table based on the specified variables.");
+         elsif T = "MEAN" then
+            Put_Line ("Function: MEAN(variable)");
+            Put_Line ("Returns the average of the variable. Group-aware if BY is used.");
+         elsif T = "SUM" then
+            Put_Line ("Function: SUM(variable)");
+            Put_Line ("Returns the sum of the variable. Group-aware if BY is used.");
+         elsif T = "HOLD" then
+            Put_Line ("Command: HOLD variable(s)");
+            Put_Line ("Prevents variables from being reset to missing between records.");
+         elsif T = "NAMES" then
+            Put_Line ("Command: NAMES");
+            Put_Line ("Displays the names of all columns currently in the Data Table.");
+         elsif T = "KEEP" then
+            Put_Line ("Command: KEEP variable(s)");
+            Put_Line ("Specifies variables to retain in the output dataset.");
+         elsif T = "DROP" then
+            Put_Line ("Command: DROP variable(s)");
+            Put_Line ("Specifies variables to exclude from the output dataset.");
+         elsif T = "RENAME" then
+            Put_Line ("Command: RENAME old_name=new_name ...");
+            Put_Line ("Changes the names of existing columns in the Data Table.");
+         elsif T = "IF" then
+            Put_Line ("Command: IF condition THEN statement [ELSE statement]");
+            Put_Line ("Executes a statement conditionally.");
+         elsif T = "SELECT" then
+            Put_Line ("Command: SELECT (expr) CASE (vals) ... OTHERWISE ... END");
+            Put_Line ("Performs multi-way branching based on an expression's value.");
+         elsif T = "DELETE" then
+            Put_Line ("Command: DELETE");
+            Put_Line ("Drops the current record from processing and output.");
+         elsif T = "OUTPUT" then
+            Put_Line ("Command: OUTPUT");
+            Put_Line ("Triggers an explicit write of the current PDV to the Data Table.");
+         elsif T = "FOR" then
+            Put_Line ("Command: FOR var = start TO end [STEP s] ... NEXT");
+            Put_Line ("Iterates a block of code over a numeric range.");
+         elsif T = "WHILE" then
+            Put_Line ("Command: WHILE condition ... WEND");
+            Put_Line ("Repeats a block of code while a condition is true.");
+         elsif T = "REPEAT" then
+            Put_Line ("Command: REPEAT count");
+            Put_Line ("Sets the number of times to iterate the Data Step (if no input file).");
+         elsif T = "DIGITS" then
+            Put_Line ("Command: DIGITS n");
+            Put_Line ("Sets the number of decimal places for numeric output (default: 5).");
+         elsif T = "SUBMIT" then
+            Put_Line ("Command: SUBMIT ""filename""");
+            Put_Line ("Executes an SData script file recursively.");
+         elsif T = "NEW" then
+            Put_Line ("Command: NEW");
+            Put_Line ("Resets the environment, clearing columns and temporary variables.");
+         elsif T = "QUIT" then
+            Put_Line ("Command: QUIT");
+            Put_Line ("Exits the SData interpreter.");
+         else
+            Put_Line ("No detailed help found for: " & T);
+         end if;
       end Print_Help;
    begin
        if Stmt = null then return; end if;
        case Stmt.Kind is
             when Stmt_HELP =>
-               Print_Help;
+               Print_Help (Stmt.Var_Name (1 .. Stmt.Var_Len));
             when Stmt_RUN =>
                Run_Active_Program;
             when Stmt_QUIT | Stmt_END =>
