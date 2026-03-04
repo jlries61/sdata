@@ -476,7 +476,7 @@ package body SData.Interpreter is
          Put_Line ("  Stat IDF:  ZIF, NIF, UIF, EIF, BIF");
          Put_Line ("  Stat RN:   ZRN, NRN, URN, ERN, PRN, GRN, MRN, WRN");
          New_Line;
-         Put_Line ("For detailed help on a specific command, use: HELP <command>");
+         Put_Line ("For detailed help on a specific command or function, use: HELP <name>");
       end Print_Help;
    begin
        if Stmt = null then return; end if;
