@@ -6,7 +6,7 @@ PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
 INSTALL_DIR = $(DESTDIR)$(BINDIR)
 
-.PHONY: all build clean run check install
+.PHONY: all build clean run check install srpm
 
 all: build
 
@@ -46,9 +46,30 @@ check: build
 	done
 	@echo "All tests passed."
 
+srpm: clean
+	@echo "Creating source tarball..."
+	@{ \
+		if [ -z "$$(git status --porcelain)" ]; then \
+			git archive --format=tar --prefix=sdata-0.1/ HEAD | gzip > sdata-0.1.tar.gz; \
+		else \
+			echo "ERROR: Working directory is not clean. Please commit changes before creating a source package."; \
+			exit 1; \
+		fi \
+	}
+	@echo "Building SRPM..."
+	@mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+	@mv sdata-0.1.tar.gz rpmbuild/SOURCES/
+	@cp sdata.spec rpmbuild/SPECS/
+	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir %(pwd)/rpmbuild"
+	@mv rpmbuild/SRPMS/sdata-0.1-1.suse.src.rpm .
+	@rm -rf rpmbuild
+	@echo "SRPM created: sdata-0.1-1.suse.src.rpm"
+
+
 install: build
 	install -d $(INSTALL_DIR)
 	install -m 755 bin/sdata $(INSTALL_DIR)/sdata
 
 clean:
+	@echo "Cleaning build artifacts..."
 	rm -rf obj bin tests/*.tmp tests/*.diff
