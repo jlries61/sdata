@@ -99,18 +99,49 @@ package body SData.Evaluator is
          begin
             if V >= 0.0 then return Num_Result (Sqrt (V)); end if;
          end;
-      elsif Name = "MAX" and then Has_Args (2) then
-         if Arg_Vals (1).Kind = Val_Integer and Arg_Vals (2).Kind = Val_Integer then
-            return (if Arg_Vals (1).Int_Val > Arg_Vals (2).Int_Val then Arg_Vals (1) else Arg_Vals (2));
+      elsif Name = "MAX" and then Has_Args (1) then
+         if Count >= 2 then
+            if Arg_Vals (1).Kind = Val_Integer and Arg_Vals (2).Kind = Val_Integer then
+               return (if Arg_Vals (1).Int_Val > Arg_Vals (2).Int_Val then Arg_Vals (1) else Arg_Vals (2));
+            else
+               return (if Convert_To_Float (Arg_Vals (1)) > Convert_To_Float (Arg_Vals (2)) then Arg_Vals (1) else Arg_Vals (2));
+            end if;
          else
-            return (if Convert_To_Float (Arg_Vals (1)) > Convert_To_Float (Arg_Vals (2)) then Arg_Vals (1) else Arg_Vals (2));
+            -- Aggregate MAX
+            declare
+               Expr_Var : constant Expression_Access := Args.Expr;
+            begin
+               if Expr_Var.Kind = Expr_Variable then
+                  return Get_Aggregate ("MAX", Expr_Var.Var_Name (1 .. Expr_Var.Var_Len), Get_Current_Group_Key);
+               end if;
+            end;
          end if;
-      elsif Name = "MIN" and then Has_Args (2) then
-         if Arg_Vals (1).Kind = Val_Integer and Arg_Vals (2).Kind = Val_Integer then
-            return (if Arg_Vals (1).Int_Val < Arg_Vals (2).Int_Val then Arg_Vals (1) else Arg_Vals (2));
+      elsif Name = "MIN" and then Has_Args (1) then
+         if Count >= 2 then
+            if Arg_Vals (1).Kind = Val_Integer and Arg_Vals (2).Kind = Val_Integer then
+               return (if Arg_Vals (1).Int_Val < Arg_Vals (2).Int_Val then Arg_Vals (1) else Arg_Vals (2));
+            else
+               return (if Convert_To_Float (Arg_Vals (1)) < Convert_To_Float (Arg_Vals (2)) then Arg_Vals (1) else Arg_Vals (2));
+            end if;
          else
-            return (if Convert_To_Float (Arg_Vals (1)) < Convert_To_Float (Arg_Vals (2)) then Arg_Vals (1) else Arg_Vals (2));
+            -- Aggregate MIN
+            declare
+               Expr_Var : constant Expression_Access := Args.Expr;
+            begin
+               if Expr_Var.Kind = Expr_Variable then
+                  return Get_Aggregate ("MIN", Expr_Var.Var_Name (1 .. Expr_Var.Var_Len), Get_Current_Group_Key);
+               end if;
+            end;
          end if;
+
+      -- Aggregate Functions
+      elsif (Name = "SUM" or Name = "MEAN" or Name = "STD" or Name = "VAR" or Name = "N" or Name = "NMISS") 
+            and then Args /= null and then Args.Expr.Kind = Expr_Variable then
+         declare
+            Var_Expr : constant Expression_Access := Args.Expr;
+         begin
+            return Get_Aggregate (Name, Var_Expr.Var_Name (1 .. Var_Expr.Var_Len), Get_Current_Group_Key);
+         end;
 
       --  Standard Normal (Z)
       elsif Name = "ZDF" and then Has_Args (1) then

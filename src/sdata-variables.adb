@@ -97,6 +97,7 @@ package body SData.Variables is
    -- Load_PDV_From_Table --
    -------------------------
    procedure Load_PDV_From_Table (Row : Positive) is
+      use GNAT.Strings;
       Col_Names : String_List_Access := SData.Table.Get_Column_Names;
    begin
       if Col_Names /= null then
@@ -112,7 +113,7 @@ package body SData.Variables is
                end if;
             end;
          end loop;
-         GNAT.Strings.Free (Col_Names);
+         declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
       end if;
    end Load_PDV_From_Table;
 
@@ -154,7 +155,7 @@ package body SData.Variables is
    -------------------------------
    procedure Commit_Snapshots_To_Table (Snapshots : Snapshot_Collector.Vector) is
       use SData.Table;
-      package Ordered_Names is new Ada.Containers.Vectors (Positive, Unbounded_String);
+      package Ordered_Names is new Ada.Containers.Vectors (Positive, Ada.Strings.Unbounded.Unbounded_String);
       Order : Ordered_Names.Vector;
    begin
       SData.Table.Clear;
@@ -221,7 +222,7 @@ package body SData.Variables is
    -------------------
    -- Get_PDV_Names --
    -------------------
-   function Get_PDV_Names return GNAT.Strings.String_List_Access is
+   function Get_PDV_Names return String_List_Access is
       use GNAT.Strings;
       Count : constant Natural := Natural (Permanent_Symbols.Length);
       List : constant String_List_Access := new String_List (1 .. Count);
@@ -356,5 +357,55 @@ package body SData.Variables is
          return False;
       end if;
    end Is_Held;
+
+   --------------------------
+   -- Set_Current_Group_Key --
+   --------------------------
+   procedure Set_Current_Group_Key (Key : String) is
+   begin
+      Current_Group_ID := To_Unbounded_String (Key);
+   end Set_Current_Group_Key;
+
+   --------------------------
+   -- Get_Current_Group_Key --
+   --------------------------
+   function Get_Current_Group_Key return String is
+   begin
+      return To_String (Current_Group_ID);
+   end Get_Current_Group_Key;
+
+   ---------------------
+   -- Store_Aggregate --
+   ---------------------
+   procedure Store_Aggregate (Func_Name, Var_Name, Group_Key : String; Val : Value) is
+      Key : constant String := To_Upper (Func_Name) & ":" & To_Upper (Var_Name) & ":" & Group_Key;
+   begin
+      if Aggregate_Symbols.Contains (Key) then
+         Aggregate_Symbols.Replace (Key, Val);
+      else
+         Aggregate_Symbols.Insert (Key, Val);
+      end if;
+   end Store_Aggregate;
+
+   -------------------
+   -- Get_Aggregate --
+   -------------------
+   function Get_Aggregate (Func_Name, Var_Name, Group_Key : String) return Value is
+      Key : constant String := To_Upper (Func_Name) & ":" & To_Upper (Var_Name) & ":" & Group_Key;
+   begin
+      if Aggregate_Symbols.Contains (Key) then
+         return Aggregate_Symbols.Element (Key);
+      else
+         return (Kind => Val_Missing);
+      end if;
+   end Get_Aggregate;
+
+   ----------------------
+   -- Clear_Aggregates --
+   ----------------------
+   procedure Clear_Aggregates is
+   begin
+      Aggregate_Symbols.Clear;
+   end Clear_Aggregates;
 
 end SData.Variables;

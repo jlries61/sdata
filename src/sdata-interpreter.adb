@@ -12,7 +12,9 @@ with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
+with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 
 package body SData.Interpreter is
 
@@ -219,6 +221,240 @@ package body SData.Interpreter is
          Current := Current.Next;
       end loop;
    end Execute_List;
+
+   -- Helper to recursively find aggregate function calls in an expression
+   procedure Scan_Expr_For_Aggs (Expr : Expression_Access; Found : in out Name_Sets.Set) is
+   begin
+      if Expr = null then return; end if;
+      case Expr.Kind is
+         when Expr_Function_Call =>
+            declare
+               F_Name : constant String := To_Upper (Expr.Func_Name (1 .. Expr.Func_Len));
+            begin
+               if F_Name = "SUM" or F_Name = "MEAN" or F_Name = "STD" or F_Name = "VAR" or 
+                  F_Name = "MIN" or F_Name = "MAX" or F_Name = "N" or F_Name = "NMISS" then
+                  -- Verify it has exactly one variable argument
+                  if Expr.Arguments /= null and then Expr.Arguments.Next = null and then 
+                     Expr.Arguments.Expr.Kind = Expr_Variable then
+                     declare
+                        V_Name : constant String := To_Upper (Expr.Arguments.Expr.Var_Name (1 .. Expr.Arguments.Expr.Var_Len));
+                     begin
+                        Found.Include (F_Name & ":" & V_Name);
+                     end;
+                  end if;
+               end if;
+               -- Recurse into arguments
+               declare Arg : Expression_List := Expr.Arguments;
+               begin while Arg /= null loop Scan_Expr_For_Aggs (Arg.Expr, Found); Arg := Arg.Next; end loop; end;
+            end;
+         when Expr_Binary_Op =>
+            Scan_Expr_For_Aggs (Expr.Left, Found);
+            Scan_Expr_For_Aggs (Expr.Right, Found);
+         when Expr_Unary_Op =>
+            Scan_Expr_For_Aggs (Expr.Operand, Found);
+         when Expr_Array_Access =>
+            Scan_Expr_For_Aggs (Expr.Arr_Idx, Found);
+         when others => null;
+      end case;
+   end Scan_Expr_For_Aggs;
+
+   -- Scans a statement list for aggregate calls
+   procedure Scan_Statements_For_Aggs (List, Boundary : Statement_Access; Found : in out Name_Sets.Set) is
+      Curr : Statement_Access := List;
+   begin
+      while Curr /= null and then Curr /= Boundary loop
+         case Curr.Kind is
+            when Stmt_LET | Stmt_SET =>
+               Scan_Expr_For_Aggs (Curr.Expr, Found);
+               if Curr.Is_Array then Scan_Expr_For_Aggs (Curr.Arr_Idx, Found); end if;
+            when Stmt_PRINT =>
+               declare Arg : Expression_List := Curr.Print_Args;
+               begin while Arg /= null loop Scan_Expr_For_Aggs (Arg.Expr, Found); Arg := Arg.Next; end loop; end;
+            when Stmt_IF =>
+               Scan_Expr_For_Aggs (Curr.Condition, Found);
+               Scan_Statements_For_Aggs (Curr.Then_Branch, null, Found);
+               Scan_Statements_For_Aggs (Curr.Else_Branch, null, Found);
+            when Stmt_SELECT =>
+               Scan_Expr_For_Aggs (Curr.Selector, Found);
+               declare B : Case_Branch := Curr.Branches;
+               begin
+                  while B /= null loop
+                     declare C : Expression_List := B.Conditions;
+                     begin while C /= null loop Scan_Expr_For_Aggs (C.Expr, Found); C := C.Next; end loop; end;
+                     Scan_Statements_For_Aggs (B.Branch_Body, null, Found);
+                     B := B.Next;
+                  end loop;
+               end;
+               Scan_Statements_For_Aggs (Curr.Otherwise_Part, null, Found);
+            when Stmt_WHILE =>
+               Scan_Expr_For_Aggs (Curr.While_Cond, Found);
+               Scan_Statements_For_Aggs (Curr.While_Body, null, Found);
+            when Stmt_FOR =>
+               Scan_Expr_For_Aggs (Curr.For_Start, Found);
+               Scan_Expr_For_Aggs (Curr.For_End, Found);
+               Scan_Expr_For_Aggs (Curr.For_Step, Found);
+               Scan_Statements_For_Aggs (Curr.For_Body, null, Found);
+            when others => null;
+         end case;
+         Curr := Curr.Next;
+      end loop;
+   end Scan_Statements_For_Aggs;
+
+   procedure Calculate_Aggregates (Start, Boundary : Statement_Access) is
+      use SData.Table;
+      Needed : Name_Sets.Set;
+   begin
+      Scan_Statements_For_Aggs (Start, Boundary, Needed);
+      Clear_Aggregates;
+      if Needed.Is_Empty or Row_Count = 0 then return; end if;
+
+      for Req of Needed loop
+         declare
+            Sep   : constant Natural := Ada.Strings.Fixed.Index (Req, ":");
+            Func  : constant String := Req (Req'First .. Sep - 1);
+            Var   : constant String := Req (Sep + 1 .. Req'Last);
+         begin
+            if Current_By_Vars.Is_Empty then
+               -- Global Aggregate
+               declare
+                  Sum, Sum_Sq, Min_V, Max_V : Long_Float := 0.0;
+                  N_Count, NMISS_Count : Natural := 0;
+                  First_Val : Boolean := True;
+               begin
+                  for R in 1 .. Row_Count loop
+                     declare V : constant Value := Get_Value (R, Var);
+                     begin
+                        if V.Kind = Val_Missing then
+                           NMISS_Count := NMISS_Count + 1;
+                        else
+                           declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
+                           begin
+                              N_Count := N_Count + 1;
+                              Sum := Sum + FV;
+                              Sum_Sq := Sum_Sq + FV**2;
+                              if First_Val then
+                                 Min_V := FV; Max_V := FV; First_Val := False;
+                              else
+                                 if FV < Min_V then Min_V := FV; end if;
+                                 if FV > Max_V then Max_V := FV; end if;
+                              end if;
+                           end;
+                        end if;
+                     end;
+                  end loop;
+                  
+                  declare
+                     Result : Value := (Kind => Val_Missing);
+                     NF : constant Long_Float := Long_Float (N_Count);
+                  begin
+                     if Func = "SUM" then Result := (Kind => Val_Numeric, Num_Val => Float (Sum));
+                     elsif Func = "MEAN" then
+                        if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Sum / NF)); end if;
+                     elsif Func = "MIN" then
+                        if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Min_V)); end if;
+                     elsif Func = "MAX" then
+                        if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Max_V)); end if;
+                     elsif Func = "N" then Result := (Kind => Val_Integer, Int_Val => N_Count);
+                     elsif Func = "NMISS" then Result := (Kind => Val_Integer, Int_Val => NMISS_Count);
+                     elsif Func = "VAR" or Func = "STD" then
+                        if N_Count > 1 then
+                           declare Variance : constant Long_Float := (Sum_Sq - (Sum**2 / NF)) / (NF - 1.0);
+                           begin
+                              if Func = "VAR" then Result := (Kind => Val_Numeric, Num_Val => Float (Variance));
+                              else Result := (Kind => Val_Numeric, Num_Val => Sqrt (Float (Variance))); end if;
+                           end;
+                        end if;
+                     end if;
+                     Store_Aggregate (Func, Var, "", Result);
+                  end;
+               end;
+            else
+               -- Grouped Aggregates
+               declare
+                  Group_Start : Positive := 1;
+               begin
+                  while Group_Start <= Row_Count loop
+                     declare
+                        Group_End : Positive := Group_Start;
+                        Sum, Sum_Sq, Min_V, Max_V : Long_Float := 0.0;
+                        N_Count, NMISS_Count : Natural := 0;
+                        First_Val : Boolean := True;
+                        Group_Key : Unbounded_String := Null_Unbounded_String;
+                     begin
+                        -- Construct group key
+                        for BV of Current_By_Vars loop
+                           Append (Group_Key, To_String (Get_Value (Group_Start, To_String (BV))) & "|");
+                        end loop;
+
+                        -- Find end of group
+                        while Group_End < Row_Count loop
+                           declare Match : Boolean := True;
+                           begin
+                              for BV of Current_By_Vars loop
+                                 if not (Get_Value (Group_Start, To_String (BV)) = Get_Value (Group_End + 1, To_String (BV))) then
+                                    Match := False; exit;
+                                 end if;
+                              end loop;
+                              exit when not Match;
+                              Group_End := Group_End + 1;
+                           end;
+                        end loop;
+
+                        -- Calculate for group
+                        for R in Group_Start .. Group_End loop
+                           declare V : constant Value := Get_Value (R, Var);
+                           begin
+                              if V.Kind = Val_Missing then
+                                 NMISS_Count := NMISS_Count + 1;
+                              else
+                                 declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
+                                 begin
+                                    N_Count := N_Count + 1;
+                                    Sum := Sum + FV;
+                                    Sum_Sq := Sum_Sq + FV**2;
+                                    if First_Val then
+                                       Min_V := FV; Max_V := FV; First_Val := False;
+                                    else
+                                       if FV < Min_V then Min_V := FV; end if;
+                                       if FV > Max_V then Max_V := FV; end if;
+                                    end if;
+                                 end;
+                              end if;
+                           end;
+                        end loop;
+
+                        declare
+                           Result : Value := (Kind => Val_Missing);
+                           NF : constant Long_Float := Long_Float (N_Count);
+                        begin
+                           if Func = "SUM" then Result := (Kind => Val_Numeric, Num_Val => Float (Sum));
+                           elsif Func = "MEAN" then
+                              if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Sum / NF)); end if;
+                           elsif Func = "MIN" then
+                              if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Min_V)); end if;
+                           elsif Func = "MAX" then
+                              if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Max_V)); end if;
+                           elsif Func = "N" then Result := (Kind => Val_Integer, Int_Val => N_Count);
+                           elsif Func = "NMISS" then Result := (Kind => Val_Integer, Int_Val => NMISS_Count);
+                           elsif Func = "VAR" or Func = "STD" then
+                              if N_Count > 1 then
+                                 declare Variance : constant Long_Float := (Sum_Sq - (Sum**2 / NF)) / (NF - 1.0);
+                                 begin
+                                    if Func = "VAR" then Result := (Kind => Val_Numeric, Num_Val => Float (Variance));
+                                    else Result := (Kind => Val_Numeric, Num_Val => Sqrt (Float (Variance))); end if;
+                                 end;
+                              end if;
+                           end if;
+                           Store_Aggregate (Func, Var, To_String (Group_Key), Result);
+                        end;
+                        Group_Start := Group_End + 1;
+                     end;
+                  end loop;
+               end;
+            end if;
+         end;
+      end loop;
+   end Calculate_Aggregates;
 
    procedure Execute_Statement (Stmt : Statement_Access) is
    begin
@@ -681,12 +917,30 @@ package body SData.Interpreter is
             end case;
             Iter := Iter.Next;
          end loop;
+
+         -- Pre-calculate aggregates based on the current state of the table
+         Calculate_Aggregates (Start, Boundary);
+
          if not Explicit_Loop_Trigger then
             Num_Records := (if Row_Count > 0 then Row_Count else 1);
          end if;
 
          for I in 1 .. Num_Records loop
             Set_Current_Record_Index (I);
+
+            -- Construct and set Group Key for this record
+            if not Current_By_Vars.Is_Empty then
+               declare
+                  Group_Key : Unbounded_String := Null_Unbounded_String;
+               begin
+                  for BV of Current_By_Vars loop
+                     Append (Group_Key, To_String (Get_Value (I, To_String (BV))) & "|");
+                  end loop;
+                  Set_Current_Group_Key (To_String (Group_Key));
+               end;
+            else
+               Set_Current_Group_Key ("");
+            end if;
             
             -- Step 1: Initialize PDV for this record
             Reset_PDV_Non_Held;
