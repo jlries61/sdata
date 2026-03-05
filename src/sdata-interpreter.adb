@@ -18,6 +18,39 @@ with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 
 package body SData.Interpreter is
 
+   -- Redirection State
+   Redirect_File : Ada.Text_IO.File_Type;
+   Is_Redirected : Boolean := False;
+
+   procedure Put_Line (Item : String) is
+   begin
+      if Is_Redirected then
+         Ada.Text_IO.Put_Line (Redirect_File, Item);
+         Ada.Text_IO.Flush (Redirect_File);
+      else
+         Ada.Text_IO.Put_Line (Item);
+      end if;
+   end Put_Line;
+
+   procedure Put (Item : String) is
+   begin
+      if Is_Redirected then
+         Ada.Text_IO.Put (Redirect_File, Item);
+         Ada.Text_IO.Flush (Redirect_File);
+      else
+         Ada.Text_IO.Put (Item);
+      end if;
+   end Put;
+
+   procedure My_New_Line is
+   begin
+      if Is_Redirected then
+         Ada.Text_IO.Put_Line (Redirect_File, "");
+      else
+         Ada.Text_IO.New_Line;
+      end if;
+   end My_New_Line;
+
    --  Forward declarations for internal logic.
    procedure Execute_Statement (Stmt : Statement_Access);
    procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null);
@@ -468,7 +501,7 @@ package body SData.Interpreter is
             Put_Line ("  Logic:     IF, SELECT, DELETE, WRITE");
             Put_Line ("  System:    SUBMIT, HELP, REM, OUTPUT");
             Put_Line ("  Loops:     FOR, WHILE, REPEAT");
-            New_Line;
+            My_New_Line;
             Put_Line ("Available Functions:");
             Put_Line ("  Math:      ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
             Put_Line ("  Aggregate: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS");
@@ -476,7 +509,7 @@ package body SData.Interpreter is
             Put_Line ("  Stat CDF:  ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF, MCF, WCF");
             Put_Line ("  Stat IDF:  ZIF, NIF, UIF, EIF, BIF");
             Put_Line ("  Stat RN:   ZRN, NRN, URN, ERN, PRN, GRN, MRN, WRN");
-            New_Line;
+            My_New_Line;
             Put_Line ("For detailed help on a specific command or function, use: HELP <name>");
          elsif T = "USE" then
             Put_Line ("Command: USE ""filename""");
@@ -599,7 +632,7 @@ package body SData.Interpreter is
                   Print_Help (Cmds (I).all);
                   Put_Line ("========================================");
                end loop;
-               New_Line;
+               My_New_Line;
                Put_Line ("========================================");
                Put_Line ("FUNCTION REFERENCE");
                Put_Line ("========================================");
@@ -747,7 +780,7 @@ package body SData.Interpreter is
                               Put (Name & ": " & To_String_Formatted (Val) & "  ");
                            end;
                         end loop;
-                        New_Line;
+                        My_New_Line;
                         declare
                            Old_List : String_List_Access := Col_Names;
                         begin
@@ -763,7 +796,7 @@ package body SData.Interpreter is
                         if Current_Arg.Next /= null then Put (" "); end if;
                         Current_Arg := Current_Arg.Next;
                      end loop;
-                     New_Line;
+                     My_New_Line;
                   end;
                end if;
             when Stmt_USE =>
@@ -964,7 +997,7 @@ package body SData.Interpreter is
                         end;
                      end loop;
                   end if;
-                  New_Line;
+                  My_New_Line;
 
                   if T_Names /= null then
                      declare Old : String_List_Access := T_Names; begin GNAT.Strings.Free (Old); end;
@@ -1022,8 +1055,31 @@ package body SData.Interpreter is
                Explicit_Output_Count := Explicit_Output_Count + 1;
                Collector.Append (SData.Variables.Take_PDV_Snapshot);
             when Stmt_OUTPUT =>
-               -- Redirection handled by Execute_Statement for declarations or in RUN setup
-               null;
+               if Is_Redirected then
+                  Ada.Text_IO.Close (Redirect_File);
+                  Is_Redirected := False;
+               end if;
+
+               if Stmt.File_Len > 0 then
+                  declare
+                     Path : String := Stmt.File_Path (1 .. Stmt.File_Len);
+                     Has_Ext : Boolean := False;
+                  begin
+                     for C of Path loop
+                        if C = '.' then Has_Ext := True; end if;
+                     end loop;
+
+                     declare
+                        Final_Path : constant String := Path & (if Has_Ext then "" else ".DAT");
+                     begin
+                        Ada.Text_IO.Create (Redirect_File, Ada.Text_IO.Out_File, Final_Path);
+                        Is_Redirected := True;
+                     exception
+                        when others =>
+                           Ada.Text_IO.Put_Line ("Error: Could not create output file " & Final_Path);
+                     end;
+                  end;
+               end if;
             when Stmt_IF =>
                if Is_True (Evaluate (Stmt.Condition)) then Execute_Statement (Stmt.Then_Branch);
                elsif Stmt.Else_Branch /= null then Execute_Statement (Stmt.Else_Branch); end if;
@@ -1226,7 +1282,7 @@ package body SData.Interpreter is
          if Current.Kind = Stmt_RUN then
             Run_One_Step (Step_Start, Current);
             Step_Start := Current.Next;
-         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT then
+         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT then
             Execute_Statement (Current);
          end if;
          Current := Current.Next;

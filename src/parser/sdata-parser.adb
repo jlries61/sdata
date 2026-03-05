@@ -592,7 +592,9 @@ package body SData.Parser is
                Tok_Next : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
             begin
                Stmt := new Statement (Stmt_OUTPUT);
-               if Tok_Next.Kind = Token_String_Literal or else Tok_Next.Kind = Token_Identifier then
+               if Tok_Next.Kind = Token_String_Literal or else 
+                  Tok_Next.Kind = Token_Identifier or else
+                  (Tok_Next.Kind >= Token_USE and then Tok_Next.Kind <= Token_STEP) then
                   declare
                      File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                   begin
