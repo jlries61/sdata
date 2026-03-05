@@ -25,7 +25,7 @@ make %{?_smp_mflags}
 
 %install
 rm -rf %{buildroot}
-%make_install
+make install DESTDIR=%{buildroot} PREFIX=/usr
 
 %files
 %{_bindir}/sdata
