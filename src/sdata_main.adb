@@ -84,8 +84,10 @@ procedure SData_Main is
                         -- Declarative statements execute immediately in REPL.
                         if Prog.Kind = Stmt_RUN then
                            Run_Active_Program;
-                        elsif Prog.Kind = Stmt_HELP or else Prog.Kind = Stmt_OUTPUT then
-                           -- Special case for HELP and OUTPUT in REPL
+                        elsif Prog.Kind = Stmt_HELP or else 
+                              Prog.Kind = Stmt_OUTPUT or else
+                              Prog.Kind = Stmt_ECHO then
+                           -- Special case for HELP, OUTPUT, ECHO in REPL
                            Execute (Prog);
                         else
                            Execute (Prog);

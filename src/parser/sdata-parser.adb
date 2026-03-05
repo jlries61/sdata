@@ -424,6 +424,12 @@ package body SData.Parser is
                else Stmt := new Statement (Stmt_SUBMIT); end if;
                Stmt.File_Len := File_Tok.Length;
                Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
+               -- Rule: Unquoted filenames converted to uppercase
+               if File_Tok.Kind /= Token_String_Literal then
+                  for I in 1 .. Stmt.File_Len loop
+                     Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
+                  end loop;
+               end if;
                loop
                   declare Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin
@@ -600,6 +606,12 @@ package body SData.Parser is
                   begin
                      Stmt.File_Len := File_Tok.Length;
                      Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
+                     -- Rule: Unquoted filenames converted to uppercase
+                     if File_Tok.Kind /= Token_String_Literal then
+                        for I in 1 .. Stmt.File_Len loop
+                           Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
+                        end loop;
+                     end if;
                   end;
                else
                   Stmt.File_Len := 0; -- Cancel output redirection
@@ -614,6 +626,18 @@ package body SData.Parser is
                      else exit; end if;
                   end;
                end loop;
+            end;
+
+         when Token_ECHO =>
+            declare
+               Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               Stmt := new Statement (Stmt_ECHO);
+               if To_Upper(Val_Tok.Text(1..Val_Tok.Length)) = "ON" then
+                  Stmt.Echo_State := True;
+               else
+                  Stmt.Echo_State := False;
+               end if;
             end;
 
          when Token_DIGITS =>

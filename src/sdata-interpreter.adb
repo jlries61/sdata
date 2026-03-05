@@ -21,13 +21,16 @@ package body SData.Interpreter is
    -- Redirection State
    Redirect_File : Ada.Text_IO.File_Type;
    Is_Redirected : Boolean := False;
+   Local_Echo    : Boolean := True;
 
    procedure Put_Line (Item : String) is
    begin
       if Is_Redirected then
          Ada.Text_IO.Put_Line (Redirect_File, Item);
          Ada.Text_IO.Flush (Redirect_File);
-      else
+      end if;
+      
+      if Local_Echo and then not SData.Config.Quiet_Mode then
          Ada.Text_IO.Put_Line (Item);
       end if;
    end Put_Line;
@@ -37,7 +40,9 @@ package body SData.Interpreter is
       if Is_Redirected then
          Ada.Text_IO.Put (Redirect_File, Item);
          Ada.Text_IO.Flush (Redirect_File);
-      else
+      end if;
+
+      if Local_Echo and then not SData.Config.Quiet_Mode then
          Ada.Text_IO.Put (Item);
       end if;
    end Put;
@@ -46,7 +51,10 @@ package body SData.Interpreter is
    begin
       if Is_Redirected then
          Ada.Text_IO.Put_Line (Redirect_File, "");
-      else
+         Ada.Text_IO.Flush (Redirect_File);
+      end if;
+
+      if Local_Echo and then not SData.Config.Quiet_Mode then
          Ada.Text_IO.New_Line;
       end if;
    end My_New_Line;
@@ -1135,6 +1143,8 @@ package body SData.Interpreter is
                SData.Config.Repeat_Count := 0;
                SData.Config.Print_Digits := 5; -- Reset to default
                Input_File_Columns.Clear;
+            when Stmt_ECHO =>
+               Local_Echo := Stmt.Echo_State;
             when Stmt_DIGITS =>
                SData.Config.Print_Digits := Stmt.Digits_Count;
             when others => null;

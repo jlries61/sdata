@@ -131,6 +131,7 @@ package SData.AST is
       Stmt_DELETE, -- Drop current record
       Stmt_WRITE,  -- Explicit record output (was Stmt_OUTPUT)
       Stmt_OUTPUT, -- Console output redirection
+      Stmt_ECHO,   -- Console output control
       Stmt_DIGITS, -- Set precision
       Stmt_HELP,   -- Display help
       Stmt_RUN,    -- Execute and export
@@ -189,6 +190,8 @@ package SData.AST is
             Otherwise_Part : Statement_Access;
          when Stmt_SORT | Stmt_BY =>
             Sort_Vars      : Variable_List;
+         when Stmt_ECHO =>
+            Echo_State : Boolean;
          when Stmt_DIGITS =>
             Digits_Count   : Natural;
          when others =>
