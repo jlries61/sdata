@@ -124,7 +124,7 @@ package SData.AST is
       Stmt_HOLD,   -- Retain variable values across records
       Stmt_UNHOLD, -- Reset variables normally
       Stmt_ARRAY,  -- Define a group of variables
-      Stmt_DIM,    -- Synonym for ARRAY
+      Stmt_DIM,    -- Real array (generates numbered variables)
       Stmt_SORT,   -- Sort the dataset
       Stmt_BY,     -- Group processing
       Stmt_SELECT, -- Multi-way branch
@@ -155,8 +155,12 @@ package SData.AST is
             Vars         : Variable_List;
             Arr_Name     : String (1 .. 32);
             Arr_Name_Len : Natural;
-            Arr_Dim      : Positive;
+            Arr_Dim      : Positive; -- Number of elements (for simple arrays) - this will become derived for DIM
             Arr_Vars     : Variable_List;
+            Arr_Start_Idx : Integer;   -- For DIM array custom subscripts
+            Arr_End_Idx   : Integer;     -- For DIM array custom subscripts
+            Is_Custom_Subscripts : Boolean := False; -- For DIM arrays (e.g., (0:11))
+            Is_Temporary_Dim     : Boolean := False; -- For DIM arrays /TEMP flag
          when Stmt_RENAME =>
             Rename_Pairs : Rename_List;
          when Stmt_IF =>

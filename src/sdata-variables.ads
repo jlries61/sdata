@@ -17,7 +17,7 @@ package SData.Variables is
    --  Ensures a variable is permanent. If it was temporary, it's moved to the table.
    procedure Set_Permanent (Name : String; Val : Value);
 
-   --  Retrieves a value. Lookup order: 1. Data Table, 2. Temporary symbols.
+   --  Retrieves a value. Lookup order: 1. Permanent PDV, 2. Temporary symbols.
    function Get (Name : String) return Value;
 
    --  Removes all temporary variables (called at the end of a RUN).
@@ -46,11 +46,16 @@ package SData.Variables is
    function Get_PDV_Names return GNAT.Strings.String_List_Access;
 
    -- Array Management
+   -- Defines a virtual array (maps existing variables)
    procedure Define_Array (Name : String; Constituents : GNAT.Strings.String_List);
-   procedure Define_Array (Name : String; Constituents : Name_Vectors.Vector);
+   procedure Define_Array (Name : String; Constituents : Name_Vectors.Vector); -- For internal use
    procedure Define_Array_Access (Name : String; Constituents : GNAT.Strings.String_List_Access);
-   function Get_Array_Element (Name : String; Index : Positive) return Value;
-   procedure Set_Array_Element (Name : String; Index : Positive; Val : Value);
+
+   -- Creates or resizes a real array (generates numbered variables)
+   procedure Dim_Array (Name : String; Start_Idx, End_Idx : Integer; Is_Temp : Boolean);
+
+   function Get_Array_Element (Name : String; Index : Integer) return Value;
+   procedure Set_Array_Element (Name : String; Index : Integer; Val : Value);
    function Has_Array (Name : String) return Boolean;
 
    -- Hold/Unhold Management
@@ -69,16 +74,28 @@ package SData.Variables is
    procedure Clear_Aggregates;
 
 private
+   -- Defines an array, whether virtual or real
+   type Array_Kind is (Virtual_Array, Real_Array);
+
+   type Array_Definition_Type is record
+      Kind        : Array_Kind;
+      Is_Temporary : Boolean := False; -- For Real_Array: If defined with /TEMP
+      Start_Index : Integer := 1;      -- For Real_Array: Custom or 1-based
+      End_Index   : Integer := 0;      -- For Real_Array: Derived from dimension or custom
+      Constituents : Name_Vectors.Vector; -- For Virtual_Array: names of members; For Real_Array: generated names
+   end record;
+   function "=" (Left, Right : Array_Definition_Type) return Boolean; -- Declare equality operator
+
    -- Holds only temporary variables created with SET.
    Temp_Symbols : Symbol_Table_Pkg.Map;
 
-   -- Holds array constituent names.
+   -- Holds array definitions (virtual or real).
    package Array_Table_Pkg is new Ada.Containers.Indefinite_Hashed_Maps
      (Key_Type        => String,
-      Element_Type    => Name_Vectors.Vector,
+      Element_Type    => Array_Definition_Type,
       Hash            => Ada.Strings.Hash,
       Equivalent_Keys => "=",
-      "="             => Name_Vectors."=");
+      "="             => "=");
    Array_Symbols : Array_Table_Pkg.Map;
 
    -- Tracks held status.

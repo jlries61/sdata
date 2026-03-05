@@ -301,7 +301,6 @@ package body SData.Interpreter is
    end Scan_Statements_For_Aggs;
 
    procedure Calculate_Aggregates (Start, Boundary : Statement_Access) is
-      use SData.Table;
       Needed : Name_Sets.Set;
    begin
       Scan_Statements_For_Aggs (Start, Boundary, Needed);
@@ -494,10 +493,14 @@ package body SData.Interpreter is
          elsif T = "SET" then
             Put_Line ("Command: SET variable = expression");
             Put_Line ("Creates a temporary variable that persists only during the Data Step.");
-         elsif T = "ARRAY" or T = "DIM" then
+         elsif T = "ARRAY" then
             Put_Line ("Command: ARRAY array_name variable(s)");
-            Put_Line ("Command: DIM array_name variable(s)");
-            Put_Line ("Groups variables into an array for indexed access using {index}.");
+            Put_Line ("Creates a virtual array providing indexed access to existing variables.");
+         elsif T = "DIM" then
+            Put_Line ("Command: DIM <arrayname> (<lower> [TO <upper>]) [/TEMP]");
+            Put_Line ("Creates a permanent or temporary array (real variables).");
+            Put_Line ("Elements are initialized to missing. /TEMP makes it temporary.");
+            Put_Line ("A DIM statement that references an existing variable or array shall fail.");
          elsif T = "BY" then
             Put_Line ("Command: BY variable(s)");
             Put_Line ("Groups data by variables. Enables FIRST. and LAST. indicators.");
@@ -673,15 +676,15 @@ package body SData.Interpreter is
                   if Stmt.Is_Array then
                      declare
                         Idx_Val : constant Value := Evaluate (Stmt.Arr_Idx);
-                        Idx : Natural;
+                        Idx : Integer;
                      begin
                         if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
-                        elsif Idx_Val.Kind = Val_Numeric then Idx := Natural (Float'Floor (Idx_Val.Num_Val));
-                        else Idx := 0; end if;
-
-                        if Idx > 0 then
-                           Set_Array_Element (Var_Name_Str, Idx, Result);
+                        elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
+                        else 
+                           raise Program_Error with "Invalid array index";
                         end if;
+
+                        Set_Array_Element (Var_Name_Str, Idx, Result);
                      end;
                   else
                      Expected := Get_Expected_Kind (Var_Name_Str);
@@ -883,39 +886,46 @@ package body SData.Interpreter is
             when Stmt_ARRAY | Stmt_DIM =>
                declare
                   S : constant Statement_Access := Stmt;
-                  V : Name_Vectors.Vector;
-                  Curr_Var : Variable_List := S.Arr_Vars;
-
-                  procedure Resolve_Range (Range_Spec : Variable_Range) is
-                     Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-                     Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
-                     End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
-                     Start_Idx, End_Idx : Natural := 0;
-                  begin
-                     if not Range_Spec.Is_Range then
-                        V.Append (To_Unbounded_String (Start_Name));
-                     elsif Col_Names /= null then
-                        for I in Col_Names'Range loop
-                           if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
-                           if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
-                        end loop;
-                        if Start_Idx > 0 and End_Idx > 0 then
-                           if Start_Idx > End_Idx then
-                              declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
-                           end if;
-                           for I in Start_Idx .. End_Idx loop
-                              V.Append (To_Unbounded_String (Col_Names (I).all));
-                           end loop;
-                        end if;
-                        GNAT.Strings.Free (Col_Names);
-                     end if;
-                  end Resolve_Range;
                begin
-                  while Curr_Var /= null loop
-                     Resolve_Range (Curr_Var.Var);
-                     Curr_Var := Curr_Var.Next;
-                  end loop;
-                  Define_Array (S.Arr_Name (1 .. S.Arr_Name_Len), V);
+                  if S.Kind = Stmt_ARRAY then
+                     declare
+                        V : Name_Vectors.Vector;
+                        Curr_Var : Variable_List := S.Arr_Vars;
+
+                        procedure Resolve_Range (Range_Spec : Variable_Range) is
+                           Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+                           Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                           End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                           Start_Idx, End_Idx : Natural := 0;
+                        begin
+                           if not Range_Spec.Is_Range then
+                              V.Append (To_Unbounded_String (Start_Name));
+                           elsif Col_Names /= null then
+                              for I in Col_Names'Range loop
+                                 if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
+                                 if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+                              end loop;
+                              if Start_Idx > 0 and End_Idx > 0 then
+                                 if Start_Idx > End_Idx then
+                                    declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                                 end if;
+                                 for I in Start_Idx .. End_Idx loop
+                                    V.Append (To_Unbounded_String (Col_Names (I).all));
+                                 end loop;
+                              end if;
+                              GNAT.Strings.Free (Col_Names);
+                           end if;
+                        end Resolve_Range;
+                     begin
+                        while Curr_Var /= null loop
+                           Resolve_Range (Curr_Var.Var);
+                           Curr_Var := Curr_Var.Next;
+                        end loop;
+                        Define_Array (S.Arr_Name (1 .. S.Arr_Name_Len), V);
+                     end;
+                  else -- Stmt_DIM
+                     Dim_Array (S.Arr_Name (1 .. S.Arr_Name_Len), S.Arr_Start_Idx, S.Arr_End_Idx, S.Is_Temporary_Dim);
+                  end if;
                exception
                   when others => Put_Line ("Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len)); raise;
                end;

@@ -277,21 +277,17 @@ package body SData.Evaluator is
          when Expr_Array_Access =>
             declare
                Index_Val : constant Value := Evaluate (Expr.Arr_Idx);
-               Idx : Natural;
+               Idx : Integer;
             begin
                if Index_Val.Kind = Val_Integer then
                   Idx := Index_Val.Int_Val;
                elsif Index_Val.Kind = Val_Numeric then
-                  Idx := Natural (Float'Floor (Index_Val.Num_Val));
+                  Idx := Integer (Float'Floor (Index_Val.Num_Val));
                else
                   return (Kind => Val_Missing);
                end if;
                
-               if Idx > 0 then
-                  return Get_Array_Element (Expr.Arr_Name (1 .. Expr.Arr_Len), Idx);
-               else
-                  return (Kind => Val_Missing);
-               end if;
+               return Get_Array_Element (Expr.Arr_Name (1 .. Expr.Arr_Len), Idx);
             end;
 
          when Expr_Unary_Op =>
@@ -369,7 +365,27 @@ package body SData.Evaluator is
             end;
 
          when Expr_Function_Call =>
-            return Evaluate_Function (To_Upper (Expr.Func_Name (1 .. Expr.Func_Len)), Expr.Arguments);
+            declare
+               FName : constant String := To_Upper (Expr.Func_Name (1 .. Expr.Func_Len));
+            begin
+               if Has_Array (FName) then
+                  declare
+                     Index_Val : constant Value := Evaluate (Expr.Arguments.Expr);
+                     Idx : Integer;
+                  begin
+                     if Index_Val.Kind = Val_Integer then
+                        Idx := Index_Val.Int_Val;
+                     elsif Index_Val.Kind = Val_Numeric then
+                        Idx := Integer (Float'Floor (Index_Val.Num_Val));
+                     else
+                        return (Kind => Val_Missing);
+                     end if;
+                     return Get_Array_Element (FName, Idx);
+                  end;
+               else
+                  return Evaluate_Function (FName, Expr.Arguments);
+               end if;
+            end;
       end case;
    end Evaluate;
 

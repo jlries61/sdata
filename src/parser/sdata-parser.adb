@@ -351,12 +351,16 @@ package body SData.Parser is
                Is_Arr  : Boolean := False;
                A_Idx   : Expression_Access := null;
             begin
-               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren or else 
+                  Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
                   Is_Arr := True;
-                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin
+                  declare 
+                     LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx); 
+                     Closing : constant Token_Kind := (if LP.Kind = Token_Left_Paren then Token_Right_Paren else Token_Right_Brace);
+                  begin
                      A_Idx := Parse_Expression (Ctx);
-                     if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Brace then
-                        Put_Line ("Error: Expected '}' in array assignment");
+                     if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Closing then
+                        Put_Line ("Error: Expected matching closing parenthesis/brace in array assignment");
                      end if;
                   end;
                end if;
@@ -448,11 +452,72 @@ package body SData.Parser is
                   Stmt.Arr_Name_Len := Name_Tok.Length;
                   Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
                   
-                  --  In the new model, the dimension is implicit based on the length of the variable list.
-                  --  We initialize it to a placeholder; the interpreter will determine the true size.
-                  Stmt.Arr_Dim := 1; 
-                  
-                  Stmt.Arr_Vars := Parse_Variable_List (Ctx);
+                  if New_Kind = Stmt_ARRAY then
+                     -- ARRAY arrayname variable_list
+                     Stmt.Arr_Vars := Parse_Variable_List (Ctx);
+                  else
+                     -- DIM arrayname (lower TO upper) [/TEMP]
+                     declare
+                        Tok_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     begin
+                        if Tok_LP.Kind /= Token_Left_Paren then
+                           Put_Line ("Error: Expected '(' after DIM array name");
+                           return null;
+                        end if;
+                        
+                        declare
+                           Tok_Start : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           if Tok_Start.Kind /= Token_Numeric_Literal then
+                              Put_Line ("Error: Expected starting index for DIM array");
+                              return null;
+                           end if;
+                           Stmt.Arr_Start_Idx := Integer'Value (Tok_Start.Text (1 .. Tok_Start.Length));
+                           
+                           declare
+                              Tok_Next : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           begin
+                              if Tok_Next.Kind = Token_TO then
+                                 declare
+                                    Tok_End : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                 begin
+                                    if Tok_End.Kind /= Token_Numeric_Literal then
+                                       Put_Line ("Error: Expected ending index for DIM array after TO");
+                                       return null;
+                                    end if;
+                                    Stmt.Arr_End_Idx := Integer'Value (Tok_End.Text (1 .. Tok_End.Length));
+                                    if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
+                                       Put_Line ("Error: Expected ')' after DIM bounds");
+                                       return null;
+                                    end if;
+                                 end;
+                              elsif Tok_Next.Kind = Token_Right_Paren then
+                                 -- Simple dimension: DIM X(10) means 1 to 10
+                                 Stmt.Arr_End_Idx := Stmt.Arr_Start_Idx;
+                                 Stmt.Arr_Start_Idx := 1;
+                              else
+                                 Put_Line ("Error: Expected TO or ')' in DIM bounds");
+                                 return null;
+                              end if;
+                           end;
+                        end;
+                     end;
+                     
+                     -- Check for /TEMP
+                     if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash then
+                        declare
+                           Discard_Slash : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Tok_Temp : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           if Tok_Temp.Length >= 4 and then To_Upper (Tok_Temp.Text (1 .. 4)) = "TEMP" then
+                              Stmt.Is_Temporary_Dim := True;
+                           else
+                              Put_Line ("Error: Expected TEMP after / in DIM statement");
+                              return null;
+                           end if;
+                        end;
+                     end if;
+                  end if;
                end;
             end;
 
