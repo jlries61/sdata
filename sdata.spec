@@ -28,8 +28,6 @@ rm -rf %{buildroot}
 %make_install
 
 %files
-%license LICENSE
-%doc README.md
 %{_bindir}/sdata
 
 %changelog
