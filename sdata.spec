@@ -7,8 +7,7 @@ License:        MIT
 URL:            https://github.com/user/sdata
 Source0:        %{name}-%{version}.tar.gz
 
-BuildRequires:  gnat
-BuildRequires:  gprbuild
+BuildRequires:  gcc-ada
 BuildRequires:  make
 
 %description
