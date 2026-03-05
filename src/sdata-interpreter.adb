@@ -1070,7 +1070,7 @@ package body SData.Interpreter is
 
                if Stmt.File_Len > 0 then
                   declare
-                     Path : String := Stmt.File_Path (1 .. Stmt.File_Len);
+                     Path : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
                      Has_Ext : Boolean := False;
                   begin
                      for C of Path loop
