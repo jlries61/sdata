@@ -49,7 +49,7 @@ check: build
 srpm: clean
 	@echo "Creating source tarball..."
 	@{ \
-		if [ -z "$$(git status --porcelain)" ]; then \
+		if [ -z "$$(git status --untracked-files=no --porcelain)" ]; then \
 			git archive --format=tar --prefix=sdata-0.1/ HEAD | gzip > sdata-0.1.tar.gz; \
 		else \
 			echo "ERROR: Working directory is not clean. Please commit changes before creating a source package."; \
