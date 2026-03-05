@@ -129,7 +129,8 @@ package SData.AST is
       Stmt_BY,     -- Group processing
       Stmt_SELECT, -- Multi-way branch
       Stmt_DELETE, -- Drop current record
-      Stmt_OUTPUT, -- Explicit record output
+      Stmt_WRITE,  -- Explicit record output (was Stmt_OUTPUT)
+      Stmt_OUTPUT, -- Console output redirection
       Stmt_DIGITS, -- Set precision
       Stmt_HELP,   -- Display help
       Stmt_RUN,    -- Execute and export
@@ -146,7 +147,7 @@ package SData.AST is
       case Kind is
          when Stmt_PRINT =>
             Print_Args : Expression_List;
-         when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_HELP =>
+         when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_HELP | Stmt_OUTPUT =>
             File_Path : String (1 .. 1024);
             File_Len  : Natural;
          when Stmt_REPEAT =>

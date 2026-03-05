@@ -179,7 +179,7 @@ package body SData.Interpreter is
       Curr : Statement_Access := Stmt;
    begin
       while Curr /= null loop
-         if Curr.Kind = Stmt_OUTPUT then return True; end if;
+         if Curr.Kind = Stmt_WRITE then return True; end if;
          
          case Curr.Kind is
             when Stmt_IF =>
@@ -465,9 +465,9 @@ package body SData.Interpreter is
             Put_Line ("  Data:      USE, SAVE, RUN, NEW, NAMES, QUIT");
             Put_Line ("  Variables: LET, SET, ARRAY, DIM, HOLD, UNHOLD, DIGITS");
             Put_Line ("  Columns:   KEEP, DROP, RENAME");
-            Put_Line ("  Logic:     IF, SELECT, DELETE, OUTPUT");
+            Put_Line ("  Logic:     IF, SELECT, DELETE, WRITE");
+            Put_Line ("  System:    SUBMIT, HELP, REM, OUTPUT");
             Put_Line ("  Loops:     FOR, WHILE, REPEAT");
-            Put_Line ("  System:    SUBMIT, HELP, REM");
             New_Line;
             Put_Line ("Available Functions:");
             Put_Line ("  Math:      ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
@@ -579,6 +579,7 @@ package body SData.Interpreter is
                   new String'("HOLD"), new String'("UNHOLD"), new String'("DIGITS"),
                   new String'("KEEP"), new String'("DROP"), new String'("RENAME"),
                   new String'("IF"), new String'("SELECT"), new String'("DELETE"),
+                  new String'("WRITE"),
                   new String'("OUTPUT"), new String'("FOR"), new String'("WHILE"),
                   new String'("REPEAT"), new String'("SUBMIT"), new String'("QUIT")
                );
@@ -631,8 +632,13 @@ package body SData.Interpreter is
             Put_Line ("Command: DELETE");
             Put_Line ("Drops the current record from processing and output.");
          elsif T = "OUTPUT" then
-            Put_Line ("Command: OUTPUT");
+            Put_Line ("Command: OUTPUT [filename] [/FMT=AUTO|LF|CRLF|CR] [/CHARSET=...] ");
+            Put_Line ("Redirects subsequent console output (PRINT) to a file.");
+            Put_Line ("If no filename is specified, redirects output back to standard output.");
+         elsif T = "WRITE" then
+            Put_Line ("Command: WRITE");
             Put_Line ("Triggers an explicit write of the current PDV to the Data Table.");
+            Put_Line ("Suppresses the default record output at the end of the Data Step.");
          elsif T = "FOR" then
             Put_Line ("Command: FOR var = start TO end [STEP s] ... NEXT");
             Put_Line ("Iterates a block of code over a numeric range.");
@@ -1012,9 +1018,12 @@ package body SData.Interpreter is
                end;
             when Stmt_DELETE =>
                Current_Record_Deleted := True;
-            when Stmt_OUTPUT =>
+            when Stmt_WRITE =>
                Explicit_Output_Count := Explicit_Output_Count + 1;
                Collector.Append (SData.Variables.Take_PDV_Snapshot);
+            when Stmt_OUTPUT =>
+               -- Redirection handled by Execute_Statement for declarations or in RUN setup
+               null;
             when Stmt_IF =>
                if Is_True (Evaluate (Stmt.Condition)) then Execute_Statement (Stmt.Then_Branch);
                elsif Stmt.Else_Branch /= null then Execute_Statement (Stmt.Else_Branch); end if;
@@ -1187,7 +1196,7 @@ package body SData.Interpreter is
 
             while Iter /= null and then Iter /= Boundary loop
                case Iter.Kind is
-                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_OUTPUT | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
+                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                      Execute_Statement(Iter);
                   when others => null;
                end case;

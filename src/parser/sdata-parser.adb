@@ -584,8 +584,35 @@ package body SData.Parser is
             Stmt := new Statement ((if Tok.Kind = Token_SORT then Stmt_SORT else Stmt_BY));
             Stmt.Sort_Vars := Parse_Variable_List (Ctx);
 
-         when Token_DELETE | Token_OUTPUT =>
-            Stmt := new Statement ((if Tok.Kind = Token_DELETE then Stmt_DELETE else Stmt_OUTPUT));
+         when Token_DELETE | Token_WRITE =>
+            Stmt := new Statement ((if Tok.Kind = Token_DELETE then Stmt_DELETE else Stmt_WRITE));
+
+         when Token_OUTPUT =>
+            declare
+               Tok_Next : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            begin
+               Stmt := new Statement (Stmt_OUTPUT);
+               if Tok_Next.Kind = Token_String_Literal or else Tok_Next.Kind = Token_Identifier then
+                  declare
+                     File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     Stmt.File_Len := File_Tok.Length;
+                     Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
+                  end;
+               else
+                  Stmt.File_Len := 0; -- Cancel output redirection
+               end if;
+               -- Skip any options for now
+               loop
+                  declare P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if P.Kind = Token_Slash then
+                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                        declare Discard_Opt : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                     else exit; end if;
+                  end;
+               end loop;
+            end;
 
          when Token_DIGITS =>
             declare

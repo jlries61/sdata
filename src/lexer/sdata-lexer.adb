@@ -234,6 +234,7 @@ package body SData.Lexer is
                elsif Upper = "DIM" then T.Kind := Token_DIM;
                elsif Upper = "ARRAY" then T.Kind := Token_ARRAY;
                elsif Upper = "PRINT" then T.Kind := Token_PRINT;
+               elsif Upper = "WRITE" then T.Kind := Token_WRITE;
                elsif Upper = "OUTPUT" then T.Kind := Token_OUTPUT;
                elsif Upper = "ECHO" then T.Kind := Token_ECHO;
                elsif Upper = "BY" then T.Kind := Token_BY;
