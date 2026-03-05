@@ -61,9 +61,9 @@ srpm: clean
 	@mv sdata-0.1.tar.gz rpmbuild/SOURCES/
 	@cp sdata.spec rpmbuild/SPECS/
 	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir %(pwd)/rpmbuild"
-	@mv rpmbuild/SRPMS/sdata-0.1-1.suse.src.rpm .
+	@mv rpmbuild/SRPMS/sdata-0.1-1.src.rpm .
 	@rm -rf rpmbuild
-	@echo "SRPM created: sdata-0.1-1.suse.src.rpm"
+	@echo "SRPM created: sdata-0.1-1.src.rpm"
 
 
 install: build
