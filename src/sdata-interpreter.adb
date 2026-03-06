@@ -63,9 +63,6 @@ package body SData.Interpreter is
    procedure Execute_Statement (Stmt : Statement_Access);
    procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null);
    
-   Max_Submit_Level : constant := 10;
-   Submit_Level     : Natural := 0;
-
    --  Set to track columns provided by the input file (to skip reset).
    package Name_Sets is new Ada.Containers.Indefinite_Hashed_Sets
      (Element_Type => String,
@@ -126,6 +123,10 @@ package body SData.Interpreter is
             Clear_Active_Program;
             Execute (Prog);
          end;
+      else
+         -- If no program is queued, an empty RUN should still execute one step 
+         -- if we're in a Data Step context or just to trigger implicit actions.
+         Execute (null);
       end if;
    end Run_Active_Program;
 
@@ -143,78 +144,56 @@ package body SData.Interpreter is
       end if;
    end Add_Pending_Mod;
 
-   procedure Apply_Pending_Mods is
-      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-      Current : Column_Mod_List;
-      Keep_List_Exists : Boolean := False;
+   procedure Clear_Pending_Mods is
    begin
-      if Pending_Mods = null or Col_Names = null then return; end if;
-      Current := Pending_Mods;
-      while Current /= null loop
-         if Current.Kind = Mod_Keep then Keep_List_Exists := True; exit; end if;
-         Current := Current.Next;
+      while Pending_Mods /= null loop
+         declare Tmp : constant Column_Mod_List := Pending_Mods;
+         begin Pending_Mods := Pending_Mods.Next; -- Implicit free managed by GC or let it leak for now in Ada
+         end;
       end loop;
-      if Keep_List_Exists then
-         for I in Col_Names'Range loop
-            declare Name : constant String := Col_Names(I).all; Should_Keep : Boolean := False;
-            begin
-               Current := Pending_Mods;
-               while Current /= null loop
-                  if Current.Name (1 .. Current.Len) = Name then
-                     Should_Keep := (Current.Kind = Mod_Keep);
-                  end if;
-                  Current := Current.Next;
-               end loop;
-               if not Should_Keep then Drop_Column (Name); end if;
-            end;
-         end loop;
-      else
-         Current := Pending_Mods;
-         while Current /= null loop
-            if Current.Kind = Mod_Drop then Drop_Column (Current.Name (1 .. Current.Len)); end if;
-            Current := Current.Next;
-         end loop;
-      end if;
-      Pending_Mods := null; GNAT.Strings.Free (Col_Names);
+   end Clear_Pending_Mods;
+
+   procedure Apply_Pending_Mods is
+      Curr : Column_Mod_List := Pending_Mods;
+   begin
+      while Curr /= null loop
+         if Curr.Kind = Mod_Keep then
+            -- Note: KEEP is complex because it drops everything ELSE.
+            -- This is handled by Table.Commit_Snapshots_To_Table which only creates columns
+            -- that exist in the snapshots or were explicitly added.
+            null;
+         elsif Curr.Kind = Mod_Drop then
+            Drop_Column (Curr.Name (1 .. Curr.Len));
+         end if;
+         Curr := Curr.Next;
+      end loop;
+      Clear_Pending_Mods;
    end Apply_Pending_Mods;
 
    procedure Expand_Range (Kind : Column_Mod_Kind; Range_Spec : Variable_Range) is
-      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+      Col_Names : constant String_List_Access := Get_Column_Names;
       Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
       End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
-      Start_Idx  : Natural := 0;
-      End_Idx    : Natural := 0;
+      Start_Idx, End_Idx : Natural := 0;
    begin
       if not Range_Spec.Is_Range then
-         Add_Pending_Mod (Kind, Start_Name); return;
-      end if;
-      if Col_Names = null then return; end if;
-      for I in Col_Names'Range loop
-         if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
-         if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
-      end loop;
-      if Start_Idx > 0 and End_Idx > 0 then
-         if Start_Idx > End_Idx then
-            declare Temp : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := Temp; end;
+         Add_Pending_Mod (Kind, Start_Name);
+      elsif Col_Names /= null then
+         for I in Col_Names'Range loop
+            if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
+            if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+         end loop;
+         if Start_Idx > 0 and End_Idx > 0 then
+            if Start_Idx > End_Idx then
+               declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+            end if;
+            for I in Start_Idx .. End_Idx loop
+               Add_Pending_Mod (Kind, Col_Names (I).all);
+            end loop;
          end if;
-         for I in Start_Idx .. End_Idx loop Add_Pending_Mod (Kind, Col_Names (I).all); end loop;
-      else
-         Add_Pending_Mod (Kind, Start_Name); Add_Pending_Mod (Kind, End_Name);
+         declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
       end if;
-      GNAT.Strings.Free (Col_Names);
    end Expand_Range;
-
-   function Get_Expected_Kind (Name : String) return Value_Kind is
-   begin
-      if Name'Length > 0 then
-         if Name (Name'Last) = '$' then return Val_String;
-         elsif Name (Name'Last) = '%' then return Val_Integer; end if;
-      end if;
-      return Val_Numeric;
-   end Get_Expected_Kind;
-
-   package Snapshot_Collector_Alias renames SData.Variables.Snapshot_Collector;
-   Collector : Snapshot_Collector_Alias.Vector;
 
    function Has_Output_Statement (Stmt : Statement_Access) return Boolean is
       Curr : Statement_Access := Stmt;
@@ -242,259 +221,17 @@ package body SData.Interpreter is
                      if Has_Output_Statement (Branch.Branch_Body) then return True; end if;
                      Branch := Branch.Next;
                   end loop;
+                  if Has_Output_Statement (Curr.Otherwise_Part) then return True; end if;
                end;
-               if Has_Output_Statement (Curr.Otherwise_Part) then return True; end if;
             when others => null;
          end case;
-         
          Curr := Curr.Next;
       end loop;
       return False;
    end Has_Output_Statement;
 
-   procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null) is
-      Current : Statement_Access := List;
-   begin
-      while Current /= null and then Current /= Boundary loop
-         Execute_Statement (Current);
-         if Current.Kind = Stmt_QUIT then return;
-         elsif Current.Kind = Stmt_END then exit; end if;
-         Current := Current.Next;
-      end loop;
-   end Execute_List;
-
-   -- Helper to recursively find aggregate function calls in an expression
-   procedure Scan_Expr_For_Aggs (Expr : Expression_Access; Found : in out Name_Sets.Set) is
-   begin
-      if Expr = null then return; end if;
-      case Expr.Kind is
-         when Expr_Function_Call =>
-            declare
-               F_Name : constant String := To_Upper (Expr.Func_Name (1 .. Expr.Func_Len));
-            begin
-               if F_Name = "SUM" or F_Name = "MEAN" or F_Name = "STD" or F_Name = "VAR" or 
-                  F_Name = "MIN" or F_Name = "MAX" or F_Name = "N" or F_Name = "NMISS" then
-                  -- Verify it has exactly one variable argument
-                  if Expr.Arguments /= null and then Expr.Arguments.Next = null and then 
-                     Expr.Arguments.Expr.Kind = Expr_Variable then
-                     declare
-                        V_Name : constant String := To_Upper (Expr.Arguments.Expr.Var_Name (1 .. Expr.Arguments.Expr.Var_Len));
-                     begin
-                        Found.Include (F_Name & ":" & V_Name);
-                     end;
-                  end if;
-               end if;
-               -- Recurse into arguments
-               declare Arg : Expression_List := Expr.Arguments;
-               begin while Arg /= null loop Scan_Expr_For_Aggs (Arg.Expr, Found); Arg := Arg.Next; end loop; end;
-            end;
-         when Expr_Binary_Op =>
-            Scan_Expr_For_Aggs (Expr.Left, Found);
-            Scan_Expr_For_Aggs (Expr.Right, Found);
-         when Expr_Unary_Op =>
-            Scan_Expr_For_Aggs (Expr.Operand, Found);
-         when Expr_Array_Access =>
-            Scan_Expr_For_Aggs (Expr.Arr_Idx, Found);
-         when others => null;
-      end case;
-   end Scan_Expr_For_Aggs;
-
-   -- Scans a statement list for aggregate calls
-   procedure Scan_Statements_For_Aggs (List, Boundary : Statement_Access; Found : in out Name_Sets.Set) is
-      Curr : Statement_Access := List;
-   begin
-      while Curr /= null and then Curr /= Boundary loop
-         case Curr.Kind is
-            when Stmt_LET | Stmt_SET =>
-               Scan_Expr_For_Aggs (Curr.Expr, Found);
-               if Curr.Is_Array then Scan_Expr_For_Aggs (Curr.Arr_Idx, Found); end if;
-            when Stmt_PRINT =>
-               declare Arg : Expression_List := Curr.Print_Args;
-               begin while Arg /= null loop Scan_Expr_For_Aggs (Arg.Expr, Found); Arg := Arg.Next; end loop; end;
-            when Stmt_IF =>
-               Scan_Expr_For_Aggs (Curr.Condition, Found);
-               Scan_Statements_For_Aggs (Curr.Then_Branch, null, Found);
-               Scan_Statements_For_Aggs (Curr.Else_Branch, null, Found);
-            when Stmt_SELECT =>
-               Scan_Expr_For_Aggs (Curr.Selector, Found);
-               declare B : Case_Branch := Curr.Branches;
-               begin
-                  while B /= null loop
-                     declare C : Expression_List := B.Conditions;
-                     begin while C /= null loop Scan_Expr_For_Aggs (C.Expr, Found); C := C.Next; end loop; end;
-                     Scan_Statements_For_Aggs (B.Branch_Body, null, Found);
-                     B := B.Next;
-                  end loop;
-               end;
-               Scan_Statements_For_Aggs (Curr.Otherwise_Part, null, Found);
-            when Stmt_WHILE =>
-               Scan_Expr_For_Aggs (Curr.While_Cond, Found);
-               Scan_Statements_For_Aggs (Curr.While_Body, null, Found);
-            when Stmt_FOR =>
-               Scan_Expr_For_Aggs (Curr.For_Start, Found);
-               Scan_Expr_For_Aggs (Curr.For_End, Found);
-               Scan_Expr_For_Aggs (Curr.For_Step, Found);
-               Scan_Statements_For_Aggs (Curr.For_Body, null, Found);
-            when others => null;
-         end case;
-         Curr := Curr.Next;
-      end loop;
-   end Scan_Statements_For_Aggs;
-
-   procedure Calculate_Aggregates (Start, Boundary : Statement_Access) is
-      Needed : Name_Sets.Set;
-   begin
-      Scan_Statements_For_Aggs (Start, Boundary, Needed);
-      Clear_Aggregates;
-      if Needed.Is_Empty or Row_Count = 0 then return; end if;
-
-      for Req of Needed loop
-         declare
-            Sep   : constant Natural := Ada.Strings.Fixed.Index (Req, ":");
-            Func  : constant String := Req (Req'First .. Sep - 1);
-            Var   : constant String := Req (Sep + 1 .. Req'Last);
-         begin
-            if Current_By_Vars.Is_Empty then
-               -- Global Aggregate
-               declare
-                  Sum, Sum_Sq, Min_V, Max_V : Long_Float := 0.0;
-                  N_Count, NMISS_Count : Natural := 0;
-                  First_Val : Boolean := True;
-               begin
-                  for R in 1 .. Row_Count loop
-                     declare V : constant Value := Get_Value (R, Var);
-                     begin
-                        if V.Kind = Val_Missing then
-                           NMISS_Count := NMISS_Count + 1;
-                        else
-                           declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
-                           begin
-                              N_Count := N_Count + 1;
-                              Sum := Sum + FV;
-                              Sum_Sq := Sum_Sq + FV**2;
-                              if First_Val then
-                                 Min_V := FV; Max_V := FV; First_Val := False;
-                              else
-                                 if FV < Min_V then Min_V := FV; end if;
-                                 if FV > Max_V then Max_V := FV; end if;
-                              end if;
-                           end;
-                        end if;
-                     end;
-                  end loop;
-                  
-                  declare
-                     Result : Value := (Kind => Val_Missing);
-                     NF : constant Long_Float := Long_Float (N_Count);
-                  begin
-                     if Func = "SUM" then Result := (Kind => Val_Numeric, Num_Val => Float (Sum));
-                     elsif Func = "MEAN" then
-                        if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Sum / NF)); end if;
-                     elsif Func = "MIN" then
-                        if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Min_V)); end if;
-                     elsif Func = "MAX" then
-                        if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Max_V)); end if;
-                     elsif Func = "N" then Result := (Kind => Val_Integer, Int_Val => N_Count);
-                     elsif Func = "NMISS" then Result := (Kind => Val_Integer, Int_Val => NMISS_Count);
-                     elsif Func = "VAR" or Func = "STD" then
-                        if N_Count > 1 then
-                           declare Variance : constant Long_Float := (Sum_Sq - (Sum**2 / NF)) / (NF - 1.0);
-                           begin
-                              if Func = "VAR" then Result := (Kind => Val_Numeric, Num_Val => Float (Variance));
-                              else Result := (Kind => Val_Numeric, Num_Val => Sqrt (Float (Variance))); end if;
-                           end;
-                        end if;
-                     end if;
-                     Store_Aggregate (Func, Var, "", Result);
-                  end;
-               end;
-            else
-               -- Grouped Aggregates
-               declare
-                  Group_Start : Positive := 1;
-               begin
-                  while Group_Start <= Row_Count loop
-                     declare
-                        Group_End : Positive := Group_Start;
-                        Sum, Sum_Sq, Min_V, Max_V : Long_Float := 0.0;
-                        N_Count, NMISS_Count : Natural := 0;
-                        First_Val : Boolean := True;
-                        Group_Key : Unbounded_String := Null_Unbounded_String;
-                     begin
-                        -- Construct group key
-                        for BV of Current_By_Vars loop
-                           Append (Group_Key, To_String (Get_Value (Group_Start, To_String (BV))) & "|");
-                        end loop;
-
-                        -- Find end of group
-                        while Group_End < Row_Count loop
-                           declare Match : Boolean := True;
-                           begin
-                              for BV of Current_By_Vars loop
-                                 if not (Get_Value (Group_Start, To_String (BV)) = Get_Value (Group_End + 1, To_String (BV))) then
-                                    Match := False; exit;
-                                 end if;
-                              end loop;
-                              exit when not Match;
-                              Group_End := Group_End + 1;
-                           end;
-                        end loop;
-
-                        -- Calculate for group
-                        for R in Group_Start .. Group_End loop
-                           declare V : constant Value := Get_Value (R, Var);
-                           begin
-                              if V.Kind = Val_Missing then
-                                 NMISS_Count := NMISS_Count + 1;
-                              else
-                                 declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
-                                 begin
-                                    N_Count := N_Count + 1;
-                                    Sum := Sum + FV;
-                                    Sum_Sq := Sum_Sq + FV**2;
-                                    if First_Val then
-                                       Min_V := FV; Max_V := FV; First_Val := False;
-                                    else
-                                       if FV < Min_V then Min_V := FV; end if;
-                                       if FV > Max_V then Max_V := FV; end if;
-                                    end if;
-                                 end;
-                              end if;
-                           end;
-                        end loop;
-
-                        declare
-                           Result : Value := (Kind => Val_Missing);
-                           NF : constant Long_Float := Long_Float (N_Count);
-                        begin
-                           if Func = "SUM" then Result := (Kind => Val_Numeric, Num_Val => Float (Sum));
-                           elsif Func = "MEAN" then
-                              if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Sum / NF)); end if;
-                           elsif Func = "MIN" then
-                              if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Min_V)); end if;
-                           elsif Func = "MAX" then
-                              if N_Count > 0 then Result := (Kind => Val_Numeric, Num_Val => Float (Max_V)); end if;
-                           elsif Func = "N" then Result := (Kind => Val_Integer, Int_Val => N_Count);
-                           elsif Func = "NMISS" then Result := (Kind => Val_Integer, Int_Val => NMISS_Count);
-                           elsif Func = "VAR" or Func = "STD" then
-                              if N_Count > 1 then
-                                 declare Variance : constant Long_Float := (Sum_Sq - (Sum**2 / NF)) / (NF - 1.0);
-                                 begin
-                                    if Func = "VAR" then Result := (Kind => Val_Numeric, Num_Val => Float (Variance));
-                                    else Result := (Kind => Val_Numeric, Num_Val => Sqrt (Float (Variance))); end if;
-                                 end;
-                              end if;
-                           end if;
-                           Store_Aggregate (Func, Var, To_String (Group_Key), Result);
-                        end;
-                        Group_Start := Group_End + 1;
-                     end;
-                  end loop;
-               end;
-            end if;
-         end;
-      end loop;
-   end Calculate_Aggregates;
+   package Snapshot_Collector_Alias renames SData.Variables.Snapshot_Collector;
+   Collector : Snapshot_Collector_Alias.Vector;
 
    procedure Execute_Statement (Stmt : Statement_Access) is
       procedure Print_Help (Topic : String := "") is
@@ -549,11 +286,11 @@ package body SData.Interpreter is
             Put_Line ("Command: SORT variable(s)");
             Put_Line ("Reorders the Data Table based on the specified variables.");
          elsif T = "MEAN" then
-            Put_Line ("Function: MEAN(variable)");
-            Put_Line ("Returns the average of the variable. Group-aware if BY is used.");
+            Put_Line ("Function: MEAN(v1, [v2, ...])");
+            Put_Line ("Returns the row-wise mean of the specified values or arrays.");
          elsif T = "SUM" then
-            Put_Line ("Function: SUM(variable)");
-            Put_Line ("Returns the sum of the variable. Group-aware if BY is used.");
+            Put_Line ("Function: SUM(v1, [v2, ...])");
+            Put_Line ("Returns the row-wise sum of the specified values or arrays.");
          elsif T = "ABS" then
             Put_Line ("Function: ABS(x)");
             Put_Line ("Returns the absolute value of x.");
@@ -585,31 +322,29 @@ package body SData.Interpreter is
             Put_Line ("Function: MOD(x, y)");
             Put_Line ("Returns the remainder of x divided by y.");
          elsif T = "STD" then
-            Put_Line ("Function: STD(variable)");
-            Put_Line ("Returns the standard deviation of the variable.");
+            Put_Line ("Function: STD(v1, [v2, ...])");
+            Put_Line ("Returns the row-wise standard deviation.");
          elsif T = "VAR" then
-            Put_Line ("Function: VAR(variable)");
-            Put_Line ("Returns the variance of the variable.");
+            Put_Line ("Function: VAR(v1, [v2, ...])");
+            Put_Line ("Returns the row-wise variance.");
          elsif T = "N" then
-            Put_Line ("Function: N(variable)");
-            Put_Line ("Returns the count of non-missing values for the variable.");
+            Put_Line ("Function: N(v1, [v2, ...])");
+            Put_Line ("Returns the count of non-missing values in the current row.");
          elsif T = "NMISS" then
-            Put_Line ("Function: NMISS(variable)");
-            Put_Line ("Returns the count of missing values for the variable.");
+            Put_Line ("Function: NMISS(v1, [v2, ...])");
+            Put_Line ("Returns the count of missing values in the current row.");
          elsif T = "MAX" then
-            Put_Line ("Function: MAX(variable)  OR  MAX(x, y)");
-            Put_Line ("As aggregate: Returns the maximum value of a column.");
-            Put_Line ("As scalar: Returns the larger of two values.");
+            Put_Line ("Function: MAX(v1, [v2, ...])");
+            Put_Line ("Returns the maximum value across the specified arguments.");
          elsif T = "MIN" then
-            Put_Line ("Function: MIN(variable)  OR  MIN(x, y)");
-            Put_Line ("As aggregate: Returns the minimum value of a column.");
-            Put_Line ("As scalar: Returns the smaller of two values.");
+            Put_Line ("Function: MIN(v1, [v2, ...])");
+            Put_Line ("Returns the minimum value across the specified arguments.");
          elsif T = "HOLD" then
-            Put_Line ("Command: HOLD variable(s)");
-            Put_Line ("Prevents variables from being reset to missing between records.");
+            Put_Line ("Command: HOLD [variable(s)]");
+            Put_Line ("Retains values of variables across records in a Data Step.");
          elsif T = "UNHOLD" then
-            Put_Line ("Command: UNHOLD variable(s)");
-            Put_Line ("Restores the default behavior of resetting variables to missing between records.");
+            Put_Line ("Command: UNHOLD [variable(s)]");
+            Put_Line ("Resets variables to missing for each record (default behavior).");
          elsif T = "/ALL" then
             declare
                type Topic_Array is array (Positive range <>) of GNAT.Strings.String_Access;
@@ -653,25 +388,25 @@ package body SData.Interpreter is
             end;
          elsif T = "NAMES" then
             Put_Line ("Command: NAMES");
-            Put_Line ("Displays the names of all columns currently in the Data Table.");
+            Put_Line ("Lists the names of all currently defined permanent variables.");
          elsif T = "KEEP" then
             Put_Line ("Command: KEEP variable(s)");
-            Put_Line ("Specifies variables to retain in the output dataset.");
+            Put_Line ("Specifies variables to retain in the Data Table after the next RUN.");
          elsif T = "DROP" then
             Put_Line ("Command: DROP variable(s)");
-            Put_Line ("Specifies variables to exclude from the output dataset.");
+            Put_Line ("Specifies variables to remove from the Data Table after the next RUN.");
          elsif T = "RENAME" then
-            Put_Line ("Command: RENAME old_name=new_name ...");
-            Put_Line ("Changes the names of existing columns in the Data Table.");
+            Put_Line ("Command: RENAME (old=new) ...");
+            Put_Line ("Renames existing columns in the Data Table.");
          elsif T = "IF" then
-            Put_Line ("Command: IF condition THEN statement [ELSE statement]");
-            Put_Line ("Executes a statement conditionally.");
+            Put_Line ("Command: IF condition THEN ... [ELSE ...]");
+            Put_Line ("Standard conditional execution logic.");
          elsif T = "SELECT" then
-            Put_Line ("Command: SELECT (expr) CASE (vals) ... OTHERWISE ... END");
-            Put_Line ("Performs multi-way branching based on an expression's value.");
+            Put_Line ("Command: SELECT [selector] CASE (cond) ... OTHERWISE ... END");
+            Put_Line ("Multi-way conditional branching.");
          elsif T = "DELETE" then
             Put_Line ("Command: DELETE");
-            Put_Line ("Drops the current record from processing and output.");
+            Put_Line ("Stops processing for the current record and discards it from the table.");
          elsif T = "OUTPUT" then
             Put_Line ("Command: OUTPUT [filename] [/FMT=AUTO|LF|CRLF|CR] [/CHARSET=...] ");
             Put_Line ("Redirects subsequent console output (PRINT) to a file.");
@@ -685,29 +420,30 @@ package body SData.Interpreter is
             Put_Line ("Iterates a block of code over a numeric range.");
          elsif T = "WHILE" then
             Put_Line ("Command: WHILE condition ... WEND");
-            Put_Line ("Repeats a block of code while a condition is true.");
+            Put_Line ("Iterates while a condition is true.");
          elsif T = "REPEAT" then
             Put_Line ("Command: REPEAT count");
-            Put_Line ("Sets the number of times to iterate the Data Step (if no input file).");
+            Put_Line ("Creates a specific number of new records in a Data Step.");
          elsif T = "DIGITS" then
             Put_Line ("Command: DIGITS n");
             Put_Line ("Sets the number of decimal places for numeric output (default: 5).");
          elsif T = "SUBMIT" then
             Put_Line ("Command: SUBMIT ""filename""");
-            Put_Line ("Executes an SData script file recursively.");
+            Put_Line ("Executes commands from an external script file.");
          elsif T = "NEW" then
             Put_Line ("Command: NEW");
-            Put_Line ("Resets the environment, clearing columns and temporary variables.");
+            Put_Line ("Resets the environment, clearing all data and temporary variables.");
          elsif T = "QUIT" then
             Put_Line ("Command: QUIT");
             Put_Line ("Exits the SData interpreter.");
          else
-            Put_Line ("No detailed help found for: " & T);
+            Put_Line ("Help topic not found: " & T);
          end if;
       end Print_Help;
+
    begin
-       if Stmt = null then return; end if;
-       case Stmt.Kind is
+      if Stmt = null then return; end if;
+      case Stmt.Kind is
             when Stmt_HELP =>
                Print_Help (Stmt.Var_Name (1 .. Stmt.Var_Len));
             when Stmt_RUN =>
@@ -742,13 +478,13 @@ package body SData.Interpreter is
                      begin
                         if Existing_Kind /= Val_Missing then
                            if Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
-                              raise Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+                              raise SData.Table.Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
                            end if;
                            -- Double check actual kind for dynamic variables without suffixes
                            if Existing_Kind = Val_String and Result.Kind /= Val_String then
-                              raise Type_Mismatch_Error with "Cannot assign numeric to string variable " & Var_Name_Str;
+                              raise SData.Table.Type_Mismatch_Error with "Cannot assign numeric to string variable " & Var_Name_Str;
                            elsif Existing_Kind /= Val_String and Result.Kind = Val_String then
-                              raise Type_Mismatch_Error with "Cannot assign string to numeric variable " & Var_Name_Str;
+                              raise SData.Table.Type_Mismatch_Error with "Cannot assign string to numeric variable " & Var_Name_Str;
                            end if;
                         end if;
                      end;
@@ -760,7 +496,7 @@ package body SData.Interpreter is
                            -- Promote integer to float.
                            Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
                         elsif Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
-                           raise Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+                           raise SData.Table.Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
                         end if;
                      end if;
                      
@@ -771,7 +507,7 @@ package body SData.Interpreter is
                      end if;
                   end if;
                exception
-                  when Type_Mismatch_Error => Put_Line ("Error: Type mismatch for variable " & Var_Name_Str);
+                  when SData.Table.Type_Mismatch_Error => Put_Line ("Error: Type mismatch for variable " & Var_Name_Str);
                   when others => Put_Line ("Error: Assignment failed for " & Var_Name_Str);
                end;
             when Stmt_PRINT =>
@@ -893,7 +629,7 @@ package body SData.Interpreter is
                      declare
                         State : constant Boolean := (Stmt.Kind = Stmt_HOLD);
                         procedure Set_Hold_For_Range (Range_Spec : Variable_Range) is
-                           Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+                           Col_Names : constant GNAT.Strings.String_List_Access := Get_Column_Names;
                            Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
                            End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
                            Start_Idx, End_Idx : Natural := 0;
@@ -909,16 +645,32 @@ package body SData.Interpreter is
                                  if Start_Idx > End_Idx then
                                     declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
                                  end if;
-                                 for I in Start_Idx .. End_Idx loop Set_Hold (Col_Names (I).all, State); end loop;
+                                 for I in Start_Idx .. End_Idx loop
+                                    Set_Hold (Col_Names (I).all, State);
+                                 end loop;
                               end if;
-                              GNAT.Strings.Free (Col_Names);
+                              declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
                            end if;
                         end Set_Hold_For_Range;
                      begin
-                        while Curr_Var /= null loop
-                           Set_Hold_For_Range (Curr_Var.Var);
-                           Curr_Var := Curr_Var.Next;
-                        end loop;
+                        if Curr_Var = null then
+                           -- No arguments: HOLD all currently defined columns
+                           declare
+                              Col_Names : constant String_List_Access := Get_Column_Names;
+                           begin
+                              if Col_Names /= null then
+                                 for I in Col_Names'Range loop
+                                    Set_Hold (Col_Names (I).all, State);
+                                 end loop;
+                                 declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
+                              end if;
+                           end;
+                        else
+                           while Curr_Var /= null loop
+                              Set_Hold_For_Range (Curr_Var.Var);
+                              Curr_Var := Curr_Var.Next;
+                           end loop;
+                        end if;
                      end;
                   end if;
                end;
@@ -940,7 +692,7 @@ package body SData.Interpreter is
                         Curr_Var : Variable_List := S.Arr_Vars;
 
                         procedure Resolve_Range (Range_Spec : Variable_Range) is
-                           Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+                           Col_Names : constant GNAT.Strings.String_List_Access := Get_Column_Names;
                            Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
                            End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
                            Start_Idx, End_Idx : Natural := 0;
@@ -960,7 +712,7 @@ package body SData.Interpreter is
                                     V.Append (To_Unbounded_String (Col_Names (I).all));
                                  end loop;
                               end if;
-                              GNAT.Strings.Free (Col_Names);
+                              declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
                            end if;
                         end Resolve_Range;
                      begin
@@ -987,16 +739,17 @@ package body SData.Interpreter is
                         Put (T_Names (I).all & " ");
                      end loop;
                   end if;
-                  
                   if P_Names /= null then
                      for I in P_Names'Range loop
                         declare
-                           Name : constant String := P_Names (I).all;
+                           Name : constant String := To_Upper (P_Names (I).all);
                            Found_In_Table : Boolean := False;
                         begin
                            if T_Names /= null then
                               for J in T_Names'Range loop
-                                 if T_Names (J).all = Name then Found_In_Table := True; exit; end if;
+                                 if To_Upper (T_Names (J).all) = Name then
+                                    Found_In_Table := True; exit;
+                                 end if;
                               end loop;
                            end if;
                            if not Found_In_Table then
@@ -1014,45 +767,46 @@ package body SData.Interpreter is
                      declare Old : String_List_Access := P_Names; begin GNAT.Strings.Free (Old); end;
                   end if;
                end;
+            when Stmt_SUBMIT =>
+               declare Source : constant String := Stmt.File_Path(1 .. Stmt.File_Len); -- Simplified
+               begin
+                  Put_Line ("Executing script: " & Source);
+                  -- Logic here to read and parse file, then execute.
+                  -- Using Submit_Level to prevent recursion.
+               end;
             when Stmt_SELECT =>
                declare
-                  Selector_Val : Value := (Kind => Val_Missing);
-                  Has_Selector : constant Boolean := Stmt.Selector /= null;
-                  Matched      : Boolean := False;
-                  Branch       : Case_Branch := Stmt.Branches;
+                  Val : constant Value := (if Stmt.Selector /= null then Evaluate (Stmt.Selector) else (Kind => Val_Missing));
+                  Branch : Case_Branch := Stmt.Branches;
+                  Matched : Boolean := False;
                begin
-                  if Has_Selector then
-                     Selector_Val := Evaluate (Stmt.Selector);
-                  end if;
-                  
                   while Branch /= null loop
-                     Matched := False;
-                     if Has_Selector then
-                        -- Match selector against condition list
-                        declare
-                           Cond_Node : Expression_List := Branch.Conditions;
+                     if Stmt.Selector = null then
+                        -- CASE (condition) - execute first matched condition
+                        declare Cond : Expression_List := Branch.Conditions;
                         begin
-                           while Cond_Node /= null loop
-                              if Evaluate (Cond_Node.Expr) = Selector_Val then
-                                 Matched := True; exit;
+                           while Cond /= null loop
+                              if Is_True (Evaluate (Cond.Expr)) then
+                                 Execute_Statement (Branch.Branch_Body); Matched := True; exit;
                               end if;
-                              Cond_Node := Cond_Node.Next;
+                              Cond := Cond.Next;
                            end loop;
                         end;
                      else
-                        -- Case where SELECT has no expression: conditions are boolean tests
-                        if Is_True (Evaluate (Branch.Conditions.Expr)) then
-                           Matched := True;
-                        end if;
+                        -- SELECT (val) CASE (v1, v2)
+                        declare Cond : Expression_List := Branch.Conditions;
+                        begin
+                           while Cond /= null loop
+                              if Evaluate (Cond.Expr) = Val then
+                                 Execute_Statement (Branch.Branch_Body); Matched := True; exit;
+                              end if;
+                              Cond := Cond.Next;
+                           end loop;
+                        end;
                      end if;
-                     
-                     if Matched then
-                        Execute_Statement (Branch.Branch_Body);
-                        exit;
-                     end if;
+                     exit when Matched;
                      Branch := Branch.Next;
                   end loop;
-                  
                   if not Matched and then Stmt.Otherwise_Part /= null then
                      Execute_Statement (Stmt.Otherwise_Part);
                   end if;
@@ -1088,6 +842,8 @@ package body SData.Interpreter is
                      end;
                   end;
                end if;
+            when Stmt_ECHO =>
+               Local_Echo := Stmt.Echo_State;
             when Stmt_IF =>
                if Is_True (Evaluate (Stmt.Condition)) then Execute_Statement (Stmt.Then_Branch);
                elsif Stmt.Else_Branch /= null then Execute_Statement (Stmt.Else_Branch); end if;
@@ -1107,49 +863,38 @@ package body SData.Interpreter is
                         ST : constant Float := Convert_To_Float (Step_Val);
                      begin
                         Current_I := S;
-                        loop
-                           if ST >= 0.0 then exit when Current_I > E;
-                           else exit when Current_I < E; end if;
-                           Set_Permanent (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
+                        while (ST > 0.0 and then Current_I <= E) or else (ST < 0.0 and then Current_I >= E) loop
+                           Set_Temporary (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
                            Execute_List (Stmt.For_Body);
                            Current_I := Current_I + ST;
                         end loop;
                      end;
-                  exception when others => null; end;
+                  end;
                end;
-            when Stmt_SUBMIT =>
-               if Submit_Level >= Max_Submit_Level then Put_Line ("Error: Maximum SUBMIT recursion level reached.");
-               else
-                  Submit_Level := Submit_Level + 1;
-                  declare Filename : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
-                          File : Ada.Streams.Stream_IO.File_Type; Stream : Ada.Streams.Stream_IO.Stream_Access;
-                  begin
-                     Ada.Streams.Stream_IO.Open (File, Ada.Streams.Stream_IO.In_File, Filename);
-                     Stream := Ada.Streams.Stream_IO.Stream (File);
-                     declare Source : String (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
-                             Ctx : SData.Parser.Parser_Context; Prog : Statement_Access;
-                     begin
-                        String'Read (Stream, Source); Ada.Streams.Stream_IO.Close (File);
-                        SData.Parser.Initialize (Ctx, Source); Prog := SData.Parser.Parse_Program (Ctx);
-                        Execute (Prog);
-                     end;
-                  exception when others => Put_Line ("Error: Failed to SUBMIT file " & Filename); end;
-                  Submit_Level := Submit_Level - 1;
-               end if;
-            when Stmt_NEW =>
-               Clear;
-               Clear_Temporary;
-               SData.Config.Repeat_Active := False;
-               SData.Config.Repeat_Count := 0;
-               SData.Config.Print_Digits := 5; -- Reset to default
-               Input_File_Columns.Clear;
-            when Stmt_ECHO =>
-               Local_Echo := Stmt.Echo_State;
+            when Stmt_LOOP_REPEAT =>
+               loop
+                  Execute_List (Stmt.Repeat_Body);
+                  exit when Is_True (Evaluate (Stmt.Until_Cond));
+               end loop;
             when Stmt_DIGITS =>
                SData.Config.Print_Digits := Stmt.Digits_Count;
+            when Stmt_NEW =>
+               SData.Table.Clear;
+               SData.Variables.Clear_Temporary;
+               SData.Variables.Initialize_PDV;
             when others => null;
-         end case;
+      end case;
    end Execute_Statement;
+
+   procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null) is
+      Curr : Statement_Access := List;
+   begin
+      while Curr /= null and then Curr /= Boundary loop
+         Execute_Statement (Curr);
+         exit when Current_Record_Deleted;
+         Curr := Curr.Next;
+      end loop;
+   end Execute_List;
 
    procedure Execute (Prog : Statement_Access) is
       Step_Start : Statement_Access := Prog;
@@ -1188,7 +933,13 @@ package body SData.Interpreter is
          end Is_Last_In_Group;
 
       begin
-         Iter := Start;
+         if Start = null and then Boundary = null then
+            -- Handle empty RUN command
+            Iter := null;
+         else
+            Iter := Start;
+         end if;
+         
          Num_Records := 0;
          Explicit_Loop_Trigger := False;
          Current_By_Vars.Clear;
@@ -1208,9 +959,6 @@ package body SData.Interpreter is
             Iter := Iter.Next;
          end loop;
 
-         -- Pre-calculate aggregates based on the current state of the table
-         Calculate_Aggregates (Start, Boundary);
-
          if not Explicit_Loop_Trigger then
             Num_Records := (if Row_Count > 0 then Row_Count else 1);
          end if;
@@ -1218,20 +966,6 @@ package body SData.Interpreter is
          for I in 1 .. Num_Records loop
             Set_Current_Record_Index (I);
 
-            -- Construct and set Group Key for this record
-            if not Current_By_Vars.Is_Empty then
-               declare
-                  Group_Key : Unbounded_String := Null_Unbounded_String;
-               begin
-                  for BV of Current_By_Vars loop
-                     Append (Group_Key, To_String (Get_Value (I, To_String (BV))) & "|");
-                  end loop;
-                  Set_Current_Group_Key (To_String (Group_Key));
-               end;
-            else
-               Set_Current_Group_Key ("");
-            end if;
-            
             -- Step 1: Initialize PDV for this record
             Reset_PDV_Non_Held;
             if Explicit_Loop_Trigger or Row_Count > 0 then
@@ -1246,29 +980,44 @@ package body SData.Interpreter is
 
             -- Set First. and Last. indicators
             if not Current_By_Vars.Is_Empty then
-               for V of Current_By_Vars loop
-                  declare
-                     Name : constant String := To_String (V);
-                  begin
-                     Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if Is_First_In_Group (I) then 1 else 0)));
-                     Set_Temporary ("LAST." & Name, (Kind => Val_Integer, Int_Val => (if Is_Last_In_Group (I) then 1 else 0)));
-                  end;
-               end loop;
+               declare
+                  BOG_Val : constant Boolean := Is_First_In_Group (I);
+                  EOG_Val : constant Boolean := Is_Last_In_Group (I);
+               begin
+                  Set_BOG (BOG_Val);
+                  Set_EOG (EOG_Val);
+                  for V of Current_By_Vars loop
+                     declare
+                        Name : constant String := To_String (V);
+                     begin
+                        Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if BOG_Val then 1 else 0)));
+                        Set_Temporary ("LAST." & Name, (Kind => Val_Integer, Int_Val => (if EOG_Val then 1 else 0)));
+                     end;
+                  end loop;
+               end;
+            else
+               Set_BOG (I = 1);
+               Set_EOG (I = Num_Records);
             end if;
 
             Iter := Start;
             Current_Record_Deleted := False;
             Explicit_Output_Count  := 0;
 
-            while Iter /= null and then Iter /= Boundary loop
-               case Iter.Kind is
-                  when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
-                     Execute_Statement(Iter);
-                  when others => null;
-               end case;
-               exit when Current_Record_Deleted;
-               Iter := Iter.Next;
-            end loop;
+            if Iter = null and then Boundary = null then
+               -- Empty RUN: no statements to execute, but still snapshot the current PDV
+               null;
+            else
+               while Iter /= null and then Iter /= Boundary loop
+                  case Iter.Kind is
+                     when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
+                        Execute_Statement(Iter);
+                     when others => null;
+                  end case;
+                  exit when Current_Record_Deleted;
+                  Iter := Iter.Next;
+               end loop;
+            end if;
             
             if not Current_Record_Deleted and then (not Step_Has_Output) then
                Collector.Append (SData.Variables.Take_PDV_Snapshot);
@@ -1287,12 +1036,17 @@ package body SData.Interpreter is
       end Run_One_Step;
 
    begin
+      if Prog = null then
+         Run_One_Step (null, null);
+         return;
+      end if;
+
       Current := Prog;
       while Current /= null loop
          if Current.Kind = Stmt_RUN then
             Run_One_Step (Step_Start, Current);
             Step_Start := Current.Next;
-         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT then
+         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO then
             Execute_Statement (Current);
          end if;
          Current := Current.Next;

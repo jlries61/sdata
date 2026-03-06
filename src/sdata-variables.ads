@@ -57,6 +57,9 @@ package SData.Variables is
    function Get_Array_Element (Name : String; Index : Integer) return Value;
    procedure Set_Array_Element (Name : String; Index : Integer; Val : Value);
    function Has_Array (Name : String) return Boolean;
+   
+   -- Returns the bounds of an array if it exists.
+   procedure Get_Array_Bounds (Name : String; Start_Idx, End_Idx : out Integer);
 
    -- Hold/Unhold Management
    procedure Set_Hold (Name : String; State : Boolean);
@@ -65,13 +68,6 @@ package SData.Variables is
    -- Group Management
    procedure Set_Current_Group_Key (Key : String);
    function Get_Current_Group_Key return String;
-
-   -- Aggregate Management
-   -- Stores a pre-calculated aggregate value for a specific variable.
-   -- If Group_Key is empty, it's a global aggregate.
-   procedure Store_Aggregate (Func_Name, Var_Name, Group_Key : String; Val : Value);
-   function Get_Aggregate (Func_Name, Var_Name, Group_Key : String) return Value;
-   procedure Clear_Aggregates;
 
 private
    -- Defines an array, whether virtual or real
@@ -110,14 +106,5 @@ private
 
    -- Holds permanent variables for the current record (PDV).
    Permanent_Symbols : Symbol_Table_Pkg.Map;
-
-   -- Holds pre-calculated aggregate values.
-   -- Key format: "FUNC:VAR:GROUP"
-   package Aggregate_Table_Pkg is new Ada.Containers.Indefinite_Hashed_Maps
-     (Key_Type        => String,
-      Element_Type    => Value,
-      Hash            => Ada.Strings.Hash,
-      Equivalent_Keys => "=");
-   Aggregate_Symbols : Aggregate_Table_Pkg.Map;
 
 end SData.Variables;

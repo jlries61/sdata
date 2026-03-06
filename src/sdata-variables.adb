@@ -530,6 +530,25 @@ package body SData.Variables is
       return Array_Symbols.Contains (To_Upper (Name));
    end Has_Array;
 
+   ----------------------
+   -- Get_Array_Bounds --
+   ----------------------
+   procedure Get_Array_Bounds (Name : String; Start_Idx, End_Idx : out Integer) is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if Array_Symbols.Contains (Upper_Name) then
+         declare
+            Arr_Def : constant Array_Definition_Type := Array_Symbols.Element (Upper_Name);
+         begin
+            Start_Idx := Arr_Def.Start_Index;
+            End_Idx   := Arr_Def.End_Index;
+         end;
+      else
+         Start_Idx := 0;
+         End_Idx   := -1;
+      end if;
+   end Get_Array_Bounds;
+
    --------------
    -- Set_Hold --
    --------------
@@ -572,39 +591,5 @@ package body SData.Variables is
    begin
       return To_String (Current_Group_ID);
    end Get_Current_Group_Key;
-
-   ---------------------
-   -- Store_Aggregate --
-   ---------------------
-   procedure Store_Aggregate (Func_Name, Var_Name, Group_Key : String; Val : Value) is
-      Key : constant String := To_Upper (Func_Name) & ":" & To_Upper (Var_Name) & ":" & Group_Key;
-   begin
-      if Aggregate_Symbols.Contains (Key) then
-         Aggregate_Symbols.Replace (Key, Val);
-      else
-         Aggregate_Symbols.Insert (Key, Val);
-      end if;
-   end Store_Aggregate;
-
-   -------------------
-   -- Get_Aggregate --
-   -------------------
-   function Get_Aggregate (Func_Name, Var_Name, Group_Key : String) return Value is
-      Key : constant String := To_Upper (Func_Name) & ":" & To_Upper (Var_Name) & ":" & Group_Key;
-   begin
-      if Aggregate_Symbols.Contains (Key) then
-         return Aggregate_Symbols.Element (Key);
-      else
-         return (Kind => Val_Missing);
-      end if;
-   end Get_Aggregate;
-
-   ----------------------
-   -- Clear_Aggregates --
-   ----------------------
-   procedure Clear_Aggregates is
-   begin
-      Aggregate_Symbols.Clear;
-   end Clear_Aggregates;
 
 end SData.Variables;

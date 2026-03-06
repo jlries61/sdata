@@ -3,8 +3,25 @@ with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData.Statistics;
 with SData.Table;
+with Ada.Containers.Vectors;
 
 package body SData.Evaluator is
+
+   BOG_Flag : Boolean := False;
+   EOG_Flag : Boolean := False;
+
+   function Is_BOG return Boolean is (BOG_Flag);
+   function Is_EOG return Boolean is (EOG_Flag);
+
+   procedure Set_BOG (Val : Boolean) is
+   begin
+      BOG_Flag := Val;
+   end Set_BOG;
+
+   procedure Set_EOG (Val : Boolean) is
+   begin
+      EOG_Flag := Val;
+   end Set_EOG;
 
    -----------------------
    -- Convert_To_Float --
@@ -23,15 +40,17 @@ package body SData.Evaluator is
    ----------------------
    function Evaluate_Function (Name : String; Args : Expression_List) return Value is
       
-      Arg_Vals : array (1 .. 4) of Value := (others => (Kind => Val_Missing));
-      Count    : Natural := 0;
+      package Value_Vectors is new Ada.Containers.Vectors (Positive, Value, SData.Values."=");
+      use type Ada.Containers.Count_Type;
+      
+      All_Vals : Value_Vectors.Vector;
       Current  : Expression_List := Args;
 
       function Has_Args (N : Positive) return Boolean is
       begin
-         if Count < N then return False; end if;
+         if All_Vals.Length < Ada.Containers.Count_Type(N) then return False; end if;
          for I in 1 .. N loop
-            if Arg_Vals (I).Kind = Val_Missing then return False; end if;
+            if All_Vals.Element (I).Kind = Val_Missing then return False; end if;
          end loop;
          return True;
       end Has_Args;
@@ -42,211 +61,287 @@ package body SData.Evaluator is
       end Num_Result;
 
    begin
-      while Current /= null and Count < 4 loop
-         Count := Count + 1;
-         Arg_Vals (Count) := Evaluate (Current.Expr);
+      -- Flatten arguments, expanding arrays if necessary
+      while Current /= null loop
+         if Current.Expr.Kind = Expr_Variable then
+            declare
+               VName : constant String := To_Upper (Current.Expr.Var_Name (1 .. Current.Expr.Var_Len));
+            begin
+               if Has_Array (VName) then
+                  declare
+                     Start_Idx, End_Idx : Integer;
+                  begin
+                     Get_Array_Bounds (VName, Start_Idx, End_Idx);
+                     for I in Start_Idx .. End_Idx loop
+                        All_Vals.Append (Get_Array_Element (VName, I));
+                     end loop;
+                  end;
+               else
+                  All_Vals.Append (Evaluate (Current.Expr));
+               end if;
+            end;
+         else
+            All_Vals.Append (Evaluate (Current.Expr));
+         end if;
          Current := Current.Next;
       end loop;
 
       --  Math Functions
       if Name = "ABS" and then Has_Args (1) then
-         if Arg_Vals (1).Kind = Val_Integer then
-            return (Kind => Val_Integer, Int_Val => abs Arg_Vals (1).Int_Val);
+         if All_Vals.Element (1).Kind = Val_Integer then
+            return (Kind => Val_Integer, Int_Val => abs All_Vals.Element (1).Int_Val);
          else
-            return Num_Result (abs Convert_To_Float (Arg_Vals (1)));
+            return Num_Result (abs Convert_To_Float (All_Vals.Element (1)));
          end if;
       elsif Name = "LOG" and then Has_Args (1) then
-         declare V : constant Float := Convert_To_Float (Arg_Vals (1));
+         declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
          begin return (if V > 0.0 then Num_Result (Log (V)) else (Kind => Val_Missing)); end;
       elsif Name = "LOG10" and then Has_Args (1) then
-         declare V : constant Float := Convert_To_Float (Arg_Vals (1));
+         declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
          begin return (if V > 0.0 then Num_Result (Log (V, 10.0)) else (Kind => Val_Missing)); end;
       elsif Name = "EXP" and then Has_Args (1) then
-         return Num_Result (Exp (Convert_To_Float (Arg_Vals (1))));
+         return Num_Result (Exp (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "ROUND" and then Has_Args (1) then
          declare
-            V : constant Float := Convert_To_Float (Arg_Vals (1));
+            V : constant Float := Convert_To_Float (All_Vals.Element (1));
             Decimals : Float := 0.0;
             Factor : Float;
          begin
-            if Count >= 2 and then Arg_Vals (2).Kind /= Val_Missing then
-               Decimals := Convert_To_Float (Arg_Vals (2));
+            if Integer(All_Vals.Length) >= 2 and then All_Vals.Element (2).Kind /= Val_Missing then
+               Decimals := Convert_To_Float (All_Vals.Element (2));
             end if;
             Factor := 10.0 ** Decimals;
             return Num_Result (Float'Rounding (V * Factor) / Factor);
          end;
       elsif Name = "CEIL" and then Has_Args (1) then
-         return Num_Result (Float'Ceiling (Convert_To_Float (Arg_Vals (1))));
+         return Num_Result (Float'Ceiling (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "FLOOR" and then Has_Args (1) then
-         return Num_Result (Float'Floor (Convert_To_Float (Arg_Vals (1))));
+         return Num_Result (Float'Floor (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "INT" and then Has_Args (1) then
-         return Num_Result (Float'Truncation (Convert_To_Float (Arg_Vals (1))));
+         return Num_Result (Float'Truncation (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "MOD" and then Has_Args (2) then
          declare
-            V1 : constant Float := Convert_To_Float (Arg_Vals (1));
-            V2 : constant Float := Convert_To_Float (Arg_Vals (2));
+            V1 : constant Float := Convert_To_Float (All_Vals.Element (1));
+            V2 : constant Float := Convert_To_Float (All_Vals.Element (2));
          begin
             if V2 /= 0.0 then return Num_Result (V1 - Float'Floor(V1/V2) * V2);
             else return (Kind => Val_Missing); end if;
          end;
       elsif Name = "RECNO" then
          return (Kind => Val_Integer, Int_Val => Integer (SData.Table.Get_Current_Record_Index));
-      elsif Name = "MISSING" and then Count >= 1 then
-         return (Kind => Val_Integer, Int_Val => (if Arg_Vals (1).Kind = Val_Missing then 1 else 0));
+      elsif Name = "BOG" then
+         return (Kind => Val_Integer, Int_Val => (if BOG_Flag then 1 else 0));
+      elsif Name = "EOG" then
+         return (Kind => Val_Integer, Int_Val => (if EOG_Flag then 1 else 0));
+      elsif Name = "MISSING" and then Integer(All_Vals.Length) >= 1 then
+         return (Kind => Val_Integer, Int_Val => (if All_Vals.Element (1).Kind = Val_Missing then 1 else 0));
       elsif Name = "SQRT" and then Has_Args (1) then
          declare
-            V : constant Float := Convert_To_Float (Arg_Vals (1));
+            V : constant Float := Convert_To_Float (All_Vals.Element (1));
          begin
-            if V >= 0.0 then return Num_Result (Sqrt (V)); end if;
+            if V >= 0.0 then return Num_Result (Sqrt (V));
+            else return (Kind => Val_Missing); end if;
          end;
-      elsif Name = "MAX" and then Has_Args (1) then
-         if Count >= 2 then
-            if Arg_Vals (1).Kind = Val_Integer and Arg_Vals (2).Kind = Val_Integer then
-               return (if Arg_Vals (1).Int_Val > Arg_Vals (2).Int_Val then Arg_Vals (1) else Arg_Vals (2));
-            else
-               return (if Convert_To_Float (Arg_Vals (1)) > Convert_To_Float (Arg_Vals (2)) then Arg_Vals (1) else Arg_Vals (2));
-            end if;
-         else
-            -- Aggregate MAX
-            declare
-               Expr_Var : constant Expression_Access := Args.Expr;
-            begin
-               if Expr_Var.Kind = Expr_Variable then
-                  return Get_Aggregate ("MAX", Expr_Var.Var_Name (1 .. Expr_Var.Var_Len), Get_Current_Group_Key);
-               end if;
-            end;
-         end if;
-      elsif Name = "MIN" and then Has_Args (1) then
-         if Count >= 2 then
-            if Arg_Vals (1).Kind = Val_Integer and Arg_Vals (2).Kind = Val_Integer then
-               return (if Arg_Vals (1).Int_Val < Arg_Vals (2).Int_Val then Arg_Vals (1) else Arg_Vals (2));
-            else
-               return (if Convert_To_Float (Arg_Vals (1)) < Convert_To_Float (Arg_Vals (2)) then Arg_Vals (1) else Arg_Vals (2));
-            end if;
-         else
-            -- Aggregate MIN
-            declare
-               Expr_Var : constant Expression_Access := Args.Expr;
-            begin
-               if Expr_Var.Kind = Expr_Variable then
-                  return Get_Aggregate ("MIN", Expr_Var.Var_Name (1 .. Expr_Var.Var_Len), Get_Current_Group_Key);
-               end if;
-            end;
-         end if;
 
-      -- Aggregate Functions
-      elsif (Name = "SUM" or Name = "MEAN" or Name = "STD" or Name = "VAR" or Name = "N" or Name = "NMISS") 
-            and then Args /= null and then Args.Expr.Kind = Expr_Variable then
+      -- Aggregate Functions (Row-wise)
+      elsif Name = "SUM" or Name = "MEAN" or Name = "STD" or Name = "VAR" or
+            Name = "MIN" or Name = "MAX" or Name = "N" or Name = "NMISS" then
          declare
-            Var_Expr : constant Expression_Access := Args.Expr;
+            Sum, Sum_Sq, Min_V, Max_V : Long_Float := 0.0;
+            N_Count, NMISS_Count : Natural := 0;
+            First_Val : Boolean := True;
          begin
-            return Get_Aggregate (Name, Var_Expr.Var_Name (1 .. Var_Expr.Var_Len), Get_Current_Group_Key);
+            for V of All_Vals loop
+               if V.Kind = Val_Missing then
+                  NMISS_Count := NMISS_Count + 1;
+               else
+                  declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
+                  begin
+                     N_Count := N_Count + 1;
+                     Sum := Sum + FV;
+                     Sum_Sq := Sum_Sq + FV**2;
+                     if First_Val then
+                        Min_V := FV; Max_V := FV; First_Val := False;
+                     else
+                        if FV < Min_V then Min_V := FV; end if;
+                        if FV > Max_V then Max_V := FV; end if;
+                     end if;
+                  end;
+               end if;
+            end loop;
+
+            if Name = "N" then return (Kind => Val_Integer, Int_Val => N_Count);
+            elsif Name = "NMISS" then return (Kind => Val_Integer, Int_Val => NMISS_Count);
+            end if;
+
+            if N_Count = 0 then return (Kind => Val_Missing); end if;
+
+            declare
+               NF : constant Long_Float := Long_Float (N_Count);
+            begin
+               if Name = "SUM" then return (Kind => Val_Numeric, Num_Val => Float (Sum));
+               elsif Name = "MEAN" then return (Kind => Val_Numeric, Num_Val => Float (Sum / NF));
+               elsif Name = "MIN" then return (Kind => Val_Numeric, Num_Val => Float (Min_V));
+               elsif Name = "MAX" then return (Kind => Val_Numeric, Num_Val => Float (Max_V));
+               elsif Name = "VAR" or Name = "STD" then
+                  if N_Count > 1 then
+                     declare Variance : constant Long_Float := (Sum_Sq - (Sum**2 / NF)) / (NF - 1.0);
+                     begin
+                        if Name = "VAR" then return (Kind => Val_Numeric, Num_Val => Float (Variance));
+                        else return (Kind => Val_Numeric, Num_Val => Sqrt (Float (Variance))); end if;
+                     end;
+                  else
+                     return (Kind => Val_Missing);
+                  end if;
+               end if;
+            end;
          end;
 
-      --  Standard Normal (Z)
+      -- Statistical Distributions (PDF)
       elsif Name = "ZDF" and then Has_Args (1) then
-         return Num_Result (SData.Statistics.Z_PDF (Convert_To_Float (Arg_Vals (1))));
+         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (All_Vals.Element (1)), 0.0, 1.0));
+      elsif Name = "NDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                         Convert_To_Float (All_Vals.Element (2)), 
+                                                         Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "UDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Uniform_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2)), 
+                                                          Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "EDF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Exponential_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                              Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "BDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Beta_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                       Convert_To_Float (All_Vals.Element (2)), 
+                                                       Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "PDF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Poisson_PMF (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "GDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Gamma_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                        Convert_To_Float (All_Vals.Element (2)), 
+                                                        Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "XDF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Chi_Square_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                             Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "TDF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Student_T_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                            Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "FDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.F_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                    Convert_To_Float (All_Vals.Element (2)), 
+                                                    Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "MDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Binomial_PMF (Convert_To_Float (All_Vals.Element (1)), 
+                                                           Convert_To_Float (All_Vals.Element (2)), 
+                                                           Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "WDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Weibull_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                         Convert_To_Float (All_Vals.Element (2)), 
+                                                         Convert_To_Float (All_Vals.Element (3))));
+
+      -- Statistical Distributions (CDF)
       elsif Name = "ZCF" and then Has_Args (1) then
-         return Num_Result (SData.Statistics.Z_CDF (Convert_To_Float (Arg_Vals (1))));
+         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (All_Vals.Element (1)), 0.0, 1.0));
+      elsif Name = "NCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                         Convert_To_Float (All_Vals.Element (2)), 
+                                                         Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "UCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Uniform_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2)), 
+                                                          Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "ECF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Exponential_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                              Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "BCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Beta_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                       Convert_To_Float (All_Vals.Element (2)), 
+                                                       Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "PCF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Poisson_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "GCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Gamma_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                        Convert_To_Float (All_Vals.Element (2)), 
+                                                        Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "XCF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Chi_Square_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                             Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "TCF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Student_T_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                            Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "FCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.F_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                    Convert_To_Float (All_Vals.Element (2)), 
+                                                    Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "MCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Binomial_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                           Convert_To_Float (All_Vals.Element (2)), 
+                                                           Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "WCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Weibull_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                         Convert_To_Float (All_Vals.Element (2)), 
+                                                         Convert_To_Float (All_Vals.Element (3))));
+
+      -- Statistical Distributions (IDF)
       elsif Name = "ZIF" and then Has_Args (1) then
-         return Num_Result (SData.Statistics.Z_IDF (Convert_To_Float (Arg_Vals (1))));
+         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (All_Vals.Element (1)), 0.0, 1.0));
+      elsif Name = "NIF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                         Convert_To_Float (All_Vals.Element (2)), 
+                                                         Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "UIF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Uniform_IDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2)), 
+                                                          Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "EIF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Exponential_IDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                              Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "BIF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Beta_IDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                       Convert_To_Float (All_Vals.Element (2)), 
+                                                       Convert_To_Float (All_Vals.Element (3))));
+
+      -- Random Numbers (RN)
       elsif Name = "ZRN" then
          return Num_Result (SData.Statistics.Normal_RN (0.0, 1.0));
-
-      --  Normal
-      elsif Name = "NDF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "NCF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "NIF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
       elsif Name = "NRN" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-
-      --  Uniform
-      elsif Name = "UDF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Uniform_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "UCF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Uniform_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "UIF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Uniform_IDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
+         return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (All_Vals.Element (1)), 
+                                                        Convert_To_Float (All_Vals.Element (2))));
       elsif Name = "URN" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Uniform_RN (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-
-      --  Exponential
-      elsif Name = "EDF" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Exponential_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-      elsif Name = "ECF" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Exponential_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-      elsif Name = "EIF" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Exponential_IDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
+         return Num_Result (SData.Statistics.Uniform_RN (Convert_To_Float (All_Vals.Element (1)), 
+                                                         Convert_To_Float (All_Vals.Element (2))));
       elsif Name = "ERN" and then Has_Args (1) then
-         return Num_Result (SData.Statistics.Exponential_RN (Convert_To_Float (Arg_Vals (1))));
-
-      --  Beta
-      elsif Name = "BDF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Beta_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "BCF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Beta_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "BIF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Beta_IDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-
-      --  Poisson
-      elsif Name = "PDF" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Poisson_PMF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-      elsif Name = "PCF" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Poisson_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
+         return Num_Result (SData.Statistics.Exponential_RN (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "PRN" and then Has_Args (1) then
-         return Num_Result (SData.Statistics.Poisson_RN (Convert_To_Float (Arg_Vals (1))));
-
-      --  Gamma
-      elsif Name = "GDF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Gamma_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "GCF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Gamma_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
+         return Num_Result (SData.Statistics.Poisson_RN (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "GRN" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Gamma_RN (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-
-      --  Chi-square
-      elsif Name = "XDF" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Chi_Square_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-      elsif Name = "XCF" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Chi_Square_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-
-      --  Student's T
-      elsif Name = "TDF" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Student_T_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-      elsif Name = "TCF" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Student_T_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-
-      --  Snedecor's F
-      elsif Name = "FDF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.F_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "FCF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.F_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-
-      --  Binomial
-      elsif Name = "MDF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Binomial_PMF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "MCF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Binomial_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
+         return Num_Result (SData.Statistics.Gamma_RN (Convert_To_Float (All_Vals.Element (1)), 
+                                                       Convert_To_Float (All_Vals.Element (2))));
       elsif Name = "MRN" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Binomial_RN (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
-
-      --  Weibull
-      elsif Name = "WDF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Weibull_PDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
-      elsif Name = "WCF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Weibull_CDF (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2)), Convert_To_Float (Arg_Vals (3))));
+         return Num_Result (SData.Statistics.Binomial_RN (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2))));
       elsif Name = "WRN" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Weibull_RN (Convert_To_Float (Arg_Vals (1)), Convert_To_Float (Arg_Vals (2))));
+         return Num_Result (SData.Statistics.Weibull_RN (Convert_To_Float (All_Vals.Element (1)), 
+                                                         Convert_To_Float (All_Vals.Element (2))));
 
       end if;
 
       return (Kind => Val_Missing);
-   exception
-      when others => return (Kind => Val_Missing);
    end Evaluate_Function;
+
+   --------------------
+   -- Get_Expected_Kind --
+   --------------------
+   function Get_Expected_Kind (Name : String) return Value_Kind is
+   begin
+      if Name'Length = 0 then return Val_Numeric; end if;
+      if Name (Name'Last) = '$' then return Val_String;
+      elsif Name (Name'Last) = '%' then return Val_Integer;
+      else return Val_Numeric; end if;
+   end Get_Expected_Kind;
 
    --------------
    -- Evaluate --
@@ -346,7 +441,6 @@ package body SData.Evaluator is
                         end case;
                      end;
                   end if;
-
                elsif L.Kind = Val_String and R.Kind = Val_String then
                   case Expr.Op is
                      when Op_Add =>
