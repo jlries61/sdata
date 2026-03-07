@@ -1,40 +1,10 @@
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Global Aggregates ---
-Global: 55.00000 5.50000 3.02765 9.16667 1.00000 10.00000 10.00000 0.00000
---- Grouped Aggregates ---
-Group 0.00000 : 15.00000 3.00000
---- Grouped Aggregates ---
-Group 0.00000 : 15.00000 3.00000
---- Grouped Aggregates ---
-Group 0.00000 : 15.00000 3.00000
---- Grouped Aggregates ---
-Group 0.00000 : 15.00000 3.00000
---- Grouped Aggregates ---
-Group 0.00000 : 15.00000 3.00000
---- Grouped Aggregates ---
-Group 1.00000 : 40.00000 8.00000
---- Grouped Aggregates ---
-Group 1.00000 : 40.00000 8.00000
---- Grouped Aggregates ---
-Group 1.00000 : 40.00000 8.00000
---- Grouped Aggregates ---
-Group 1.00000 : 40.00000 8.00000
---- Grouped Aggregates ---
-Group 1.00000 : 40.00000 8.00000
+--- Row-wise aggregates on scalars ---
+SUM(A,B,C): 90.00000
+MEAN(A,B,C): 30.00000
+N(A,B,C,D): 3
+NMISS(A,B,C,D): 1
+STD(10,20,60): 26.45751
+--- Row-wise aggregates on an array ---
+SUM(V): 100.00000
+MEAN(V): 25.00000
+STD(V): 12.90994

@@ -154,19 +154,48 @@ package body SData.Interpreter is
    end Clear_Pending_Mods;
 
    procedure Apply_Pending_Mods is
+      Keep_Mods_Exist : Boolean := False;
+      Keep_List : Name_Sets.Set;
       Curr : Column_Mod_List := Pending_Mods;
    begin
+      -- First, check for KEEP statements and build a keep list
       while Curr /= null loop
          if Curr.Kind = Mod_Keep then
-            -- Note: KEEP is complex because it drops everything ELSE.
-            -- This is handled by Table.Commit_Snapshots_To_Table which only creates columns
-            -- that exist in the snapshots or were explicitly added.
-            null;
-         elsif Curr.Kind = Mod_Drop then
+            Keep_Mods_Exist := True;
+            Keep_List.Include (Curr.Name(1 .. Curr.Len));
+         end if;
+         Curr := Curr.Next;
+      end loop;
+
+      -- If there was a KEEP statement, drop everything not in the list
+      if Keep_Mods_Exist then
+         declare
+            All_Cols : String_List_Access := Get_Column_Names;
+         begin
+            if All_Cols /= null then
+               for I in All_Cols'Range loop
+                  declare
+                     Col_Name : constant String := To_Upper(All_Cols(I).all);
+                  begin
+                     if not Keep_List.Contains(Col_Name) then
+                        Drop_Column(Col_Name);
+                     end if;
+                  end;
+               end loop;
+               GNAT.Strings.Free(All_Cols);
+            end if;
+         end;
+      end if;
+
+      -- Now handle explicit drops
+      Curr := Pending_Mods;
+      while Curr /= null loop
+         if Curr.Kind = Mod_Drop then
             Drop_Column (Curr.Name (1 .. Curr.Len));
          end if;
          Curr := Curr.Next;
       end loop;
+
       Clear_Pending_Mods;
    end Apply_Pending_Mods;
 
@@ -237,6 +266,7 @@ package body SData.Interpreter is
       procedure Print_Help (Topic : String := "") is
          T : constant String := To_Upper (Topic);
       begin
+         if Stmt = null then return; end if;
          if T = "" then
             Put_Line ("SData version " & SData.Config.Version_Str);
             Put_Line ("Available Commands:");
@@ -544,9 +574,10 @@ package body SData.Interpreter is
                   end;
                end if;
             when Stmt_USE =>
-               declare File_Name : constant String := Stmt.File_Path(1 .. Stmt.File_Len);
+               declare 
+                  File_Name : constant String := Stmt.File_Path(1 .. Stmt.File_Len);
                begin
-                  if File_Name = "mock" or File_Name = "mock_data" then
+                  if To_Upper(File_Name) = "MOCK" or To_Upper(File_Name) = "MOCK_DATA" then
                      Clear; Add_Column ("ID", Col_Integer); Add_Column ("NAME", Col_String); Add_Column ("SALARY", Col_Numeric);
                      for I in 1 .. 3 loop
                         Add_Row; Set_Value (I, "ID", (Kind => Val_Integer, Int_Val => I));
@@ -565,8 +596,8 @@ package body SData.Interpreter is
                      GNAT.Strings.Free (Col_Names);
                   end if;
                end;
-               if not SData.Config.Quiet_Mode and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock_data" 
-                 and then Stmt.File_Path(1 .. Stmt.File_Len) /= "mock" then
+               if not SData.Config.Quiet_Mode and then Stmt.File_Path(1 .. Stmt.File_Len) /= "MOCK_DATA" 
+                 and then Stmt.File_Path(1 .. Stmt.File_Len) /= "MOCK" then
                   --  Open_Input already prints success for some formats.
                   null;
                end if;
@@ -595,14 +626,30 @@ package body SData.Interpreter is
                   end if;
                end;
             when Stmt_BY =>
+               Current_By_Vars.Clear;
                declare
                   Curr_Var : Variable_List := Stmt.Sort_Vars;
+                  -- Count vars
+                  Count : Natural := 0;
+                  Tmp : Variable_List := Curr_Var;
                begin
-                  Current_By_Vars.Clear;
-                  while Curr_Var /= null loop
-                     Current_By_Vars.Append (To_Unbounded_String (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len))));
-                     Curr_Var := Curr_Var.Next;
-                  end loop;
+                  while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
+                  if Count > 0 then
+                     declare
+                        Crit : Sort_Criteria_Array (1 .. Count);
+                        Idx : Positive := 1;
+                     begin
+                        while Curr_Var /= null loop
+                           Crit (Idx).Name := (others => ' ');
+                           Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
+                           Crit (Idx).Len := Curr_Var.Var.Start_Len;
+                           Crit (Idx).Dir := Ascending;
+                           Current_By_Vars.Append (To_Unbounded_String (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len))));
+                           Idx := Idx + 1; Curr_Var := Curr_Var.Next;
+                        end loop;
+                        Sort (Crit);
+                     end;
+                  end if;
                end;
             when Stmt_REPEAT =>
                SData.Config.Repeat_Active := True;
@@ -889,6 +936,7 @@ package body SData.Interpreter is
    procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null) is
       Curr : Statement_Access := List;
    begin
+      if List = null then return; end if;
       while Curr /= null and then Curr /= Boundary loop
          Execute_Statement (Curr);
          exit when Current_Record_Deleted;
@@ -907,27 +955,35 @@ package body SData.Interpreter is
          Step_Has_Output : constant Boolean := Has_Output_Statement (Start);
 
          function Is_First_In_Group (Idx : Positive) return Boolean is
+            Prev_Value : Value;
+            Curr_Value : Value;
          begin
-            if Idx = 1 or Current_By_Vars.Is_Empty then return True; end if;
+            if Idx = 1 then return True; end if;
+            if Current_By_Vars.Is_Empty then return False; end if;
             for V of Current_By_Vars loop
-               declare
-                  Name : constant String := To_String (V);
-               begin
-                  if not (Get_Value (Idx, Name) = Get_Value (Idx - 1, Name)) then return True; end if;
-               end;
+               Prev_Value := Get_Value (Idx - 1, To_String(V));
+               Curr_Value := Get_Value (Idx, To_String(V));
+               -- Ada.Text_IO.Put_Line ("DEBUG: Is_First_In_Group comparing " & To_String(V) & " Prev:" & To_String(Prev_Value) & " Curr:" & To_String(Curr_Value));
+               if not (Curr_Value = Prev_Value) then 
+                  return True; 
+               end if;
             end loop;
             return False;
          end Is_First_In_Group;
 
          function Is_Last_In_Group (Idx : Positive) return Boolean is
+            Next_Value : Value;
+            Curr_Value : Value;
          begin
-            if Idx = Num_Records or Current_By_Vars.Is_Empty then return True; end if;
+            if Idx = Num_Records then return True; end if;
+            if Current_By_Vars.Is_Empty then return False; end if;
             for V of Current_By_Vars loop
-               declare
-                  Name : constant String := To_String (V);
-               begin
-                  if not (Get_Value (Idx, Name) = Get_Value (Idx + 1, Name)) then return True; end if;
-               end;
+               Next_Value := Get_Value (Idx + 1, To_String(V));
+               Curr_Value := Get_Value (Idx, To_String(V));
+               -- Ada.Text_IO.Put_Line ("DEBUG: Is_Last_In_Group comparing " & To_String(V) & " Next:" & To_String(Next_Value) & " Curr:" & To_String(Curr_Value));
+               if not (Curr_Value = Next_Value) then 
+                  return True; 
+               end if;
             end loop;
             return False;
          end Is_Last_In_Group;
@@ -942,7 +998,7 @@ package body SData.Interpreter is
          
          Num_Records := 0;
          Explicit_Loop_Trigger := False;
-         Current_By_Vars.Clear;
+         -- Current_By_Vars.Clear; -- This is now cleared only by an explicit BY statement.
          Initialize_PDV;
          Collector.Clear;
          
@@ -968,15 +1024,7 @@ package body SData.Interpreter is
 
             -- Step 1: Initialize PDV for this record
             Reset_PDV_Non_Held;
-            if Explicit_Loop_Trigger or Row_Count > 0 then
-               if I <= Row_Count then
-                  Load_PDV_From_Table (I);
-               else
-                  -- Logic for REPEAT: ensure current columns are in PDV
-                  -- but they will be missing by default from Reset_PDV_Non_Held.
-                  null;
-               end if;
-            end if;
+            Load_PDV_From_Table (I);
 
             -- Set First. and Last. indicators
             if not Current_By_Vars.Is_Empty then

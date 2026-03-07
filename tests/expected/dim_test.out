@@ -1,0 +1,4 @@
+X(1)= 10  X(2)= 20  X(3)= 30
+Y(0)= 100  Y(1)= 200  Y(2)= 300
+Inside RUN 3: Z(1)= 5  Z(2)= 15
+Outside RUN 3 (should be missing): Z(1)= .

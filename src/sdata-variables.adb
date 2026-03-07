@@ -110,8 +110,8 @@ package body SData.Variables is
    procedure Clear_Temporary is
    begin
       Temp_Symbols.Clear;
-      Permanent_Symbols.Clear;
-      -- Clear any temporary Real_Array elements
+      -- Permanent_Symbols are NOT cleared here. They are managed by the Data Step loop.
+      -- (i.e., Reset_PDV_Non_Held and Load_PDV_From_Table)
       declare
          Cursor : Array_Table_Pkg.Cursor := Array_Symbols.First;
       begin
