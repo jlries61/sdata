@@ -1,4 +1,5 @@
 with Ada.Text_IO;   use Ada.Text_IO;
+with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Containers.Vectors;
@@ -82,13 +83,26 @@ package body SData.File_IO is
       return To_String (Res);
    end Escape_XML;
 
-   ----------------
-   -- Open_Input --
-   ----------------
    procedure Open_Input (File_Name : String; Fmt : Format_Type) is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
+      U_Name  : constant String := To_Upper (File_Name);
    begin
+      if U_Name = "MOCK" or U_Name = "MOCK_DATA" then
+         Clear; Add_Column ("ID", Col_Integer); Add_Column ("NAME", Col_String); Add_Column ("SALARY", Col_Numeric);
+         for I in 1 .. 3 loop
+            Add_Row; Set_Value (I, "ID", (Kind => Val_Integer, Int_Val => I));
+            Set_Value (I, "SALARY", (Kind => Val_Numeric, Num_Val => 50000.0 + Float(I - 1) * 10000.0));
+         end loop;
+         Set_Value(1, "NAME", (Kind => Val_String, Str_Val => "Alice" & (1 .. 1019 => ' '), Str_Len => 5));
+         Set_Value(2, "NAME", (Kind => Val_String, Str_Val => "Bob" & (1 .. 1021 => ' '), Str_Len => 3));
+         Set_Value(3, "NAME", (Kind => Val_String, Str_Val => "Charlie" & (1 .. 1017 => ' '), Str_Len => 7));
+         if not SData.Config.Quiet_Mode then
+            Put_Line ("Generating mock data...");
+         end if;
+         return;
+      end if;
+
       for I in reverse File_Name'Range loop
          if File_Name (I) = '.' then
             Ext_Idx := I;

@@ -27,6 +27,7 @@ package SData.Variables is
    procedure Initialize_PDV;
    procedure Load_PDV_From_Table (Row : Positive);
    procedure Reset_PDV_Non_Held;
+   procedure Refresh_PDV_Names;
    
    package Symbol_Table_Pkg is new Ada.Containers.Indefinite_Hashed_Maps
      (Key_Type        => String,

@@ -171,6 +171,26 @@ package body SData.Variables is
       end if;
    end Load_PDV_From_Table;
 
+   -----------------------
+   -- Refresh_PDV_Names --
+   -----------------------
+   procedure Refresh_PDV_Names is
+      Col_Names : constant GNAT.Strings.String_List_Access := SData.Table.Get_Column_Names;
+   begin
+      if Col_Names /= null then
+         for I in Col_Names'Range loop
+            declare
+               Name : constant String := To_Upper (Col_Names (I).all);
+            begin
+               if not Permanent_Symbols.Contains (Name) then
+                  Permanent_Symbols.Insert (Name, (Kind => Val_Missing));
+               end if;
+            end;
+         end loop;
+         declare Old : GNAT.Strings.String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
+      end if;
+   end Refresh_PDV_Names;
+
    ------------------------
    -- Reset_PDV_Non_Held --
    ------------------------

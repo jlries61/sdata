@@ -577,18 +577,10 @@ package body SData.Interpreter is
                declare 
                   File_Name : constant String := Stmt.File_Path(1 .. Stmt.File_Len);
                begin
-                  if To_Upper(File_Name) = "MOCK" or To_Upper(File_Name) = "MOCK_DATA" then
-                     Clear; Add_Column ("ID", Col_Integer); Add_Column ("NAME", Col_String); Add_Column ("SALARY", Col_Numeric);
-                     for I in 1 .. 3 loop
-                        Add_Row; Set_Value (I, "ID", (Kind => Val_Integer, Int_Val => I));
-                        Set_Value (I, "SALARY", (Kind => Val_Numeric, Num_Val => 50000.0 + Float(I - 1) * 10000.0));
-                     end loop;
-                     Set_Value(1, "NAME", (Kind => Val_String, Str_Val => "Alice" & (1 .. 1019 => ' '), Str_Len => 5));
-                     Set_Value(2, "NAME", (Kind => Val_String, Str_Val => "Bob" & (1 .. 1021 => ' '), Str_Len => 3));
-                     Set_Value(3, "NAME", (Kind => Val_String, Str_Val => "Charlie" & (1 .. 1017 => ' '), Str_Len => 7));
-                  else SData.File_IO.Open_Input (File_Name, SData.Config.Input_Format); end if;
+                  SData.File_IO.Open_Input (File_Name, SData.Config.Input_Format);
                end;
                Input_File_Columns.Clear;
+               Refresh_PDV_Names;
                declare Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
                begin
                   if Col_Names /= null then
@@ -1094,7 +1086,7 @@ package body SData.Interpreter is
          if Current.Kind = Stmt_RUN then
             Run_One_Step (Step_Start, Current);
             Step_Start := Current.Next;
-         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO then
+         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE then
             Execute_Statement (Current);
          end if;
          Current := Current.Next;

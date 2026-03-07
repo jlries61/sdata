@@ -70,6 +70,11 @@ procedure SData_Main is
                Initialize (Ctx, Line (1 .. Last));
                Prog := Parse_Program (Ctx);
                
+               if Prog = null then
+                  -- Check if we have an unrecognized command error reported during parsing
+                  null;
+               end if;
+
                while Prog /= null loop
                   declare
                      -- Determine if the statement is declarative.
@@ -86,8 +91,10 @@ procedure SData_Main is
                            Run_Active_Program;
                         elsif Prog.Kind = Stmt_HELP or else 
                               Prog.Kind = Stmt_OUTPUT or else
-                              Prog.Kind = Stmt_ECHO then
-                           -- Special case for HELP, OUTPUT, ECHO in REPL
+                              Prog.Kind = Stmt_ECHO or else
+                              Prog.Kind = Stmt_NAMES or else
+                              Prog.Kind = Stmt_USE then
+                           -- Special case for interactive immediate execution
                            Execute (Prog);
                         else
                            Execute (Prog);
