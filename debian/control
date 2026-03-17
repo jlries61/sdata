@@ -1,0 +1,14 @@
+Source: sdata
+Section: science
+Priority: optional
+Maintainer: John L. Ries <john@theyarnbard.com>
+Build-Depends: debhelper-compat (= 13), gnat, gprbuild, make
+Standards-Version: 4.5.0
+
+Package: sdata
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: A statistical data interpreter for processing datasets.
+ sdata is a statistical data interpreter designed for data step-based
+ processing. It includes a comprehensive suite of statistical distributions,
+ aggregate functions, and advanced variable handling.

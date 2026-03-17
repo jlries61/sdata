@@ -11,3 +11,10 @@
 *.swp
 *~
 *.src.rpm
+sdata_0.1*
+sdata-0.1.tar.gz
+debian/files
+debian/sdata/
+debian/sdata.substvars
+debian/debhelper-build-stamp
+

@@ -90,6 +90,23 @@ srpm: clean
 	@rm -rf rpmbuild
 	@echo "SRPM created: sdata-0.1-1.src.rpm"
 
+dsc: clean
+	@echo "Creating Debian Source Package..."
+	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
+	 TEMP_DIR=$$(mktemp -d); \
+	 BASE_DIR="sdata-0.1"; \
+	 SRC_DIR="$$TEMP_DIR/$$BASE_DIR"; \
+	 mkdir -p "$$SRC_DIR"; \
+	 cp -r * "$$SRC_DIR/"; \
+	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz sciada-0.4.0.tar.gz; do \
+	   tar xzf "$$TARBALL_DIR/$$tb" -C "$$SRC_DIR/"; \
+	 done; \
+	 cd "$$TEMP_DIR" && tar czf "sdata_0.1.orig.tar.gz" "$$BASE_DIR"; \
+	 cd "$$SRC_DIR" && dpkg-source -b .; \
+	 mv "$$TEMP_DIR"/sdata_0.1* . ; \
+	 rm -rf "$$TEMP_DIR"
+	@echo "Debian Source Package created (sdata_0.1-1.dsc, sdata_0.1.orig.tar.gz, etc.)"
+
 
 install: build
 	install -d $(INSTALL_DIR)

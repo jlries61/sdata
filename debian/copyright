@@ -1,0 +1,23 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: sdata
+Source: https://github.com/user/sdata
+
+Files: *
+Copyright: 2026 John L. Ries <john@theyarnbard.com>
+License: MIT
+
+Files: zipada_*
+Copyright: Gautier de Montmollin
+License: MIT
+
+Files: xmlada_*
+Copyright: AdaCore
+License: GPL-3.0+
+
+Files: mathpaqs_*
+Copyright: Gautier de Montmollin
+License: MIT
+
+Files: sciada_*
+Copyright: Stephane Carrez
+License: Apache-2.0
