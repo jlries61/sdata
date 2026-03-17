@@ -1026,6 +1026,7 @@ package body SData.Interpreter is
                SData.Table.Clear;
                SData.Variables.Clear_Temporary;
                SData.Variables.Initialize_PDV;
+               Clear_Active_Program;
             when others => null;
       end case;
    end Execute_Statement;
@@ -1199,7 +1200,7 @@ package body SData.Interpreter is
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
             Step_Start := Current.Next;
-         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE or else Current.Kind = Stmt_SYSTEM or else Current.Kind = Stmt_FPATH then
+         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE or else Current.Kind = Stmt_SYSTEM or else Current.Kind = Stmt_FPATH or else Current.Kind = Stmt_NEW then
             Execute_Statement (Current);
          end if;
          Current := Current.Next;
