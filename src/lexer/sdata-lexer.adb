@@ -216,6 +216,7 @@ package body SData.Lexer is
                elsif Upper = "NEW" then T.Kind := Token_NEW;
                elsif Upper = "IF" then T.Kind := Token_IF;
                elsif Upper = "THEN" then T.Kind := Token_THEN;
+               elsif Upper = "ELSEIF" then T.Kind := Token_ELSEIF;
                elsif Upper = "ELSE" then T.Kind := Token_ELSE;
                elsif Upper = "FOR" then T.Kind := Token_FOR;
                elsif Upper = "NEXT" then T.Kind := Token_NEXT;

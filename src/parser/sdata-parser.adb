@@ -16,6 +16,89 @@ package body SData.Parser is
    function Parse_Expression (Ctx : in out Parser_Context) return Expression_Access;
    function Parse_Expression_List (Ctx : in out Parser_Context; Closing : Token_Kind) return Expression_List;
    function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access;
+   --  Parse an IF/ELSEIF statement starting from the condition (IF token already consumed).
+   function Parse_If_Statement (Ctx : in out Parser_Context) return Statement_Access;
+
+   --  Parse a block of statements for the body of a block-form IF clause.
+   --  Stops when it encounters ELSE, ELSEIF, or END (any of which is consumed).
+   --  Returns the terminating token kind via Term_Kind.
+   function Parse_If_Body (Ctx      : in out Parser_Context;
+                           Term_Kind : out Token_Kind) return Statement_Access;
+
+   function Parse_If_Body (Ctx      : in out Parser_Context;
+                           Term_Kind : out Token_Kind) return Statement_Access is
+      First, Current, New_Stmt : Statement_Access := null;
+   begin
+      loop
+         --  Skip blank lines / colons.
+         while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline or else
+               Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon loop
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+         end loop;
+         --  Check terminators.
+         declare Peek : constant Token_Kind := Peek_Next_Token (Ctx.Lex_Ctx).Kind; begin
+            if Peek = Token_ELSE or else Peek = Token_ELSEIF or else
+               Peek = Token_END  or else Peek = Token_EOF
+            then
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               Term_Kind := Peek;
+               return First;
+            end if;
+         end;
+         New_Stmt := Parse_Statement (Ctx);
+         if New_Stmt = null then Term_Kind := Token_EOF; return First; end if;
+         if First = null then First := New_Stmt; Current := New_Stmt;
+         else Current.Next := New_Stmt; Current := New_Stmt; end if;
+      end loop;
+   end Parse_If_Body;
+
+   --  Parse an IF (or ELSEIF) statement starting from the condition expression.
+   --  The IF/ELSEIF keyword has already been consumed by the caller.
+   function Parse_If_Statement (Ctx : in out Parser_Context) return Statement_Access is
+      S : constant Statement_Access := new Statement (Stmt_IF);
+   begin
+      S.Condition := Parse_Expression (Ctx);
+      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_THEN then
+         declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+      end if;
+      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline or else
+         Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_EOF
+      then
+         --  Block form.
+         declare Term : Token_Kind; begin
+            S.Then_Branch := Parse_If_Body (Ctx, Term);
+            if Term = Token_ELSEIF then
+               S.Else_Branch := Parse_If_Statement (Ctx);
+            elsif Term = Token_ELSE then
+               declare Term2 : Token_Kind; begin
+                  S.Else_Branch := Parse_If_Body (Ctx, Term2);
+                  if Term2 = Token_END and then
+                     Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_IF then
+                     declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                  end if;
+               end;
+            elsif Term = Token_END then
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_IF then
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               end if;
+               S.Else_Branch := null;
+            end if;
+         end;
+      else
+         --  Inline form.
+         S.Then_Branch := Parse_Statement (Ctx);
+         if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_ELSEIF then
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+            S.Else_Branch := Parse_If_Statement (Ctx);
+         elsif Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_ELSE then
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+            S.Else_Branch := Parse_Statement (Ctx);
+         else
+            S.Else_Branch := null;
+         end if;
+      end if;
+      return S;
+   end Parse_If_Statement;
    function Parse_Rename_List (Ctx : in out Parser_Context) return Rename_List;
 
    ---------------------------
@@ -727,31 +810,8 @@ package body SData.Parser is
             Stmt := new Statement (Stmt_RUN);
 
          when Token_IF =>
-            Stmt := new Statement (Stmt_IF);
-            Stmt.Condition := Parse_Expression (Ctx);
-            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_THEN then
-               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-            end if;
-            --  Block form: IF cond THEN <newline> ... END IF
-            --  Inline form: IF cond THEN stmt [ELSE stmt]
-            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline or else
-               Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_EOF
-            then
-               --  Block form: parse until we see END (which precedes IF or ELSE).
-               Stmt.Then_Branch := Parse_Block (Ctx, Token_END);
-               --  Consume the trailing IF token (END was consumed by Parse_Block).
-               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_IF then
-                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-               end if;
-               Stmt.Else_Branch := null;
-            else
-               --  Inline form: single statement on same line.
-               Stmt.Then_Branch := Parse_Statement (Ctx);
-               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_ELSE then
-                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                  Stmt.Else_Branch := Parse_Statement (Ctx);
-               end if;
-            end if;
+            --  Delegate to Parse_If_Statement (IF token already consumed).
+            Stmt := Parse_If_Statement (Ctx);
 
          when Token_WHILE =>
             Stmt := new Statement (Stmt_WHILE);

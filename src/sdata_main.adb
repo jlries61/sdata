@@ -47,7 +47,6 @@ procedure SData_Main is
       Put_Line ("  -s, --outfmt             Output dataset and format");
       Put_Line ("  -o <file>                Console output file");
       Put_Line ("  -q                       Suppress console output (Quiet Mode)");
-      Put_Line ("  -t                       Max temporary variable memory (not yet implemented)");
       Put_Line ("  -p                       Pager specification (not yet implemented)");
    end Print_Usage;
 
