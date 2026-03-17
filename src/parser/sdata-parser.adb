@@ -888,6 +888,12 @@ package body SData.Parser is
                         Next_T.Kind = Token_SUBMIT or else
                         Next_T.Kind = Token_NEW or else
                         Next_T.Kind = Token_RSEED or else
+                        Next_T.Kind = Token_FPATH or else
+                        Next_T.Kind = Token_ECHO or else
+                        Next_T.Kind = Token_SYSTEM or else
+                        Next_T.Kind = Token_ELSEIF or else
+                        Next_T.Kind = Token_NOT or else
+                        Next_T.Kind = Token_WRITE or else
                         Next_T.Kind = Token_QUIT then
                         declare
                            Arg_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);

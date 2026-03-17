@@ -341,22 +341,35 @@ package body SData.Interpreter is
          if T = "" then
             Put_Line ("SData version " & SData.Config.Version_Str);
             Put_Line ("Available Commands:");
-            Put_Line ("  Data:      USE, SAVE, RUN, NEW, NAMES, QUIT");
-            Put_Line ("  Variables: LET, SET, ARRAY, DIM, HOLD, UNHOLD, DIGITS");
-            Put_Line ("  Columns:   KEEP, DROP, RENAME");
-            Put_Line ("  Logic:     IF, SELECT, DELETE, WRITE");
-            Put_Line ("  System:    SUBMIT, HELP, REM, OUTPUT");
-            Put_Line ("  Loops:     FOR, WHILE, REPEAT");
+            Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE");
+            Put_Line ("  Variables:   LET, SET, HOLD, UNHOLD, KEEP, DROP, RENAME");
+            Put_Line ("  Arrays:      ARRAY, DIM");
+            Put_Line ("  Control:     IF, SELECT, FOR, WHILE, REPEAT");
+            Put_Line ("  Data step:   BY, SORT, REPEAT");
+            Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
+            Put_Line ("  Files/paths: FPATH");
+            Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, QUIT, END");
             My_New_Line;
             Put_Line ("Available Functions:");
-            Put_Line ("  Math:      ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
-            Put_Line ("  Aggregate: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS");
-            Put_Line ("  Stat PDF:  ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF, MDF, WDF");
-            Put_Line ("  Stat CDF:  ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF, MCF, WCF");
-            Put_Line ("  Stat IDF:  ZIF, NIF, UIF, EIF, BIF");
-            Put_Line ("  Stat RN:   ZRN, NRN, URN, ERN, PRN, GRN, MRN, WRN");
+            Put_Line ("  Math:        ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
+            Put_Line ("  Trig (rad):  SIN, COS, TAN, ATN, ATAN2, SINH, COSH, TANH");
+            Put_Line ("  Trig (deg):  SIND, COSD, TAND, ATND, ATAN2D");
+            Put_Line ("  String:      LEN, LEFT$, RIGHT$, MID$, TRIM$, UCASE$, LCASE$,");
+            Put_Line ("               POS, CHR$, STR$, VAL, NUM$");
+            Put_Line ("  Conversion:  NUM, HEX$, OCT$, BIN$");
+            Put_Line ("  Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, OBS, OBSC$");
+            Put_Line ("  Special:     MISSING, NMISS, RAN, RANDOM, DATE$, TIME$, SHELL");
+            Put_Line ("  Aggregate:   SUM, MEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS");
+            Put_Line ("  Stat PDF:    ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF,");
+            Put_Line ("               MDF, WDF, LDF");
+            Put_Line ("  Stat CDF:    ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF,");
+            Put_Line ("               MCF, WCF, LCF");
+            Put_Line ("  Stat IDF:    ZIF, NIF, UIF, EIF, BIF, GIF, XIF, TIF, FIF, WIF,");
+            Put_Line ("               LIF, PIF");
+            Put_Line ("  Stat RN:     ZRN, NRN, URN, ERN, BRN, PRN, GRN, MRN, XRN, TRN,");
+            Put_Line ("               FRN, WRN, LRN, RAN, RANDOM");
             My_New_Line;
-            Put_Line ("For detailed help on a specific command or function, use: HELP <name>");
+            Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
          elsif T = "USE" then
             Put_Line ("Command: USE ""filename""");
             Put_Line ("Loads a dataset from CSV, ODS, or XLSX files into the Data Table.");
@@ -446,99 +459,332 @@ package body SData.Interpreter is
          elsif T = "UNHOLD" then
             Put_Line ("Command: UNHOLD [variable(s)]");
             Put_Line ("Resets variables to missing for each record (default behavior).");
+         -- ── Commands ──────────────────────────────────────────────────────
+         elsif T = "USE" then
+            Put_Line ("Command: USE ""filename""");
+            Put_Line ("Loads a dataset (CSV, ODS, XLSX) into the Data Table.");
+            Put_Line ("USE ""mock"" generates a small synthetic dataset for testing.");
+         elsif T = "SAVE" then
+            Put_Line ("Command: SAVE ""filename""");
+            Put_Line ("Writes the current Data Table to a file after the next RUN.");
+         elsif T = "RUN" then
+            Put_Line ("Command: RUN");
+            Put_Line ("Executes the queued data step and reports record/variable counts.");
+         elsif T = "NEW" then
+            Put_Line ("Command: NEW");
+            Put_Line ("Clears the Data Table, all variables, and the queued program.");
+         elsif T = "NAMES" then
+            Put_Line ("Command: NAMES");
+            Put_Line ("Lists currently defined permanent and temporary variables.");
+         elsif T = "WRITE" then
+            Put_Line ("Command: WRITE");
+            Put_Line ("Explicitly writes the current PDV record to the output table.");
+            Put_Line ("Suppresses the automatic end-of-step write for that record.");
+         elsif T = "DELETE" then
+            Put_Line ("Command: DELETE");
+            Put_Line ("Discards the current record; processing moves to the next record.");
+         elsif T = "LET" then
+            Put_Line ("Command: LET variable = expression");
+            Put_Line ("Assigns a value to a permanent variable (column in the Data Table).");
+            Put_Line ("Type is determined by name suffix: none=float, %=integer, $=string.");
+         elsif T = "SET" then
+            Put_Line ("Command: SET variable = expression");
+            Put_Line ("Assigns a value to a temporary variable (not saved to the table).");
+         elsif T = "HOLD" then
+            Put_Line ("Command: HOLD [variable(s)]");
+            Put_Line ("Retains the listed permanent variables across records (not reset to");
+            Put_Line ("missing at the start of each record). No args = hold all.");
+         elsif T = "UNHOLD" then
+            Put_Line ("Command: UNHOLD [variable(s)]");
+            Put_Line ("Cancels a previous HOLD. No args = unhold all.");
+         elsif T = "KEEP" then
+            Put_Line ("Command: KEEP variable(s)");
+            Put_Line ("Drops all permanent variables NOT listed after the next RUN.");
+         elsif T = "DROP" then
+            Put_Line ("Command: DROP variable(s)");
+            Put_Line ("Drops the listed permanent variables after the next RUN.");
+         elsif T = "RENAME" then
+            Put_Line ("Command: RENAME old=new [, old=new ...]");
+            Put_Line ("Renames columns in the Data Table.");
+         elsif T = "ARRAY" then
+            Put_Line ("Command: ARRAY arrayname var1 [, var2 ...]");
+            Put_Line ("Creates a virtual array providing indexed access to existing variables.");
+            Put_Line ("ARRAY arrayname (no vars) undefines the virtual array.");
+         elsif T = "DIM" then
+            Put_Line ("Command: DIM arrayname(lower [TO upper]) [/TEMP]");
+            Put_Line ("Creates a real array. Elements initialised to missing.");
+            Put_Line ("/TEMP makes the array temporary (not saved to the table).");
+         elsif T = "ELSEIF" then
+            Put_Line ("ELSEIF is part of the IF statement. See: HELP IF");
+         elsif T = "IF" then
+            Put_Line ("Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]");
+            Put_Line ("         IF condition THEN");
+            Put_Line ("           statements");
+            Put_Line ("         [ELSEIF condition THEN");
+            Put_Line ("           statements]");
+            Put_Line ("         [ELSE");
+            Put_Line ("           statements]");
+            Put_Line ("         END IF");
+            Put_Line ("Conditional execution. ELSEIF supported in block form.");
+         elsif T = "SELECT" then
+            Put_Line ("Command: SELECT [expression]");
+            Put_Line ("           CASE (value [, value ...]) statements");
+            Put_Line ("           [OTHERWISE statements]");
+            Put_Line ("         END");
+            Put_Line ("Multi-way branch. Without expression uses WHEN (condition) form.");
+         elsif T = "FOR" then
+            Put_Line ("Command: FOR var = start TO end [STEP s]");
+            Put_Line ("           statements");
+            Put_Line ("         NEXT");
+            Put_Line ("Counter-controlled loop.");
+         elsif T = "WHILE" then
+            Put_Line ("Command: WHILE condition");
+            Put_Line ("           statements");
+            Put_Line ("         WEND");
+            Put_Line ("Condition-controlled loop; executes while condition is true.");
+         elsif T = "REPEAT" then
+            Put_Line ("Command (data step): REPEAT n");
+            Put_Line ("  Creates n new records in the next RUN.");
+            Put_Line ("Command (loop):      REPEAT");
+            Put_Line ("                       statements");
+            Put_Line ("                     UNTIL condition");
+            Put_Line ("  Executes body at least once; loops until condition is true.");
+         elsif T = "BY" then
+            Put_Line ("Command: BY variable(s)");
+            Put_Line ("Divides input into groups by consecutive equal values of the listed");
+            Put_Line ("variables. Enables BOG()/EOG() and FIRST./LAST. indicators.");
+         elsif T = "SORT" then
+            Put_Line ("Command: SORT variable(s)");
+            Put_Line ("Sorts the Data Table by the specified variables (ascending).");
+         elsif T = "PRINT" then
+            Put_Line ("Command: PRINT [expr [, expr ...]]");
+            Put_Line ("Prints values separated by spaces. No arguments prints all");
+            Put_Line ("permanent variables with their names for the current record.");
+         elsif T = "OUTPUT" then
+            Put_Line ("Command: OUTPUT [""filename""]");
+            Put_Line ("Redirects PRINT output to a file (written to file AND stdout).");
+            Put_Line ("OUTPUT with no argument closes the current output file.");
+         elsif T = "ECHO" then
+            Put_Line ("Command: ECHO ON | OFF");
+            Put_Line ("Enables or disables writing console output to stdout.");
+            Put_Line ("Output still goes to the OUTPUT file if one is open.");
+         elsif T = "DIGITS" then
+            Put_Line ("Command: DIGITS n");
+            Put_Line ("Sets decimal places for floating-point output (default 5).");
+         elsif T = "FPATH" then
+            Put_Line ("Command: FPATH [path] [/ USE | SAVE | SUBMIT | OUTPUT]");
+            Put_Line ("Sets the default directory for the specified command(s).");
+            Put_Line ("FPATH with no arguments resets all paths to current directory.");
+         elsif T = "RSEED" then
+            Put_Line ("Command: RSEED n");
+            Put_Line ("Seeds the random number generator with integer n.");
+            Put_Line ("Re-seeding with the same value reproduces the same sequence.");
+         elsif T = "SYSTEM" then
+            Put_Line ("Command: SYSTEM ""shell-command""");
+            Put_Line ("Executes a shell command. Disabled by --noshell flag.");
+         elsif T = "SUBMIT" then
+            Put_Line ("Command: SUBMIT ""filename""");
+            Put_Line ("Reads and executes commands from a script file.");
+            Put_Line ("Recursive SUBMIT (direct or indirect) is detected and rejected.");
+            Put_Line ("Default extension: .CMD");
+         elsif T = "HELP" then
+            Put_Line ("Command: HELP [topic | /ALL]");
+            Put_Line ("Displays help. HELP /ALL prints the full reference.");
+         elsif T = "QUIT" or else T = "END" then
+            Put_Line ("Command: QUIT | END");
+            Put_Line ("Exits the interpreter.");
+
+         -- ── Math functions ───────────────────────────────────────────────
+         elsif T = "ABS" then
+            Put_Line ("Function: ABS(x)  ->  |x|");
+         elsif T = "SQRT" then
+            Put_Line ("Function: SQRT(x)  ->  square root of x (x >= 0)");
+         elsif T = "LOG" then
+            Put_Line ("Function: LOG(x)  ->  natural logarithm (x > 0)");
+         elsif T = "LOG10" then
+            Put_Line ("Function: LOG10(x)  ->  base-10 logarithm (x > 0)");
+         elsif T = "EXP" then
+            Put_Line ("Function: EXP(x)  ->  e raised to the power x");
+         elsif T = "ROUND" then
+            Put_Line ("Function: ROUND(x [, n])  ->  x rounded to n decimal places (default 0)");
+         elsif T = "CEIL" then
+            Put_Line ("Function: CEIL(x)  ->  smallest integer >= x");
+         elsif T = "FLOOR" then
+            Put_Line ("Function: FLOOR(x)  ->  largest integer <= x");
+         elsif T = "INT" then
+            Put_Line ("Function: INT(x)  ->  truncate toward zero");
+         elsif T = "MOD" then
+            Put_Line ("Function: MOD(x, y)  ->  x mod y (floor division remainder)");
+
+         -- ── Trig (radians) ────────────────────────────────────────────────
+         elsif T = "SIN" then  Put_Line ("Function: SIN(x)  ->  sine of x (radians)");
+         elsif T = "COS" then  Put_Line ("Function: COS(x)  ->  cosine of x (radians)");
+         elsif T = "TAN" then  Put_Line ("Function: TAN(x)  ->  tangent of x (radians)");
+         elsif T = "ATN" then  Put_Line ("Function: ATN(x)  ->  arctangent of x (radians)");
+         elsif T = "ATAN2" then Put_Line ("Function: ATAN2(y, x)  ->  arctangent of y/x (radians)");
+         elsif T = "SINH" then Put_Line ("Function: SINH(x)  ->  hyperbolic sine");
+         elsif T = "COSH" then Put_Line ("Function: COSH(x)  ->  hyperbolic cosine");
+         elsif T = "TANH" then Put_Line ("Function: TANH(x)  ->  hyperbolic tangent");
+
+         -- ── Trig (degrees) ────────────────────────────────────────────────
+         elsif T = "SIND"  then Put_Line ("Function: SIND(x)   ->  sine of x (degrees)");
+         elsif T = "COSD"  then Put_Line ("Function: COSD(x)   ->  cosine of x (degrees)");
+         elsif T = "TAND"  then Put_Line ("Function: TAND(x)   ->  tangent of x (degrees)");
+         elsif T = "ATND"  then Put_Line ("Function: ATND(x)   ->  arctangent of x (degrees)");
+         elsif T = "ATAN2D" then Put_Line ("Function: ATAN2D(y,x) ->  arctangent of y/x (degrees)");
+
+         -- ── String functions ─────────────────────────────────────────────
+         elsif T = "LEN"   then Put_Line ("Function: LEN(s$)  ->  length of string s$");
+         elsif T = "LEFT$" then Put_Line ("Function: LEFT$(s$, n)  ->  leftmost n characters");
+         elsif T = "RIGHT$" then Put_Line ("Function: RIGHT$(s$, n)  ->  rightmost n characters");
+         elsif T = "MID$"  then Put_Line ("Function: MID$(s$, start [, len])  ->  substring");
+         elsif T = "TRIM$" then Put_Line ("Function: TRIM$(s$)  ->  strip leading/trailing spaces");
+         elsif T = "UCASE$" then Put_Line ("Function: UCASE$(s$)  ->  convert to upper case");
+         elsif T = "LCASE$" then Put_Line ("Function: LCASE$(s$)  ->  convert to lower case");
+         elsif T = "POS"   then Put_Line ("Function: POS(needle$, haystack$)  ->  1-based position, 0=not found");
+         elsif T = "CHR$"  then Put_Line ("Function: CHR$(n)  ->  character with ASCII code n");
+         elsif T = "STR$"  then Put_Line ("Function: STR$(x)  ->  numeric x formatted as string");
+         elsif T = "VAL"   then Put_Line ("Function: VAL(s$)  ->  parse string s$ as a number");
+         elsif T = "NUM$"  then Put_Line ("Function: NUM$(x)  ->  numeric x formatted as string (alias for STR$)");
+         elsif T = "NUM"   then Put_Line ("Function: NUM(x)  ->  convert string or integer x to float");
+
+         -- ── Base conversion ───────────────────────────────────────────────
+         elsif T = "HEX$" then Put_Line ("Function: HEX$(n)  ->  hexadecimal string for integer n");
+         elsif T = "OCT$" then Put_Line ("Function: OCT$(n)  ->  octal string for integer n");
+         elsif T = "BIN$" then Put_Line ("Function: BIN$(n)  ->  binary string for integer n");
+
+         -- ── Record navigation ─────────────────────────────────────────────
+         elsif T = "RECNO" then Put_Line ("Function: RECNO()  ->  current record number (1-based)");
+         elsif T = "BOF"   then Put_Line ("Function: BOF()  ->  1 if first record, else 0");
+         elsif T = "EOF"   then Put_Line ("Function: EOF()  ->  1 if last record, else 0");
+         elsif T = "BOG"   then Put_Line ("Function: BOG()  ->  1 at start of BY group, else 0");
+         elsif T = "EOG"   then Put_Line ("Function: EOG()  ->  1 at end of BY group, else 0");
+         elsif T = "LAG" or else T = "LAGC$" then
+            Put_Line ("Function: LAG(""varname"") / LAGC$(""varname"")");
+            Put_Line ("  Returns the value of the named variable from the previous record.");
+            Put_Line ("  Returns missing for the first record.");
+         elsif T = "OBS" or else T = "OBSC$" then
+            Put_Line ("Function: OBS(""varname"", row) / OBSC$(""varname"", row)");
+            Put_Line ("  Returns the value of the named variable from the given row.");
+
+         -- ── Special functions ─────────────────────────────────────────────
+         elsif T = "MISSING" then Put_Line ("Function: MISSING(x)  ->  1 if x is missing, else 0");
+         elsif T = "NMISS"   then Put_Line ("Function: NMISS(v1, ...)  ->  count of missing values");
+         elsif T = "RAN" or else T = "RANDOM" then
+            Put_Line ("Function: RAN() / RANDOM()  ->  uniform random number in [0, 1)");
+            Put_Line ("  Use RSEED n before calling to get a reproducible sequence.");
+         elsif T = "DATE$"  then Put_Line ("Function: DATE$()  ->  current date as ""YYYY-MM-DD""");
+         elsif T = "TIME$"  then Put_Line ("Function: TIME$()  ->  current time as ""HH:MM:SS""");
+         elsif T = "SHELL"  then
+            Put_Line ("Function: SHELL(""command"")  ->  0 on success, 1 on failure");
+            Put_Line ("  Disabled by --noshell flag.");
+
+         -- ── Aggregate functions ────────────────────────────────────────────
+         elsif T = "SUM"    then Put_Line ("Function: SUM(v1, ...)    ->  sum of non-missing values");
+         elsif T = "MEAN"   then Put_Line ("Function: MEAN(v1, ...)   ->  mean of non-missing values");
+         elsif T = "STD"    then Put_Line ("Function: STD(v1, ...)    ->  sample std dev");
+         elsif T = "VAR"    then Put_Line ("Function: VAR(v1, ...)    ->  sample variance");
+         elsif T = "MIN"    then Put_Line ("Function: MIN(v1, ...)    ->  minimum non-missing value");
+         elsif T = "MAX"    then Put_Line ("Function: MAX(v1, ...)    ->  maximum non-missing value");
+         elsif T = "MEDIAN" then Put_Line ("Function: MEDIAN(v1, ...) ->  median of non-missing values");
+         elsif T = "N"      then Put_Line ("Function: N(v1, ...)      ->  count of non-missing values");
+
+         -- ── Statistical distributions ─────────────────────────────────────
+         --  Naming: Z=Normal, N=Normal(mu,sigma), U=Uniform, E=Exponential,
+         --          B=Beta, P=Poisson, G=Gamma, X=Chi-square, T=Student-T,
+         --          F=F, M=Binomial, W=Weibull, L=Laplace
+         --  Suffix: DF=PDF, CF=CDF, IF=IDF(quantile), RN=random variate
+         elsif T = "ZDF" or T = "ZCF" or T = "ZIF" or T = "ZRN" then
+            Put_Line ("Standard Normal (mu=0, sigma=1): ZDF(x) ZCF(x) ZIF(p) ZRN()");
+         elsif T = "NDF" or T = "NCF" or T = "NIF" or T = "NRN" then
+            Put_Line ("Normal: NDF(x,mu,sigma) NCF(x,mu,sigma) NIF(p,mu,sigma) NRN(mu,sigma)");
+         elsif T = "UDF" or T = "UCF" or T = "UIF" or T = "URN" then
+            Put_Line ("Uniform: UDF(x,lo,hi) UCF(x,lo,hi) UIF(p,lo,hi) URN(lo,hi)");
+         elsif T = "EDF" or T = "ECF" or T = "EIF" or T = "ERN" then
+            Put_Line ("Exponential: EDF(x,rate) ECF(x,rate) EIF(p,rate) ERN(rate)");
+         elsif T = "BDF" or T = "BCF" or T = "BIF" or T = "BRN" then
+            Put_Line ("Beta: BDF(x,a,b) BCF(x,a,b) BIF(p,a,b)  [no BRN]");
+         elsif T = "PDF" or T = "PCF" or T = "PIF" or T = "PRN" then
+            Put_Line ("Poisson: PDF(k,lambda) PCF(k,lambda) PIF(p,lambda) PRN(lambda)");
+         elsif T = "GDF" or T = "GCF" or T = "GIF" or T = "GRN" then
+            Put_Line ("Gamma: GDF(x,shape,rate) GCF(x,shape,rate) GIF(p,shape,rate) GRN(shape,rate)");
+         elsif T = "XDF" or T = "XCF" or T = "XIF" or T = "XRN" then
+            Put_Line ("Chi-square: XDF(x,df) XCF(x,df) XIF(p,df) XRN(df)");
+         elsif T = "TDF" or T = "TCF" or T = "TIF" or T = "TRN" then
+            Put_Line ("Student-T: TDF(x,df) TCF(x,df) TIF(p,df) TRN(df)");
+         elsif T = "FDF" or T = "FCF" or T = "FIF" or T = "FRN" then
+            Put_Line ("F: FDF(x,df1,df2) FCF(x,df1,df2) FIF(p,df1,df2) FRN(df1,df2)");
+         elsif T = "MDF" or T = "MCF" or T = "MIF" or T = "MRN" then
+            Put_Line ("Binomial: MDF(k,n,p) MCF(k,n,p) MIF(p,n,prob)  [no MRN]");
+         elsif T = "WDF" or T = "WCF" or T = "WIF" or T = "WRN" then
+            Put_Line ("Weibull: WDF(x,scale,shape) WCF(x,scale,shape) WIF(p,scale,shape) WRN(scale,shape)");
+         elsif T = "LDF" or T = "LCF" or T = "LIF" or T = "LRN" then
+            Put_Line ("Laplace: LDF(x,loc,scale) LCF(x,loc,scale) LIF(p,loc,scale) LRN(loc,scale)");
+
+         -- ── HELP /ALL ────────────────────────────────────────────────────
          elsif T = "/ALL" then
             declare
                type Topic_Array is array (Positive range <>) of GNAT.Strings.String_Access;
                Cmds : constant Topic_Array := (
-                  new String'("USE"), new String'("SAVE"), new String'("RUN"), 
-                  new String'("NEW"), new String'("NAMES"), new String'("LET"),
-                  new String'("SET"), new String'("ARRAY"), new String'("DIM"),
-                  new String'("HOLD"), new String'("UNHOLD"), new String'("DIGITS"),
-                  new String'("KEEP"), new String'("DROP"), new String'("RENAME"),
-                  new String'("IF"), new String'("SELECT"), new String'("DELETE"),
-                  new String'("WRITE"),
-                  new String'("OUTPUT"), new String'("FOR"), new String'("WHILE"),
-                  new String'("REPEAT"), new String'("SUBMIT"), new String'("QUIT")
+                  new String'("USE"), new String'("SAVE"), new String'("RUN"),
+                  new String'("NEW"), new String'("NAMES"), new String'("WRITE"),
+                  new String'("DELETE"), new String'("LET"), new String'("SET"),
+                  new String'("HOLD"), new String'("UNHOLD"), new String'("KEEP"),
+                  new String'("DROP"), new String'("RENAME"), new String'("ARRAY"),
+                  new String'("DIM"), new String'("IF"), new String'("SELECT"),
+                  new String'("FOR"), new String'("WHILE"), new String'("REPEAT"),
+                  new String'("BY"), new String'("SORT"), new String'("PRINT"),
+                  new String'("OUTPUT"), new String'("ECHO"), new String'("DIGITS"),
+                  new String'("FPATH"), new String'("RSEED"), new String'("SYSTEM"),
+                  new String'("SUBMIT"), new String'("HELP"), new String'("QUIT")
                );
                Funcs : constant Topic_Array := (
                   new String'("ABS"), new String'("SQRT"), new String'("LOG"),
                   new String'("LOG10"), new String'("EXP"), new String'("ROUND"),
                   new String'("CEIL"), new String'("FLOOR"), new String'("INT"),
-                  new String'("MOD"), new String'("SUM"), new String'("MEAN"),
-                  new String'("STD"), new String'("VAR"), new String'("MIN"),
-                  new String'("MAX"), new String'("N"), new String'("NMISS")
+                  new String'("MOD"), new String'("SIN"), new String'("COS"),
+                  new String'("TAN"), new String'("ATN"), new String'("ATAN2"),
+                  new String'("SINH"), new String'("COSH"), new String'("TANH"),
+                  new String'("SIND"), new String'("COSD"), new String'("TAND"),
+                  new String'("ATND"), new String'("ATAN2D"),
+                  new String'("LEN"), new String'("LEFT$"), new String'("RIGHT$"),
+                  new String'("MID$"), new String'("TRIM$"), new String'("UCASE$"),
+                  new String'("LCASE$"), new String'("POS"), new String'("CHR$"),
+                  new String'("STR$"), new String'("VAL"), new String'("NUM$"),
+                  new String'("NUM"), new String'("HEX$"), new String'("OCT$"),
+                  new String'("BIN$"), new String'("RECNO"), new String'("BOF"),
+                  new String'("EOF"), new String'("BOG"), new String'("EOG"),
+                  new String'("LAG"), new String'("OBS"), new String'("MISSING"),
+                  new String'("NMISS"), new String'("RAN"), new String'("DATE$"),
+                  new String'("TIME$"), new String'("SHELL"), new String'("SUM"),
+                  new String'("MEAN"), new String'("STD"), new String'("VAR"),
+                  new String'("MIN"), new String'("MAX"), new String'("MEDIAN"),
+                  new String'("N"), new String'("ZDF"), new String'("NDF"),
+                  new String'("UDF"), new String'("EDF"), new String'("BDF"),
+                  new String'("PDF"), new String'("GDF"), new String'("XDF"),
+                  new String'("TDF"), new String'("FDF"), new String'("MDF"),
+                  new String'("WDF"), new String'("LDF"), new String'("ZIF"),
+                  new String'("NIF"), new String'("UIF"), new String'("EIF"),
+                  new String'("BIF"), new String'("GIF"), new String'("XIF"),
+                  new String'("TIF"), new String'("FIF"), new String'("WIF"),
+                  new String'("LIF"), new String'("PIF")
                );
             begin
-               Put_Line ("========================================");
-               Put_Line ("COMMAND REFERENCE");
-               Put_Line ("========================================");
+               Put_Line ("=== COMMAND REFERENCE ===");
                for I in Cmds'Range loop
-                  Print_Help (Cmds (I).all);
-                  Put_Line ("========================================");
+                  Print_Help (Cmds (I).all); My_New_Line;
                end loop;
-               My_New_Line;
-               Put_Line ("========================================");
-               Put_Line ("FUNCTION REFERENCE");
-               Put_Line ("========================================");
+               Put_Line ("=== FUNCTION REFERENCE ===");
                for I in Funcs'Range loop
-                  Print_Help (Funcs (I).all);
-                  Put_Line ("========================================");
+                  Print_Help (Funcs (I).all); My_New_Line;
                end loop;
-               for I in Cmds'Range loop declare Old : GNAT.Strings.String_Access := Cmds (I); begin GNAT.Strings.Free (Old); end; end loop;
+               for I in Cmds'Range  loop declare Old : GNAT.Strings.String_Access := Cmds (I);  begin GNAT.Strings.Free (Old); end; end loop;
                for I in Funcs'Range loop declare Old : GNAT.Strings.String_Access := Funcs (I); begin GNAT.Strings.Free (Old); end; end loop;
             end;
-         elsif T = "NAMES" then
-            Put_Line ("Command: NAMES");
-            Put_Line ("Lists the names of all currently defined permanent variables.");
-         elsif T = "KEEP" then
-            Put_Line ("Command: KEEP variable(s)");
-            Put_Line ("Specifies variables to retain in the Data Table after the next RUN.");
-         elsif T = "DROP" then
-            Put_Line ("Command: DROP variable(s)");
-            Put_Line ("Specifies variables to remove from the Data Table after the next RUN.");
-         elsif T = "RENAME" then
-            Put_Line ("Command: RENAME (old=new) ...");
-            Put_Line ("Renames existing columns in the Data Table.");
-         elsif T = "IF" then
-            Put_Line ("Command: IF condition THEN ... [ELSE ...]");
-            Put_Line ("Standard conditional execution logic.");
-         elsif T = "SELECT" then
-            Put_Line ("Command: SELECT [selector] CASE (cond) ... OTHERWISE ... END");
-            Put_Line ("Multi-way conditional branching.");
-         elsif T = "DELETE" then
-            Put_Line ("Command: DELETE");
-            Put_Line ("Stops processing for the current record and discards it from the table.");
-         elsif T = "OUTPUT" then
-            Put_Line ("Command: OUTPUT [filename] [/FMT=AUTO|LF|CRLF|CR] [/CHARSET=...] ");
-            Put_Line ("Redirects subsequent console output (PRINT) to a file.");
-            Put_Line ("If no filename is specified, redirects output back to standard output.");
-         elsif T = "WRITE" then
-            Put_Line ("Command: WRITE");
-            Put_Line ("Triggers an explicit write of the current PDV to the Data Table.");
-            Put_Line ("Suppresses the default record output at the end of the Data Step.");
-         elsif T = "FOR" then
-            Put_Line ("Command: FOR var = start TO end [STEP s] ... NEXT");
-            Put_Line ("Iterates a block of code over a numeric range.");
-         elsif T = "WHILE" then
-            Put_Line ("Command: WHILE condition ... WEND");
-            Put_Line ("Iterates while a condition is true.");
-         elsif T = "REPEAT" then
-            Put_Line ("Command: REPEAT count");
-            Put_Line ("Creates a specific number of new records in a Data Step.");
-         elsif T = "DIGITS" then
-            Put_Line ("Command: DIGITS n");
-            Put_Line ("Sets the number of decimal places for numeric output (default: 5).");
-         elsif T = "SUBMIT" then
-            Put_Line ("Command: SUBMIT ""filename""");
-            Put_Line ("Executes commands from an external script file.");
-         elsif T = "NEW" then
-            Put_Line ("Command: NEW");
-            Put_Line ("Resets the environment, clearing all data and temporary variables.");
-         elsif T = "QUIT" then
-            Put_Line ("Command: QUIT");
-            Put_Line ("Exits the SData interpreter.");
+
          else
             Put_Line ("Help topic not found: " & T);
+            Put_Line ("Type HELP for a list of commands and functions.");
          end if;
       end Print_Help;
 
