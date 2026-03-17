@@ -147,16 +147,18 @@ package body SData.Interpreter is
             Tail    : Statement_Access := Prog;
             Run_Cap : constant Statement_Access := new Statement (Stmt_RUN);
          begin
-            Clear_Active_Program;
-            --  Find the tail and cap the chain with a synthetic Stmt_RUN so
-            --  that Execute's outer loop calls Run_One_Step on the queued
-            --  deferred statements (it only does so when it encounters a RUN
-            --  node as a boundary marker).
+            --  Cap the chain with a synthetic Stmt_RUN so that Execute's
+            --  outer loop calls Run_One_Step on the queued deferred
+            --  statements.  The program is NOT cleared — it persists so
+            --  that subsequent RUN commands re-execute the same program.
+            --  Only NEW, USE, or REPEAT should replace the program.
             while Tail.Next /= null loop
                Tail := Tail.Next;
             end loop;
             Tail.Next := Run_Cap;
             Execute (Prog);
+            --  Remove the synthetic cap so the chain is clean for next time.
+            Tail.Next := null;
          end;
       else
          -- No program queued: execute an empty step (e.g. bare RUN in REPL).
