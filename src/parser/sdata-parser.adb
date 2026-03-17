@@ -649,6 +649,10 @@ package body SData.Parser is
          when Token_DELETE | Token_WRITE =>
             Stmt := new Statement ((if Tok.Kind = Token_DELETE then Stmt_DELETE else Stmt_WRITE));
 
+         when Token_RSEED =>
+            Stmt := new Statement (Stmt_RSEED);
+            Stmt.Seed_Expr := Parse_Expression (Ctx);
+
          when Token_OUTPUT =>
             declare
                Tok_Next : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
@@ -797,6 +801,7 @@ package body SData.Parser is
                         Next_T.Kind = Token_DIGITS or else
                         Next_T.Kind = Token_SUBMIT or else
                         Next_T.Kind = Token_NEW or else
+                        Next_T.Kind = Token_RSEED or else
                         Next_T.Kind = Token_QUIT then
                         declare
                            Arg_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);

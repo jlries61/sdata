@@ -5,6 +5,9 @@ with SData.Variables; use SData.Variables;
 with SData.Evaluator; use SData.Evaluator;
 with GNAT.Strings; use GNAT.Strings;
 with SData.System;
+with SData.Statistics;
+with SData.Parser; use SData.Parser;
+with Ada.Streams.Stream_IO;
 with Ada.Exceptions;
 with SData.File_IO;
 with SData.Config;    use SData.Config;
@@ -94,6 +97,9 @@ package body SData.Interpreter is
       Hash         => Ada.Strings.Hash,
       Equivalent_Elements => "=");
    Input_File_Columns : Name_Sets.Set;
+
+   --  Set of script files currently in the SUBMIT execution chain (for cycle detection).
+   Submit_Chain : Name_Sets.Set;
 
    --  Column modifications state.
    type Column_Mod_Kind is (Mod_Keep, Mod_Drop);
@@ -889,11 +895,59 @@ package body SData.Interpreter is
                   end if;
                end;
             when Stmt_SUBMIT =>
-               declare Source : constant String := Stmt.File_Path(1 .. Stmt.File_Len); -- Simplified
+               declare
+                  Source : constant String :=
+                     Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SUBMIT");
+                  Path   : String (1 .. 1024);
+                  P_Len  : Natural := Source'Length;
                begin
-                  Put_Line ("Executing script: " & Source);
-                  -- Logic here to read and parse file, then execute.
-                  -- Using Submit_Level to prevent recursion.
+                  Path (1 .. P_Len) := Source;
+                  --  Append default extension if none present.
+                  declare Has_Ext : Boolean := False; begin
+                     for C of Source loop if C = '.' then Has_Ext := True; end if; end loop;
+                     if not Has_Ext then
+                        Path (P_Len + 1 .. P_Len + 4) := ".CMD";
+                        P_Len := P_Len + 4;
+                     end if;
+                  end;
+                  declare Final : constant String := Path (1 .. P_Len); begin
+                     if Submit_Chain.Contains (Final) then
+                        raise Script_Error with
+                           "Recursive SUBMIT detected: " & Final;
+                     end if;
+                     Submit_Chain.Insert (Final);
+                     declare
+                        File   : Ada.Streams.Stream_IO.File_Type;
+                        Stream : Ada.Streams.Stream_IO.Stream_Access;
+                     begin
+                        Ada.Streams.Stream_IO.Open
+                           (File, Ada.Streams.Stream_IO.In_File, Final);
+                        Stream := Ada.Streams.Stream_IO.Stream (File);
+                        declare
+                           Contents : String
+                              (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
+                        begin
+                           String'Read (Stream, Contents);
+                           Ada.Streams.Stream_IO.Close (File);
+                           declare
+                              Sub_Ctx  : Parser_Context;
+                              Sub_Prog : Statement_Access;
+                           begin
+                              Initialize (Sub_Ctx, Contents);
+                              Sub_Prog := Parse_Program (Sub_Ctx);
+                              Execute (Sub_Prog);
+                           end;
+                        end;
+                     exception
+                        when Ada.Streams.Stream_IO.Name_Error =>
+                           Submit_Chain.Delete (Final);
+                           raise Script_Error with "SUBMIT: file not found: " & Final;
+                        when others =>
+                           Submit_Chain.Delete (Final);
+                           raise;
+                     end;
+                     Submit_Chain.Delete (Final);
+                  end;
                end;
             when Stmt_SYSTEM =>
                if SData.Config.Disable_Shell then
@@ -1027,12 +1081,23 @@ package body SData.Interpreter is
                      SData.Config.FPath_Output := To_Unbounded_String (Path); 
                   end if;
                end;
+            when Stmt_RSEED =>
+               declare
+                  V : constant Value := Evaluate (Stmt.Seed_Expr);
+                  S : constant Integer :=
+                     (if V.Kind = Val_Integer then V.Int_Val
+                      else Integer (Convert_To_Float (V)));
+               begin
+                  SData.Statistics.Set_Seed (S);
+               end;
             when Stmt_NEW =>
                SData.Table.Clear;
                SData.Variables.Clear_Temporary;
                SData.Variables.Initialize_PDV;
                Clear_Active_Program;
-            when others => null;
+            pragma Warnings (Off, "choice is redundant");
+            when others => null;  -- REPEAT, LOOP_REPEAT handled at the Execute level.
+            pragma Warnings (On, "choice is redundant");
       end case;
    end Execute_Statement;
 
@@ -1213,7 +1278,7 @@ package body SData.Interpreter is
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
             Step_Start := Current.Next;
-         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE or else Current.Kind = Stmt_SYSTEM or else Current.Kind = Stmt_FPATH or else Current.Kind = Stmt_NEW then
+         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE or else Current.Kind = Stmt_SYSTEM or else Current.Kind = Stmt_FPATH or else Current.Kind = Stmt_NEW or else Current.Kind = Stmt_RSEED then
             Execute_Statement (Current);
          end if;
          Current := Current.Next;

@@ -25,6 +25,18 @@ package body SData.Statistics is
       end if;
    end Ensure_Random_Init;
 
+   procedure Set_Seed (Seed : Integer) is
+   begin
+      Ada.Numerics.Float_Random.Reset (Generator, Seed);
+      Initialized := True;
+   end Set_Seed;
+
+   function Uniform_Random return Float is
+   begin
+      Ensure_Random_Init;
+      return Float (Ada.Numerics.Float_Random.Random (Generator));
+   end Uniform_Random;
+
    ----------------------
    -- Incomplete_Gamma --
    ----------------------

@@ -8,6 +8,8 @@ with Ada.Containers.Vectors;
 with Ada.Text_IO; use Ada.Text_IO;
 with SData.System;
 with SData.Interpreter;
+with Ada.Calendar;
+with Ada.Numerics;
 
 package body SData.Evaluator is
 
@@ -433,6 +435,368 @@ package body SData.Evaluator is
             Result.Str_Val (1 .. Result.Str_Len) := Img (Img'First .. Img'First + Result.Str_Len - 1);
             return Result;
          end;
+
+      -- Trigonometric Functions (radians)
+      elsif Name = "SIN" and then Has_Args (1) then
+         return Num_Result (Sin (Convert_To_Float (All_Vals.Element (1))));
+      elsif Name = "COS" and then Has_Args (1) then
+         return Num_Result (Cos (Convert_To_Float (All_Vals.Element (1))));
+      elsif Name = "TAN" and then Has_Args (1) then
+         return Num_Result (Tan (Convert_To_Float (All_Vals.Element (1))));
+      elsif Name = "ATN" and then Has_Args (1) then
+         return Num_Result (Arctan (Convert_To_Float (All_Vals.Element (1))));
+      elsif Name = "ATAN2" and then Has_Args (2) then
+         return Num_Result (Arctan (Convert_To_Float (All_Vals.Element (1)),
+                                   Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "SINH" and then Has_Args (1) then
+         return Num_Result (Sinh (Convert_To_Float (All_Vals.Element (1))));
+      elsif Name = "COSH" and then Has_Args (1) then
+         return Num_Result (Cosh (Convert_To_Float (All_Vals.Element (1))));
+      elsif Name = "TANH" and then Has_Args (1) then
+         return Num_Result (Tanh (Convert_To_Float (All_Vals.Element (1))));
+
+      -- Trigonometric Functions (degrees)
+      elsif Name = "SIND" and then Has_Args (1) then
+         return Num_Result (Sin (Convert_To_Float (All_Vals.Element (1)) * Ada.Numerics.Pi / 180.0));
+      elsif Name = "COSD" and then Has_Args (1) then
+         return Num_Result (Cos (Convert_To_Float (All_Vals.Element (1)) * Ada.Numerics.Pi / 180.0));
+      elsif Name = "TAND" and then Has_Args (1) then
+         return Num_Result (Tan (Convert_To_Float (All_Vals.Element (1)) * Ada.Numerics.Pi / 180.0));
+      elsif Name = "ATND" and then Has_Args (1) then
+         return Num_Result (Arctan (Convert_To_Float (All_Vals.Element (1))) * 180.0 / Ada.Numerics.Pi);
+      elsif Name = "ATAN2D" and then Has_Args (2) then
+         return Num_Result (Arctan (Convert_To_Float (All_Vals.Element (1)),
+                                   Convert_To_Float (All_Vals.Element (2))) * 180.0 / Ada.Numerics.Pi);
+
+      -- String Functions
+      elsif Name = "LEN" and then Has_Args (1) then
+         declare V : constant Value := All_Vals.Element (1); begin
+            if V.Kind = Val_String then return (Kind => Val_Integer, Int_Val => V.Str_Len);
+            else return (Kind => Val_Missing); end if;
+         end;
+      elsif Name = "LEFT$" and then Has_Args (2) then
+         declare
+            V : constant Value := All_Vals.Element (1);
+            N : constant Integer := Integer (Convert_To_Float (All_Vals.Element (2)));
+            R : Value (Val_String);
+         begin
+            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            R.Str_Len := Integer'Min (N, V.Str_Len);
+            R.Str_Val (1 .. R.Str_Len) := V.Str_Val (1 .. R.Str_Len);
+            return R;
+         end;
+      elsif Name = "RIGHT$" and then Has_Args (2) then
+         declare
+            V : constant Value := All_Vals.Element (1);
+            N : constant Integer := Integer (Convert_To_Float (All_Vals.Element (2)));
+            R : Value (Val_String);
+            Start : Integer;
+         begin
+            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            Start := Integer'Max (1, V.Str_Len - N + 1);
+            R.Str_Len := V.Str_Len - Start + 1;
+            R.Str_Val (1 .. R.Str_Len) := V.Str_Val (Start .. V.Str_Len);
+            return R;
+         end;
+      elsif Name = "MID$" and then (Has_Args (2) or else Has_Args (3)) then
+         declare
+            V     : constant Value   := All_Vals.Element (1);
+            Start : constant Integer := Integer (Convert_To_Float (All_Vals.Element (2)));
+            Len   : constant Integer :=
+               (if Has_Args (3) then Integer (Convert_To_Float (All_Vals.Element (3)))
+                else V.Str_Len);
+            R     : Value (Val_String);
+            S, E  : Integer;
+         begin
+            if V.Kind /= Val_String or else Start < 1 then return (Kind => Val_Missing); end if;
+            S := Start;
+            E := Integer'Min (S + Len - 1, V.Str_Len);
+            if S > V.Str_Len then R.Str_Len := 0;
+            else R.Str_Len := E - S + 1;
+                 R.Str_Val (1 .. R.Str_Len) := V.Str_Val (S .. E);
+            end if;
+            return R;
+         end;
+      elsif Name = "TRIM$" and then Has_Args (1) then
+         declare
+            V : constant Value := All_Vals.Element (1);
+            R : Value (Val_String);
+            S, E : Integer;
+         begin
+            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            S := 1; E := V.Str_Len;
+            while S <= E and then V.Str_Val (S) = ' ' loop S := S + 1; end loop;
+            while E >= S and then V.Str_Val (E) = ' ' loop E := E - 1; end loop;
+            R.Str_Len := Integer'Max (0, E - S + 1);
+            if R.Str_Len > 0 then R.Str_Val (1 .. R.Str_Len) := V.Str_Val (S .. E); end if;
+            return R;
+         end;
+      elsif Name = "UCASE$" and then Has_Args (1) then
+         declare
+            V : constant Value := All_Vals.Element (1);
+            R : Value (Val_String);
+         begin
+            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            R.Str_Len := V.Str_Len;
+            for I in 1 .. R.Str_Len loop
+               R.Str_Val (I) := To_Upper (V.Str_Val (I));
+            end loop;
+            return R;
+         end;
+      elsif Name = "LCASE$" and then Has_Args (1) then
+         declare
+            V : constant Value := All_Vals.Element (1);
+            R : Value (Val_String);
+         begin
+            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            R.Str_Len := V.Str_Len;
+            for I in 1 .. R.Str_Len loop
+               R.Str_Val (I) := To_Lower (V.Str_Val (I));
+            end loop;
+            return R;
+         end;
+      elsif Name = "POS" and then Has_Args (2) then
+         declare
+            Needle   : constant Value := All_Vals.Element (1);
+            Haystack : constant Value := All_Vals.Element (2);
+            NL, HL   : Integer;
+         begin
+            if Needle.Kind /= Val_String or else Haystack.Kind /= Val_String then
+               return (Kind => Val_Missing);
+            end if;
+            NL := Needle.Str_Len; HL := Haystack.Str_Len;
+            if NL = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
+            for I in 1 .. HL - NL + 1 loop
+               if Haystack.Str_Val (I .. I + NL - 1) = Needle.Str_Val (1 .. NL) then
+                  return (Kind => Val_Integer, Int_Val => I);
+               end if;
+            end loop;
+            return (Kind => Val_Integer, Int_Val => 0);
+         end;
+      elsif Name = "CHR$" and then Has_Args (1) then
+         declare
+            Code : constant Integer := Integer (Convert_To_Float (All_Vals.Element (1)));
+            R    : Value (Val_String);
+         begin
+            R.Str_Len := 1;
+            R.Str_Val (1) := Character'Val (Code);
+            return R;
+         end;
+      elsif Name = "STR$" and then Has_Args (1) then
+         declare
+            Img : constant String := SData.Values.To_String_Formatted (All_Vals.Element (1));
+            R   : Value (Val_String);
+         begin
+            R.Str_Len := Integer'Min (Img'Length, 1024);
+            R.Str_Val (1 .. R.Str_Len) := Img (Img'First .. Img'First + R.Str_Len - 1);
+            return R;
+         end;
+      elsif Name = "VAL" and then Has_Args (1) then
+         declare
+            V : constant Value := All_Vals.Element (1);
+         begin
+            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            begin
+               return (Kind => Val_Numeric,
+                       Num_Val => Float'Value (V.Str_Val (1 .. V.Str_Len)));
+            exception
+               when others => return (Kind => Val_Missing);
+            end;
+         end;
+
+      -- Base Conversion Functions
+      elsif Name = "HEX$" and then Has_Args (1) then
+         declare
+            N   : constant Integer := Integer (Convert_To_Float (All_Vals.Element (1)));
+            Buf : String (1 .. 16);
+            Len : Natural := 0;
+            Val : Integer := abs N;
+            Hex_Chars : constant String := "0123456789ABCDEF";
+            R   : Value (Val_String);
+         begin
+            if Val = 0 then Buf (1) := '0'; Len := 1;
+            else
+               while Val > 0 loop
+                  Len := Len + 1;
+                  Buf (Len) := Hex_Chars (Val mod 16 + 1);
+                  Val := Val / 16;
+               end loop;
+               -- Reverse
+               for I in 1 .. Len / 2 loop
+                  declare Tmp : constant Character := Buf (I);
+                  begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
+               end loop;
+            end if;
+            R.Str_Len := Len;
+            R.Str_Val (1 .. Len) := Buf (1 .. Len);
+            return R;
+         end;
+      elsif Name = "OCT$" and then Has_Args (1) then
+         declare
+            N   : constant Integer := Integer (Convert_To_Float (All_Vals.Element (1)));
+            Buf : String (1 .. 16);
+            Len : Natural := 0;
+            Val : Integer := abs N;
+            R   : Value (Val_String);
+         begin
+            if Val = 0 then Buf (1) := '0'; Len := 1;
+            else
+               while Val > 0 loop
+                  Len := Len + 1;
+                  Buf (Len) := Character'Val (Val mod 8 + Character'Pos ('0'));
+                  Val := Val / 8;
+               end loop;
+               for I in 1 .. Len / 2 loop
+                  declare Tmp : constant Character := Buf (I);
+                  begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
+               end loop;
+            end if;
+            R.Str_Len := Len;
+            R.Str_Val (1 .. Len) := Buf (1 .. Len);
+            return R;
+         end;
+      elsif Name = "BIN$" and then Has_Args (1) then
+         declare
+            N   : constant Integer := Integer (Convert_To_Float (All_Vals.Element (1)));
+            Buf : String (1 .. 32);
+            Len : Natural := 0;
+            Val : Integer := abs N;
+            R   : Value (Val_String);
+         begin
+            if Val = 0 then Buf (1) := '0'; Len := 1;
+            else
+               while Val > 0 loop
+                  Len := Len + 1;
+                  Buf (Len) := Character'Val (Val mod 2 + Character'Pos ('0'));
+                  Val := Val / 2;
+               end loop;
+               for I in 1 .. Len / 2 loop
+                  declare Tmp : constant Character := Buf (I);
+                  begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
+               end loop;
+            end if;
+            R.Str_Len := Len;
+            R.Str_Val (1 .. Len) := Buf (1 .. Len);
+            return R;
+         end;
+
+      -- Record Navigation Functions
+      elsif Name = "BOF" then
+         return (Kind => Val_Integer,
+                 Int_Val => (if SData.Table.Get_Current_Record_Index <= 1 then 1 else 0));
+      elsif Name = "EOF" then
+         return (Kind => Val_Integer,
+                 Int_Val => (if SData.Table.Get_Current_Record_Index >= SData.Table.Row_Count
+                             then 1 else 0));
+      elsif (Name = "LAG" or else Name = "LAGC$") and then Has_Args (1) then
+         declare
+            Var  : constant Value   := All_Vals.Element (1);
+            Idx  : constant Natural := SData.Table.Get_Current_Record_Index;
+            Col  : Value (Val_String);
+         begin
+            if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            Col.Str_Val (1 .. Var.Str_Len) := Var.Str_Val (1 .. Var.Str_Len);
+            Col.Str_Len := Var.Str_Len;
+            if Idx <= 1 then return (Kind => Val_Missing); end if;
+            return SData.Table.Get_Value (Idx - 1, Col.Str_Val (1 .. Col.Str_Len));
+         end;
+      elsif (Name = "OBS" or else Name = "OBSC$") and then Has_Args (2) then
+         declare
+            Row_Val : constant Value := All_Vals.Element (1);
+            Var     : constant Value := All_Vals.Element (2);
+            Row     : Integer;
+            Col     : Value (Val_String);
+         begin
+            if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            Row := Integer (Convert_To_Float (Row_Val));
+            if Row < 1 or else Row > SData.Table.Row_Count then
+               return (Kind => Val_Missing);
+            end if;
+            Col.Str_Val (1 .. Var.Str_Len) := Var.Str_Val (1 .. Var.Str_Len);
+            Col.Str_Len := Var.Str_Len;
+            return SData.Table.Get_Value (Row, Col.Str_Val (1 .. Col.Str_Len));
+         end;
+
+      -- Date and Time Functions
+      elsif Name = "DATE$" then
+         declare
+            R   : Value (Val_String);
+            Now : constant Ada.Calendar.Time := Ada.Calendar.Clock;
+            Y   : Ada.Calendar.Year_Number;
+            Mo  : Ada.Calendar.Month_Number;
+            D   : Ada.Calendar.Day_Number;
+            Sec : Ada.Calendar.Day_Duration;
+            Buf : String (1 .. 10);
+         begin
+            Ada.Calendar.Split (Now, Y, Mo, D, Sec);
+            declare
+               YS : constant String := Y'Image;
+               MS : constant String := (if Mo < 10 then "0" else "") & Mo'Image (Mo'Image'First + 1 .. Mo'Image'Last);
+               DS : constant String := (if D  < 10 then "0" else "") & D'Image  (D'Image'First  + 1 .. D'Image'Last);
+            begin
+               Buf := YS (YS'Last - 3 .. YS'Last) & "-" & MS & "-" & DS;
+            end;
+            R.Str_Len := 10;
+            R.Str_Val (1 .. 10) := Buf;
+            return R;
+         end;
+      elsif Name = "TIME$" then
+         declare
+            R   : Value (Val_String);
+            Now : constant Ada.Calendar.Time := Ada.Calendar.Clock;
+            Y   : Ada.Calendar.Year_Number;
+            Mo  : Ada.Calendar.Month_Number;
+            D   : Ada.Calendar.Day_Number;
+            Sec : Ada.Calendar.Day_Duration;
+            Total_Sec : Natural;
+            H, Mi, S  : Natural;
+            Buf : String (1 .. 8);
+         begin
+            Ada.Calendar.Split (Now, Y, Mo, D, Sec);
+            Total_Sec := Natural (Float'Floor (Float (Sec)));
+            H  := Total_Sec / 3600;
+            Mi := (Total_Sec mod 3600) / 60;
+            S  := Total_Sec mod 60;
+            declare
+               HS  : constant String := (if H  < 10 then "0" else "") & H'Image  (H'Image'First  + 1 .. H'Image'Last);
+               MiS : constant String := (if Mi < 10 then "0" else "") & Mi'Image (Mi'Image'First + 1 .. Mi'Image'Last);
+               SS  : constant String := (if S  < 10 then "0" else "") & S'Image  (S'Image'First  + 1 .. S'Image'Last);
+            begin
+               Buf := HS & ":" & MiS & ":" & SS;
+            end;
+            R.Str_Len := 8;
+            R.Str_Val (1 .. 8) := Buf;
+            return R;
+         end;
+
+      -- Aggregate: MEDIAN
+      elsif Name = "MEDIAN" then
+         declare
+            package Float_Vecs is new Ada.Containers.Vectors (Positive, Float);
+            package Float_Sort  is new Float_Vecs.Generic_Sorting;
+            Vals : Float_Vecs.Vector;
+            N    : Natural := 0;
+         begin
+            for I in 1 .. Integer (All_Vals.Length) loop
+               declare V : constant Value := All_Vals.Element (I); begin
+                  if V.Kind /= Val_Missing then
+                     Vals.Append (Convert_To_Float (V));
+                     N := N + 1;
+                  end if;
+               end;
+            end loop;
+            if N = 0 then return (Kind => Val_Missing); end if;
+            Float_Sort.Sort (Vals);
+            if N mod 2 = 1 then
+               return Num_Result (Vals.Element ((N + 1) / 2));
+            else
+               return Num_Result ((Vals.Element (N / 2) + Vals.Element (N / 2 + 1)) / 2.0);
+            end if;
+         end;
+
+      -- Seeded Random Number (uniform 0..1)
+      elsif Name = "RAN" or else Name = "RANDOM" then
+         return Num_Result (SData.Statistics.Uniform_Random);
 
       end if;
 

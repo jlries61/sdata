@@ -79,6 +79,9 @@ package SData.Statistics is
    function Student_T_RN (DF : Float) return Float;
    function F_RN (DF1, DF2 : Float) return Float;
 
+   procedure Set_Seed (Seed : Integer);
+   function  Uniform_Random return Float;  -- Returns uniform [0,1) using the shared generator.
+
 private
    --  Use Long_Float internally for better precision
    type Internal_Float is new Long_Float;
