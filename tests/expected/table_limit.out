@@ -1,3 +1,2 @@
-Adding 10 rows with limit of 5...
-Error: Maximum table size (-m) exceeded:  5 records.
-An error occurred: ADA.IO_EXCEPTIONS.STORAGE_ERROR: Maximum table size (-m) exceeded:  5 records.
+RUN complete. 4 records and 1 variables processed.
+An error occurred: PROGRAM_ERROR: Table row limit ( 5) exceeded.
