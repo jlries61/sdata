@@ -10,3 +10,4 @@ ID: 2  NAME: Bob  SALARY: 66000.00000
 ID NAME SALARY 
 ID: 3  NAME: Charlie  SALARY: 70000.00000  
 ID: 3  NAME: Charlie  SALARY: 77000.00000  
+RUN complete. 3 records and 3 variables processed.

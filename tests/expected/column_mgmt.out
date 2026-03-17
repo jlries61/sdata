@@ -14,6 +14,7 @@ Original Names:
 IDENT NAME SALARY_NEW ID SALARY 
 After Rename:
 IDENT NAME SALARY_NEW ID SALARY 
+RUN complete. 3 records and 2 variables processed.
 IDENT NAME ID SALARY_NEW SALARY 
 After Keep IDENT, NAME and RUN:
 IDENT NAME 
@@ -21,6 +22,7 @@ After Keep IDENT, NAME and RUN:
 IDENT NAME 
 After Keep IDENT, NAME and RUN:
 IDENT NAME 
+RUN complete. 3 records and 1 variables processed.
 IDENT NAME 
 After Drop NAME and RUN:
 IDENT 
@@ -28,3 +30,4 @@ After Drop NAME and RUN:
 IDENT 
 After Drop NAME and RUN:
 IDENT 
+RUN complete. 3 records and 1 variables processed.
