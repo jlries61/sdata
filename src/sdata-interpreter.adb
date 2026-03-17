@@ -366,7 +366,7 @@ package body SData.Interpreter is
             Put_Line ("               MCF, WCF, LCF");
             Put_Line ("  Stat IDF:    ZIF, NIF, UIF, EIF, BIF, GIF, XIF, TIF, FIF, WIF,");
             Put_Line ("               LIF, PIF");
-            Put_Line ("  Stat RN:     ZRN, NRN, URN, ERN, BRN, PRN, GRN, MRN, XRN, TRN,");
+            Put_Line ("  Stat RN:     ZRN, NRN, URN, ERN, PRN, GRN, MRN, XRN, TRN,");
             Put_Line ("               FRN, WRN, LRN, RAN, RANDOM");
             My_New_Line;
             Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
