@@ -21,8 +21,11 @@ check: build
 	@for f in tests/*.cmd; do \
 		base=$$(basename $$f .cmd); \
 		exp="tests/expected/$$base.out"; \
+		flags="tests/$$base.flags"; \
+		extra_flags=""; \
+		if [ -f "$$flags" ]; then extra_flags=$$(cat "$$flags"); fi; \
 		echo -n "Testing $$f... "; \
-		./bin/sdata $$f > tests/$$base.tmp 2>&1; \
+		./bin/sdata $$extra_flags $$f > tests/$$base.tmp 2>&1; \
 		if [ $$? -ne 0 ]; then \
 			echo "FAILED (Execution Error)"; \
 			rm tests/$$base.tmp; \
