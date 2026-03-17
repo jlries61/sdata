@@ -1,15 +1,16 @@
 Attempting overflow addition...
-Error: Assignment failed for C%
+Error: Assignment failed for variable C%: Integer overflow in OP_ADD
 Result: .
+RUN complete. 1 records and 2 variables processed.
 Attempting overflow multiplication...
-Error: Assignment failed for D%
+Error: Assignment failed for variable D%: Integer overflow in OP_MUL
 Result: .
+RUN complete. 1 records and 1 variables processed.
 Integer div by zero:
-Error: Division by zero.
+RUN complete. 1 records and 1 variables processed.
 Float div by zero:
-Error: Division by zero.
+RUN complete. 1 records and 1 variables processed.
 Log of zero:
-Error: Argument to LOG must be positive.
+RUN complete. 1 records and 1 variables processed.
 Log of negative:
-Error: Argument to LOG10 must be positive.
-RUN complete. 1 records and 8 variables processed.
+RUN complete. 1 records and 1 variables processed.

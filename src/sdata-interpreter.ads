@@ -7,6 +7,11 @@ with SData.AST; use SData.AST;
 
 package SData.Interpreter is
 
+   --  Raised when a statement fails during execution.  The exception message
+   --  contains the formatted, user-readable error text.  Main catches this
+   --  silently (the message has already been printed by the interpreter).
+   Script_Error : exception;
+
    --  Executes the provided AST program.
    procedure Execute (Prog : Statement_Access);
 

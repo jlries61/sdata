@@ -41,13 +41,14 @@ procedure SData_Main is
       Put_Line ("  -m <size>     Set max in-memory table size");
       Put_Line ("  -t <count>    Set max temporary variables");
       Put_Line ("  --clen <len>  Set max character variable length");
-      Put_Line ("  --noshell     Disable SHELL command and function");
-      Put_Line ("  -u, --infmt   Input dataset and format");
-      Put_Line ("  -s, --outfmt  Output dataset and format");
-      Put_Line ("  -o <file>     Console output file");
-      Put_Line ("  -q            Suppress console output (Quiet Mode)");
-      Put_Line ("  -t            Max temporary variable memory (not yet implemented)");
-      Put_Line ("  -p            Pager specification (not yet implemented)");
+      Put_Line ("  --noshell                Disable SHELL command and function");
+      Put_Line ("  -k, --continue-on-error  Continue executing after a statement error");
+      Put_Line ("  -u, --infmt              Input dataset and format");
+      Put_Line ("  -s, --outfmt             Output dataset and format");
+      Put_Line ("  -o <file>                Console output file");
+      Put_Line ("  -q                       Suppress console output (Quiet Mode)");
+      Put_Line ("  -t                       Max temporary variable memory (not yet implemented)");
+      Put_Line ("  -p                       Pager specification (not yet implemented)");
    end Print_Usage;
 
    --  Runs the Interactive REPL.
@@ -97,6 +98,8 @@ procedure SData_Main is
             when End_Error =>
                New_Line;
                exit REPL;
+            when SData.Interpreter.Script_Error =>
+               null;  -- Error already printed; keep the REPL running.
             when E : others =>
                Put_Line ("Error: " & Exception_Message (E));
          end;
@@ -183,6 +186,8 @@ begin
             end if;
          elsif Arg = "--noshell" then
             Disable_Shell := True;
+         elsif Arg = "-k" or else Arg = "--continue-on-error" then
+            Continue_On_Error := True;
          elsif Arg(1) /= '-' then
             -- This is the main command file to execute.
             Filename (1 .. Arg'Length) := Arg;
@@ -236,7 +241,8 @@ begin
    end;
 
 exception
-   -- Catch all exceptions and provide detailed error reporting.
+   when SData.Interpreter.Script_Error =>
+      null;  -- Error message already printed by the interpreter; exit cleanly.
    when E : others =>
       Put_Line ("An error occurred: " & Exception_Name (E) & ": " & Exception_Message (E));
 end SData_Main;

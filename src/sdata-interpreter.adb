@@ -549,8 +549,9 @@ package body SData.Interpreter is
                declare
                   Var_Name_Str : constant String := Stmt.Var_Name(1 .. Stmt.Var_Len);
                   Expected     : Value_Kind;
-                  Result       : Value := Evaluate (Stmt.Expr);
+                  Result       : Value;  -- Initialised in body so exceptions are caught below
                begin
+                  Result := Evaluate (Stmt.Expr);
                   if Stmt.Is_Array then
                      declare
                         Idx_Val : constant Value := Evaluate (Stmt.Arr_Idx);
@@ -613,8 +614,11 @@ package body SData.Interpreter is
                      end if;
                   end if;
                exception
-                  when E : SData.Table.Type_Mismatch_Error => Put_Line ("Error: Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E));
-                  when E : others => Put_Line ("Error: Assignment failed for " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E));
+                  when E : SData.Table.Type_Mismatch_Error =>
+                     raise Script_Error with "Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
+                  when Script_Error => raise;
+                  when E : others =>
+                     raise Script_Error with "Assignment failed for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
                end;
             when Stmt_PRINT =>
                if Stmt.Print_Args = null then
@@ -842,7 +846,8 @@ package body SData.Interpreter is
                      Dim_Array (S.Arr_Name (1 .. S.Arr_Name_Len), S.Arr_Start_Idx, S.Arr_End_Idx, S.Is_Temporary_Dim);
                   end if;
                exception
-                  when others => Put_Line ("Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len)); raise;
+                  when E : others =>
+                     raise Script_Error with "Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
                end;
             when Stmt_NAMES =>
                declare
@@ -1157,7 +1162,15 @@ package body SData.Interpreter is
                while Iter /= null and then Iter /= Boundary loop
                   case Iter.Kind is
                      when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SYSTEM | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
-                        Execute_Statement(Iter);
+                        begin
+                           Execute_Statement(Iter);
+                        exception
+                           when E : others =>
+                              Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
+                              if not SData.Config.Continue_On_Error then
+                                 raise Script_Error with Ada.Exceptions.Exception_Message (E);
+                              end if;
+                        end;
                      when others => null;
                   end case;
                   exit when Current_Record_Deleted;

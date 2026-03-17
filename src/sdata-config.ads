@@ -44,7 +44,8 @@ package SData.Config is
    Max_Table_Rows  : Natural := 0;      -- 0 means no limit
    Max_String_Len  : Natural := 0;      -- 0 means no limit
    Max_Temp_Vars   : Natural := 0;      -- 0 means no limit
-   Disable_Shell   : Boolean := False;
+   Disable_Shell      : Boolean := False;
+   Continue_On_Error  : Boolean := False;
 
    --  Version information
    Version_Major : constant := 0;
