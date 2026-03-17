@@ -4,6 +4,17 @@ GPR_FILE = sdata.gpr
 # Prefer the Alire-managed gprbuild if present, fall back to system gprbuild.
 ALIRE_GPRBUILD := /home/jries/.local/share/alire/toolchains/gprbuild_25.0.1_9a2e6cfb/bin/gprbuild
 GPRBUILD_ALIRE_PATH := $(if $(wildcard $(ALIRE_GPRBUILD)),$(ALIRE_GPRBUILD),$(shell which gprbuild 2>/dev/null))
+
+# GPR_PROJECT_PATH: tells gprbuild where to find dependency .gpr files.
+# If already set in the environment (e.g. by the RPM spec), use that.
+# Otherwise auto-detect from sibling Alire-managed directories.
+DEP_BASE := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+_ZIPADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/zipada_*))
+_XMLADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/xmlada_*))
+_MATHPAQS_DIR  := $(firstword $(wildcard $(DEP_BASE)/mathpaqs_*))
+_SCIADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/sciada_*))
+_LOCAL_GPR_PATH := $(_ZIPADA_DIR):$(_XMLADA_DIR)/dom:$(_XMLADA_DIR)/input_sources:$(_MATHPAQS_DIR):$(_SCIADA_DIR)
+export GPR_PROJECT_PATH ?= $(_LOCAL_GPR_PATH)
 PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
 INSTALL_DIR = $(DESTDIR)$(BINDIR)
