@@ -4,7 +4,9 @@ MEAN(A,B,C): 30.00000
 N(A,B,C,D): 3
 NMISS(A,B,C,D): 1
 STD(10,20,60): 26.45751
+RUN complete. 1 records and 4 variables processed.
 --- Row-wise aggregates on an array ---
 SUM(V): 100.00000
 MEAN(V): 25.00000
 STD(V): 12.90994
+RUN complete. 1 records and 4 variables processed.
