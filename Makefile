@@ -1,7 +1,9 @@
 # Makefile for SData
 
 GPR_FILE = sdata.gpr
-GPRBUILD_ALIRE_PATH := /home/jries/.local/share/alire/toolchains/gprbuild_25.0.1_9a2e6cfb/bin/gprbuild
+# Prefer the Alire-managed gprbuild if present, fall back to system gprbuild.
+ALIRE_GPRBUILD := /home/jries/.local/share/alire/toolchains/gprbuild_25.0.1_9a2e6cfb/bin/gprbuild
+GPRBUILD_ALIRE_PATH := $(if $(wildcard $(ALIRE_GPRBUILD)),$(ALIRE_GPRBUILD),$(shell which gprbuild 2>/dev/null))
 PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
 INSTALL_DIR = $(DESTDIR)$(BINDIR)

@@ -7,7 +7,13 @@ License:        MIT
 URL:            https://github.com/user/sdata
 Source0:        %{name}-%{version}.tar.gz
 
-BuildRequires:  gcc-ada
+# GNAT (Ada compiler) package name differs across RPM distributions:
+#   gcc-ada   — openSUSE, SLES
+#   gcc-gnat  — Fedora, RHEL/CentOS/Rocky/Alma, Mageia, OpenMandriva
+# The boolean OR syntax requires RPM >= 4.13 (Fedora 27+, openSUSE Leap 15.1+,
+# RHEL 8+).  If building on an older release substitute the appropriate name.
+BuildRequires:  (gcc-ada or gcc-gnat)
+BuildRequires:  gprbuild
 BuildRequires:  make
 
 %description
@@ -19,8 +25,8 @@ aggregate functions, and advanced variable handling.
 %setup -q
 
 %build
-# The GPRBUILD_ALIRE_PATH is hardcoded in the Makefile for this project
-# In a more standard setup, you would rely on the system's gprbuild.
+# The Makefile prefers the Alire-managed gprbuild if present and falls back
+# to the system gprbuild (installed via the gprbuild BuildRequires above).
 make %{?_smp_mflags}
 
 %install
