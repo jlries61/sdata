@@ -3,7 +3,8 @@
 GPR_FILE = sdata.gpr
 # Prefer the Alire-managed gprbuild if present, fall back to system gprbuild.
 ALIRE_GPRBUILD := /home/jries/.local/share/alire/toolchains/gprbuild_25.0.1_9a2e6cfb/bin/gprbuild
-GPRBUILD_ALIRE_PATH := $(if $(wildcard $(ALIRE_GPRBUILD)),$(ALIRE_GPRBUILD),$(shell which gprbuild 2>/dev/null))
+# Try Alire, then 'which', then default to 'gprbuild' and let the shell decide.
+GPRBUILD_ALIRE_PATH := $(firstword $(wildcard $(ALIRE_GPRBUILD)) $(shell which gprbuild 2>/dev/null) gprbuild)
 
 # GPR_PROJECT_PATH: tells gprbuild where to find dependency .gpr files.
 # If already set in the environment (e.g. by the RPM spec), use that.
