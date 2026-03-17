@@ -76,6 +76,14 @@ srpm: clean
 	@mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 	@mv sdata-0.1.tar.gz rpmbuild/SOURCES/
 	@cp sdata.spec rpmbuild/SPECS/
+	@# Copy vendored Ada library tarballs from their canonical location.
+	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
+	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz sciada-0.4.0.tar.gz; do \
+	   if [ ! -f "$$TARBALL_DIR/$$tb" ]; then \
+	     echo "ERROR: dependency tarball not found: $$TARBALL_DIR/$$tb"; exit 1; \
+	   fi; \
+	   cp "$$TARBALL_DIR/$$tb" rpmbuild/SOURCES/; \
+	 done
 	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir %(pwd)/rpmbuild"
 	@mv rpmbuild/SRPMS/sdata-0.1-1.src.rpm .
 	@rm -rf rpmbuild
