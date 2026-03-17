@@ -362,6 +362,24 @@ package body SData.Evaluator is
       elsif Name = "PIF" and then Has_Args (2) then
          return Num_Result (SData.Statistics.Poisson_IDF (Convert_To_Float (All_Vals.Element (1)), 
                                                           Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "GIF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Gamma_IDF (Convert_To_Float (All_Vals.Element (1)),
+                                                        Convert_To_Float (All_Vals.Element (2)),
+                                                        Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "XIF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Chi_Square_IDF (Convert_To_Float (All_Vals.Element (1)),
+                                                             Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "TIF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Student_T_IDF (Convert_To_Float (All_Vals.Element (1)),
+                                                            Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "FIF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.F_IDF (Convert_To_Float (All_Vals.Element (1)),
+                                                    Convert_To_Float (All_Vals.Element (2)),
+                                                    Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "WIF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Weibull_IDF (Convert_To_Float (All_Vals.Element (1)),
+                                                          Convert_To_Float (All_Vals.Element (2)),
+                                                          Convert_To_Float (All_Vals.Element (3))));
 
       -- Random Numbers (RN)
       elsif Name = "ZRN" then
@@ -702,19 +720,17 @@ package body SData.Evaluator is
          end;
       elsif (Name = "OBS" or else Name = "OBSC$") and then Has_Args (2) then
          declare
-            Row_Val : constant Value := All_Vals.Element (1);
-            Var     : constant Value := All_Vals.Element (2);
+            --  Argument order: OBS(varname$, row)
+            Var     : constant Value := All_Vals.Element (1);
+            Row_Val : constant Value := All_Vals.Element (2);
             Row     : Integer;
-            Col     : Value (Val_String);
          begin
             if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
             Row := Integer (Convert_To_Float (Row_Val));
             if Row < 1 or else Row > SData.Table.Row_Count then
                return (Kind => Val_Missing);
             end if;
-            Col.Str_Val (1 .. Var.Str_Len) := Var.Str_Val (1 .. Var.Str_Len);
-            Col.Str_Len := Var.Str_Len;
-            return SData.Table.Get_Value (Row, Col.Str_Val (1 .. Col.Str_Len));
+            return SData.Table.Get_Value (Row, Var.Str_Val (1 .. Var.Str_Len));
          end;
 
       -- Date and Time Functions
@@ -860,15 +876,23 @@ package body SData.Evaluator is
          when Expr_Unary_Op =>
             declare Operand_Val : constant Value := Evaluate (Expr.Operand);
             begin
-               if Operand_Val.Kind = Val_Numeric then
-                  case Expr.UOp is when Op_Neg => return (Kind => Val_Numeric, Num_Val => -Operand_Val.Num_Val); end case;
+               if Expr.UOp = Op_Not then
+                  --  NOT: 0 -> 1, non-zero -> 0, missing -> missing
+                  if Operand_Val.Kind = Val_Missing then return (Kind => Val_Missing); end if;
+                  declare V : constant Float := Convert_To_Float (Operand_Val); begin
+                     return (Kind => Val_Integer, Int_Val => (if V = 0.0 then 1 else 0));
+                  end;
+               elsif Operand_Val.Kind = Val_Numeric then
+                  case Expr.UOp is when Op_Neg => return (Kind => Val_Numeric, Num_Val => -Operand_Val.Num_Val);
+                                   when others => return (Kind => Val_Missing); end case;
                elsif Operand_Val.Kind = Val_Integer then
                   case Expr.UOp is 
                      when Op_Neg => 
                         if Operand_Val.Int_Val = Integer'First then
                            raise Constraint_Error with "Integer overflow in unary negation";
                         end if;
-                        return (Kind => Val_Integer, Int_Val => -Operand_Val.Int_Val); 
+                        return (Kind => Val_Integer, Int_Val => -Operand_Val.Int_Val);
+                     when others => return (Kind => Val_Missing);
                   end case;
                else return (Kind => Val_Missing); end if;
             end;

@@ -74,7 +74,12 @@ package SData.Statistics is
    function Laplace_RN  (Location, Scale : Float) return Float;
 
    -- Extra Quantiles/RNGs
-   function Poisson_IDF (P, Lambda : Float) return Float;
+   function Poisson_IDF   (P, Lambda     : Float) return Float;
+   function Chi_Square_IDF (P, DF        : Float) return Float;
+   function Student_T_IDF  (P, DF        : Float) return Float;
+   function F_IDF          (P, DF1, DF2  : Float) return Float;
+   function Gamma_IDF      (P, Shape, Rate : Float) return Float;
+   function Weibull_IDF    (P, Shape, Scale : Float) return Float;
    function Chi_Square_RN (DF : Float) return Float;
    function Student_T_RN (DF : Float) return Float;
    function F_RN (DF1, DF2 : Float) return Float;

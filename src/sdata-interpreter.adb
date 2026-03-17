@@ -621,10 +621,16 @@ package body SData.Interpreter is
                   end if;
                exception
                   when E : SData.Table.Type_Mismatch_Error =>
-                     raise Script_Error with "Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
-                  when Script_Error => raise;
+                     Put_Line ("Error: Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E));
+                     raise Script_Error with "Type mismatch for variable " & Var_Name_Str;
+                  when E : Script_Error =>
+                     --  Script_Error from evaluator (e.g. div-by-zero, domain error):
+                     --  print the message here so it always appears, then re-raise.
+                     Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
+                     raise;
                   when E : others =>
-                     raise Script_Error with "Assignment failed for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
+                     Put_Line ("Error: Assignment failed for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E));
+                     raise Script_Error with "Assignment failed for variable " & Var_Name_Str;
                end;
             when Stmt_PRINT =>
                if Stmt.Print_Args = null then
@@ -853,7 +859,8 @@ package body SData.Interpreter is
                   end if;
                exception
                   when E : others =>
-                     raise Script_Error with "Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
+                     Put_Line ("Error: Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E));
+                     raise Script_Error with "Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len);
                end;
             when Stmt_NAMES =>
                declare
@@ -912,6 +919,7 @@ package body SData.Interpreter is
                   end;
                   declare Final : constant String := Path (1 .. P_Len); begin
                      if Submit_Chain.Contains (Final) then
+                        Put_Line ("Error: Recursive SUBMIT detected: " & Final);
                         raise Script_Error with
                            "Recursive SUBMIT detected: " & Final;
                      end if;
@@ -1030,8 +1038,8 @@ package body SData.Interpreter is
             when Stmt_ECHO =>
                Local_Echo := Stmt.Echo_State;
             when Stmt_IF =>
-               if Is_True (Evaluate (Stmt.Condition)) then Execute_Statement (Stmt.Then_Branch);
-               elsif Stmt.Else_Branch /= null then Execute_Statement (Stmt.Else_Branch); end if;
+               if Is_True (Evaluate (Stmt.Condition)) then Execute_List (Stmt.Then_Branch);
+               elsif Stmt.Else_Branch /= null then Execute_List (Stmt.Else_Branch); end if;
             when Stmt_WHILE =>
                while Is_True (Evaluate (Stmt.While_Cond)) loop Execute_List (Stmt.While_Body); end loop;
             when Stmt_FOR =>
@@ -1226,10 +1234,13 @@ package body SData.Interpreter is
             else
                while Iter /= null and then Iter /= Boundary loop
                   case Iter.Kind is
-                     when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
+                     when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                         begin
                            Execute_Statement(Iter);
                         exception
+                           when Script_Error =>
+                              --  Message already printed; stop or continue based on flag.
+                              if not SData.Config.Continue_On_Error then raise; end if;
                            when E : others =>
                               Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
                               if not SData.Config.Continue_On_Error then
@@ -1278,8 +1289,19 @@ package body SData.Interpreter is
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
             Step_Start := Current.Next;
-         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE or else Current.Kind = Stmt_SYSTEM or else Current.Kind = Stmt_FPATH or else Current.Kind = Stmt_NEW or else Current.Kind = Stmt_RSEED then
-            Execute_Statement (Current);
+         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE or else Current.Kind = Stmt_SYSTEM or else Current.Kind = Stmt_FPATH or else Current.Kind = Stmt_NEW or else Current.Kind = Stmt_RSEED or else Current.Kind = Stmt_SUBMIT then
+            begin
+               Execute_Statement (Current);
+            exception
+               when Script_Error =>
+                  --  Message already printed; stop or continue based on flag.
+                  if not SData.Config.Continue_On_Error then raise; end if;
+               when E : others =>
+                  Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
+                  if not SData.Config.Continue_On_Error then
+                     raise Script_Error with Ada.Exceptions.Exception_Message (E);
+                  end if;
+            end;
          end if;
          Current := Current.Next;
       end loop;

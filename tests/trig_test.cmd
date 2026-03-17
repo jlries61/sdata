@@ -1,0 +1,24 @@
+-- Test trig functions (radians)
+LET PI = 3.14159265358979
+LET SINPI2 = SIN(PI / 2)
+LET COS0   = COS(0)
+LET TAN1   = TAN(1)
+LET ATN1   = ATN(1)
+PRINT "SIN(pi/2):" SINPI2
+PRINT "COS(0):"    COS0
+PRINT "TAN(1):"    TAN1
+PRINT "ATN(1):"    ATN1
+PRINT "ATAN2(1,1):" ATAN2(1,1)
+PRINT "SINH(1):"   SINH(1)
+PRINT "COSH(0):"   COSH(0)
+PRINT "TANH(0):"   TANH(0)
+RUN
+
+-- Test trig functions (degrees)
+PRINT "SIND(90):"   SIND(90)
+PRINT "COSD(0):"    COSD(0)
+PRINT "TAND(45):"   TAND(45)
+PRINT "ATND(1):"    ATND(1)
+PRINT "ATAN2D(1,1):" ATAN2D(1,1)
+RUN
+QUIT

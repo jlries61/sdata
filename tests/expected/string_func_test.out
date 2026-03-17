@@ -1,0 +1,13 @@
+LEN: 17
+TRIM$: Hello, World!
+UCASE$:   HELLO, WORLD!  
+LCASE$:   hello, world!  
+LEFT$(7): Hello
+RIGHT$(6): World!
+MID$(8,5): World
+POS found: 8
+POS missing: 0
+CHR$(65): A
+STR$(42): 42
+VAL: 3.14000
+RUN complete. 1 records and 1 variables processed.

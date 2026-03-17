@@ -1,0 +1,15 @@
+SIN(pi/2): 1.00000
+COS(0): 1.00000
+TAN(1): 1.55741
+ATN(1): 0.78540
+ATAN2(1,1): 0.78540
+SINH(1): 1.17520
+COSH(0): 1.00000
+TANH(0): 0.00000
+RUN complete. 1 records and 5 variables processed.
+SIND(90): 1.00000
+COSD(0): 1.00000
+TAND(45): 1.00000
+ATND(1): 45.00000
+ATAN2D(1,1): 45.00000
+RUN complete. 1 records and 5 variables processed.

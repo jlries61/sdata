@@ -1,0 +1,10 @@
+HEX$(255): FF
+HEX$(16): 10
+HEX$(0): 0
+OCT$(8): 10
+OCT$(255): 377
+OCT$(0): 0
+BIN$(10): 1010
+BIN$(255): 11111111
+BIN$(0): 0
+RUN complete. 1 records and 0 variables processed.

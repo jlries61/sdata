@@ -1,0 +1,4 @@
+MEDIAN(3,1,4,1,5,9,2,6): 3.50000
+MEDIAN(10,20,30): 20.00000
+MEDIAN(10,20): 15.00000
+RUN complete. 1 records and 3 variables processed.

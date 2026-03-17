@@ -95,12 +95,12 @@ package body SData.Parser is
       Node : Expression_Access;
    begin
       case Tok.Kind is
-         when Token_Minus =>
+         when Token_Minus | Token_NOT =>
             declare
-               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Op_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
                Node := new Expression (Expr_Unary_Op);
-               Node.UOp := Op_Neg;
+               Node.UOp := (if Op_Tok.Kind = Token_NOT then Op_Not else Op_Neg);
                Node.Operand := Parse_Primary (Ctx);
                return Node;
             end;
@@ -386,12 +386,23 @@ package body SData.Parser is
             end;
 
          when Token_REPEAT =>
-            declare
-               Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-            begin
-               Stmt := new Statement (Stmt_REPEAT);
-               Stmt.Count := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
-            end;
+            --  If the next token is a newline (or EOF/colon) it is a REPEAT/UNTIL
+            --  loop block; otherwise it is REPEAT n (data-step record count).
+            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline or else
+               Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_EOF or else
+               Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon
+            then
+               Stmt := new Statement (Stmt_LOOP_REPEAT);
+               Stmt.Repeat_Body := Parse_Block (Ctx, Token_UNTIL);
+               Stmt.Until_Cond  := Parse_Expression (Ctx);
+            else
+               declare
+                  Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  Stmt := new Statement (Stmt_REPEAT);
+                  Stmt.Count := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+               end;
+            end if;
 
          when Token_PRINT =>
             Stmt := new Statement (Stmt_PRINT);
@@ -721,10 +732,25 @@ package body SData.Parser is
             if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_THEN then
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
             end if;
-            Stmt.Then_Branch := Parse_Statement (Ctx);
-            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_ELSE then
-               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-               Stmt.Else_Branch := Parse_Statement (Ctx);
+            --  Block form: IF cond THEN <newline> ... END IF
+            --  Inline form: IF cond THEN stmt [ELSE stmt]
+            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline or else
+               Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_EOF
+            then
+               --  Block form: parse until we see END (which precedes IF or ELSE).
+               Stmt.Then_Branch := Parse_Block (Ctx, Token_END);
+               --  Consume the trailing IF token (END was consumed by Parse_Block).
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_IF then
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               end if;
+               Stmt.Else_Branch := null;
+            else
+               --  Inline form: single statement on same line.
+               Stmt.Then_Branch := Parse_Statement (Ctx);
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_ELSE then
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                  Stmt.Else_Branch := Parse_Statement (Ctx);
+               end if;
             end if;
 
          when Token_WHILE =>

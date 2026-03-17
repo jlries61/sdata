@@ -1,0 +1,9 @@
+-- Test MEDIAN function
+LET M1 = MEDIAN(3, 1, 4, 1, 5, 9, 2, 6)
+LET M2 = MEDIAN(10, 20, 30)
+LET M3 = MEDIAN(10, 20)
+PRINT "MEDIAN(3,1,4,1,5,9,2,6):" M1
+PRINT "MEDIAN(10,20,30):"         M2
+PRINT "MEDIAN(10,20):"            M3
+RUN
+QUIT

@@ -601,4 +601,83 @@ package body SData.Statistics is
       return (U1 / DF1) / (U2 / DF2);
    end F_RN;
 
+   --  Generic bisection IDF: find x in [Lo, Hi] such that CDF(x) = P.
+   --  The CDF must be monotonically non-decreasing.
+   generic
+      with function CDF_Func (X : Float) return Float;
+   function Bisect_IDF (P, Lo, Hi : Float) return Float;
+
+   function Bisect_IDF (P, Lo, Hi : Float) return Float is
+      L : Float := Lo;
+      H : Float := Hi;
+      M : Float;
+   begin
+      for I in 1 .. 100 loop
+         M := (L + H) / 2.0;
+         if CDF_Func (M) < P then L := M; else H := M; end if;
+         exit when H - L < 1.0e-9;
+      end loop;
+      return (L + H) / 2.0;
+   end Bisect_IDF;
+
+   -----------------------
+   -- Chi_Square_IDF --
+   -----------------------
+   function Chi_Square_IDF (P, DF : Float) return Float is
+      function CDF (X : Float) return Float is (Chi_Square_CDF (X, DF));
+      function Bisect is new Bisect_IDF (CDF);
+   begin
+      if P <= 0.0 then return 0.0; end if;
+      if P >= 1.0 then return Float'Last; end if;
+      return Bisect (P, 0.0, DF + 10.0 * Float (Sqrt (Long_Float (2.0 * DF))));
+   end Chi_Square_IDF;
+
+   ----------------------
+   -- Student_T_IDF --
+   ----------------------
+   function Student_T_IDF (P, DF : Float) return Float is
+      function CDF (X : Float) return Float is (Student_T_CDF (X, DF));
+      function Bisect is new Bisect_IDF (CDF);
+   begin
+      if P <= 0.0 then return Float'First; end if;
+      if P >= 1.0 then return Float'Last; end if;
+      return Bisect (P, -1000.0, 1000.0);
+   end Student_T_IDF;
+
+   ---------------
+   -- F_IDF --
+   ---------------
+   function F_IDF (P, DF1, DF2 : Float) return Float is
+      function CDF (X : Float) return Float is (F_CDF (X, DF1, DF2));
+      function Bisect is new Bisect_IDF (CDF);
+   begin
+      if P <= 0.0 then return 0.0; end if;
+      if P >= 1.0 then return Float'Last; end if;
+      return Bisect (P, 0.0, 1000.0);
+   end F_IDF;
+
+   ----------------
+   -- Gamma_IDF --
+   ----------------
+   function Gamma_IDF (P, Shape, Rate : Float) return Float is
+      function CDF (X : Float) return Float is (Gamma_CDF (X, Shape, Rate));
+      function Bisect is new Bisect_IDF (CDF);
+   begin
+      if P <= 0.0 then return 0.0; end if;
+      if P >= 1.0 then return Float'Last; end if;
+      return Bisect (P, 0.0, Shape / Rate + 50.0 * Float (Sqrt (Long_Float (Shape))) / Rate);
+   end Gamma_IDF;
+
+   ------------------
+   -- Weibull_IDF --
+   ------------------
+   function Weibull_IDF (P, Shape, Scale : Float) return Float is
+      function CDF (X : Float) return Float is (Weibull_CDF (X, Scale, Shape));
+      function Bisect is new Bisect_IDF (CDF);
+   begin
+      if P <= 0.0 then return 0.0; end if;
+      if P >= 1.0 then return Float'Last; end if;
+      return Bisect (P, 0.0, Scale * 10.0);
+   end Weibull_IDF;
+
 end SData.Statistics;
