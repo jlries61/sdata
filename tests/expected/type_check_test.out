@@ -2,31 +2,4 @@ Generating mock data...
 Generating mock data...
 ID BEFORE:
 1
-Error: Type mismatch for variable ID
-ID AFTER (Should match BEFORE):
-1
-NAME BEFORE:
-Alice
-Error: Type mismatch for variable NAME
-NAME AFTER (Should match BEFORE):
-Alice
-ID BEFORE:
-2
-Error: Type mismatch for variable ID
-ID AFTER (Should match BEFORE):
-2
-NAME BEFORE:
-Bob
-Error: Type mismatch for variable NAME
-NAME AFTER (Should match BEFORE):
-Bob
-ID BEFORE:
-3
-Error: Type mismatch for variable ID
-ID AFTER (Should match BEFORE):
-3
-NAME BEFORE:
-Charlie
-Error: Type mismatch for variable NAME
-NAME AFTER (Should match BEFORE):
-Charlie
+Error: Type mismatch for variable ID: Cannot assign VAL_STRING to VAL_NUMERIC
