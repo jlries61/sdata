@@ -17,7 +17,6 @@ Source4:        sciada-0.4.0.tar.gz
 # The boolean OR syntax requires RPM >= 4.13 (Fedora 27+, openSUSE Leap 15.1+,
 # RHEL 8+).  If building on an older release substitute the appropriate name.
 BuildRequires:  (gcc-ada or gcc-gnat)
-BuildRequires:  gprbuild
 BuildRequires:  make
 
 %description
@@ -47,9 +46,11 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_bindir}/sdata
 
 %changelog
-* Wed Mar 17 2026 Your Name <you@example.com> - 0.1-1
+* Tue Mar 17 2026 John L. Ries <john@theyarnbard.com> - 0.1-1
 - Bundle Ada library dependencies (zipada, xmlada, mathpaqs, sciada)
   as vendored sources so the build requires only gcc-gnat/gcc-ada and
-  gprbuild with no additional Ada library packages.
+  make with no additional Ada library packages.
 - Use (gcc-ada or gcc-gnat) boolean dependency to support both
   openSUSE/SLES and Fedora/RHEL naming conventions.
+- Remove explicit gprbuild dependency to allow builds using Alire-managed
+  toolchains in the user's path.
