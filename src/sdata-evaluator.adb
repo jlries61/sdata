@@ -7,6 +7,7 @@ with SData.Table;
 with Ada.Containers.Vectors;
 with Ada.Text_IO; use Ada.Text_IO;
 with SData.System;
+with SData.Interpreter;
 
 package body SData.Evaluator is
 
@@ -126,10 +127,20 @@ package body SData.Evaluator is
          end if;
       elsif Name = "LOG" and then Has_Args (1) then
          declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
-         begin return (if V > 0.0 then Num_Result (Log (V)) else (Kind => Val_Missing)); end;
+         begin
+            if V <= 0.0 then
+               raise SData.Interpreter.Script_Error with "Argument to LOG must be positive.";
+            end if;
+            return Num_Result (Log (V));
+         end;
       elsif Name = "LOG10" and then Has_Args (1) then
          declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
-         begin return (if V > 0.0 then Num_Result (Log (V, 10.0)) else (Kind => Val_Missing)); end;
+         begin
+            if V <= 0.0 then
+               raise SData.Interpreter.Script_Error with "Argument to LOG10 must be positive.";
+            end if;
+            return Num_Result (Log (V, 10.0));
+         end;
       elsif Name = "EXP" and then Has_Args (1) then
          return Num_Result (Exp (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "ROUND" and then Has_Args (1) then
@@ -517,7 +528,9 @@ package body SData.Evaluator is
                            when Op_Sub => Res64 := L64 - R64;
                            when Op_Mul => Res64 := L64 * R64;
                            when Op_Div => 
-                              if R.Int_Val = 0 then return (Kind => Val_Missing); end if;
+                              if R.Int_Val = 0 then
+                                 raise SData.Interpreter.Script_Error with "Division by zero.";
+                              end if;
                               -- Return float for division to preserve precision.
                               return (Kind => Val_Numeric, Num_Val => Float (L.Int_Val) / Float (R.Int_Val));
                            when Op_Pow => return (Kind => Val_Numeric, Num_Val => Float (L.Int_Val) ** Float (R.Int_Val));
@@ -547,7 +560,11 @@ package body SData.Evaluator is
                            when Op_Add => return (Kind => Val_Numeric, Num_Val => FL + FR);
                            when Op_Sub => return (Kind => Val_Numeric, Num_Val => FL - FR);
                            when Op_Mul => return (Kind => Val_Numeric, Num_Val => FL * FR);
-                           when Op_Div => if FR = 0.0 then return (Kind => Val_Missing); end if; return (Kind => Val_Numeric, Num_Val => FL / FR);
+                           when Op_Div =>
+                              if FR = 0.0 then
+                                 raise SData.Interpreter.Script_Error with "Division by zero.";
+                              end if;
+                              return (Kind => Val_Numeric, Num_Val => FL / FR);
                            when Op_Pow => return (Kind => Val_Numeric, Num_Val => FL ** FR);
                            when Op_Eq  => return (Kind => Val_Integer, Int_Val => (if FL = FR then 1 else 0));
                            when Op_Ne  => return (Kind => Val_Integer, Int_Val => (if FL /= FR then 1 else 0));

@@ -7,10 +7,14 @@ Error: Assignment failed for variable D%: Integer overflow in OP_MUL
 Result: .
 RUN complete. 1 records and 1 variables processed.
 Integer div by zero:
-RUN complete. 1 records and 1 variables processed.
+Error: Division by zero.
+RUN complete. 1 records and 0 variables processed.
 Float div by zero:
-RUN complete. 1 records and 1 variables processed.
+Error: Division by zero.
+RUN complete. 1 records and 0 variables processed.
 Log of zero:
-RUN complete. 1 records and 1 variables processed.
+Error: Argument to LOG must be positive.
+RUN complete. 1 records and 0 variables processed.
 Log of negative:
-RUN complete. 1 records and 1 variables processed.
+Error: Argument to LOG10 must be positive.
+RUN complete. 1 records and 0 variables processed.
