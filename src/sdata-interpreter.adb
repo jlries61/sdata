@@ -584,6 +584,17 @@ package body SData.Interpreter is
                         end if;
                      end if;
                      
+                     -- Enforce --clen limit on string values before storing.
+                     if Result.Kind = Val_String and then
+                        SData.Config.Max_String_Len > 0 and then
+                        Result.Str_Len > SData.Config.Max_String_Len
+                     then
+                        Put_Line ("Warning: String truncated to " &
+                                  Integer'Image (SData.Config.Max_String_Len) &
+                                  " characters.");
+                        Result.Str_Len := SData.Config.Max_String_Len;
+                     end if;
+
                      if Stmt.Kind = Stmt_LET then
                         Set_Permanent (Var_Name_Str, Result);
                      else
@@ -1168,8 +1179,16 @@ package body SData.Interpreter is
       while Current /= null loop
          if Current.Kind = Stmt_RUN then
             Run_One_Step (Step_Start, Current);
+            declare
+               RC  : constant String := Natural'Image (SData.Table.Row_Count);
+               VC  : constant String := Natural'Image (SData.Table.Column_Count);
+            begin
+               Put_Line ("RUN complete. " &
+                         RC (RC'First + 1 .. RC'Last) & " records and " &
+                         VC (VC'First + 1 .. VC'Last) & " variables processed.");
+            end;
             Step_Start := Current.Next;
-         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE then
+         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE or else Current.Kind = Stmt_SYSTEM or else Current.Kind = Stmt_FPATH then
             Execute_Statement (Current);
          end if;
          Current := Current.Next;
