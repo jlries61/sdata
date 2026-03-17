@@ -57,7 +57,7 @@ package SData.AST is
          when Expr_Array_Access =>
             Arr_Name : String (1 .. 32);
             Arr_Len  : Natural;
-            Arr_Idx  : Expression_Access;
+            Arr_Idx  : Expression_List; -- Supports multiple subscripts: X(1, 3, 5)
       end case;
    end record;
 
@@ -120,6 +120,7 @@ package SData.AST is
       Stmt_QUIT,   -- Terminate program
       Stmt_NAMES,  -- List column names
       Stmt_SUBMIT, -- Recursive script execution
+      Stmt_SYSTEM, -- External command execution
       Stmt_RSEED,  -- Set random seed
       Stmt_HOLD,   -- Retain variable values across records
       Stmt_UNHOLD, -- Reset variables normally
@@ -133,6 +134,7 @@ package SData.AST is
       Stmt_OUTPUT, -- Console output redirection
       Stmt_ECHO,   -- Console output control
       Stmt_DIGITS, -- Set precision
+      Stmt_FPATH,  -- Set default directories
       Stmt_HELP,   -- Display help
       Stmt_RUN,    -- Execute and export
       Stmt_NEW     -- Reset environment
@@ -148,9 +150,13 @@ package SData.AST is
       case Kind is
          when Stmt_PRINT =>
             Print_Args : Expression_List;
-         when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_HELP | Stmt_OUTPUT =>
+         when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_SYSTEM | Stmt_HELP | Stmt_OUTPUT | Stmt_FPATH =>
             File_Path : String (1 .. 1024);
             File_Len  : Natural;
+            Use_Flag    : Boolean := False; -- For FPATH
+            Save_Flag   : Boolean := False; -- For FPATH
+            Submit_Flag : Boolean := False; -- For FPATH
+            Output_Flag : Boolean := False; -- For FPATH
          when Stmt_REPEAT =>
             Count : Natural;
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM =>

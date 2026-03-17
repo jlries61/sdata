@@ -485,4 +485,108 @@ package body SData.Statistics is
       return Scale * Float ((-Log (1.0 - Long_Float (U)))**(1.0 / Long_Float (Shape)));
    end Weibull_RN;
 
+   -----------------
+   -- Laplace_PDF --
+   -----------------
+   function Laplace_PDF (X, Location, Scale : Float) return Float is
+      XF : constant Long_Float := Long_Float (X);
+      MU : constant Long_Float := Long_Float (Location);
+      B  : constant Long_Float := Long_Float (Scale);
+   begin
+      if B <= 0.0 then raise Constraint_Error with "Laplace scale must be positive"; end if;
+      return Float (Exp (-abs(XF - MU) / B) / (2.0 * B));
+   end Laplace_PDF;
+
+   -----------------
+   -- Laplace_CDF --
+   -----------------
+   function Laplace_CDF (X, Location, Scale : Float) return Float is
+      XF : constant Long_Float := Long_Float (X);
+      MU : constant Long_Float := Long_Float (Location);
+      B  : constant Long_Float := Long_Float (Scale);
+   begin
+      if B <= 0.0 then raise Constraint_Error with "Laplace scale must be positive"; end if;
+      if XF < MU then
+         return Float (0.5 * Exp ((XF - MU) / B));
+      else
+         return Float (1.0 - 0.5 * Exp (-(XF - MU) / B));
+      end if;
+   end Laplace_CDF;
+
+   -----------------
+   -- Laplace_IDF --
+   -----------------
+   function Laplace_IDF (P, Location, Scale : Float) return Float is
+      PF : constant Long_Float := Long_Float (P);
+      MU : constant Long_Float := Long_Float (Location);
+      B  : constant Long_Float := Long_Float (Scale);
+   begin
+      if B <= 0.0 then raise Constraint_Error with "Laplace scale must be positive"; end if;
+      if PF <= 0.0 or PF >= 1.0 then return 0.0; end if; -- Should ideally handle boundary
+      if PF < 0.5 then
+         return Float (MU + B * Log (2.0 * PF));
+      else
+         return Float (MU - B * Log (2.0 - 2.0 * PF));
+      end if;
+   end Laplace_IDF;
+
+   -----------------
+   -- Laplace_RN --
+   -----------------
+   function Laplace_RN (Location, Scale : Float) return Float is
+      U : Float;
+   begin
+      Ensure_Random_Init;
+      U := Ada.Numerics.Float_Random.Random (Generator);
+      -- Simple inversion method
+      return Laplace_IDF (U, Location, Scale);
+   end Laplace_RN;
+
+   -----------------
+   -- Poisson_IDF --
+   -----------------
+   function Poisson_IDF (P, Lambda : Float) return Float is
+      PF : constant Long_Float := Long_Float (P);
+      L  : constant Long_Float := Long_Float (Lambda);
+      Sum : Long_Float := 0.0;
+      K   : Natural := 0;
+   begin
+      if PF <= 0.0 then return 0.0; end if;
+      if PF >= 1.0 then return Float'Last; end if;
+      loop
+         Sum := Sum + Long_Float (Poisson_PMF (Float (K), Float (L)));
+         exit when Sum >= PF or K > 1000000;
+         K := K + 1;
+      end loop;
+      return Float (K);
+   end Poisson_IDF;
+
+   -------------------
+   -- Chi_Square_RN --
+   -------------------
+   function Chi_Square_RN (DF : Float) return Float is
+   begin
+      return Gamma_RN (DF / 2.0, 0.5);
+   end Chi_Square_RN;
+
+   -------------------
+   -- Student_T_RN --
+   -------------------
+   function Student_T_RN (DF : Float) return Float is
+      Z : constant Float := Normal_RN (0.0, 1.0);
+      V : constant Float := Chi_Square_RN (DF);
+   begin
+      return Z / Float (Sqrt (Long_Float (V / DF)));
+   end Student_T_RN;
+
+   ----------
+   -- F_RN --
+   ----------
+   function F_RN (DF1, DF2 : Float) return Float is
+      U1 : constant Float := Chi_Square_RN (DF1);
+      U2 : constant Float := Chi_Square_RN (DF2);
+   begin
+      return (U1 / DF1) / (U2 / DF2);
+   end F_RN;
+
 end SData.Statistics;

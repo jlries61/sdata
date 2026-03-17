@@ -1,0 +1,15 @@
+Attempting overflow addition...
+Error: Assignment failed for C%
+Result: .
+Attempting overflow multiplication...
+Error: Assignment failed for D%
+Result: .
+Integer div by zero:
+Error: Division by zero.
+Float div by zero:
+Error: Division by zero.
+Log of zero:
+Error: Argument to LOG must be positive.
+Log of negative:
+Error: Argument to LOG10 must be positive.
+RUN complete. 1 records and 8 variables processed.

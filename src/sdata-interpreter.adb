@@ -4,17 +4,15 @@ with SData.Values;    use SData.Values;
 with SData.Variables; use SData.Variables;
 with SData.Evaluator; use SData.Evaluator;
 with GNAT.Strings; use GNAT.Strings;
+with SData.System;
+with Ada.Exceptions;
 with SData.File_IO;
 with SData.Config;    use SData.Config;
-with SData.Parser;
-with Ada.Streams.Stream_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
-with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 
 package body SData.Interpreter is
 
@@ -22,6 +20,27 @@ package body SData.Interpreter is
    Redirect_File : Ada.Text_IO.File_Type;
    Is_Redirected : Boolean := False;
    Local_Echo    : Boolean := True;
+
+   -- Pager State
+   Lines_On_Page : constant := 24;
+   Lines_Printed : Natural := 0;
+   Interactive_Mode : Boolean := False;
+
+   procedure Set_Interactive (Val : Boolean) is
+   begin
+      Interactive_Mode := Val;
+   end Set_Interactive;
+
+   procedure Check_Pager is
+      Dummy : String (1 .. 10);
+      Last  : Natural;
+   begin
+      if Interactive_Mode and then Local_Echo and then Lines_Printed >= Lines_On_Page then
+         Ada.Text_IO.Put ("-- More -- (Press Enter)");
+         Ada.Text_IO.Get_Line (Dummy, Last);
+         Lines_Printed := 0;
+      end if;
+   end Check_Pager;
 
    procedure Put_Line (Item : String) is
    begin
@@ -32,6 +51,8 @@ package body SData.Interpreter is
       
       if Local_Echo and then not SData.Config.Quiet_Mode then
          Ada.Text_IO.Put_Line (Item);
+         Lines_Printed := Lines_Printed + 1;
+         Check_Pager;
       end if;
    end Put_Line;
 
@@ -56,6 +77,8 @@ package body SData.Interpreter is
 
       if Local_Echo and then not SData.Config.Quiet_Mode then
          Ada.Text_IO.New_Line;
+         Lines_Printed := Lines_Printed + 1;
+         Check_Pager;
       end if;
    end My_New_Line;
 
@@ -63,6 +86,8 @@ package body SData.Interpreter is
    procedure Execute_Statement (Stmt : Statement_Access);
    procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null);
    
+   function Full_Path (Path : String; Category : String) return String;
+
    --  Set to track columns provided by the input file (to skip reset).
    package Name_Sets is new Ada.Containers.Indefinite_Hashed_Sets
      (Element_Type => String,
@@ -261,6 +286,35 @@ package body SData.Interpreter is
 
    package Snapshot_Collector_Alias renames SData.Variables.Snapshot_Collector;
    Collector : Snapshot_Collector_Alias.Vector;
+
+   function Full_Path (Path : String; Category : String) return String is
+      Cat  : constant String := To_Upper (Category);
+      Base : Unbounded_String := Null_Unbounded_String;
+   begin
+      if Path'Length >= 1 and then (Path(Path'First) = '/' or else (Path'Length >= 2 and then Path(Path'First + 1) = ':')) then
+         return Path;
+      end if;
+
+      if Cat = "USE" then Base := SData.Config.FPath_Use;
+      elsif Cat = "SAVE" then Base := SData.Config.FPath_Save;
+      elsif Cat = "SUBMIT" then Base := SData.Config.FPath_Submit;
+      elsif Cat = "OUTPUT" then Base := SData.Config.FPath_Output;
+      end if;
+
+      if Base = Null_Unbounded_String or else To_String (Base) = "" then
+         return Path;
+      end if;
+
+      declare
+         B : constant String := To_String (Base);
+      begin
+         if B(B'Last) = '/' or else B(B'Last) = '\' then
+            return B & Path;
+         else
+            return B & "/" & Path;
+         end if;
+      end;
+   end Full_Path;
 
    procedure Execute_Statement (Stmt : Statement_Access) is
       procedure Print_Help (Topic : String := "") is
@@ -537,8 +591,8 @@ package body SData.Interpreter is
                      end if;
                   end if;
                exception
-                  when SData.Table.Type_Mismatch_Error => Put_Line ("Error: Type mismatch for variable " & Var_Name_Str);
-                  when others => Put_Line ("Error: Assignment failed for " & Var_Name_Str);
+                  when E : SData.Table.Type_Mismatch_Error => Put_Line ("Error: Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E));
+                  when E : others => Put_Line ("Error: Assignment failed for " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E));
                end;
             when Stmt_PRINT =>
                if Stmt.Print_Args = null then
@@ -576,8 +630,9 @@ package body SData.Interpreter is
             when Stmt_USE =>
                declare 
                   File_Name : constant String := Stmt.File_Path(1 .. Stmt.File_Len);
+                  Expanded : constant String := Full_Path (File_Name, "USE");
                begin
-                  SData.File_IO.Open_Input (File_Name, SData.Config.Input_Format);
+                  SData.File_IO.Open_Input (Expanded, SData.Config.Input_Format);
                end;
                Input_File_Columns.Clear;
                Refresh_PDV_Names;
@@ -813,6 +868,16 @@ package body SData.Interpreter is
                   -- Logic here to read and parse file, then execute.
                   -- Using Submit_Level to prevent recursion.
                end;
+            when Stmt_SYSTEM =>
+               if SData.Config.Disable_Shell then
+                  Put_Line ("Error: SYSTEM command is disabled.");
+               else
+                  declare
+                     Success : Boolean;
+                  begin
+                     SData.System.Shell_Execute (Stmt.File_Path(1 .. Stmt.File_Len), Success);
+                  end;
+               end if;
             when Stmt_SELECT =>
                declare
                   Val : constant Value := (if Stmt.Selector /= null then Evaluate (Stmt.Selector) else (Kind => Val_Missing));
@@ -863,7 +928,7 @@ package body SData.Interpreter is
 
                if Stmt.File_Len > 0 then
                   declare
-                     Path : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
+                     Path : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT");
                      Has_Ext : Boolean := False;
                   begin
                      for C of Path loop
@@ -917,6 +982,24 @@ package body SData.Interpreter is
                end loop;
             when Stmt_DIGITS =>
                SData.Config.Print_Digits := Stmt.Digits_Count;
+            when Stmt_FPATH =>
+               declare
+                  Path : constant String := (if Stmt.File_Len > 0 then Stmt.File_Path (1 .. Stmt.File_Len) else "");
+                  Reset_All : constant Boolean := not (Stmt.Use_Flag or Stmt.Save_Flag or Stmt.Submit_Flag or Stmt.Output_Flag);
+               begin
+                  if Reset_All or Stmt.Use_Flag then 
+                     SData.Config.FPath_Use := To_Unbounded_String (Path); 
+                  end if;
+                  if Reset_All or Stmt.Save_Flag then 
+                     SData.Config.FPath_Save := To_Unbounded_String (Path); 
+                  end if;
+                  if Reset_All or Stmt.Submit_Flag then 
+                     SData.Config.FPath_Submit := To_Unbounded_String (Path); 
+                  end if;
+                  if Reset_All or Stmt.Output_Flag then 
+                     SData.Config.FPath_Output := To_Unbounded_String (Path); 
+                  end if;
+               end;
             when Stmt_NEW =>
                SData.Table.Clear;
                SData.Variables.Clear_Temporary;
@@ -1050,7 +1133,7 @@ package body SData.Interpreter is
             else
                while Iter /= null and then Iter /= Boundary loop
                   case Iter.Kind is
-                     when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
+                     when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_SUBMIT | Stmt_SYSTEM | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                         Execute_Statement(Iter);
                      when others => null;
                   end case;
@@ -1068,7 +1151,7 @@ package body SData.Interpreter is
          Set_Current_Record_Index (0);
          Apply_Pending_Mods;
          if SData.Config.Save_File_Active then
-            SData.File_IO.Open_Output (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), SData.Config.Save_File_Fmt);
+            SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt);
             if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
             SData.Config.Save_File_Active := False;
          end if;

@@ -1,0 +1,7 @@
+-- Testing string length constraint
+-- Run with: sdata --clen 5 clen_test.sdata
+LET S$ = "1234"
+LET S$ = S$ + "567890"
+PRINT "S$ is " + S$
+RUN
+QUIT

@@ -196,9 +196,8 @@ package body SData.Lexer is
                Advance (Ctx);
             end loop;
 
-         --  Identify Identifiers or Keywords.
-         elsif Is_Letter (C) then
-            while not Is_End_Of_Source (Ctx) and then (Is_Alphanumeric (Current_Char (Ctx)) or Current_Char (Ctx) = '_' or Current_Char (Ctx) = '$' or Current_Char (Ctx) = '%' or Current_Char (Ctx) = '.') loop
+         elsif Is_Letter (C) or C = '/' then
+            while not Is_End_Of_Source (Ctx) and then (Is_Alphanumeric (Current_Char (Ctx)) or Current_Char (Ctx) = '_' or Current_Char (Ctx) = '$' or Current_Char (Ctx) = '%' or Current_Char (Ctx) = '.' or Current_Char (Ctx) = '/') loop
                T.Length := T.Length + 1;
                T.Text (T.Length) := Current_Char (Ctx);
                Advance (Ctx);
@@ -208,8 +207,8 @@ package body SData.Lexer is
             declare
                Upper : constant String := To_Upper (T.Text (1 .. T.Length));
             begin
-               if Upper = "USE" then T.Kind := Token_USE;
-               elsif Upper = "SAVE" then T.Kind := Token_SAVE;
+               if Upper = "USE" or Upper = "/USE" then T.Kind := Token_USE;
+               elsif Upper = "SAVE" or Upper = "/SAVE" then T.Kind := Token_SAVE;
                elsif Upper = "KEEP" then T.Kind := Token_KEEP;
                elsif Upper = "DROP" then T.Kind := Token_DROP;
                elsif Upper = "HOLD" then T.Kind := Token_HOLD;
@@ -228,14 +227,15 @@ package body SData.Lexer is
                elsif Upper = "CASE" then T.Kind := Token_CASE;
                elsif Upper = "WHEN" then T.Kind := Token_WHEN;
                elsif Upper = "OTHERWISE" then T.Kind := Token_OTHERWISE;
-               elsif Upper = "SUBMIT" then T.Kind := Token_SUBMIT;
+               elsif Upper = "SUBMIT" or Upper = "/SUBMIT" then T.Kind := Token_SUBMIT;
                elsif Upper = "LET" then T.Kind := Token_LET;
                elsif Upper = "SET" then T.Kind := Token_SET;
                elsif Upper = "DIM" then T.Kind := Token_DIM;
                elsif Upper = "ARRAY" then T.Kind := Token_ARRAY;
+               elsif Upper = "SYSTEM" or Upper = "/SYSTEM" then T.Kind := Token_SYSTEM;
                elsif Upper = "PRINT" then T.Kind := Token_PRINT;
                elsif Upper = "WRITE" then T.Kind := Token_WRITE;
-               elsif Upper = "OUTPUT" then T.Kind := Token_OUTPUT;
+               elsif Upper = "OUTPUT" or Upper = "/OUTPUT" then T.Kind := Token_OUTPUT;
                elsif Upper = "ECHO" then T.Kind := Token_ECHO;
                elsif Upper = "BY" then T.Kind := Token_BY;
                elsif Upper = "SORT" then T.Kind := Token_SORT;

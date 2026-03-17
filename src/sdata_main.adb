@@ -38,9 +38,10 @@ procedure SData_Main is
       Put_Line ("Options:");
       Put_Line ("  -h, --help    Show this help message");
       Put_Line ("  -v, --version Show version information");
-      Put_Line ("  -m <size>     Set max in-memory table size (not yet implemented)");
-      Put_Line ("  --clen <len>  Set max character variable length (not yet implemented)");
-      Put_Line ("  --noshell     Disable SHELL command (not yet implemented)");
+      Put_Line ("  -m <size>     Set max in-memory table size");
+      Put_Line ("  -t <count>    Set max temporary variables");
+      Put_Line ("  --clen <len>  Set max character variable length");
+      Put_Line ("  --noshell     Disable SHELL command and function");
       Put_Line ("  -u, --infmt   Input dataset and format");
       Put_Line ("  -s, --outfmt  Output dataset and format");
       Put_Line ("  -o <file>     Console output file");
@@ -56,6 +57,7 @@ procedure SData_Main is
       Ctx  : Parser_Context;
       Prog : Statement_Access;
    begin
+      Set_Interactive (True);
       Put_Line ("SData Statistical Interpreter version " & SData.Config.Version_Str);
       Put_Line ("Interactive Console. Type QUIT to exit.");
       loop
@@ -184,6 +186,23 @@ begin
                   end if;
                end;
             end if;
+         elsif Arg = "-m" then
+            if Idx < Argument_Count then
+               Idx := Idx + 1;
+               Max_Table_Rows := Natural'Value (Argument (Idx));
+            end if;
+         elsif Arg = "-t" then
+            if Idx < Argument_Count then
+               Idx := Idx + 1;
+               Max_Temp_Vars := Natural'Value (Argument (Idx));
+            end if;
+         elsif Arg = "--clen" then
+            if Idx < Argument_Count then
+               Idx := Idx + 1;
+               Max_String_Len := Natural'Value (Argument (Idx));
+            end if;
+         elsif Arg = "--noshell" then
+            Disable_Shell := True;
          elsif Arg(1) /= '-' then
             -- This is the main command file to execute.
             Filename (1 .. Arg'Length) := Arg;

@@ -1,5 +1,6 @@
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
+with SData.Variables; use SData.Variables;
 
 package body SData.Parser is
 
@@ -13,8 +14,42 @@ package body SData.Parser is
 
    --  Forward declarations for mutual recursion.
    function Parse_Expression (Ctx : in out Parser_Context) return Expression_Access;
+   function Parse_Expression_List (Ctx : in out Parser_Context; Closing : Token_Kind) return Expression_List;
    function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access;
    function Parse_Rename_List (Ctx : in out Parser_Context) return Rename_List;
+
+   ---------------------------
+   -- Parse_Expression_List --
+   ---------------------------
+   function Parse_Expression_List (Ctx : in out Parser_Context; Closing : Token_Kind) return Expression_List is
+      Head, Last, New_Node : Expression_List := null;
+   begin
+      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Closing then
+         return null;
+      end if;
+
+      loop
+         declare
+            Expr : constant Expression_Access := Parse_Expression (Ctx);
+         begin
+            New_Node := new Expression_List_Node'(Expr => Expr, Next => null);
+            if Head = null then
+               Head := New_Node;
+            else
+               Last.Next := New_Node;
+            end if;
+            Last := New_Node;
+         end;
+
+         if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+         else
+            exit;
+         end if;
+      end loop;
+
+      return Head;
+   end Parse_Expression_List;
 
    -----------------
    -- Parse_Block --
@@ -86,53 +121,26 @@ package body SData.Parser is
                      return Node;
 
                   when Token_Identifier =>
-                     if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren then
-                        Node := new Expression (Expr_Function_Call);
-                        Node.Func_Len := Actual_Tok.Length;
-                        Node.Func_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                     if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren or else
+                        Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
                         declare
-                           Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- Consume '('
-                           Last_Arg : Expression_List := null;
+                           LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Closing : constant Token_Kind := (if LP.Kind = Token_Left_Paren then Token_Right_Paren else Token_Right_Brace);
                         begin
-                           if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                              loop
-                                 declare
-                                    Arg_Expr : constant Expression_Access := Parse_Expression (Ctx);
-                                    New_Arg  : constant Expression_List := new Expression_List_Node'(Expr => Arg_Expr, Next => null);
-                                 begin
-                                    if Node.Arguments = null then
-                                       Node.Arguments := New_Arg;
-                                    else
-                                       Last_Arg.Next := New_Arg;
-                                    end if;
-                                    Last_Arg := New_Arg;
-                                 end;
-
-                                 if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
-                                    declare
-                                       Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                                    begin null; end;
-                                 else
-                                    exit;
-                                 end if;
-                              end loop;
+                           if Has_Array (To_Upper (Actual_Tok.Text (1 .. Actual_Tok.Length))) then
+                              Node := new Expression (Expr_Array_Access);
+                              Node.Arr_Len := Actual_Tok.Length;
+                              Node.Arr_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                              Node.Arr_Idx := Parse_Expression_List (Ctx, Closing);
+                           else
+                              Node := new Expression (Expr_Function_Call);
+                              Node.Func_Len := Actual_Tok.Length;
+                              Node.Func_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                              Node.Arguments := Parse_Expression_List (Ctx, Closing);
                            end if;
 
-                           if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                              Put_Line ("Error: Expected ')'");
-                           end if;
-                        end;
-                        return Node;
-                     elsif Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
-                        Node := new Expression (Expr_Array_Access);
-                        Node.Arr_Len := Actual_Tok.Length;
-                        Node.Arr_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
-                        declare
-                           Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- Consume '{'
-                        begin
-                           Node.Arr_Idx := Parse_Expression (Ctx);
-                           if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Brace then
-                              Put_Line ("Error: Expected '}' after array index");
+                           if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Closing then
+                              Put_Line ("Error: Expected matching closing bracket/paren");
                            end if;
                         end;
                         return Node;
@@ -415,29 +423,77 @@ package body SData.Parser is
                end loop;
             end;
 
-         when Token_USE | Token_SAVE | Token_SUBMIT =>
+         when Token_USE | Token_SAVE | Token_SUBMIT | Token_SYSTEM | Token_FPATH =>
             declare
                File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
                if Tok.Kind = Token_USE then Stmt := new Statement (Stmt_USE);
                elsif Tok.Kind = Token_SAVE then Stmt := new Statement (Stmt_SAVE);
-               else Stmt := new Statement (Stmt_SUBMIT); end if;
-               Stmt.File_Len := File_Tok.Length;
-               Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
-               -- Rule: Unquoted filenames converted to uppercase
-               if File_Tok.Kind /= Token_String_Literal then
-                  for I in 1 .. Stmt.File_Len loop
-                     Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
+               elsif Tok.Kind = Token_SUBMIT then Stmt := new Statement (Stmt_SUBMIT);
+               elsif Tok.Kind = Token_SYSTEM then Stmt := new Statement (Stmt_SYSTEM);
+               else Stmt := new Statement (Stmt_FPATH); end if;
+               
+               if Tok.Kind = Token_FPATH and then (File_Tok.Kind = Token_Newline or else File_Tok.Kind = Token_Semicolon or else File_Tok.Kind = Token_Slash) then
+                   -- FPATH without leading path (either empty or starting with a flag)
+                   Stmt.File_Len := 0;
+               else
+                   Stmt.File_Len := File_Tok.Length;
+                   Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
+                   -- Rule: Unquoted filenames converted to uppercase
+                   if File_Tok.Kind /= Token_String_Literal then
+                      for I in 1 .. Stmt.File_Len loop
+                         Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
+                      end loop;
+                   end if;
+               end if;
+
+               if Tok.Kind = Token_FPATH then
+                  -- Handle FPATH flags
+                  declare
+                     procedure Process_Flag (T : Token) is
+                        Flag_Name : constant String := To_Upper (T.Text (1 .. T.Length));
+                     begin
+                        if Flag_Name = "USE" or T.Kind = Token_USE then Stmt.Use_Flag := True;
+                        elsif Flag_Name = "SAVE" or T.Kind = Token_SAVE then Stmt.Save_Flag := True;
+                        elsif Flag_Name = "SUBMIT" or T.Kind = Token_SUBMIT then Stmt.Submit_Flag := True;
+                        elsif Flag_Name = "OUTPUT" or T.Kind = Token_OUTPUT then Stmt.Output_Flag := True;
+                        end if;
+                     end Process_Flag;
+                  begin
+                     if File_Tok.Kind = Token_Slash then
+                        Process_Flag (Get_Next_Token (Ctx.Lex_Ctx));
+                     elsif File_Tok.Kind = Token_USE or else File_Tok.Kind = Token_SAVE or else File_Tok.Kind = Token_SUBMIT or else File_Tok.Kind = Token_OUTPUT then
+                        Process_Flag (File_Tok);
+                     end if;
+
+                     loop
+                        declare Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           if Peeked.Kind = Token_Slash then
+                              declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                      Flag_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              begin
+                                 Process_Flag (Flag_Tok);
+                              end;
+                           elsif Peeked.Kind = Token_USE or else Peeked.Kind = Token_SAVE or else Peeked.Kind = Token_SUBMIT or else Peeked.Kind = Token_OUTPUT then
+                              Process_Flag (Get_Next_Token (Ctx.Lex_Ctx));
+                           else
+                              exit;
+                           end if;
+                        end;
+                     end loop;
+                  end;
+               else
+                  -- For USE/SAVE/SUBMIT/SYSTEM, skip optional slashes/params for now
+                  loop
+                     declare Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                     begin
+                        if Peeked.Kind = Token_Slash or else Peeked.Kind = Token_String_Literal then
+                           declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                        else exit; end if;
+                     end;
                   end loop;
                end if;
-               loop
-                  declare Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
-                  begin
-                     if Peeked.Kind = Token_Slash or else Peeked.Kind = Token_String_Literal then
-                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                     else exit; end if;
-                  end;
-               end loop;
             end;
 
          when Token_KEEP | Token_DROP | Token_HOLD | Token_UNHOLD =>

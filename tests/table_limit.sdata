@@ -1,0 +1,9 @@
+-- Testing table limit
+-- Run with: sdata -m 2
+LET X = 1
+RUN
+LET X = 2
+RUN
+LET X = 3
+RUN
+QUIT

@@ -2,6 +2,7 @@ with Ada.Characters.Handling; use Ada.Characters.Handling;
 with GNAT.Strings; use GNAT.Strings;
 with Ada.Containers; use Ada.Containers; -- For Count_Type
 with Ada.Strings.Fixed;
+with SData.Config;
 
 package body SData.Variables is
 
@@ -46,6 +47,10 @@ package body SData.Variables is
       if Temp_Symbols.Contains (Upper_Name) then
          Temp_Symbols.Replace (Upper_Name, Val);
       else
+         -- Check limit if set
+         if SData.Config.Max_Temp_Vars > 0 and then Natural (Temp_Symbols.Length) >= SData.Config.Max_Temp_Vars then
+            raise Program_Error with "Temporary variable limit (" & Integer'Image(SData.Config.Max_Temp_Vars) & ") exceeded.";
+         end if;
          Temp_Symbols.Insert (Upper_Name, Val);
       end if;
    end Set_Temporary;

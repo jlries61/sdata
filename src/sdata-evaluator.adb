@@ -1,9 +1,12 @@
 with SData.Variables; use SData.Variables;
+with SData.Config;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData.Statistics;
 with SData.Table;
 with Ada.Containers.Vectors;
+with Ada.Text_IO; use Ada.Text_IO;
+with SData.System;
 
 package body SData.Evaluator is
 
@@ -76,6 +79,34 @@ package body SData.Evaluator is
                         All_Vals.Append (Get_Array_Element (VName, I));
                      end loop;
                   end;
+               else
+                  All_Vals.Append (Evaluate (Current.Expr));
+               end if;
+            end;
+         elsif Current.Expr.Kind = Expr_Array_Access or else Current.Expr.Kind = Expr_Function_Call then
+            declare
+               AName : constant String := To_Upper ((if Current.Expr.Kind = Expr_Array_Access 
+                                                     then Current.Expr.Arr_Name (1 .. Current.Expr.Arr_Len)
+                                                     else Current.Expr.Func_Name (1 .. Current.Expr.Func_Len)));
+               Sub_List : Expression_List := (if Current.Expr.Kind = Expr_Array_Access 
+                                              then Current.Expr.Arr_Idx
+                                              else Current.Expr.Arguments);
+            begin
+               -- If it's an array, expand subscripts
+               if Has_Array (AName) then
+                  while Sub_List /= null loop
+                     declare
+                        Idx_Val : constant Value := Evaluate (Sub_List.Expr);
+                        Idx : Integer;
+                     begin
+                        if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
+                        else Idx := Integer (Float'Floor (Convert_To_Float (Idx_Val))); end if;
+                        All_Vals.Append (Get_Array_Element (AName, idx));
+                     exception
+                        when others => All_Vals.Append ((Kind => Val_Missing));
+                     end;
+                     Sub_List := Sub_List.Next;
+                  end loop;
                else
                   All_Vals.Append (Evaluate (Current.Expr));
                end if;
@@ -240,6 +271,10 @@ package body SData.Evaluator is
          return Num_Result (SData.Statistics.Weibull_PDF (Convert_To_Float (All_Vals.Element (1)), 
                                                          Convert_To_Float (All_Vals.Element (2)), 
                                                          Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "LDF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Laplace_PDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2)), 
+                                                          Convert_To_Float (All_Vals.Element (3))));
 
       -- Statistical Distributions (CDF)
       elsif Name = "ZCF" and then Has_Args (1) then
@@ -284,6 +319,10 @@ package body SData.Evaluator is
          return Num_Result (SData.Statistics.Weibull_CDF (Convert_To_Float (All_Vals.Element (1)), 
                                                          Convert_To_Float (All_Vals.Element (2)), 
                                                          Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "LCF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Laplace_CDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2)), 
+                                                          Convert_To_Float (All_Vals.Element (3))));
 
       -- Statistical Distributions (IDF)
       elsif Name = "ZIF" and then Has_Args (1) then
@@ -303,6 +342,13 @@ package body SData.Evaluator is
          return Num_Result (SData.Statistics.Beta_IDF (Convert_To_Float (All_Vals.Element (1)), 
                                                        Convert_To_Float (All_Vals.Element (2)), 
                                                        Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "LIF" and then Has_Args (3) then
+         return Num_Result (SData.Statistics.Laplace_IDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2)), 
+                                                          Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "PIF" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Poisson_IDF (Convert_To_Float (All_Vals.Element (1)), 
+                                                          Convert_To_Float (All_Vals.Element (2))));
 
       -- Random Numbers (RN)
       elsif Name = "ZRN" then
@@ -326,6 +372,56 @@ package body SData.Evaluator is
       elsif Name = "WRN" and then Has_Args (2) then
          return Num_Result (SData.Statistics.Weibull_RN (Convert_To_Float (All_Vals.Element (1)), 
                                                          Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "LRN" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.Laplace_RN (Convert_To_Float (All_Vals.Element (1)), 
+                                                         Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "XRN" and then Has_Args (1) then
+         return Num_Result (SData.Statistics.Chi_Square_RN (Convert_To_Float (All_Vals.Element (1))));
+      elsif Name = "TRN" and then Has_Args (1) then
+         return Num_Result (SData.Statistics.Student_T_RN (Convert_To_Float (All_Vals.Element (1))));
+      elsif Name = "FRN" and then Has_Args (2) then
+         return Num_Result (SData.Statistics.F_RN (Convert_To_Float (All_Vals.Element (1)),
+                                                   Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "SHELL" and then Has_Args (1) then
+         if SData.Config.Disable_Shell then
+            Put_Line ("Error: SHELL function is disabled.");
+            return (Kind => Val_Missing);
+         else
+            declare
+               Command : constant String := SData.Values.To_String (All_Vals.Element (1));
+               Success : Boolean;
+            begin
+               SData.System.Shell_Execute (Command, Success);
+               return (Kind => Val_Integer, Int_Val => (if Success then 0 else 1));
+            end;
+         end if;
+      elsif Name = "NUM" and then Has_Args (1) then
+         declare
+            V : constant Value := All_Vals.Element (1);
+         begin
+            if V.Kind = Val_Numeric or V.Kind = Val_Integer then
+               return V;
+            elsif V.Kind = Val_String then
+               begin
+                  return (Kind => Val_Numeric, Num_Val => Float'Value (V.Str_Val (1 .. V.Str_Len)));
+               exception
+                  when others => return (Kind => Val_Missing);
+               end;
+            else
+               return (Kind => Val_Missing);
+            end if;
+         end;
+      elsif Name = "NUM$" and then Has_Args (1) then
+         declare
+            V : constant Value := All_Vals.Element (1);
+            Result : Value (Val_String);
+            Img : constant String := SData.Values.To_String_Formatted (V);
+         begin
+            Result.Str_Len := Img'Length;
+            if Result.Str_Len > 1024 then Result.Str_Len := 1024; end if;
+            Result.Str_Val (1 .. Result.Str_Len) := Img (Img'First .. Img'First + Result.Str_Len - 1);
+            return Result;
+         end;
 
       end if;
 
@@ -371,7 +467,8 @@ package body SData.Evaluator is
 
          when Expr_Array_Access =>
             declare
-               Index_Val : constant Value := Evaluate (Expr.Arr_Idx);
+               -- Handle first subscript
+               Index_Val : constant Value := (if Expr.Arr_Idx /= null then Evaluate (Expr.Arr_Idx.Expr) else (Kind => Val_Missing));
                Idx : Integer;
             begin
                if Index_Val.Kind = Val_Integer then
@@ -391,7 +488,13 @@ package body SData.Evaluator is
                if Operand_Val.Kind = Val_Numeric then
                   case Expr.UOp is when Op_Neg => return (Kind => Val_Numeric, Num_Val => -Operand_Val.Num_Val); end case;
                elsif Operand_Val.Kind = Val_Integer then
-                  case Expr.UOp is when Op_Neg => return (Kind => Val_Integer, Int_Val => -Operand_Val.Int_Val); end case;
+                  case Expr.UOp is 
+                     when Op_Neg => 
+                        if Operand_Val.Int_Val = Integer'First then
+                           raise Constraint_Error with "Integer overflow in unary negation";
+                        end if;
+                        return (Kind => Val_Integer, Int_Val => -Operand_Val.Int_Val); 
+                  end case;
                else return (Kind => Val_Missing); end if;
             end;
 
@@ -404,22 +507,36 @@ package body SData.Evaluator is
                if (L.Kind = Val_Numeric or L.Kind = Val_Integer) and (R.Kind = Val_Numeric or R.Kind = Val_Integer) then
                   -- If both are integers, result is integer (mostly).
                   if L.Kind = Val_Integer and R.Kind = Val_Integer then
-                     case Expr.Op is
-                        when Op_Add => return (Kind => Val_Integer, Int_Val => L.Int_Val + R.Int_Val);
-                        when Op_Sub => return (Kind => Val_Integer, Int_Val => L.Int_Val - R.Int_Val);
-                        when Op_Mul => return (Kind => Val_Integer, Int_Val => L.Int_Val * R.Int_Val);
-                        when Op_Div => 
-                           if R.Int_Val = 0 then return (Kind => Val_Missing); end if;
-                           -- Return float for division to preserve precision.
-                           return (Kind => Val_Numeric, Num_Val => Float (L.Int_Val) / Float (R.Int_Val));
-                        when Op_Pow => return (Kind => Val_Numeric, Num_Val => Float (L.Int_Val) ** Float (R.Int_Val));
-                        when Op_Eq  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val = R.Int_Val then 1 else 0));
-                        when Op_Ne  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val /= R.Int_Val then 1 else 0));
-                        when Op_Lt  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val < R.Int_Val then 1 else 0));
-                        when Op_Le  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val <= R.Int_Val then 1 else 0));
-                        when Op_Gt  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val > R.Int_Val then 1 else 0));
-                        when Op_Ge  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val >= R.Int_Val then 1 else 0));
-                     end case;
+                     declare
+                        L64 : constant Long_Integer := Long_Integer (L.Int_Val);
+                        R64 : constant Long_Integer := Long_Integer (R.Int_Val);
+                        Res64 : Long_Integer;
+                     begin
+                        case Expr.Op is
+                           when Op_Add => Res64 := L64 + R64;
+                           when Op_Sub => Res64 := L64 - R64;
+                           when Op_Mul => Res64 := L64 * R64;
+                           when Op_Div => 
+                              if R.Int_Val = 0 then return (Kind => Val_Missing); end if;
+                              -- Return float for division to preserve precision.
+                              return (Kind => Val_Numeric, Num_Val => Float (L.Int_Val) / Float (R.Int_Val));
+                           when Op_Pow => return (Kind => Val_Numeric, Num_Val => Float (L.Int_Val) ** Float (R.Int_Val));
+                           when Op_Eq  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val = R.Int_Val then 1 else 0));
+                           when Op_Ne  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val /= R.Int_Val then 1 else 0));
+                           when Op_Lt  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val < R.Int_Val then 1 else 0));
+                           when Op_Le  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val <= R.Int_Val then 1 else 0));
+                           when Op_Gt  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val > R.Int_Val then 1 else 0));
+                           when Op_Ge  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val >= R.Int_Val then 1 else 0));
+                        end case;
+
+                        if Expr.Op in Op_Add .. Op_Mul then
+                           if Res64 < Long_Integer (Integer'First) or else Res64 > Long_Integer (Integer'Last) then
+                              raise Constraint_Error with "Integer overflow in " & Expr.Op'Image;
+                           end if;
+                           return (Kind => Val_Integer, Int_Val => Integer (Res64));
+                        end if;
+                        return (Kind => Val_Missing);
+                     end;
                   else
                      -- One or both are Float, promote to Float.
                      declare
@@ -444,12 +561,24 @@ package body SData.Evaluator is
                elsif L.Kind = Val_String and R.Kind = Val_String then
                   case Expr.Op is
                      when Op_Add =>
-                        declare V : Value (Val_String);
+                        declare 
+                           V : Value (Val_String);
+                           Limit : Natural := 1024;
                         begin
+                           if SData.Config.Max_String_Len > 0 and then SData.Config.Max_String_Len < 1024 then
+                              Limit := SData.Config.Max_String_Len;
+                           end if;
+
                            V.Str_Len := L.Str_Len + R.Str_Len;
-                           if V.Str_Len > 1024 then V.Str_Len := 1024; end if;
+                           if V.Str_Len > Limit then 
+                              Put_Line ("Warning: String truncated to " & Integer'Image(Limit) & " characters.");
+                              V.Str_Len := Limit;
+                           end if;
+                           
                            V.Str_Val (1 .. L.Str_Len) := L.Str_Val (1 .. L.Str_Len);
-                           V.Str_Val (L.Str_Len + 1 .. V.Str_Len) := R.Str_Val (1 .. V.Str_Len - L.Str_Len);
+                           if V.Str_Len > L.Str_Len then
+                              V.Str_Val (L.Str_Len + 1 .. V.Str_Len) := R.Str_Val (1 .. V.Str_Len - L.Str_Len);
+                           end if;
                            return V;
                         end;
                      when Op_Eq => return (Kind => Val_Integer, Int_Val => (if L.Str_Val (1 .. L.Str_Len) = R.Str_Val (1 .. R.Str_Len) then 1 else 0));
@@ -464,7 +593,8 @@ package body SData.Evaluator is
             begin
                if Has_Array (FName) then
                   declare
-                     Index_Val : constant Value := Evaluate (Expr.Arguments.Expr);
+                     -- Simple array lookup from function-like syntax F(idx)
+                     Index_Val : constant Value := (if Expr.Arguments /= null then Evaluate (Expr.Arguments.Expr) else (Kind => Val_Missing));
                      Idx : Integer;
                   begin
                      if Index_Val.Kind = Val_Integer then

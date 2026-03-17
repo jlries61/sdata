@@ -19,4 +19,6 @@ package SData.Interpreter is
    --  Executes the global active program.
    procedure Run_Active_Program;
 
+   procedure Set_Interactive (Val : Boolean);
+
 end SData.Interpreter;

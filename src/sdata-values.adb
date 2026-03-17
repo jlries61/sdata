@@ -61,6 +61,8 @@ package body SData.Values is
             return V.Num_Val /= 0.0;
          when Val_Integer =>
             return V.Int_Val /= 0;
+         when Val_String =>
+            return V.Str_Len > 0;
          when others =>
             return False;
       end case;
