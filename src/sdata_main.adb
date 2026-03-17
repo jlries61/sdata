@@ -60,53 +60,33 @@ procedure SData_Main is
       Set_Interactive (True);
       Put_Line ("SData Statistical Interpreter version " & SData.Config.Version_Str);
       Put_Line ("Interactive Console. Type QUIT to exit.");
-      loop
+      REPL : loop
          Put ("sdata> ");
          Flush;
          begin
             Get_Line (Line, Last);
             if Last > 0 then
-               -- Check for continuation: if the line ends with a comma or we are inside a block.
-               -- Simplification: for now, just process line by line.
-               -- But FOR/WHILE need multiple lines.
                Initialize (Ctx, Line (1 .. Last));
                Prog := Parse_Program (Ctx);
-               
-               if Prog = null then
-                  -- Check if we have an unrecognized command error reported during parsing
-                  null;
-               end if;
 
                while Prog /= null loop
                   declare
-                     -- Determine if the statement is declarative.
-                     -- Note: This is a simplified check for now.
-                     Is_Declarative : constant Boolean := 
-                        Prog.Kind in Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP | 
+                     Is_Declarative : constant Boolean :=
+                        Prog.Kind in Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP |
                                      Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END |
                                      Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
                                      Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT;
                   begin
                      if Is_Declarative then
-                        -- Declarative statements execute immediately in REPL.
                         if Prog.Kind = Stmt_RUN then
                            Run_Active_Program;
-                        elsif Prog.Kind = Stmt_HELP or else 
-                              Prog.Kind = Stmt_OUTPUT or else
-                              Prog.Kind = Stmt_ECHO or else
-                              Prog.Kind = Stmt_NAMES or else
-                              Prog.Kind = Stmt_USE then
-                           -- Special case for interactive immediate execution
-                           Execute (Prog);
+                        elsif Prog.Kind = Stmt_QUIT or else Prog.Kind = Stmt_END then
+                           exit REPL;
                         else
                            Execute (Prog);
                         end if;
-                        
-                        if Prog.Kind = Stmt_QUIT then
-                           exit;
-                        end if;
                      else
-                        -- Non-declarative statements are queued until RUN.
+                        -- Deferred statements are queued until RUN.
                         Add_To_Active_Program (Prog);
                      end if;
                   end;
@@ -116,12 +96,12 @@ procedure SData_Main is
          exception
             when End_Error =>
                New_Line;
-               exit;
+               exit REPL;
             when E : others =>
                Put_Line ("Error: " & Exception_Message (E));
          end;
-         exit when not Is_Open (Standard_Input);
-      end loop;
+         exit REPL when not Is_Open (Standard_Input);
+      end loop REPL;
    end Run_REPL;
 
    Ctx      : Parser_Context;
