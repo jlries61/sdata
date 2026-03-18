@@ -93,6 +93,7 @@ srpm: clean
 dsc: clean
 	@echo "Creating Debian Source Package..."
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
+	 CUR_DIR=$$(pwd); \
 	 TEMP_DIR=$$(mktemp -d); \
 	 BASE_DIR="sdata-0.1"; \
 	 SRC_DIR="$$TEMP_DIR/$$BASE_DIR"; \
@@ -103,7 +104,7 @@ dsc: clean
 	 done; \
 	 cd "$$TEMP_DIR" && tar czf "sdata_0.1.orig.tar.gz" "$$BASE_DIR"; \
 	 cd "$$SRC_DIR" && dpkg-source -b .; \
-	 mv "$$TEMP_DIR"/sdata_0.1* . ; \
+	 mv "$$TEMP_DIR"/sdata_0.1* "$$CUR_DIR/" ; \
 	 rm -rf "$$TEMP_DIR"
 	@echo "Debian Source Package created (sdata_0.1-1.dsc, sdata_0.1.orig.tar.gz, etc.)"
 
