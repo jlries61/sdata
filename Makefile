@@ -108,6 +108,29 @@ dsc: clean
 	 rm -rf "$$TEMP_DIR"
 	@echo "Debian Source Package created (sdata_0.1-1.dsc, sdata_0.1.orig.tar.gz, etc.)"
 
+slackware: clean
+	@echo "Creating SlackBuild tarball..."
+	@{ \
+		if [ -z "$$(git status --untracked-files=no --porcelain)" ]; then \
+			git archive --format=tar --prefix=sdata-0.1/ HEAD | gzip > sdata-0.1.tar.gz; \
+		else \
+			echo "ERROR: Working directory is not clean. Please commit changes before creating a source package."; \
+			exit 1; \
+		fi \
+	}
+	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
+	 CUR_DIR=$$(pwd); \
+	 TEMP_DIR=$$(mktemp -d); \
+	 cp sdata-0.1.tar.gz "$$TEMP_DIR/"; \
+	 cp slackware/* "$$TEMP_DIR/"; \
+	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz sciada-0.4.0.tar.gz; do \
+	   cp "$$TARBALL_DIR/$$tb" "$$TEMP_DIR/"; \
+	 done; \
+	 cd "$$TEMP_DIR" && tar czf sdata-0.1-slackbuild.tar.gz *; \
+	 mv "$$TEMP_DIR/sdata-0.1-slackbuild.tar.gz" "$$CUR_DIR/"; \
+	 rm -rf "$$TEMP_DIR"
+	@echo "SlackBuild package created: sdata-0.1-slackbuild.tar.gz"
+
 
 install: build
 	install -d $(INSTALL_DIR)
