@@ -224,70 +224,40 @@ package body SData.Variables is
    -----------------------
    -- Take_PDV_Snapshot --
    -----------------------
-   function Take_PDV_Snapshot return Symbol_Table_Pkg.Map is
+   procedure Flush_PDV_To_Output is
    begin
-      return Permanent_Symbols;
-   end Take_PDV_Snapshot;
-
-   -------------------------------
-   -- Commit_Snapshots_To_Table --
-   -------------------------------
-   procedure Commit_Snapshots_To_Table (Snapshots : Snapshot_Collector.Vector) is
-      package Ordered_Names is new Ada.Containers.Vectors (Positive, Unbounded_String);
-      Order : Ordered_Names.Vector;
-   begin
-      SData.Table.Clear;
-      if Snapshots.Is_Empty then return; end if;
-      
-      -- 1. Identify all columns from all snapshots and preserve order
-      for S of Snapshots loop
+      -- Ensure columns exist
+      for Pos in Permanent_Symbols.Iterate loop
          declare
-            Pos : Symbol_Table_Pkg.Cursor := S.First;
+            Name : constant String := Symbol_Table_Pkg.Key (Pos);
+            V    : constant Value := Symbol_Table_Pkg.Element (Pos);
+            Typ  : Column_Type := Col_Numeric;
          begin
-            while Symbol_Table_Pkg.Has_Element (Pos) loop
-               declare
-                  Name : constant String := Symbol_Table_Pkg.Key (Pos);
-                  V    : constant Value := Symbol_Table_Pkg.Element (Pos);
-                  Typ  : Column_Type := Col_Numeric;
-                  Found : Boolean := False;
-               begin
-                  for ON of Order loop
-                     if To_String (ON) = Name then Found := True; exit; end if;
-                  end loop;
-
-                  if not Found then
-                     Order.Append (To_Unbounded_String (Name));
-                     -- Determine type by suffix or first observed value
-                     if Name'Length > 0 then
-                        if Name (Name'Last) = '$' then Typ := Col_String;
-                        elsif Name (Name'Last) = '%' then Typ := Col_Integer; end if;
-                     end if;
-                     
-                     if V.Kind = Val_Integer then Typ := Col_Integer;
-                     elsif V.Kind = Val_String then Typ := Col_String;
-                     end if;
-
-                     Add_Column (Name, Typ);
-                  end if;
-               end;
-               Symbol_Table_Pkg.Next (Pos);
-            end loop;
+            if V.Kind = Val_Integer then
+               Typ := Col_Integer;
+            elsif V.Kind = Val_Numeric then
+               Typ := Col_Numeric;
+            elsif V.Kind = Val_String then
+               Typ := Col_String;
+            end if;
+            SData.Table.Add_Output_Column (Name, Typ);
          end;
       end loop;
-      
-      -- 2. Add rows
-      for S of Snapshots loop
-         Add_Row;
-         declare
-            Pos : Symbol_Table_Pkg.Cursor := S.First;
-         begin
-            while Symbol_Table_Pkg.Has_Element (Pos) loop
-               Set_Value (Row_Count, Symbol_Table_Pkg.Key (Pos), Symbol_Table_Pkg.Element (Pos));
-               Symbol_Table_Pkg.Next (Pos);
-            end loop;
-         end;
-      end loop;
-   end Commit_Snapshots_To_Table;
+
+      SData.Table.Add_Output_Row;
+      declare
+         R : constant Positive := SData.Table.Output_Row_Count;
+      begin
+         for Pos in Permanent_Symbols.Iterate loop
+            declare
+               Name : constant String := Symbol_Table_Pkg.Key (Pos);
+               V    : constant Value := Symbol_Table_Pkg.Element (Pos);
+            begin
+               SData.Table.Set_Output_Value (R, Name, V);
+            end;
+         end loop;
+      end;
+   end Flush_PDV_To_Output;
 
    function Get_Type (Name : String) return Value_Kind is
       Upper : constant String := To_Upper (Name);

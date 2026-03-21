@@ -70,6 +70,18 @@ package SData.Table is
    procedure Set_Current_Record_Index (Index : Natural);
    function Get_Current_Record_Index return Natural;
    
+
+   --  Output Table Management
+   procedure Initialize_Output_Table;
+   procedure Add_Output_Column (Name : String; Col_Type : Column_Type);
+   procedure Add_Output_Row;
+   procedure Set_Output_Value (Row : Positive; Column_Name : String; Val : Value);
+   procedure Commit_Output_Table;
+   function Output_Row_Count return Natural;
+
+   procedure Set_Record_Explicitly_Written (State : Boolean);
+   function Get_Record_Explicitly_Written return Boolean;
+
    --  Package to store lists of column names.
    package Name_Vectors is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
 
@@ -95,6 +107,12 @@ private
       
    --  The global data table state.
    Data_Table : Column_Maps.Map;
+
+
+   Output_Data_Table : Column_Maps.Map;
+   Output_Column_Order : Name_Vectors.Vector;
+   Output_Table_Row_Count : Natural := 0;
+   Record_Explicitly_Written : Boolean := False;
 
    --  Maintains the insertion order of column names for range expansion.
    Column_Order : Name_Vectors.Vector;

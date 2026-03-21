@@ -4,7 +4,6 @@
 with SData.Values; use SData.Values;
 with SData.Table;  use SData.Table;
 with Ada.Containers.Indefinite_Hashed_Maps;
-with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with GNAT.Strings;
@@ -35,12 +34,8 @@ package SData.Variables is
       Hash           => Ada.Strings.Hash,
       Equivalent_Keys => "=");
 
-   function Take_PDV_Snapshot return Symbol_Table_Pkg.Map;
-
-   package Snapshot_Collector is new Ada.Containers.Vectors (Positive, Symbol_Table_Pkg.Map, "=" => Symbol_Table_Pkg."=");
-
-   -- Reconstruct table from snapshots
-   procedure Commit_Snapshots_To_Table (Snapshots : Snapshot_Collector.Vector);
+   -- Flushes the current PDV to the Output Table
+   procedure Flush_PDV_To_Output;
 
    function Get_Type (Name : String) return Value_Kind;
    

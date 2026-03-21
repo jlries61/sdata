@@ -116,7 +116,7 @@ package body SData.Interpreter is
 
    --  State for Data Step record processing.
    Current_Record_Deleted : Boolean := False;
-   Explicit_Output_Count  : Natural := 0;
+   
 
    -- For BY statement processing
    package By_Group_Names is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
@@ -301,8 +301,8 @@ package body SData.Interpreter is
       return False;
    end Has_Output_Statement;
 
-   package Snapshot_Collector_Alias renames SData.Variables.Snapshot_Collector;
-   Collector : Snapshot_Collector_Alias.Vector;
+   
+   
 
    function Full_Path (Path : String; Category : String) return String is
       Cat  : constant String := To_Upper (Category);
@@ -1263,8 +1263,8 @@ package body SData.Interpreter is
             when Stmt_DELETE =>
                Current_Record_Deleted := True;
             when Stmt_WRITE =>
-               Explicit_Output_Count := Explicit_Output_Count + 1;
-               Collector.Append (SData.Variables.Take_PDV_Snapshot);
+               SData.Variables.Flush_PDV_To_Output;
+               SData.Table.Set_Record_Explicitly_Written (True);
             when Stmt_OUTPUT =>
                if Is_Redirected then
                   Ada.Text_IO.Close (Redirect_File);
@@ -1384,7 +1384,7 @@ package body SData.Interpreter is
 
       procedure Run_One_Step (Start, Boundary : Statement_Access) is
          Iter : Statement_Access;
-         Step_Has_Output : constant Boolean := Has_Output_Statement (Start);
+         Global_Has_Write : constant Boolean := Has_Output_Statement (Start);
 
          function Is_First_In_Group (Idx : Positive) return Boolean is
             Prev_Value : Value;
@@ -1432,7 +1432,7 @@ package body SData.Interpreter is
          Explicit_Loop_Trigger := False;
          -- Current_By_Vars.Clear; -- This is now cleared only by an explicit BY statement.
          Initialize_PDV;
-         Collector.Clear;
+         SData.Table.Initialize_Output_Table;
          
          while Iter /= null and then Iter /= Boundary loop
             case Iter.Kind is
@@ -1482,7 +1482,7 @@ package body SData.Interpreter is
 
             Iter := Start;
             Current_Record_Deleted := False;
-            Explicit_Output_Count  := 0;
+            SData.Table.Set_Record_Explicitly_Written (False);
 
             if Iter = null and then Boundary = null then
                -- Empty RUN: no statements to execute, but still snapshot the current PDV
@@ -1510,12 +1510,12 @@ package body SData.Interpreter is
                end loop;
             end if;
             
-            if not Current_Record_Deleted and then (not Step_Has_Output) then
-               Collector.Append (SData.Variables.Take_PDV_Snapshot);
+            if not Current_Record_Deleted and then not Global_Has_Write then
+               SData.Variables.Flush_PDV_To_Output;
             end if;
          end loop;
          
-         Commit_Snapshots_To_Table (Collector);
+         SData.Table.Commit_Output_Table;
          Set_Current_Record_Index (0);
          Apply_Pending_Mods;
          if SData.Config.Save_File_Active then

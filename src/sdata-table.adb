@@ -1,3 +1,4 @@
+with Ada.Text_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers;         use Ada.Containers;
 with SData.Config;
@@ -330,5 +331,98 @@ package body SData.Table is
    begin
       return Current_Record;
    end Get_Current_Record_Index;
+
+
+   -----------------------------
+   -- Output Table Management --
+   -----------------------------
+
+   procedure Initialize_Output_Table is
+   begin
+      Output_Data_Table.Clear;
+      Output_Column_Order.Clear;
+      Output_Table_Row_Count := 0;
+   end Initialize_Output_Table;
+
+   procedure Add_Output_Column (Name : String; Col_Type : Column_Type) is
+      Upper_Name : constant String := To_Upper (Name);
+      New_Col : Column;
+   begin
+      if Output_Data_Table.Contains (Upper_Name) then return; end if;
+      New_Col.Name := (others => ' ');
+      New_Col.Name (1 .. Upper_Name'Length) := Upper_Name;
+      New_Col.Typ := Col_Type;
+      
+      -- If the output table already has rows, pad with missing values
+      for I in 1 .. Output_Table_Row_Count loop
+         New_Col.Data.Append ((Kind => Val_Missing));
+      end loop;
+      
+      Output_Data_Table.Insert (Upper_Name, New_Col);
+      Output_Column_Order.Append (To_Unbounded_String (Upper_Name));
+   end Add_Output_Column;
+
+   procedure Add_Output_Row is
+   begin
+      if SData.Config.Max_Table_Rows > 0 and then Output_Table_Row_Count >= SData.Config.Max_Table_Rows then
+         Ada.Text_IO.Put_Line ("Warning: Table row limit (" & Integer'Image(SData.Config.Max_Table_Rows) & ") exceeded. Memory cache full.");
+         -- In Phase 5, this will spill to disk. For now, we continue but warn.
+      end if;
+      Output_Table_Row_Count := Output_Table_Row_Count + 1;
+      
+      for Pos in Output_Data_Table.Iterate loop
+         declare
+            Col : Column := Column_Maps.Element (Pos);
+         begin
+            Col.Data.Append ((Kind => Val_Missing));
+            Output_Data_Table.Replace_Element (Pos, Col);
+         end;
+      end loop;
+   end Add_Output_Row;
+
+   procedure Set_Output_Value (Row : Positive; Column_Name : String; Val : Value) is
+      Upper_Name : constant String := To_Upper (Column_Name);
+      Col : Column;
+   begin
+      if not Output_Data_Table.Contains (Upper_Name) then
+         return; -- Or throw an error
+      end if;
+      
+      Col := Output_Data_Table.Element (Upper_Name);
+      
+      if Col.Typ = Col_Numeric and then Val.Kind /= Val_Numeric and then Val.Kind /= Val_Missing then
+         raise Type_Mismatch_Error with "Expected Numeric for column " & Upper_Name;
+      elsif Col.Typ = Col_Integer and then Val.Kind /= Val_Integer and then Val.Kind /= Val_Missing then
+         raise Type_Mismatch_Error with "Expected Integer for column " & Upper_Name;
+      elsif Col.Typ = Col_String and then Val.Kind /= Val_String and then Val.Kind /= Val_Missing then
+         raise Type_Mismatch_Error with "Expected String for column " & Upper_Name;
+      end if;
+      
+      Col.Data.Replace_Element (Row, Val);
+      Output_Data_Table.Replace (Upper_Name, Col);
+   end Set_Output_Value;
+
+   procedure Commit_Output_Table is
+   begin
+      Data_Table := Output_Data_Table;
+      Column_Order := Output_Column_Order;
+      Table_Row_Count := Output_Table_Row_Count;
+      Initialize_Output_Table;
+   end Commit_Output_Table;
+
+   function Output_Row_Count return Natural is
+   begin
+      return Output_Table_Row_Count;
+   end Output_Row_Count;
+
+   procedure Set_Record_Explicitly_Written (State : Boolean) is
+   begin
+      Record_Explicitly_Written := State;
+   end Set_Record_Explicitly_Written;
+
+   function Get_Record_Explicitly_Written return Boolean is
+   begin
+      return Record_Explicitly_Written;
+   end Get_Record_Explicitly_Written;
 
 end SData.Table;
