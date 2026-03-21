@@ -519,7 +519,8 @@ package body SData.Parser is
 
          when Token_USE | Token_SAVE | Token_SUBMIT | Token_SYSTEM | Token_FPATH =>
             declare
-               File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               File_Tok : Token;
+               Peeked   : Token;
             begin
                if Tok.Kind = Token_USE then Stmt := new Statement (Stmt_USE);
                elsif Tok.Kind = Token_SAVE then Stmt := new Statement (Stmt_SAVE);
@@ -527,18 +528,29 @@ package body SData.Parser is
                elsif Tok.Kind = Token_SYSTEM then Stmt := new Statement (Stmt_SYSTEM);
                else Stmt := new Statement (Stmt_FPATH); end if;
                
-               if Tok.Kind = Token_FPATH and then (File_Tok.Kind = Token_Newline or else File_Tok.Kind = Token_Semicolon or else File_Tok.Kind = Token_Slash) then
-                   -- FPATH without leading path (either empty or starting with a flag)
-                   Stmt.File_Len := 0;
+               Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+               
+               if Peeked.Kind = Token_Newline or else Peeked.Kind = Token_Semicolon or else Peeked.Kind = Token_EOF then
+                  Stmt.File_Len := 0;
+               elsif Peeked.Kind = Token_Slash then
+                  -- Starts with a flag, so no file path
+                  Stmt.File_Len := 0;
                else
-                   Stmt.File_Len := File_Tok.Length;
-                   Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
-                   -- Rule: Unquoted filenames converted to uppercase
-                   if File_Tok.Kind /= Token_String_Literal then
-                      for I in 1 .. Stmt.File_Len loop
-                         Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
-                      end loop;
-                   end if;
+                  File_Tok := Get_Next_Token (Ctx.Lex_Ctx);
+                  
+                  if Tok.Kind = Token_USE and then File_Tok.Kind = Token_MOCK then
+                     Stmt.Is_Mock := True;
+                     Stmt.File_Len := 0;
+                  else
+                     Stmt.File_Len := File_Tok.Length;
+                     Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
+                     -- Rule: Unquoted filenames converted to uppercase
+                     if File_Tok.Kind /= Token_String_Literal then
+                        for I in 1 .. Stmt.File_Len loop
+                           Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
+                        end loop;
+                     end if;
+                  end if;
                end if;
 
                if Tok.Kind = Token_FPATH then
@@ -554,38 +566,34 @@ package body SData.Parser is
                         end if;
                      end Process_Flag;
                   begin
-                     if File_Tok.Kind = Token_Slash then
-                        Process_Flag (Get_Next_Token (Ctx.Lex_Ctx));
-                     elsif File_Tok.Kind = Token_USE or else File_Tok.Kind = Token_SAVE or else File_Tok.Kind = Token_SUBMIT or else File_Tok.Kind = Token_OUTPUT then
-                        Process_Flag (File_Tok);
-                     end if;
-
                      loop
-                        declare Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
-                        begin
-                           if Peeked.Kind = Token_Slash then
-                              declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                                      Flag_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                              begin
-                                 Process_Flag (Flag_Tok);
-                              end;
-                           elsif Peeked.Kind = Token_USE or else Peeked.Kind = Token_SAVE or else Peeked.Kind = Token_SUBMIT or else Peeked.Kind = Token_OUTPUT then
-                              Process_Flag (Get_Next_Token (Ctx.Lex_Ctx));
-                           else
-                              exit;
-                           end if;
-                        end;
+                        Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+                        if Peeked.Kind = Token_Slash then
+                           declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                   Flag_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           begin
+                              Process_Flag (Flag_Tok);
+                           end;
+                        elsif Peeked.Kind = Token_USE or else Peeked.Kind = Token_SAVE or else Peeked.Kind = Token_SUBMIT or else Peeked.Kind = Token_OUTPUT then
+                           Process_Flag (Get_Next_Token (Ctx.Lex_Ctx));
+                        else
+                           exit;
+                        end if;
                      end loop;
                   end;
                else
-                  -- For USE/SAVE/SUBMIT/SYSTEM, skip optional slashes/params for now
+                  -- For USE/SAVE/SUBMIT/SYSTEM, skip optional slashes/params properly
                   loop
-                     declare Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
-                     begin
-                        if Peeked.Kind = Token_Slash or else Peeked.Kind = Token_String_Literal then
+                     Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+                     if Peeked.Kind = Token_Slash then
+                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                        
+                        Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+                        if Peeked.Kind = Token_Equal then
                            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                        else exit; end if;
-                     end;
+                           
+                        end if;
+                     else exit; end if;
                   end loop;
                end if;
             end;

@@ -914,9 +914,19 @@ package body SData.Interpreter is
             when Stmt_USE =>
                declare 
                   File_Name : constant String := Stmt.File_Path(1 .. Stmt.File_Len);
-                  Expanded : constant String := Full_Path (File_Name, "USE");
+                  Expanded : String (1 .. 1024);
+                  Exp_Len  : Natural := 0;
                begin
-                  SData.File_IO.Open_Input (Expanded, SData.Config.Input_Format);
+                  if Stmt.Is_Mock then
+                     Exp_Len := 4;
+                     Expanded (1 .. 4) := "MOCK";
+                  else
+                     declare Full : constant String := Full_Path (File_Name, "USE"); begin
+                        Exp_Len := Full'Length;
+                        Expanded (1 .. Exp_Len) := Full;
+                     end;
+                  end if;
+                  SData.File_IO.Open_Input (Expanded(1 .. Exp_Len), SData.Config.Input_Format);
                end;
                Input_File_Columns.Clear;
                Refresh_PDV_Names;

@@ -208,6 +208,7 @@ package body SData.Lexer is
                Upper : constant String := To_Upper (T.Text (1 .. T.Length));
             begin
                if Upper = "USE" or Upper = "/USE" then T.Kind := Token_USE;
+               elsif Upper = "MOCK" or Upper = "/MOCK" then T.Kind := Token_MOCK;
                elsif Upper = "SAVE" or Upper = "/SAVE" then T.Kind := Token_SAVE;
                elsif Upper = "KEEP" then T.Kind := Token_KEEP;
                elsif Upper = "DROP" then T.Kind := Token_DROP;

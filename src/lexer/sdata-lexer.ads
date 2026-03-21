@@ -12,7 +12,7 @@ package SData.Lexer is
       Token_Numeric_Literal, -- 123.45
 
       -- Keywords (Commands / Commands that are reserved words)
-      Token_USE, Token_SAVE, Token_KEEP, Token_DROP, Token_HOLD, Token_UNHOLD, Token_NEW,
+      Token_USE, Token_MOCK, Token_SAVE, Token_KEEP, Token_DROP, Token_HOLD, Token_UNHOLD, Token_NEW,
       Token_IF, Token_THEN, Token_ELSE, Token_ELSEIF, Token_FOR, Token_NEXT, Token_WHILE, Token_WEND,
       Token_REPEAT, Token_UNTIL, Token_SELECT, Token_CASE, Token_WHEN, Token_OTHERWISE, Token_SUBMIT,
       Token_LET, Token_SET, Token_DIM, Token_ARRAY, Token_SYSTEM,

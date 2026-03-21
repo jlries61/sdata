@@ -153,6 +153,7 @@ package SData.AST is
          when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_SYSTEM | Stmt_HELP | Stmt_OUTPUT | Stmt_FPATH =>
             File_Path : String (1 .. 1024);
             File_Len  : Natural;
+            Is_Mock     : Boolean := False; -- For USE MOCK
             Use_Flag    : Boolean := False; -- For FPATH
             Save_Flag   : Boolean := False; -- For FPATH
             Submit_Flag : Boolean := False; -- For FPATH
