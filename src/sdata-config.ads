@@ -13,6 +13,10 @@ package SData.Config is
 
    --  The desired format for the output dataset (set via --outfmt).
    Output_Format : Format_Type := CSV;
+
+   --  Optional input file from command line (-u).
+   Input_File_Path : String (1 .. 1024) := (others => ' ');
+   Input_File_Len  : Natural := 0;
    
    --  If True, suppresses informational messages (e.g., "Dataset opened").
    Quiet_Mode    : Boolean := False;

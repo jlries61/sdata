@@ -1,5 +1,6 @@
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
+with SData.Config;
 with SData.Variables; use SData.Variables;
 
 package body SData.Parser is
@@ -582,17 +583,40 @@ package body SData.Parser is
                      end loop;
                   end;
                else
-                  -- For USE/SAVE/SUBMIT/SYSTEM, skip optional slashes/params properly
+                  -- For USE/SAVE/SUBMIT/SYSTEM/OUTPUT, parse optional slashes/params
                   loop
                      Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
                      if Peeked.Kind = Token_Slash then
-                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                        
-                        Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
-                        if Peeked.Kind = Token_Equal then
-                           declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                           
-                        end if;
+                        declare 
+                           Discard  : Token := Get_Next_Token (Ctx.Lex_Ctx); 
+                           Flag_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Flag_Name : constant String := To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+                        begin
+                           Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+                           if Peeked.Kind = Token_Equal then
+                              Discard := Get_Next_Token (Ctx.Lex_Ctx);
+                              declare
+                                 Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                 Val_Str : constant String := To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+                              begin
+                                 if Flag_Name = "FMT" then
+                                    Stmt.Format_Specified := True;
+                                    if Val_Str = "CSV" then Stmt.Fmt_Override := SData.Config.CSV;
+                                    elsif Val_Str = "ODF" or else Val_Str = "ODS" then Stmt.Fmt_Override := SData.Config.ODF;
+                                    elsif Val_Str = "OOXML" or else Val_Str = "XLSX" then Stmt.Fmt_Override := SData.Config.OOXML;
+                                    end if;
+                                 elsif Flag_Name = "NSCAN" then
+                                    Stmt.NSCAN_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                                 elsif Flag_Name = "HEADER" then
+                                    Stmt.Header_Specified := True;
+                                    Stmt.Header_Val := (Val_Str = "YES");
+                                 elsif Flag_Name = "DLM" then
+                                    Stmt.DLM_Len := Val_Tok.Length;
+                                    Stmt.DLM_Path (1 .. Val_Tok.Length) := Val_Tok.Text (1 .. Val_Tok.Length);
+                                 end if;
+                              end;
+                           end if;
+                        end;
                      else exit; end if;
                   end loop;
                end if;

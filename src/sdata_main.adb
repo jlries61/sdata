@@ -142,7 +142,17 @@ begin
                   Output_File_Len := Val'Length;
                end;
             end if;
-         elsif Arg = "-u" or Arg = "--infmt" then
+         elsif Arg = "-u" then
+            if Idx < Argument_Count then
+               Idx := Idx + 1;
+               declare
+                  Val : constant String := Argument (Idx);
+               begin
+                  Input_File_Path (1 .. Val'Length) := Val;
+                  Input_File_Len := Val'Length;
+               end;
+            end if;
+         elsif Arg = "--infmt" then
             -- Set the global input format.
             if Idx < Argument_Count then
                Idx := Idx + 1;
@@ -219,6 +229,16 @@ begin
    end loop;
 
    --  Verify that a command file was provided.
+   if Input_File_Len > 0 then
+      declare
+         Stmt : constant Statement_Access := new Statement (Stmt_USE);
+      begin
+         Stmt.File_Path (1 .. Input_File_Len) := Input_File_Path (1 .. Input_File_Len);
+         Stmt.File_Len := Input_File_Len;
+         SData.Interpreter.Execute (Stmt);
+      end;
+   end if;
+
    if Filename_Len = 0 then
       Run_REPL;
       return;

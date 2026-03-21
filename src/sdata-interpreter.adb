@@ -926,7 +926,8 @@ package body SData.Interpreter is
                         Expanded (1 .. Exp_Len) := Full;
                      end;
                   end if;
-                  SData.File_IO.Open_Input (Expanded(1 .. Exp_Len), SData.Config.Input_Format);
+                  SData.File_IO.Open_Input (Expanded(1 .. Exp_Len), 
+                    (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format));
                end;
                Input_File_Columns.Clear;
                Refresh_PDV_Names;
@@ -999,7 +1000,7 @@ package body SData.Interpreter is
             when Stmt_SAVE =>
                SData.Config.Save_File_Path (1 .. Stmt.File_Len) := Stmt.File_Path (1 .. Stmt.File_Len);
                SData.Config.Save_File_Len := Stmt.File_Len;
-               SData.Config.Save_File_Fmt := SData.Config.Output_Format;
+               SData.Config.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
                SData.Config.Save_File_Active := True;
             when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD =>
                declare
