@@ -867,16 +867,13 @@ package body SData.Interpreter is
                   end if;
                exception
                   when E : SData.Table.Type_Mismatch_Error =>
-                     Put_Line ("Error: Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E));
-                     raise Script_Error with "Type mismatch for variable " & Var_Name_Str;
-                  when E : Script_Error =>
+                     raise Script_Error with "Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
+                  when Script_Error =>
                      --  Script_Error from evaluator (e.g. div-by-zero, domain error):
-                     --  print the message here so it always appears, then re-raise.
-                     Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
+                     --  re-raise to let the top-level handler print it.
                      raise;
                   when E : others =>
-                     Put_Line ("Error: Assignment failed for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E));
-                     raise Script_Error with "Assignment failed for variable " & Var_Name_Str;
+                     raise Script_Error with "Assignment failed for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
                end;
             when Stmt_PRINT =>
                if Stmt.Print_Args = null then
@@ -1116,8 +1113,7 @@ package body SData.Interpreter is
                   end if;
                exception
                   when E : others =>
-                     Put_Line ("Error: Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E));
-                     raise Script_Error with "Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len);
+                     raise Script_Error with "Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
                end;
             when Stmt_NAMES =>
                declare
@@ -1176,7 +1172,6 @@ package body SData.Interpreter is
                   end;
                   declare Final : constant String := Path (1 .. P_Len); begin
                      if Submit_Chain.Contains (Final) then
-                        Put_Line ("Error: Recursive SUBMIT detected: " & Final);
                         raise Script_Error with
                            "Recursive SUBMIT detected: " & Final;
                      end if;
@@ -1314,7 +1309,7 @@ package body SData.Interpreter is
                      begin
                         Current_I := S;
                         while (ST > 0.0 and then Current_I <= E) or else (ST < 0.0 and then Current_I >= E) loop
-                           Set_Temporary (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
+                           Set_Permanent (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
                            Execute_List (Stmt.For_Body);
                            Current_I := Current_I + ST;
                         end loop;
@@ -1495,9 +1490,12 @@ package body SData.Interpreter is
                         begin
                            Execute_Statement(Iter);
                         exception
-                           when Script_Error =>
-                              --  Message already printed; stop or continue based on flag.
-                              if not SData.Config.Continue_On_Error then raise; end if;
+                           when E : Script_Error =>
+                              if SData.Config.Continue_On_Error then
+                                 Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
+                              else
+                                 raise;
+                              end if;
                            when E : others =>
                               Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
                               if not SData.Config.Continue_On_Error then
@@ -1550,9 +1548,12 @@ package body SData.Interpreter is
             begin
                Execute_Statement (Current);
             exception
-               when Script_Error =>
-                  --  Message already printed; stop or continue based on flag.
-                  if not SData.Config.Continue_On_Error then raise; end if;
+               when E : Script_Error =>
+                  if SData.Config.Continue_On_Error then
+                     Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
+                  else
+                     raise;
+                  end if;
                when E : others =>
                   Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
                   if not SData.Config.Continue_On_Error then

@@ -43,6 +43,7 @@ procedure SData_Main is
       Put_Line ("  --clen <len>  Set max character variable length");
       Put_Line ("  --noshell                Disable SHELL command and function");
       Put_Line ("  -k, --continue-on-error  Continue executing after a statement error");
+      Put_Line ("  --ignore-math-errors     Math domain errors return MISSING instead of halting");
       Put_Line ("  -u, --infmt              Input dataset and format");
       Put_Line ("  -s, --outfmt             Output dataset and format");
       Put_Line ("  -o <file>                Console output file");
@@ -195,6 +196,8 @@ begin
             end if;
          elsif Arg = "--noshell" then
             Disable_Shell := True;
+         elsif Arg = "--ignore-math-errors" then
+            Ignore_Math_Errors := True;
          elsif Arg = "-k" or else Arg = "--continue-on-error" then
             Continue_On_Error := True;
          elsif Arg(1) /= '-' then
@@ -260,8 +263,8 @@ begin
    end;
 
 exception
-   when SData.Interpreter.Script_Error =>
-      null;  -- Error message already printed by the interpreter; exit cleanly.
+   when E : SData.Interpreter.Script_Error =>
+      Put_Line ("Error: " & Exception_Message (E));
    when E : others =>
       Put_Line ("An error occurred: " & Exception_Name (E) & ": " & Exception_Message (E));
 end SData_Main;

@@ -19,6 +19,16 @@ package body SData.Evaluator is
    function Is_BOG return Boolean is (BOG_Flag);
    function Is_EOG return Boolean is (EOG_Flag);
 
+   function Handle_Domain_Error (Msg : String) return Value is
+   begin
+      if SData.Config.Ignore_Math_Errors then
+         Put_Line ("Warning: " & Msg);
+         return (Kind => Val_Missing);
+      else
+         raise SData.Interpreter.Script_Error with Msg;
+      end if;
+   end Handle_Domain_Error;
+
    procedure Set_BOG (Val : Boolean) is
    begin
       BOG_Flag := Val;
@@ -131,7 +141,7 @@ package body SData.Evaluator is
          declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
          begin
             if V <= 0.0 then
-               raise SData.Interpreter.Script_Error with "Argument to LOG must be positive.";
+               return Handle_Domain_Error ("Argument to LOG must be positive.");
             end if;
             return Num_Result (Log (V));
          end;
@@ -139,12 +149,19 @@ package body SData.Evaluator is
          declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
          begin
             if V <= 0.0 then
-               raise SData.Interpreter.Script_Error with "Argument to LOG10 must be positive.";
+               return Handle_Domain_Error ("Argument to LOG10 must be positive.");
             end if;
             return Num_Result (Log (V, 10.0));
          end;
       elsif Name = "EXP" and then Has_Args (1) then
-         return Num_Result (Exp (Convert_To_Float (All_Vals.Element (1))));
+         declare
+            V : constant Float := Convert_To_Float (All_Vals.Element (1));
+         begin
+            if V > 88.0 then
+               return Handle_Domain_Error ("Argument to EXP is too large (overflow).");
+            end if;
+            return Num_Result (Exp (V));
+         end;
       elsif Name = "ROUND" and then Has_Args (1) then
          declare
             V : constant Float := Convert_To_Float (All_Vals.Element (1));
@@ -169,7 +186,7 @@ package body SData.Evaluator is
             V2 : constant Float := Convert_To_Float (All_Vals.Element (2));
          begin
             if V2 /= 0.0 then return Num_Result (V1 - Float'Floor(V1/V2) * V2);
-            else return (Kind => Val_Missing); end if;
+            else return Handle_Domain_Error ("Division by zero in MOD."); end if;
          end;
       elsif Name = "RECNO" then
          return (Kind => Val_Integer, Int_Val => Integer (SData.Table.Get_Current_Record_Index));
@@ -184,7 +201,7 @@ package body SData.Evaluator is
             V : constant Float := Convert_To_Float (All_Vals.Element (1));
          begin
             if V >= 0.0 then return Num_Result (Sqrt (V));
-            else return (Kind => Val_Missing); end if;
+            else return Handle_Domain_Error ("Argument to SQRT must be non-negative."); end if;
          end;
 
       -- Aggregate Functions (Row-wise)
