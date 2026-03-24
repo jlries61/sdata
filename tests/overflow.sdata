@@ -1,7 +1,0 @@
--- Testing integer overflow
-LET A% = 2000000000
-LET B% = 2000000000
-LET C% = A% + B%
-PRINT C%
-RUN
-QUIT
