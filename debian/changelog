@@ -1,6 +1,11 @@
+sdata (0.1.1-1) unstable; urgency=medium
+
+  * Finalize Phase 1 with corrected memory architecture and parser.
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 23 Mar 2026 17:35:00 -0700
+
 sdata (0.1-1) unstable; urgency=medium
 
   * Initial release.
-  * Bundle Ada library dependencies (zipada, xmlada, mathpaqs, sciada).
 
- -- John L. Ries <john@theyarnbard.com>  Tue, 17 Mar 2026 16:00:00 -0600
+ -- John L. Ries <john@theyarnbard.com>  Tue, 17 Mar 2026 10:00:00 -0700

@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.1
+Version:        0.1.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -46,6 +46,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_bindir}/sdata
 
 %changelog
+* Mon Mar 23 2026 John L. Ries <john@theyarnbard.com> - 0.1.1-1
+- Finalize Phase 1 with corrected memory architecture and parser.
+
 * Tue Mar 17 2026 John L. Ries <john@theyarnbard.com> - 0.1-1
 - Bundle Ada library dependencies (zipada, xmlada, mathpaqs, sciada)
   as vendored sources so the build requires only gcc-gnat/gcc-ada and
