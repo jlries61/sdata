@@ -1,0 +1,23 @@
+Dataset opened: tests/data/sample.csv
+CATEGORY VAL1 VAL2 VAL3 
+Dataset opened: tests/data/sample.csv
+CATEGORY VAL1 VAL2 VAL3 
+CATEGORY VAL1 VAL2 VAL3 
+CATEGORY VAL1 VAL2 VAL3 
+CATEGORY VAL1 VAL2 VAL3 
+CATEGORY VAL1 VAL2 VAL3 
+CATEGORY VAL1 VAL2 VAL3 
+RUN complete. 6 records and 4 variables processed.
+N is 123.45000
+S$ is 123.45000
+N is 123.45000
+S$ is 123.45000
+N is 123.45000
+S$ is 123.45000
+N is 123.45000
+S$ is 123.45000
+N is 123.45000
+S$ is 123.45000
+N is 123.45000
+S$ is 123.45000
+RUN complete. 6 records and 6 variables processed.
