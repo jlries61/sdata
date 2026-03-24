@@ -893,45 +893,13 @@ package body SData.Parser is
                               Stmt.Var_Name (1 .. 4) := "/ALL";
                            end if;
                         end;
-                     elsif Next_T.Kind = Token_Identifier or else
-                        Next_T.Kind = Token_LET or else
-                        Next_T.Kind = Token_SET or else
-                        Next_T.Kind = Token_ARRAY or else
-                        Next_T.Kind = Token_DIM or else
-                        Next_T.Kind = Token_USE or else
-                        Next_T.Kind = Token_SAVE or else
-                        Next_T.Kind = Token_RUN or else
-                        Next_T.Kind = Token_IF or else
-                        Next_T.Kind = Token_BY or else
-                        Next_T.Kind = Token_SORT or else
-                        Next_T.Kind = Token_HOLD or else
-                        Next_T.Kind = Token_UNHOLD or else
-                        Next_T.Kind = Token_REPEAT or else
-                        Next_T.Kind = Token_NAMES or else
-                        Next_T.Kind = Token_KEEP or else
-                        Next_T.Kind = Token_DROP or else
-                        Next_T.Kind = Token_RENAME or else
-                        Next_T.Kind = Token_SELECT or else
-                        Next_T.Kind = Token_DELETE or else
-                        Next_T.Kind = Token_OUTPUT or else
-                        Next_T.Kind = Token_FOR or else
-                        Next_T.Kind = Token_WHILE or else
-                        Next_T.Kind = Token_DIGITS or else
-                        Next_T.Kind = Token_SUBMIT or else
-                        Next_T.Kind = Token_NEW or else
-                        Next_T.Kind = Token_RSEED or else
-                        Next_T.Kind = Token_FPATH or else
-                        Next_T.Kind = Token_ECHO or else
-                        Next_T.Kind = Token_SYSTEM or else
-                        Next_T.Kind = Token_ELSEIF or else
-                        Next_T.Kind = Token_NOT or else
-                        Next_T.Kind = Token_WRITE or else
-                        Next_T.Kind = Token_QUIT then
+                     elsif Next_T.Kind /= Token_Newline and then Next_T.Kind /= Token_Colon and then 
+                           Next_T.Kind /= Token_Semicolon and then Next_T.Kind /= Token_EOF then
                         declare
                            Arg_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
-                           Stmt.Var_Len := Arg_Tok.Length;
-                           Stmt.Var_Name (1 .. Arg_Tok.Length) := Arg_Tok.Text (1 .. Arg_Tok.Length);
+                           Stmt.Var_Len := (if Arg_Tok.Length > 32 then 32 else Arg_Tok.Length);
+                           Stmt.Var_Name (1 .. Stmt.Var_Len) := Arg_Tok.Text (1 .. Stmt.Var_Len);
                         end;
                      else
                         Stmt.Var_Len := 0;

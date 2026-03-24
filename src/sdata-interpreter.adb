@@ -416,6 +416,66 @@ package body SData.Interpreter is
          elsif T = "SORT" then
             Put_Line ("Command: SORT variable(s)");
             Put_Line ("Reorders the Data Table based on the specified variables.");
+         elsif T = "NEW" then
+            Put_Line ("Command: NEW");
+            Put_Line ("Clears the Data Table, all variables, and the queued program.");
+         elsif T = "NAMES" then
+            Put_Line ("Command: NAMES");
+            Put_Line ("Lists currently defined permanent and temporary variables.");
+         elsif T = "DELETE" then
+            Put_Line ("Command: DELETE");
+            Put_Line ("Discards the current record; processing moves to the next record.");
+         elsif T = "HOLD" then
+            Put_Line ("Command: HOLD [variable(s)]");
+            Put_Line ("Retains the listed permanent variables across records.");
+         elsif T = "UNHOLD" then
+            Put_Line ("Command: UNHOLD [variable(s)]");
+            Put_Line ("Cancels a previous HOLD. No args = unhold all.");
+         elsif T = "KEEP" then
+            Put_Line ("Command: KEEP variable(s)");
+            Put_Line ("Drops all permanent variables NOT listed after the next RUN.");
+         elsif T = "DROP" then
+            Put_Line ("Command: DROP variable(s)");
+            Put_Line ("Drops the listed permanent variables after the next RUN.");
+         elsif T = "RENAME" then
+            Put_Line ("Command: RENAME old=new [, old=new ...]");
+            Put_Line ("Renames columns in the Data Table.");
+         elsif T = "IF" or else T = "ELSEIF" then
+            Put_Line ("Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]");
+            Put_Line ("Conditional execution. Supports single-line and multi-line block forms.");
+         elsif T = "SELECT" then
+            Put_Line ("Command: SELECT [expression]");
+            Put_Line ("Multi-way branch using CASE (value) or WHEN (condition).");
+         elsif T = "FOR" then
+            Put_Line ("Command: FOR var = start TO end [STEP s] ... NEXT");
+            Put_Line ("Counter-controlled loop.");
+         elsif T = "WHILE" then
+            Put_Line ("Command: WHILE condition ... WEND");
+            Put_Line ("Condition-controlled loop; executes while condition is true.");
+         elsif T = "REPEAT" then
+            Put_Line ("Command (data step): REPEAT n  (creates n records)");
+            Put_Line ("Command (loop):      REPEAT ... UNTIL condition");
+         elsif T = "OUTPUT" then
+            Put_Line ("Command: OUTPUT [""filename""] [/CHARSET=...] [/FMT=...]");
+            Put_Line ("Redirects PRINT output to a file (written to file AND stdout).");
+         elsif T = "ECHO" then
+            Put_Line ("Command: ECHO ON | OFF");
+            Put_Line ("Enables or disables writing console output to stdout.");
+         elsif T = "DIGITS" then
+            Put_Line ("Command: DIGITS n");
+            Put_Line ("Sets decimal places for floating-point output (default 5).");
+         elsif T = "FPATH" then
+            Put_Line ("Command: FPATH [path] [/ USE | SAVE | SUBMIT | OUTPUT]");
+            Put_Line ("Sets the default directory for the specified command(s).");
+         elsif T = "RSEED" then
+            Put_Line ("Command: RSEED n");
+            Put_Line ("Seeds the random number generator with integer n.");
+         elsif T = "HELP" then
+            Put_Line ("Command: HELP [topic | /ALL]");
+            Put_Line ("Displays help. HELP /ALL prints the full reference.");
+         elsif T = "QUIT" or else T = "END" then
+            Put_Line ("Command: QUIT | END");
+            Put_Line ("Exits the interpreter.");
          elsif T = "MEAN" then
             Put_Line ("Function: MEAN(v1, [v2, ...])");
             Put_Line ("Returns the row-wise mean of the specified values or arrays.");
@@ -551,7 +611,6 @@ package body SData.Interpreter is
 
          -- ── Special functions ─────────────────────────────────────────────
          elsif T = "MISSING" then Put_Line ("Function: MISSING(x)  ->  1 if x is missing, else 0");
-         elsif T = "NMISS"   then Put_Line ("Function: NMISS(v1, ...)  ->  count of missing values");
          elsif T = "RAN" or else T = "RANDOM" then
             Put_Line ("Function: RAN() / RANDOM()  ->  uniform random number in [0, 1)");
             Put_Line ("  Use RSEED n before calling to get a reproducible sequence.");
@@ -603,10 +662,6 @@ package body SData.Interpreter is
          elsif T = "LDF" or T = "LCF" or T = "LIF" or T = "LRN" then
             Put_Line ("Laplace: LDF(x,loc,scale) LCF(x,loc,scale) LIF(p,loc,scale) LRN(loc,scale)");
 
-         elsif T = "MISSING" then
-            Put_Line ("Function: MISSING(v) -> returns 1 if v is missing, 0 otherwise");
-         elsif T = "NMISS" then
-            Put_Line ("Function: NMISS(v1, ...) -> returns the count of missing values in the list");
          elsif T = "OPTIONS" then
             Put_Line ("Runtime Configuration Flags:");
             Put_Line ("  --noshell            : Disable SYSTEM/SHELL");
