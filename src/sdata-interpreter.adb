@@ -348,7 +348,7 @@ package body SData.Interpreter is
             Put_Line ("  Data step:   BY, SORT, REPEAT");
             Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
             Put_Line ("  Files/paths: FPATH");
-            Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, QUIT, END");
+            Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
             My_New_Line;
             Put_Line ("Available Functions:");
             Put_Line ("  Math:        ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
@@ -371,11 +371,28 @@ package body SData.Interpreter is
             My_New_Line;
             Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
          elsif T = "USE" then
-            Put_Line ("Command: USE ""filename""");
-            Put_Line ("Loads a dataset from CSV, ODS, or XLSX files into the Data Table.");
+            Put_Line ("Command: USE [MOCK | ""filename""] [/FMT=format] [/NSCAN=n]");
+            Put_Line ("Loads a dataset from CSV, ODF, or OOXML files into the Data Table.");
+            Put_Line ("USE MOCK generates synthetic test data.");
          elsif T = "SAVE" then
-            Put_Line ("Command: SAVE ""filename""");
+            Put_Line ("Command: SAVE ""filename"" [/FMT=format] [/HEADER=YES|NO]");
             Put_Line ("Queues the current Data Table to be saved after the next RUN command.");
+         elsif T = "WRITE" then
+            Put_Line ("Command: WRITE");
+            Put_Line ("Explicitly writes the current PDV record to the output table.");
+            Put_Line ("Suppresses the automatic end-of-step write for that record.");
+         elsif T = "SUBMIT" then
+            Put_Line ("Command: SUBMIT ""filename""");
+            Put_Line ("Executes commands from an external script file. Default extension: .CMD.");
+            Put_Line ("Provides cycle detection to prevent recursive submission.");
+         elsif T = "SYSTEM" then
+            Put_Line ("Command: SYSTEM ""command""");
+            Put_Line ("Executes an external shell command. Disabled by --noshell.");
+            Put_Line ("Uses /bin/sh on POSIX systems to avoid profile script side-effects.");
+         elsif T = "PRINT" then
+            Put_Line ("Command: PRINT [expr [[,] | [;] expr] ...]");
+            Put_Line ("Outputs values to the console, separated by spaces.");
+            Put_Line ("No arguments: Prints all permanent variables for the current record.");
          elsif T = "RUN" then
             Put_Line ("Command: RUN");
             Put_Line ("Triggers the execution of the Data Step and any deferred SAVE operations.");
@@ -459,141 +476,6 @@ package body SData.Interpreter is
          elsif T = "UNHOLD" then
             Put_Line ("Command: UNHOLD [variable(s)]");
             Put_Line ("Resets variables to missing for each record (default behavior).");
-         -- ── Commands ──────────────────────────────────────────────────────
-         elsif T = "USE" then
-            Put_Line ("Command: USE ""filename""");
-            Put_Line ("Loads a dataset (CSV, ODS, XLSX) into the Data Table.");
-            Put_Line ("USE ""mock"" generates a small synthetic dataset for testing.");
-         elsif T = "SAVE" then
-            Put_Line ("Command: SAVE ""filename""");
-            Put_Line ("Writes the current Data Table to a file after the next RUN.");
-         elsif T = "RUN" then
-            Put_Line ("Command: RUN");
-            Put_Line ("Executes the queued data step and reports record/variable counts.");
-         elsif T = "NEW" then
-            Put_Line ("Command: NEW");
-            Put_Line ("Clears the Data Table, all variables, and the queued program.");
-         elsif T = "NAMES" then
-            Put_Line ("Command: NAMES");
-            Put_Line ("Lists currently defined permanent and temporary variables.");
-         elsif T = "WRITE" then
-            Put_Line ("Command: WRITE");
-            Put_Line ("Explicitly writes the current PDV record to the output table.");
-            Put_Line ("Suppresses the automatic end-of-step write for that record.");
-         elsif T = "DELETE" then
-            Put_Line ("Command: DELETE");
-            Put_Line ("Discards the current record; processing moves to the next record.");
-         elsif T = "LET" then
-            Put_Line ("Command: LET variable = expression");
-            Put_Line ("Assigns a value to a permanent variable (column in the Data Table).");
-            Put_Line ("Type is determined by name suffix: none=float, %=integer, $=string.");
-         elsif T = "SET" then
-            Put_Line ("Command: SET variable = expression");
-            Put_Line ("Assigns a value to a temporary variable (not saved to the table).");
-         elsif T = "HOLD" then
-            Put_Line ("Command: HOLD [variable(s)]");
-            Put_Line ("Retains the listed permanent variables across records (not reset to");
-            Put_Line ("missing at the start of each record). No args = hold all.");
-         elsif T = "UNHOLD" then
-            Put_Line ("Command: UNHOLD [variable(s)]");
-            Put_Line ("Cancels a previous HOLD. No args = unhold all.");
-         elsif T = "KEEP" then
-            Put_Line ("Command: KEEP variable(s)");
-            Put_Line ("Drops all permanent variables NOT listed after the next RUN.");
-         elsif T = "DROP" then
-            Put_Line ("Command: DROP variable(s)");
-            Put_Line ("Drops the listed permanent variables after the next RUN.");
-         elsif T = "RENAME" then
-            Put_Line ("Command: RENAME old=new [, old=new ...]");
-            Put_Line ("Renames columns in the Data Table.");
-         elsif T = "ARRAY" then
-            Put_Line ("Command: ARRAY arrayname var1 [, var2 ...]");
-            Put_Line ("Creates a virtual array providing indexed access to existing variables.");
-            Put_Line ("ARRAY arrayname (no vars) undefines the virtual array.");
-         elsif T = "DIM" then
-            Put_Line ("Command: DIM arrayname(lower [TO upper]) [/TEMP]");
-            Put_Line ("Creates a real array. Elements initialised to missing.");
-            Put_Line ("/TEMP makes the array temporary (not saved to the table).");
-         elsif T = "ELSEIF" then
-            Put_Line ("ELSEIF is part of the IF statement. See: HELP IF");
-         elsif T = "IF" then
-            Put_Line ("Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]");
-            Put_Line ("         IF condition THEN");
-            Put_Line ("           statements");
-            Put_Line ("         [ELSEIF condition THEN");
-            Put_Line ("           statements]");
-            Put_Line ("         [ELSE");
-            Put_Line ("           statements]");
-            Put_Line ("         END IF");
-            Put_Line ("Conditional execution. ELSEIF supported in block form.");
-         elsif T = "SELECT" then
-            Put_Line ("Command: SELECT [expression]");
-            Put_Line ("           CASE (value [, value ...]) statements");
-            Put_Line ("           [OTHERWISE statements]");
-            Put_Line ("         END");
-            Put_Line ("Multi-way branch. Without expression uses WHEN (condition) form.");
-         elsif T = "FOR" then
-            Put_Line ("Command: FOR var = start TO end [STEP s]");
-            Put_Line ("           statements");
-            Put_Line ("         NEXT");
-            Put_Line ("Counter-controlled loop.");
-         elsif T = "WHILE" then
-            Put_Line ("Command: WHILE condition");
-            Put_Line ("           statements");
-            Put_Line ("         WEND");
-            Put_Line ("Condition-controlled loop; executes while condition is true.");
-         elsif T = "REPEAT" then
-            Put_Line ("Command (data step): REPEAT n");
-            Put_Line ("  Creates n new records in the next RUN.");
-            Put_Line ("Command (loop):      REPEAT");
-            Put_Line ("                       statements");
-            Put_Line ("                     UNTIL condition");
-            Put_Line ("  Executes body at least once; loops until condition is true.");
-         elsif T = "BY" then
-            Put_Line ("Command: BY variable(s)");
-            Put_Line ("Divides input into groups by consecutive equal values of the listed");
-            Put_Line ("variables. Enables BOG()/EOG() and FIRST./LAST. indicators.");
-         elsif T = "SORT" then
-            Put_Line ("Command: SORT variable(s)");
-            Put_Line ("Sorts the Data Table by the specified variables (ascending).");
-         elsif T = "PRINT" then
-            Put_Line ("Command: PRINT [expr [, expr ...]]");
-            Put_Line ("Prints values separated by spaces. No arguments prints all");
-            Put_Line ("permanent variables with their names for the current record.");
-         elsif T = "OUTPUT" then
-            Put_Line ("Command: OUTPUT [""filename""]");
-            Put_Line ("Redirects PRINT output to a file (written to file AND stdout).");
-            Put_Line ("OUTPUT with no argument closes the current output file.");
-         elsif T = "ECHO" then
-            Put_Line ("Command: ECHO ON | OFF");
-            Put_Line ("Enables or disables writing console output to stdout.");
-            Put_Line ("Output still goes to the OUTPUT file if one is open.");
-         elsif T = "DIGITS" then
-            Put_Line ("Command: DIGITS n");
-            Put_Line ("Sets decimal places for floating-point output (default 5).");
-         elsif T = "FPATH" then
-            Put_Line ("Command: FPATH [path] [/ USE | SAVE | SUBMIT | OUTPUT]");
-            Put_Line ("Sets the default directory for the specified command(s).");
-            Put_Line ("FPATH with no arguments resets all paths to current directory.");
-         elsif T = "RSEED" then
-            Put_Line ("Command: RSEED n");
-            Put_Line ("Seeds the random number generator with integer n.");
-            Put_Line ("Re-seeding with the same value reproduces the same sequence.");
-         elsif T = "SYSTEM" then
-            Put_Line ("Command: SYSTEM ""shell-command""");
-            Put_Line ("Executes a shell command. Disabled by --noshell flag.");
-         elsif T = "SUBMIT" then
-            Put_Line ("Command: SUBMIT ""filename""");
-            Put_Line ("Reads and executes commands from a script file.");
-            Put_Line ("Recursive SUBMIT (direct or indirect) is detected and rejected.");
-            Put_Line ("Default extension: .CMD");
-         elsif T = "HELP" then
-            Put_Line ("Command: HELP [topic | /ALL]");
-            Put_Line ("Displays help. HELP /ALL prints the full reference.");
-         elsif T = "QUIT" or else T = "END" then
-            Put_Line ("Command: QUIT | END");
-            Put_Line ("Exits the interpreter.");
-
          -- ── Math functions ───────────────────────────────────────────────
          elsif T = "ABS" then
             Put_Line ("Function: ABS(x)  ->  |x|");
@@ -721,6 +603,18 @@ package body SData.Interpreter is
          elsif T = "LDF" or T = "LCF" or T = "LIF" or T = "LRN" then
             Put_Line ("Laplace: LDF(x,loc,scale) LCF(x,loc,scale) LIF(p,loc,scale) LRN(loc,scale)");
 
+         elsif T = "MISSING" then
+            Put_Line ("Function: MISSING(v) -> returns 1 if v is missing, 0 otherwise");
+         elsif T = "NMISS" then
+            Put_Line ("Function: NMISS(v1, ...) -> returns the count of missing values in the list");
+         elsif T = "OPTIONS" then
+            Put_Line ("Runtime Configuration Flags:");
+            Put_Line ("  --noshell            : Disable SYSTEM/SHELL");
+            Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
+            Put_Line ("  --clen <n>           : Set max character variable length");
+            Put_Line ("  -m <n>               : Set max in-memory table rows");
+            Put_Line ("  -k                   : Continue execution after statement error");
+
          -- ── HELP /ALL ────────────────────────────────────────────────────
          elsif T = "/ALL" then
             declare
@@ -736,7 +630,7 @@ package body SData.Interpreter is
                   new String'("BY"), new String'("SORT"), new String'("PRINT"),
                   new String'("OUTPUT"), new String'("ECHO"), new String'("DIGITS"),
                   new String'("FPATH"), new String'("RSEED"), new String'("SYSTEM"),
-                  new String'("SUBMIT"), new String'("HELP"), new String'("QUIT")
+                  new String'("SUBMIT"), new String'("HELP"), new String'("QUIT"), new String'("OPTIONS")
                );
                Funcs : constant Topic_Array := (
                   new String'("ABS"), new String'("SQRT"), new String'("LOG"),
