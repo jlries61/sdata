@@ -50,11 +50,12 @@ package SData.Config is
    Max_Temp_Vars   : Natural := 0;      -- 0 means no limit
    Disable_Shell      : Boolean := False;
    Continue_On_Error  : Boolean := False;
+   Ignore_Math_Errors : Boolean := False; -- If True, domain errors return Val_Missing instead of halting.
 
    --  Version information
    Version_Major : constant := 0;
-   Version_Minor : constant := 1;
-   Version_Patch : constant := 1;
-   Version_Str   : constant String := "0.1.1";
+   Version_Minor : constant := 2;
+   Version_Patch : constant := 0;
+   Version_Str   : constant String := "0.2.0";
 
 end SData.Config;

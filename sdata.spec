@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.1.1
+Version:        0.2.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -46,6 +46,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_bindir}/sdata
 
 %changelog
+* Mon Mar 23 2026 John L. Ries <john@theyarnbard.com> - 0.2.0-1
+- Phase 2 complete: Robust control flow and standardized function library.
+
 * Mon Mar 23 2026 John L. Ries <john@theyarnbard.com> - 0.1.1-1
 - Finalize Phase 1 with corrected memory architecture and parser.
 

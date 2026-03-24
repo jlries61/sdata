@@ -1,3 +1,9 @@
+sdata (0.2.0-1) unstable; urgency=medium
+
+  * Phase 2 complete: Robust control flow and standardized function library.
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 23 Mar 2026 19:30:00 -0700
+
 sdata (0.1.1-1) unstable; urgency=medium
 
   * Finalize Phase 1 with corrected memory architecture and parser.
