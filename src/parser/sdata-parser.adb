@@ -59,7 +59,9 @@ package body SData.Parser is
       S : constant Statement_Access := new Statement (Stmt_IF);
    begin
       S.Condition := Parse_Expression (Ctx);
-      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_THEN then
+      if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_THEN then
+         raise Script_Error with "Expected THEN after IF condition.";
+      else
          declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
       end if;
       if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline or else

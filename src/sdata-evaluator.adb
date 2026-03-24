@@ -25,7 +25,7 @@ package body SData.Evaluator is
          Put_Line ("Warning: " & Msg);
          return (Kind => Val_Missing);
       else
-         raise SData.Interpreter.Script_Error with Msg;
+         raise SData.Script_Error with Msg;
       end if;
    end Handle_Domain_Error;
 
@@ -871,7 +871,24 @@ package body SData.Evaluator is
                return V;
             end;
 
-         when Expr_Variable => return Get (Expr.Var_Name (1 .. Expr.Var_Len));
+         when Expr_Variable =>
+            declare
+               VName : constant String := To_Upper (Expr.Var_Name (1 .. Expr.Var_Len));
+               VVal  : constant Value  := Get (VName);
+            begin
+               if VVal.Kind = Val_Missing then
+                  --  Fall back to zero-arg functions (optional parentheses)
+                  if VName = "BOF"   or else VName = "EOF"    or else
+                     VName = "BOG"   or else VName = "EOG"    or else
+                     VName = "RECNO" or else VName = "DATE$"  or else
+                     VName = "TIME$" or else VName = "RAN"    or else
+                     VName = "RANDOM"
+                  then
+                     return Evaluate_Function (VName, null);
+                  end if;
+               end if;
+               return VVal;
+            end;
 
          when Expr_Array_Access =>
             declare
@@ -934,7 +951,7 @@ package body SData.Evaluator is
                            when Op_Mul => Res64 := L64 * R64;
                            when Op_Div => 
                               if R.Int_Val = 0 then
-                                 raise SData.Interpreter.Script_Error with "Division by zero.";
+                                 raise SData.Script_Error with "Division by zero.";
                               end if;
                               -- Return float for division to preserve precision.
                               return (Kind => Val_Numeric, Num_Val => Float (L.Int_Val) / Float (R.Int_Val));
@@ -967,7 +984,7 @@ package body SData.Evaluator is
                            when Op_Mul => return (Kind => Val_Numeric, Num_Val => FL * FR);
                            when Op_Div =>
                               if FR = 0.0 then
-                                 raise SData.Interpreter.Script_Error with "Division by zero.";
+                                 raise SData.Script_Error with "Division by zero.";
                               end if;
                               return (Kind => Val_Numeric, Num_Val => FL / FR);
                            when Op_Pow => return (Kind => Val_Numeric, Num_Val => FL ** FR);

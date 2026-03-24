@@ -98,10 +98,10 @@ procedure SData_Main is
             when End_Error =>
                New_Line;
                exit REPL;
-            when SData.Interpreter.Script_Error =>
-               null;  -- Error already printed; keep the REPL running.
-            when E : others =>
+            when E : SData.Script_Error =>
                Put_Line ("Error: " & Exception_Message (E));
+            when others =>
+               Put_Line ("An unexpected error occurred.");
          end;
          exit REPL when not Is_Open (Standard_Input);
       end loop REPL;
@@ -263,7 +263,7 @@ begin
    end;
 
 exception
-   when E : SData.Interpreter.Script_Error =>
+   when E : SData.Script_Error =>
       Put_Line ("Error: " & Exception_Message (E));
    when E : others =>
       Put_Line ("An error occurred: " & Exception_Name (E) & ": " & Exception_Message (E));

@@ -307,29 +307,64 @@ package body SData.Interpreter is
    function Full_Path (Path : String; Category : String) return String is
       Cat  : constant String := To_Upper (Category);
       Base : Unbounded_String := Null_Unbounded_String;
-   begin
-      if Path'Length >= 1 and then (Path(Path'First) = '/' or else (Path'Length >= 2 and then Path(Path'First + 1) = ':')) then
-         return Path;
-      end if;
+      Result : Unbounded_String;
 
-      if Cat = "USE" then Base := SData.Config.FPath_Use;
-      elsif Cat = "SAVE" then Base := SData.Config.FPath_Save;
-      elsif Cat = "SUBMIT" then Base := SData.Config.FPath_Submit;
-      elsif Cat = "OUTPUT" then Base := SData.Config.FPath_Output;
-      end if;
-
-      if Base = Null_Unbounded_String or else To_String (Base) = "" then
-         return Path;
-      end if;
-
-      declare
-         B : constant String := To_String (Base);
+      function Has_Extension (S : String) return Boolean is
       begin
-         if B(B'Last) = '/' or else B(B'Last) = '\' then
-            return B & Path;
-         else
-            return B & "/" & Path;
+         for I in reverse S'Range loop
+            if S (I) = '.' then
+               return True;
+            elsif S (I) = '/' or else S (I) = '\' then
+               return False;
+            end if;
+         end loop;
+         return False;
+      end Has_Extension;
+   begin
+      -- 1. Handle absolute paths
+      if Path'Length >= 1 and then (Path (Path'First) = '/' or else (Path'Length >= 2 and then Path (Path'First + 1) = ':')) then
+         Result := To_Unbounded_String (Path);
+      else
+         -- 2. Handle FPATH prepending
+         if Cat = "USE" then
+            Base := SData.Config.FPath_Use;
+         elsif Cat = "SAVE" then
+            Base := SData.Config.FPath_Save;
+         elsif Cat = "SUBMIT" then
+            Base := SData.Config.FPath_Submit;
+         elsif Cat = "OUTPUT" then
+            Base := SData.Config.FPath_Output;
          end if;
+
+         if Base /= Null_Unbounded_String and then To_String (Base) /= "" then
+            declare
+               B : constant String := To_String (Base);
+            begin
+               if B (B'Last) = '/' or else B (B'Last) = '\' then
+                  Result := To_Unbounded_String (B & Path);
+               else
+                  Result := To_Unbounded_String (B & "/" & Path);
+               end if;
+            end;
+         else
+            Result := To_Unbounded_String (Path);
+         end if;
+      end if;
+
+      -- 3. Append default extensions if missing
+      declare
+         S : constant String := To_String (Result);
+      begin
+         if not Has_Extension (S) then
+            if Cat = "USE" or else Cat = "SAVE" then
+               return S & ".CSV";
+            elsif Cat = "SUBMIT" then
+               return S & ".CMD";
+            elsif Cat = "OUTPUT" then
+               return S & ".DAT";
+            end if;
+         end if;
+         return S;
       end;
    end Full_Path;
 
@@ -944,10 +979,15 @@ package body SData.Interpreter is
                SData.Config.Repeat_Count := Stmt.Count;
                Input_File_Columns.Clear;
             when Stmt_SAVE =>
-               SData.Config.Save_File_Path (1 .. Stmt.File_Len) := Stmt.File_Path (1 .. Stmt.File_Len);
-               SData.Config.Save_File_Len := Stmt.File_Len;
-               SData.Config.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
-               SData.Config.Save_File_Active := True;
+               declare
+                  File_Name : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
+                  Full      : constant String := Full_Path (File_Name, "SAVE");
+               begin
+                  SData.Config.Save_File_Path (1 .. Full'Length) := Full;
+                  SData.Config.Save_File_Len := Full'Length;
+                  SData.Config.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
+                  SData.Config.Save_File_Active := True;
+               end;
             when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD =>
                declare
                   Curr_Var : Variable_List := Stmt.Vars;
@@ -1105,33 +1145,21 @@ package body SData.Interpreter is
                end;
             when Stmt_SUBMIT =>
                declare
-                  Source : constant String :=
+                  Final : constant String :=
                      Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SUBMIT");
-                  Path   : String (1 .. 1024);
-                  P_Len  : Natural := Source'Length;
                begin
-                  Path (1 .. P_Len) := Source;
-                  --  Append default extension if none present.
-                  declare Has_Ext : Boolean := False; begin
-                     for C of Source loop if C = '.' then Has_Ext := True; end if; end loop;
-                     if not Has_Ext then
-                        Path (P_Len + 1 .. P_Len + 4) := ".CMD";
-                        P_Len := P_Len + 4;
-                     end if;
-                  end;
-                  declare Final : constant String := Path (1 .. P_Len); begin
-                     if Submit_Chain.Contains (Final) then
-                        raise Script_Error with
-                           "Recursive SUBMIT detected: " & Final;
-                     end if;
-                     Submit_Chain.Insert (Final);
-                     declare
-                        File   : Ada.Streams.Stream_IO.File_Type;
-                        Stream : Ada.Streams.Stream_IO.Stream_Access;
-                     begin
-                        Ada.Streams.Stream_IO.Open
-                           (File, Ada.Streams.Stream_IO.In_File, Final);
-                        Stream := Ada.Streams.Stream_IO.Stream (File);
+                  if Submit_Chain.Contains (Final) then
+                     raise Script_Error with
+                        "Recursive SUBMIT detected: " & Final;
+                  end if;
+                  Submit_Chain.Insert (Final);
+                  declare
+                     File   : Ada.Streams.Stream_IO.File_Type;
+                     Stream : Ada.Streams.Stream_IO.Stream_Access;
+                  begin
+                     Ada.Streams.Stream_IO.Open
+                        (File, Ada.Streams.Stream_IO.In_File, Final);
+                     Stream := Ada.Streams.Stream_IO.Stream (File);
                         declare
                            Contents : String
                               (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
@@ -1157,7 +1185,6 @@ package body SData.Interpreter is
                      end;
                      Submit_Chain.Delete (Final);
                   end;
-               end;
             when Stmt_SYSTEM =>
                if SData.Config.Disable_Shell then
                   Put_Line ("Error: SYSTEM command is disabled.");
@@ -1218,22 +1245,13 @@ package body SData.Interpreter is
 
                if Stmt.File_Len > 0 then
                   declare
-                     Path : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT");
-                     Has_Ext : Boolean := False;
+                     Final_Path : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT");
                   begin
-                     for C of Path loop
-                        if C = '.' then Has_Ext := True; end if;
-                     end loop;
-
-                     declare
-                        Final_Path : constant String := Path & (if Has_Ext then "" else ".DAT");
-                     begin
-                        Ada.Text_IO.Create (Redirect_File, Ada.Text_IO.Out_File, Final_Path);
-                        Is_Redirected := True;
-                     exception
-                        when others =>
-                           Ada.Text_IO.Put_Line ("Error: Could not create output file " & Final_Path);
-                     end;
+                     Ada.Text_IO.Create (Redirect_File, Ada.Text_IO.Out_File, Final_Path);
+                     Is_Redirected := True;
+                  exception
+                     when others =>
+                        Ada.Text_IO.Put_Line ("Error: Could not create output file " & Final_Path);
                   end;
                end if;
             when Stmt_ECHO =>
