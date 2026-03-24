@@ -7,7 +7,6 @@ with SData.Table;
 with Ada.Containers.Vectors;
 with Ada.Text_IO; use Ada.Text_IO;
 with SData.System;
-with SData.Interpreter;
 with Ada.Calendar;
 with Ada.Numerics;
 

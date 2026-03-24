@@ -1,12 +1,9 @@
 Generating mock data...
-Generating mock data...
 REC: 1 ID: 1 LAG_ID: . BOF: 1.00000 EOF: 0.00000
 REC: 2 ID: 2 LAG_ID: 1.00000 BOF: 0.00000 EOF: 0.00000
 REC: 3 ID: 3 LAG_ID: 2.00000 BOF: 0.00000 EOF: 1.00000
 RUN complete. 3 records and 6 variables processed.
 Generating mock data...
-Generating mock data...
-RUN complete. 3 records and 3 variables processed.
 Row 1 NAME: Alice
 Row 3 ID: 3.00000
-RUN complete. 1 records and 5 variables processed.
+RUN complete. 3 records and 5 variables processed.
