@@ -20,7 +20,7 @@ PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
 INSTALL_DIR = $(DESTDIR)$(BINDIR)
 
-.PHONY: all build clean run check install srpm
+.PHONY: all build clean run check install srpm pkg
 
 all: build
 
@@ -131,6 +131,22 @@ slackware: clean
 	 rm -rf "$$TEMP_DIR"
 	@echo "SlackBuild package created: sdata-0.1.1-slackbuild.tar.gz"
 
+
+pkg: build
+	@echo "Creating macOS installer package..."
+	@TEMP_DIR=$$(mktemp -d); \
+	 PKG_ROOT="$$TEMP_DIR/root"; \
+	 mkdir -p "$$PKG_ROOT/usr/local/bin"; \
+	 cp bin/sdata "$$PKG_ROOT/usr/local/bin/sdata"; \
+	 chmod 755 "$$PKG_ROOT/usr/local/bin/sdata"; \
+	 pkgbuild \
+	   --root "$$PKG_ROOT" \
+	   --identifier com.sdata.pkg \
+	   --version 0.1.1 \
+	   --install-location / \
+	   sdata-0.1.1.pkg; \
+	 rm -rf "$$TEMP_DIR"
+	@echo "macOS package created: sdata-0.1.1.pkg"
 
 install: build
 	install -d $(INSTALL_DIR)

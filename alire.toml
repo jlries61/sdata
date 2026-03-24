@@ -1,0 +1,23 @@
+name = "sdata"
+description = "A data command interpreter for tabular data processing."
+version = "0.1.1"
+
+authors = ["John L. Ries"]
+maintainers = ["John L. Ries <john@theyarnbard.com>"]
+licenses = "MIT"
+website = ""
+tags = []
+
+executables = ["sdata"]
+
+[[depends-on]]
+zipada = "^62.0.0"
+
+[[depends-on]]
+xmlada = "^21.0.0"
+
+[[depends-on]]
+mathpaqs = "^20230121.0.0"
+
+[[depends-on]]
+sciada = "~0.4.0"

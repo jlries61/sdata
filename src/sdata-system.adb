@@ -15,10 +15,14 @@ package body SData.System is
          declare
             Is_Windows : constant Boolean := (Shell'Length >= 7 and then To_Upper(Shell(Shell'Last-6..Shell'Last)) = "CMD.EXE") 
                                              or else (Shell'Length >= 3 and then To_Upper(Shell(Shell'Last-2..Shell'Last)) = "CMD");
-            Arg : constant String := (if Is_Windows then "/c" else "-c");
+            --  For non-interactive command execution, use /bin/sh (POSIX mode)
+            --  rather than the user's login shell to avoid sourcing profile
+            --  scripts (.zshenv, .bashrc, etc.) that produce unwanted output.
+            Exec : constant String := (if Is_Windows then Shell else "/bin/sh");
+            Arg  : constant String := (if Is_Windows then "/c" else "-c");
             Args : GNAT.OS_Lib.Argument_List := (new String'(Arg), new String'(Command));
          begin
-            GNAT.OS_Lib.Spawn (Shell, Args, Success);
+            GNAT.OS_Lib.Spawn (Exec, Args, Success);
             for I in Args'Range loop Free (Args (I)); end loop;
          end;
       end if;
