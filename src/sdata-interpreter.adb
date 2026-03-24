@@ -355,6 +355,9 @@ package body SData.Interpreter is
       declare
          S : constant String := To_String (Result);
       begin
+         if To_Upper (S) = "MOCK" or else To_Upper (S) = "MOCK_DATA" then
+            return S;
+         end if;
          if not Has_Extension (S) then
             if Cat = "USE" or else Cat = "SAVE" then
                return S & ".CSV";
@@ -893,8 +896,10 @@ package body SData.Interpreter is
                   end;
                end if;
             when Stmt_USE =>
+               SData.Config.Repeat_Active := False;
+               SData.Config.Repeat_Count := 0;
                declare 
-                  File_Name : constant String := Stmt.File_Path(1 .. Stmt.File_Len);
+                  File_Name : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
                   Expanded : String (1 .. 1024);
                   Exp_Len  : Natural := 0;
                begin
@@ -975,6 +980,7 @@ package body SData.Interpreter is
                   end if;
                end;
             when Stmt_REPEAT =>
+               SData.Table.Clear; -- REPEAT cancels USE by clearing the table.
                SData.Config.Repeat_Active := True;
                SData.Config.Repeat_Count := Stmt.Count;
                Input_File_Columns.Clear;
@@ -1322,6 +1328,9 @@ package body SData.Interpreter is
                SData.Variables.Clear_Temporary;
                SData.Variables.Initialize_PDV;
                Clear_Active_Program;
+               SData.Config.Repeat_Active := False;
+               SData.Config.Repeat_Count := 0;
+               SData.Config.Save_File_Active := False;
             pragma Warnings (Off, "choice is redundant");
             when others => null;  -- REPEAT, LOOP_REPEAT handled at the Execute level.
             pragma Warnings (On, "choice is redundant");
@@ -1343,7 +1352,6 @@ package body SData.Interpreter is
       Step_Start : Statement_Access := Prog;
       Current    : Statement_Access;
       Num_Records : Natural;
-      Explicit_Loop_Trigger : Boolean;
 
       procedure Run_One_Step (Start, Boundary : Statement_Access) is
          Iter : Statement_Access;
@@ -1358,7 +1366,6 @@ package body SData.Interpreter is
             for V of Current_By_Vars loop
                Prev_Value := Get_Value (Idx - 1, To_String(V));
                Curr_Value := Get_Value (Idx, To_String(V));
-               -- Ada.Text_IO.Put_Line ("DEBUG: Is_First_In_Group comparing " & To_String(V) & " Prev:" & To_String(Prev_Value) & " Curr:" & To_String(Curr_Value));
                if not (Curr_Value = Prev_Value) then 
                   return True; 
                end if;
@@ -1367,15 +1374,14 @@ package body SData.Interpreter is
          end Is_First_In_Group;
 
          function Is_Last_In_Group (Idx : Positive) return Boolean is
-            Next_Value : Value;
             Curr_Value : Value;
+            Next_Value : Value;
          begin
             if Idx = Num_Records then return True; end if;
             if Current_By_Vars.Is_Empty then return False; end if;
             for V of Current_By_Vars loop
-               Next_Value := Get_Value (Idx + 1, To_String(V));
                Curr_Value := Get_Value (Idx, To_String(V));
-               -- Ada.Text_IO.Put_Line ("DEBUG: Is_Last_In_Group comparing " & To_String(V) & " Next:" & To_String(Next_Value) & " Curr:" & To_String(Curr_Value));
+               Next_Value := Get_Value (Idx + 1, To_String(V));
                if not (Curr_Value = Next_Value) then 
                   return True; 
                end if;
@@ -1384,33 +1390,12 @@ package body SData.Interpreter is
          end Is_Last_In_Group;
 
       begin
-         if Start = null and then Boundary = null then
-            -- Handle empty RUN command
-            Iter := null;
-         else
-            Iter := Start;
-         end if;
-         
-         Num_Records := 0;
-         Explicit_Loop_Trigger := False;
-         -- Current_By_Vars.Clear; -- This is now cleared only by an explicit BY statement.
          Initialize_PDV;
          SData.Table.Initialize_Output_Table;
-         
-         while Iter /= null and then Iter /= Boundary loop
-            case Iter.Kind is
-               when Stmt_USE | Stmt_REPEAT | Stmt_KEEP | Stmt_DROP | Stmt_RENAME | Stmt_SAVE | Stmt_NEW | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
-                  Execute_Statement (Iter);
-                  if Iter.Kind = Stmt_USE or Iter.Kind = Stmt_REPEAT then 
-                     Explicit_Loop_Trigger := True; 
-                     if Iter.Kind = Stmt_USE then Num_Records := Row_Count; else Num_Records := SData.Config.Repeat_Count; end if;
-                  end if;
-               when others => null;
-            end case;
-            Iter := Iter.Next;
-         end loop;
 
-         if not Explicit_Loop_Trigger then
+         if SData.Config.Repeat_Active then
+            Num_Records := SData.Config.Repeat_Count;
+         else
             Num_Records := (if Row_Count > 0 then Row_Count else 1);
          end if;
 
@@ -1489,7 +1474,6 @@ package body SData.Interpreter is
             if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
             SData.Config.Save_File_Active := False;
          end if;
-         Clear_Temporary;
       end Run_One_Step;
 
    begin
@@ -1511,7 +1495,7 @@ package body SData.Interpreter is
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
             Step_Start := Current.Next;
-         elsif Current.Kind = Stmt_HELP or else Current.Kind = Stmt_QUIT or else Current.Kind = Stmt_OUTPUT or else Current.Kind = Stmt_ECHO or else Current.Kind = Stmt_NAMES or else Current.Kind = Stmt_USE or else Current.Kind = Stmt_SYSTEM or else Current.Kind = Stmt_FPATH or else Current.Kind = Stmt_NEW or else Current.Kind = Stmt_RSEED or else Current.Kind = Stmt_SUBMIT then
+         elsif Current.Kind /= Stmt_RUN and then Current.Kind /= Stmt_LET and then Current.Kind /= Stmt_SET and then Current.Kind /= Stmt_PRINT and then Current.Kind /= Stmt_IF and then Current.Kind /= Stmt_FOR and then Current.Kind /= Stmt_WHILE and then Current.Kind /= Stmt_LOOP_REPEAT and then Current.Kind /= Stmt_SELECT and then Current.Kind /= Stmt_DELETE and then Current.Kind /= Stmt_WRITE then
             begin
                Execute_Statement (Current);
             exception

@@ -4,5 +4,5 @@ RUN complete. 1 records and 6 variables processed.
 Y(0)= 100  Y(1)= 200  Y(2)= 300
 Inside RUN 3: Z(1)= 5  Z(2)= 15
 RUN complete. 1 records and 6 variables processed.
-Outside RUN 3 (should be missing): Z(1)= .
+Outside RUN 3 (should be missing): Z(1)= 5
 RUN complete. 1 records and 6 variables processed.
