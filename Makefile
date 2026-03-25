@@ -148,7 +148,8 @@ pkg: build
 	 rm -rf "$$TEMP_DIR"
 	@echo "macOS package created: sdata-0.2.0.pkg"
 
-install: build
+install:
+	@test -x bin/sdata || { echo "Error: bin/sdata not found. Run 'make' first."; exit 1; }
 	install -d $(INSTALL_DIR)
 	install -m 755 bin/sdata $(INSTALL_DIR)/sdata
 
