@@ -226,60 +226,76 @@ package body SData.File_IO is
          end loop;
       end Process_Row;
 
-      Header_Line, First_Data_Line : Unbounded_String;
-      Has_Header, Has_Data : Boolean := False;
+      Header_Line : Unbounded_String;
+      Has_Header  : Boolean := False;
+      NSCAN : constant := 20;
+
+      --  Buffer to hold up to NSCAN data lines for type scanning
+      type UB_Array is array (Positive range <>) of Unbounded_String;
+      Scan_Lines  : UB_Array (1 .. NSCAN);
+      Scan_Count  : Natural := 0;
    begin
       Open (File, In_File, File_Name);
       if not End_Of_File (File) then
          Header_Line := To_Unbounded_String (Get_Line (File));
          Has_Header := True;
       end if;
-      if not End_Of_File (File) then
-         First_Data_Line := To_Unbounded_String (Get_Line (File));
-         Has_Data := True;
-      end if;
+      --  Read up to NSCAN data lines for type detection
+      while not End_Of_File (File) and then Scan_Count < NSCAN loop
+         Scan_Count := Scan_Count + 1;
+         Scan_Lines (Scan_Count) := To_Unbounded_String (Get_Line (File));
+      end loop;
       if Has_Header then
          declare
             Headers : constant String_Array := Split (To_String (Header_Line));
             Names   : String_List (1 .. Headers'Length);
-            Data_Fields : String_Array (1 .. Headers'Length) := (others => Null_Unbounded_String);
+            --  Track whether each column has been determined yet
+            Col_Determined : array (Headers'Range) of Boolean := (others => False);
+            Col_Types      : array (Headers'Range) of Column_Type := (others => Col_Numeric);
          begin
-            if Has_Data then
+            --  Scan up to NSCAN rows to determine column types
+            for R in 1 .. Scan_Count loop
                declare
-                  DF : constant String_Array := Split (To_String (First_Data_Line));
+                  DF : constant String_Array := Split (To_String (Scan_Lines (R)));
                begin
-                  for I in DF'Range loop
-                     if I <= Data_Fields'Length then
-                        Data_Fields (I) := DF (I);
+                  for I in Headers'Range loop
+                     if not Col_Determined (I) and then I <= DF'Length then
+                        declare
+                           Val_Str : constant String := To_String (DF (I));
+                        begin
+                           if Val_Str /= "" and then Val_Str /= "." then
+                              --  Non-missing value: try to parse as numeric
+                              begin
+                                 declare Dummy : Float;
+                                 begin
+                                    Dummy := Float'Value (Val_Str);
+                                    Col_Types (I) := Col_Numeric;
+                                 end;
+                              exception
+                                 when others =>
+                                    Col_Types (I) := Col_String;
+                              end;
+                              Col_Determined (I) := True;
+                           end if;
+                        end;
                      end if;
                   end loop;
                end;
-            end if;
+            end loop;
             Clear;
             for I in Headers'Range loop
                declare
                   Name : constant String := Safe_Name (To_String (Headers (I)), "COL" & Trim (I'Img, Ada.Strings.Both));
-                  Typ  : Column_Type := Col_String;
-                  Val_Str : constant String := To_String (Data_Fields (I));
                begin
                   Names (I) := new String'(Name);
-                  if Val_Str /= "" and then Val_Str /= "." then
-                     begin
-                        declare Dummy : Float; 
-                        begin 
-                           Dummy := Float'Value (Val_Str); 
-                           Typ := (if Dummy = 0.0 or else Dummy /= 0.0 then Col_Numeric else Col_String);
-                        end;
-                     exception
-                        when others => null;
-                     end;
-                  end if;
-                  Add_Column (Name, Typ);
+                  Add_Column (Name, Col_Types (I));
                end;
             end loop;
-            if Has_Data then
-               Process_Row (Data_Fields, Names);
-            end if;
+            --  Process the buffered scan lines
+            for R in 1 .. Scan_Count loop
+               Process_Row (Split (To_String (Scan_Lines (R))), Names);
+            end loop;
+            --  Process remaining lines
             while not End_Of_File (File) loop
                Process_Row (Split (Get_Line (File)), Names);
             end loop;
