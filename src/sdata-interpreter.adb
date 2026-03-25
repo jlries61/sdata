@@ -266,10 +266,10 @@ package body SData.Interpreter is
       end if;
    end Expand_Range;
 
-   function Has_Output_Statement (Stmt : Statement_Access) return Boolean is
+   function Has_Output_Statement (Stmt : Statement_Access; Boundary : Statement_Access := null) return Boolean is
       Curr : Statement_Access := Stmt;
    begin
-      while Curr /= null loop
+      while Curr /= null and then Curr /= Boundary loop
          if Curr.Kind = Stmt_WRITE then return True; end if;
          
          case Curr.Kind is
@@ -1356,7 +1356,7 @@ package body SData.Interpreter is
 
       procedure Run_One_Step (Start, Boundary : Statement_Access) is
          Iter : Statement_Access;
-         Global_Has_Write : constant Boolean := Has_Output_Statement (Start);
+         Global_Has_Write : constant Boolean := Has_Output_Statement (Start, Boundary);
 
          function Is_First_In_Group (Idx : Positive) return Boolean is
             Prev_Value : Value;

@@ -76,7 +76,7 @@ procedure SData_Main is
                         Prog.Kind in Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP |
                                      Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END |
                                      Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
-                                     Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED;
+                                     Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH;
                   begin
                      if Is_Declarative then
                         if Prog.Kind = Stmt_RUN then
