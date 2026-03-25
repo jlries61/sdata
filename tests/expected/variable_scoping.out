@@ -5,7 +5,13 @@ RUN complete. 3 records and 1 variables processed.
 RUN complete. 1 records and 0 variables processed.
 TV is missing (1): 1
 RUN complete. 1 records and 0 variables processed.
-
+Permanent Variables (Table Columns):
+(none)
+Session Variables (SET):
+(none)
 PROMOTED is now permanent (10): 10.00000
-PROMOTED 
+Permanent Variables (Table Columns):
+(none)
+Session Variables (SET):
+(none)
 RUN complete. 1 records and 1 variables processed.

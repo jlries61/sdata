@@ -1,32 +1,80 @@
 Generating mock data...
+Permanent Variables (Table Columns):
 ID NAME SALARY 
-IDENT NAME SALARY_NEW ID SALARY 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
+IDENT NAME SALARY_NEW 
+Session Variables (SET):
+(none)
 Original Names:
+Permanent Variables (Table Columns):
 IDENT NAME SALARY_NEW 
+Session Variables (SET):
+(none)
 After Rename:
+Permanent Variables (Table Columns):
 IDENT NAME SALARY_NEW 
+Session Variables (SET):
+(none)
 Original Names:
+Permanent Variables (Table Columns):
 IDENT NAME SALARY_NEW 
+Session Variables (SET):
+(none)
 After Rename:
+Permanent Variables (Table Columns):
 IDENT NAME SALARY_NEW 
+Session Variables (SET):
+(none)
 Original Names:
+Permanent Variables (Table Columns):
 IDENT NAME SALARY_NEW 
+Session Variables (SET):
+(none)
 After Rename:
+Permanent Variables (Table Columns):
 IDENT NAME SALARY_NEW 
+Session Variables (SET):
+(none)
 RUN complete. 3 records and 2 variables processed.
-IDENT NAME SALARY_NEW 
-After Keep IDENT, NAME and RUN:
+Permanent Variables (Table Columns):
 IDENT NAME 
+Session Variables (SET):
+(none)
 After Keep IDENT, NAME and RUN:
+Permanent Variables (Table Columns):
 IDENT NAME 
+Session Variables (SET):
+(none)
 After Keep IDENT, NAME and RUN:
+Permanent Variables (Table Columns):
 IDENT NAME 
+Session Variables (SET):
+(none)
+After Keep IDENT, NAME and RUN:
+Permanent Variables (Table Columns):
+IDENT NAME 
+Session Variables (SET):
+(none)
 RUN complete. 3 records and 1 variables processed.
-IDENT NAME 
-After Drop NAME and RUN:
+Permanent Variables (Table Columns):
 IDENT 
+Session Variables (SET):
+(none)
 After Drop NAME and RUN:
+Permanent Variables (Table Columns):
 IDENT 
+Session Variables (SET):
+(none)
 After Drop NAME and RUN:
+Permanent Variables (Table Columns):
 IDENT 
+Session Variables (SET):
+(none)
+After Drop NAME and RUN:
+Permanent Variables (Table Columns):
+IDENT 
+Session Variables (SET):
+(none)
 RUN complete. 3 records and 1 variables processed.

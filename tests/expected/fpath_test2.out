@@ -1,11 +1,32 @@
 Dataset opened: tests/data/sample.csv
+Permanent Variables (Table Columns):
 CATEGORY VAL1 VAL2 VAL3 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
 CATEGORY VAL1 VAL2 VAL3 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
 CATEGORY VAL1 VAL2 VAL3 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
 CATEGORY VAL1 VAL2 VAL3 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
 CATEGORY VAL1 VAL2 VAL3 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
 CATEGORY VAL1 VAL2 VAL3 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
 CATEGORY VAL1 VAL2 VAL3 
+Session Variables (SET):
+(none)
 RUN complete. 6 records and 4 variables processed.
 N is 123.45000
 S$ is 123.45000

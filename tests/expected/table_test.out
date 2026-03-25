@@ -1,12 +1,24 @@
 Generating mock data...
+Permanent Variables (Table Columns):
 ID NAME SALARY 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
 ID NAME SALARY 
+Session Variables (SET):
+(none)
 ID: 1  NAME: Alice  SALARY: 50000.00000  
 ID: 1  NAME: Alice  SALARY: 55000.00000  
+Permanent Variables (Table Columns):
 ID NAME SALARY 
+Session Variables (SET):
+(none)
 ID: 2  NAME: Bob  SALARY: 60000.00000  
 ID: 2  NAME: Bob  SALARY: 66000.00000  
+Permanent Variables (Table Columns):
 ID NAME SALARY 
+Session Variables (SET):
+(none)
 ID: 3  NAME: Charlie  SALARY: 70000.00000  
 ID: 3  NAME: Charlie  SALARY: 77000.00000  
 RUN complete. 3 records and 3 variables processed.
