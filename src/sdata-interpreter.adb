@@ -891,7 +891,27 @@ package body SData.Interpreter is
                   declare Current_Arg : Expression_List := Stmt.Print_Args;
                   begin
                      while Current_Arg /= null loop
-                        Put (To_String_Formatted (Evaluate (Current_Arg.Expr)));
+                        if Current_Arg.Expr.Kind = Expr_Variable then
+                           declare
+                              VName : constant String := To_Upper (Current_Arg.Expr.Var_Name (1 .. Current_Arg.Expr.Var_Len));
+                           begin
+                              if Has_Array (VName) then
+                                 declare
+                                    Start_Idx, End_Idx : Integer;
+                                 begin
+                                    Get_Array_Bounds (VName, Start_Idx, End_Idx);
+                                    for I in Start_Idx .. End_Idx loop
+                                       Put (To_String_Formatted (Get_Array_Element (VName, I)));
+                                       if I /= End_Idx then Put (" "); end if;
+                                    end loop;
+                                 end;
+                              else
+                                 Put (To_String_Formatted (Evaluate (Current_Arg.Expr)));
+                              end if;
+                           end;
+                        else
+                           Put (To_String_Formatted (Evaluate (Current_Arg.Expr)));
+                        end if;
                         if Current_Arg.Next /= null then Put (" "); end if;
                         Current_Arg := Current_Arg.Next;
                      end loop;

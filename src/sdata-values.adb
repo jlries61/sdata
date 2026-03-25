@@ -41,6 +41,17 @@ package body SData.Values is
                Img : String (1 .. 100);
                Aft_Count : constant Natural := SData.Config.Print_Digits;
             begin
+               if V.Num_Val = 0.0 then 
+                  declare
+                     Zero_Img : String (1 .. Aft_Count + 2);
+                  begin
+                     Zero_Img (1 .. 2) := "0.";
+                     for I in 3 .. Zero_Img'Last loop
+                        Zero_Img (I) := '0';
+                     end loop;
+                     return Zero_Img;
+                  end;
+               end if;
                Float_IO.Put (Img, V.Num_Val, Aft => Aft_Count, Exp => 0);
                return Trim (Img, Ada.Strings.Both);
             exception
