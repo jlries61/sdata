@@ -342,6 +342,20 @@ package body SData.Table is
       Output_Data_Table.Clear;
       Output_Column_Order.Clear;
       Output_Table_Row_Count := 0;
+      --  Seed the output table with the current column structure (no data)
+      --  so that column names are preserved even if all records are deleted.
+      for Name of Column_Order loop
+         declare
+            Upper_Name : constant String := To_String (Name);
+            Src_Col    : constant Column := Data_Table.Element (Upper_Name);
+            New_Col    : Column;
+         begin
+            New_Col.Name := Src_Col.Name;
+            New_Col.Typ  := Src_Col.Typ;
+            Output_Data_Table.Insert (Upper_Name, New_Col);
+            Output_Column_Order.Append (Name);
+         end;
+      end loop;
    end Initialize_Output_Table;
 
    procedure Add_Output_Column (Name : String; Col_Type : Column_Type) is

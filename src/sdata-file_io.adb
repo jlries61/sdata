@@ -291,6 +291,9 @@ package body SData.File_IO is
                   Add_Column (Name, Col_Types (I));
                end;
             end loop;
+            if Scan_Count = 0 then
+               Put_Line ("Warning: File contains a header but no data records.");
+            end if;
             --  Process the buffered scan lines
             for R in 1 .. Scan_Count loop
                Process_Row (Split (To_String (Scan_Lines (R))), Names);
