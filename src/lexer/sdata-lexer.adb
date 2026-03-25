@@ -232,6 +232,7 @@ package body SData.Lexer is
                elsif Upper = "SUBMIT" or Upper = "/SUBMIT" then T.Kind := Token_SUBMIT;
                elsif Upper = "LET" then T.Kind := Token_LET;
                elsif Upper = "SET" then T.Kind := Token_SET;
+               elsif Upper = "UNSET" then T.Kind := Token_UNSET;
                elsif Upper = "DIM" then T.Kind := Token_DIM;
                elsif Upper = "ARRAY" then T.Kind := Token_ARRAY;
                elsif Upper = "SYSTEM" or Upper = "/SYSTEM" then T.Kind := Token_SYSTEM;

@@ -107,6 +107,7 @@ package SData.AST is
    type Statement_Kind is (
       Stmt_LET,    -- Variable assignment
       Stmt_SET,    -- Temporary assignment
+      Stmt_UNSET,  -- Session variable removal
       Stmt_PRINT,  -- Output to console
       Stmt_USE,    -- Load dataset
       Stmt_SAVE,   -- Save dataset
@@ -171,7 +172,7 @@ package SData.AST is
             DLM_Len          : Natural := 0;
          when Stmt_REPEAT =>
             Count : Natural;
-         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM =>
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM =>
             Vars         : Variable_List;
             Arr_Name     : String (1 .. 32);
             Arr_Name_Len : Natural;

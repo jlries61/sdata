@@ -624,10 +624,11 @@ package body SData.Parser is
                end if;
             end;
 
-         when Token_KEEP | Token_DROP | Token_HOLD | Token_UNHOLD =>
+         when Token_KEEP | Token_DROP | Token_HOLD | Token_UNHOLD | Token_UNSET =>
             if Tok.Kind = Token_KEEP then Stmt := new Statement (Stmt_KEEP);
             elsif Tok.Kind = Token_DROP then Stmt := new Statement (Stmt_DROP);
             elsif Tok.Kind = Token_HOLD then Stmt := new Statement (Stmt_HOLD);
+            elsif Tok.Kind = Token_UNSET then Stmt := new Statement (Stmt_UNSET);
             else Stmt := new Statement (Stmt_UNHOLD); end if;
             Stmt.Vars := Parse_Variable_List (Ctx);
 

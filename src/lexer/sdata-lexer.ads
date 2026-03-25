@@ -15,7 +15,7 @@ package SData.Lexer is
       Token_USE, Token_MOCK, Token_SAVE, Token_KEEP, Token_DROP, Token_HOLD, Token_UNHOLD, Token_NEW,
       Token_IF, Token_THEN, Token_ELSE, Token_ELSEIF, Token_FOR, Token_NEXT, Token_WHILE, Token_WEND,
       Token_REPEAT, Token_UNTIL, Token_SELECT, Token_CASE, Token_WHEN, Token_OTHERWISE, Token_SUBMIT,
-      Token_LET, Token_SET, Token_DIM, Token_ARRAY, Token_SYSTEM,
+      Token_LET, Token_SET, Token_UNSET, Token_DIM, Token_ARRAY, Token_SYSTEM,
       Token_PRINT, Token_WRITE, Token_OUTPUT, Token_ECHO,
       Token_BY, Token_SORT, Token_RENAME, Token_DELETE, Token_RSEED, Token_NOT,
       Token_OPTIONS, Token_DIGITS, Token_FPATH, Token_HEADER,

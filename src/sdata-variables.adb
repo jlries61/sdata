@@ -2,6 +2,7 @@ with Ada.Characters.Handling; use Ada.Characters.Handling;
 with GNAT.Strings; use GNAT.Strings;
 with Ada.Containers; use Ada.Containers; -- For Count_Type
 with Ada.Strings.Fixed;
+with Ada.Text_IO;
 with SData.Config;
 
 package body SData.Variables is
@@ -39,9 +40,10 @@ package body SData.Variables is
    procedure Set_Temporary (Name : String; Val : Value) is
       Upper_Name : constant String := To_Upper (Name);
    begin
-      --  Rule: SET cannot overwrite a permanent variable (column).
+      --  Rule: SET implicitly drops permanent variable from table (Exclusivity)
       if SData.Table.Has_Column (Upper_Name) then
-         raise Program_Error with "Cannot SET permanent variable '" & Upper_Name & "' as temporary.";
+         Ada.Text_IO.Put_Line ("Warning: Column '" & Upper_Name & "' dropped from table and converted to session variable.");
+         SData.Table.Drop_Column (Upper_Name);
       end if;
 
       if Temp_Symbols.Contains (Upper_Name) then
@@ -61,10 +63,9 @@ package body SData.Variables is
    procedure Set_Permanent (Name : String; Val : Value) is
       Upper_Name : constant String := To_Upper (Name);
    begin
-      --  If we were tracking this as a temporary variable, remove it from that pool (Promotion).
-      --  EXCEPT if it is HELD.
+      --  Rule: LET implicitly unsets session variable (Promotion/Exclusivity)
       if Temp_Symbols.Contains (Upper_Name) and then not Is_Held (Upper_Name) then
-         Symbol_Table_Pkg.Delete (Temp_Symbols, Upper_Name);
+         Temp_Symbols.Delete (Upper_Name);
       end if;
 
       --  Update the Permanent symbols PDV.
@@ -83,6 +84,17 @@ package body SData.Variables is
          end if;
       end if;
    end Set_Permanent;
+
+   -----------
+   -- Unset --
+   -----------
+   procedure Unset (Name : String) is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if Temp_Symbols.Contains (Upper_Name) then
+         Temp_Symbols.Delete (Upper_Name);
+      end if;
+   end Unset;
 
    ---------
    -- Get --
@@ -267,6 +279,17 @@ package body SData.Variables is
       end if;
       return Val_Missing;
    end Get_Type;
+
+   function Get_Session_Names return String_List_Access is
+      Result : constant String_List_Access := new String_List (1 .. Integer (Temp_Symbols.Length));
+      Idx    : Integer := 1;
+   begin
+      for Pos in Temp_Symbols.Iterate loop
+         Result (Idx) := new String'(Symbol_Table_Pkg.Key (Pos));
+         Idx := Idx + 1;
+      end loop;
+      return Result;
+   end Get_Session_Names;
 
    -------------------
    -- Get_PDV_Names --

@@ -380,7 +380,7 @@ package body SData.Interpreter is
             Put_Line ("SData version " & SData.Config.Version_Str);
             Put_Line ("Available Commands:");
             Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE");
-            Put_Line ("  Variables:   LET, SET, HOLD, UNHOLD, KEEP, DROP, RENAME");
+            Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
             Put_Line ("  Arrays:      ARRAY, DIM");
             Put_Line ("  Control:     IF, SELECT, FOR, WHILE, REPEAT");
             Put_Line ("  Data step:   BY, SORT, REPEAT");
@@ -440,6 +440,9 @@ package body SData.Interpreter is
          elsif T = "SET" then
             Put_Line ("Command: SET variable = expression");
             Put_Line ("Creates a temporary variable that persists only during the Data Step.");
+         elsif T = "UNSET" then
+            Put_Line ("Command: UNSET variable(s)");
+            Put_Line ("Removes one or more session variables from memory.");
          elsif T = "ARRAY" then
             Put_Line ("Command: ARRAY array_name variable(s)");
             Put_Line ("Creates a virtual array providing indexed access to existing variables.");
@@ -715,7 +718,7 @@ package body SData.Interpreter is
                Cmds : constant Topic_Array := (
                   new String'("USE"), new String'("SAVE"), new String'("RUN"),
                   new String'("NEW"), new String'("NAMES"), new String'("WRITE"),
-                  new String'("DELETE"), new String'("LET"), new String'("SET"),
+                  new String'("DELETE"), new String'("LET"), new String'("SET"), new String'("UNSET"),
                   new String'("HOLD"), new String'("UNHOLD"), new String'("KEEP"),
                   new String'("DROP"), new String'("RENAME"), new String'("ARRAY"),
                   new String'("DIM"), new String'("IF"), new String'("SELECT"),
@@ -994,11 +997,16 @@ package body SData.Interpreter is
                   SData.Config.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
                   SData.Config.Save_File_Active := True;
                end;
-            when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD =>
+            when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET =>
                declare
                   Curr_Var : Variable_List := Stmt.Vars;
                begin
-                  if Stmt.Kind = Stmt_KEEP or Stmt.Kind = Stmt_DROP then
+                  if Stmt.Kind = Stmt_UNSET then
+                     while Curr_Var /= null loop
+                        SData.Variables.Unset (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
+                        Curr_Var := Curr_Var.Next;
+                     end loop;
+                  elsif Stmt.Kind = Stmt_KEEP or Stmt.Kind = Stmt_DROP then
                      declare K : constant Column_Mod_Kind := (if Stmt.Kind = Stmt_KEEP then Mod_Keep else Mod_Drop);
                      begin
                         while Curr_Var /= null loop
@@ -1112,41 +1120,34 @@ package body SData.Interpreter is
                end;
             when Stmt_NAMES =>
                declare
-                  -- Merge Table columns and Permanent PDV symbols
                   T_Names : constant String_List_Access := Get_Column_Names;
-                  P_Names : constant String_List_Access := Get_PDV_Names;
+                  S_Names : constant String_List_Access := Get_Session_Names;
                begin
-                  if T_Names /= null then
+                  Put_Line ("Permanent Variables (Table Columns):");
+                  if T_Names /= null and then T_Names'Length > 0 then
                      for I in T_Names'Range loop
                         Put (T_Names (I).all & " ");
                      end loop;
+                     My_New_Line;
+                  else
+                     Put_Line ("(none)");
                   end if;
-                  if P_Names /= null then
-                     for I in P_Names'Range loop
-                        declare
-                           Name : constant String := To_Upper (P_Names (I).all);
-                           Found_In_Table : Boolean := False;
-                        begin
-                           if T_Names /= null then
-                              for J in T_Names'Range loop
-                                 if To_Upper (T_Names (J).all) = Name then
-                                    Found_In_Table := True; exit;
-                                 end if;
-                              end loop;
-                           end if;
-                           if not Found_In_Table then
-                              Put (Name & " ");
-                           end if;
-                        end;
+
+                  Put_Line ("Session Variables (SET):");
+                  if S_Names /= null and then S_Names'Length > 0 then
+                     for I in S_Names'Range loop
+                        Put (S_Names (I).all & " ");
                      end loop;
+                     My_New_Line;
+                  else
+                     Put_Line ("(none)");
                   end if;
-                  My_New_Line;
 
                   if T_Names /= null then
                      declare Old : String_List_Access := T_Names; begin GNAT.Strings.Free (Old); end;
                   end if;
-                  if P_Names /= null then
-                     declare Old : String_List_Access := P_Names; begin GNAT.Strings.Free (Old); end;
+                  if S_Names /= null then
+                     declare Old : String_List_Access := S_Names; begin GNAT.Strings.Free (Old); end;
                   end if;
                end;
             when Stmt_SUBMIT =>

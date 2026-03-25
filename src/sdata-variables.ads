@@ -19,6 +19,9 @@ package SData.Variables is
    --  Retrieves a value. Lookup order: 1. Permanent PDV, 2. Temporary symbols.
    function Get (Name : String) return Value;
 
+   --  Removes a session variable.
+   procedure Unset (Name : String);
+
    --  Removes all temporary variables (called at the end of a RUN).
    procedure Clear_Temporary;
 
@@ -40,6 +43,8 @@ package SData.Variables is
    function Get_Type (Name : String) return Value_Kind;
    
    function Get_PDV_Names return GNAT.Strings.String_List_Access;
+
+   function Get_Session_Names return GNAT.Strings.String_List_Access;
 
    -- Array Management
    -- Defines a virtual array (maps existing variables)
