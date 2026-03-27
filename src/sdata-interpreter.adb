@@ -536,7 +536,7 @@ package body SData.Interpreter is
             Put_Line ("  UNTIL I > 10");
          elsif T = "OUTPUT" then
             Put_Line ("Command: OUTPUT [""filename""] [/CHARSET=...] [/FMT=...]");
-            Put_Line ("Redirects PRINT output to a file (written to file AND stdout).");
+            Put_Line ("Redirects all console output to a file (written to file AND stdout).");
             Put_Line ("No arguments: Closes the current output file.");
             Put_Line ("Options:");
             Put_Line ("  /CHARSET=cs  Specifies the character set (e.g., UTF-8, ASCII).");
