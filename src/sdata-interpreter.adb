@@ -492,6 +492,14 @@ package body SData.Interpreter is
          elsif T = "IF" or else T = "ELSEIF" then
             Put_Line ("Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]");
             Put_Line ("Conditional execution. Supports single-line and multi-line block forms.");
+            Put_Line ("Example:");
+            Put_Line ("  IF AGE < 18 THEN");
+            Put_Line ("    LET STATUS$ = ""MINOR""");
+            Put_Line ("  ELSEIF AGE < 65 THEN");
+            Put_Line ("    LET STATUS$ = ""ADULT""");
+            Put_Line ("  ELSE");
+            Put_Line ("    LET STATUS$ = ""SENIOR""");
+            Put_Line ("  END IF");
          elsif T = "SELECT" then
             Put_Line ("Command: SELECT [expression]");
             Put_Line ("Multi-way branch using CASE (value) or WHEN (condition).");
