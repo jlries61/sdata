@@ -537,6 +537,10 @@ package body SData.Interpreter is
          elsif T = "OUTPUT" then
             Put_Line ("Command: OUTPUT [""filename""] [/CHARSET=...] [/FMT=...]");
             Put_Line ("Redirects PRINT output to a file (written to file AND stdout).");
+            Put_Line ("No arguments: Closes the current output file.");
+            Put_Line ("Options:");
+            Put_Line ("  /CHARSET=cs  Specifies the character set (e.g., UTF-8, ASCII).");
+            Put_Line ("  /FMT=format  Specifies the file format (e.g., CSV, ODF).");
          elsif T = "ECHO" then
             Put_Line ("Command: ECHO ON | OFF");
             Put_Line ("Enables or disables writing console output to stdout.");
