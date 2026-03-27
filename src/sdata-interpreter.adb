@@ -412,9 +412,17 @@ package body SData.Interpreter is
             Put_Line ("Command: USE [MOCK | ""filename""] [/FMT=format] [/NSCAN=n]");
             Put_Line ("Loads a dataset from CSV, ODF, or OOXML files into the Data Table.");
             Put_Line ("USE MOCK generates synthetic test data.");
+            Put_Line ("Options:");
+            Put_Line ("  /FMT=format  Specifies the file format (CSV, ODF, OOXML).");
+            Put_Line ("               Default is auto-detected from file extension.");
+            Put_Line ("  /NSCAN=n     Number of rows to scan for type detection (default: 20).");
          elsif T = "SAVE" then
             Put_Line ("Command: SAVE ""filename"" [/FMT=format] [/HEADER=YES|NO]");
             Put_Line ("Queues the current Data Table to be saved after the next RUN command.");
+            Put_Line ("Options:");
+            Put_Line ("  /FMT=format  Specifies the output format (CSV, ODF, OOXML).");
+            Put_Line ("               Default is auto-detected from file extension.");
+            Put_Line ("  /HEADER=val  Whether to write a header row (YES or NO). Default: YES.");
          elsif T = "WRITE" then
             Put_Line ("Command: WRITE");
             Put_Line ("Explicitly writes the current PDV record to the output table.");
