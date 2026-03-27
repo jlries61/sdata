@@ -503,15 +503,37 @@ package body SData.Interpreter is
          elsif T = "SELECT" then
             Put_Line ("Command: SELECT [expression]");
             Put_Line ("Multi-way branch using CASE (value) or WHEN (condition).");
+            Put_Line ("Example:");
+            Put_Line ("  SELECT GRADE$");
+            Put_Line ("    CASE ""A"" : PRINT ""EXCELLENT""");
+            Put_Line ("    CASE ""B"" : PRINT ""GOOD""");
+            Put_Line ("    OTHERWISE : PRINT ""SEE ME""");
+            Put_Line ("  END SELECT");
          elsif T = "FOR" then
             Put_Line ("Command: FOR var = start TO end [STEP s] ... NEXT");
             Put_Line ("Counter-controlled loop.");
+            Put_Line ("Example:");
+            Put_Line ("  FOR I = 1 TO 10 STEP 2");
+            Put_Line ("    PRINT I");
+            Put_Line ("  NEXT I");
          elsif T = "WHILE" then
             Put_Line ("Command: WHILE condition ... WEND");
             Put_Line ("Condition-controlled loop; executes while condition is true.");
+            Put_Line ("Example:");
+            Put_Line ("  SET I = 1");
+            Put_Line ("  WHILE I <= 10");
+            Put_Line ("    PRINT I");
+            Put_Line ("    SET I = I + 1");
+            Put_Line ("  WEND");
          elsif T = "REPEAT" then
             Put_Line ("Command (data step): REPEAT n  (creates n records)");
             Put_Line ("Command (loop):      REPEAT ... UNTIL condition");
+            Put_Line ("Example:");
+            Put_Line ("  SET I = 1");
+            Put_Line ("  REPEAT");
+            Put_Line ("    PRINT I");
+            Put_Line ("    SET I = I + 1");
+            Put_Line ("  UNTIL I > 10");
          elsif T = "OUTPUT" then
             Put_Line ("Command: OUTPUT [""filename""] [/CHARSET=...] [/FMT=...]");
             Put_Line ("Redirects PRINT output to a file (written to file AND stdout).");
