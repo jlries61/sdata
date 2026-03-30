@@ -82,21 +82,13 @@ package body SData.Table is
    -- Add_Row --
    -------------
    procedure Add_Row is
-      Position : Column_Maps.Cursor := Data_Table.First;
    begin
       if SData.Config.Max_Table_Rows > 0 and then Table_Row_Count >= SData.Config.Max_Table_Rows then
          raise Program_Error with "Table row limit (" & Integer'Image(SData.Config.Max_Table_Rows) & ") exceeded.";
       end if;
-
       Table_Row_Count := Table_Row_Count + 1;
-      while Column_Maps.Has_Element (Position) loop
-         declare
-            Col : Column := Column_Maps.Element (Position);
-         begin
-            Col.Data.Append ( (Kind => Val_Missing) );
-            Data_Table.Replace_Element (Position, Col);
-         end;
-         Column_Maps.Next (Position);
+      for Pos in Data_Table.Iterate loop
+         Data_Table.Reference (Pos).Element.all.Data.Append ((Kind => Val_Missing));
       end loop;
    end Add_Row;
 
@@ -104,56 +96,55 @@ package body SData.Table is
    -- Get_Value --
    ---------------
    function Get_Value (Row : Positive; Column_Name : String) return Value is
-      Upper_Name : constant String := To_Upper (Column_Name);
+   begin
+      return Get_Value_Upper (Row, To_Upper (Column_Name));
+   end Get_Value;
+
+   function Get_Value_Upper (Row : Positive; Upper_Name : String) return Value is
    begin
       if not Data_Table.Contains (Upper_Name) then
          return (Kind => Val_Missing);
       end if;
-      
       declare
-         Col : constant Column := Data_Table.Element (Upper_Name);
+         Ref : constant Column_Maps.Constant_Reference_Type :=
+            Data_Table.Constant_Reference (Upper_Name);
       begin
-         if Count_Type (Row) > Col.Data.Length then
+         if Count_Type (Row) > Ref.Element.all.Data.Length then
             return (Kind => Val_Missing);
          end if;
-         return Col.Data.Element (Row);
+         return Ref.Element.all.Data.Element (Row);
       end;
-   end Get_Value;
+   end Get_Value_Upper;
 
-   ---------------
-   -- Set_Value --
-   ---------------
    procedure Set_Value (Row : Positive; Column_Name : String; Val : Value) is
-      Upper_Name : constant String := To_Upper (Column_Name);
+   begin
+      Set_Value_Upper (Row, To_Upper (Column_Name), Val);
+   end Set_Value;
+
+   procedure Set_Value_Upper (Row : Positive; Upper_Name : String; Val : Value) is
    begin
       if not Data_Table.Contains (Upper_Name) then
          return;
       end if;
-
       declare
-         Position : constant Column_Maps.Cursor := Data_Table.Find (Upper_Name);
-         Col : Column := Column_Maps.Element (Position);
+         Ref : constant Column_Maps.Reference_Type := Data_Table.Reference (Upper_Name);
+         Col : Column renames Ref.Element.all;
       begin
-         --  Safety check: Ensure the row actually exists in this column's data vector.
          if Count_Type (Row) > Col.Data.Length then
-            --  Auto-extend if necessary (though Add_Row should handle this).
             for I in Positive (Col.Data.Length) + 1 .. Row loop
                Col.Data.Append ((Kind => Val_Missing));
             end loop;
          end if;
-
          if Val.Kind /= Val_Missing then
             if Col.Typ = Col_Numeric and Val.Kind /= Val_Numeric then
                if Val.Kind = Val_Integer then
                   Col.Data.Replace_Element (Row, (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val)));
-                  Data_Table.Replace_Element (Position, Col);
                   return;
                end if;
                raise Type_Mismatch_Error with "Expected Numeric, got " & Val.Kind'Image;
             elsif Col.Typ = Col_Integer and Val.Kind /= Val_Integer then
                if Val.Kind = Val_Numeric then
                   Col.Data.Replace_Element (Row, (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val))));
-                  Data_Table.Replace_Element (Position, Col);
                   return;
                end if;
                raise Type_Mismatch_Error with "Expected Integer, got " & Val.Kind'Image;
@@ -161,11 +152,9 @@ package body SData.Table is
                raise Type_Mismatch_Error with "Expected String, got " & Val.Kind'Image;
             end if;
          end if;
-
          Col.Data.Replace_Element (Row, Val);
-         Data_Table.Replace_Element (Position, Col);
       end;
-   end Set_Value;
+   end Set_Value_Upper;
 
    -------------------
    -- Rename_Column --
@@ -253,10 +242,23 @@ package body SData.Table is
       --  GNAT.Heap_Sort_G (heapsort, O(n log n) worst case), then
       --  reconstruct every column's data vector in sorted order.
       --
-      --  Heap_Sort_G uses index 0 as a scratch element, so the Indices
-      --  array is sized 0..Table_Row_Count; slot 0 is the temporary.
+      --  Performance note: calling Get_Value inside the comparator would copy
+      --  the entire column vector on every comparison (O(n log n) full-column
+      --  copies).  Instead, we pre-extract the sort-key values into plain
+      --  arrays before the sort so that each comparison is just two array
+      --  accesses.  Total data movement drops from O(n² log n) to O(n).
+      --
+      --  Heap_Sort_G uses index 0 as a scratch element, so Indices is sized
+      --  0..N; slot 0 is the temporary.
 
       N : constant Natural := Table_Row_Count;
+
+      --  One pre-extracted value array per sort criterion.
+      --  Index 0 is a dummy Val_Missing for the heapsort scratch slot.
+      type Value_Row     is array (Natural range <>) of Value;
+      type Value_Row_Acc is access Value_Row;
+      Key_Data : array (Criteria'Range) of Value_Row_Acc;
+
       type Index_Array is array (Natural range <>) of Natural;
       Indices : Index_Array (0 .. N);
 
@@ -264,20 +266,20 @@ package body SData.Table is
       begin
          Indices (To) := Indices (From);
       end Move;
+      pragma Inline (Move);
 
       function Lt (Op1, Op2 : Natural) return Boolean is
          L : constant Natural := Indices (Op1);
          R : constant Natural := Indices (Op2);
       begin
-         for I in Criteria'Range loop
+         for C in Criteria'Range loop
+            --  Use renames rather than copies to avoid copying Values.
             declare
-               Col_Name : constant String :=
-                  To_Upper (Criteria (I).Name (1 .. Criteria (I).Len));
-               VL : constant Value := Get_Value (L, Col_Name);
-               VR : constant Value := Get_Value (R, Col_Name);
+               VL : Value renames Key_Data (C)(L);
+               VR : Value renames Key_Data (C)(R);
             begin
                if VL /= VR then
-                  if Criteria (I).Dir = Ascending then
+                  if Criteria (C).Dir = Ascending then
                      return VL < VR;
                   else
                      return VR < VL;
@@ -285,37 +287,67 @@ package body SData.Table is
                end if;
             end;
          end loop;
-         --  All sort keys are equal: preserve original order (stable sort).
+         --  All sort keys equal: fall back to original row order (stable).
          return L < R;
       end Lt;
+      pragma Inline (Lt);
 
       package Heap is new GNAT.Heap_Sort_G (Move, Lt);
 
    begin
       if N <= 1 or else Criteria'Length = 0 then return; end if;
 
-      --  Initialise index array: slot 0 is the scratch element.
+      --  Pre-extract sort-key values.
+      for C in Criteria'Range loop
+         declare
+            Col_Name : constant String :=
+               To_Upper (Criteria (C).Name (1 .. Criteria (C).Len));
+            Row_Vals : constant Value_Row_Acc := new Value_Row (0 .. N);
+         begin
+            Row_Vals (0) := (Kind => Val_Missing);  --  scratch-slot sentinel
+            if Data_Table.Contains (Col_Name) then
+               declare
+                  --  Constant_Reference avoids copying the whole Column record.
+                  Ref : constant Column_Maps.Constant_Reference_Type :=
+                     Data_Table.Constant_Reference (Col_Name);
+               begin
+                  for R in 1 .. N loop
+                     Row_Vals (R) := Ref.Element.all.Data.Element (R);
+                  end loop;
+               end;
+            else
+               for R in 1 .. N loop
+                  Row_Vals (R) := (Kind => Val_Missing);
+               end loop;
+            end if;
+            Key_Data (C) := Row_Vals;
+         end;
+      end loop;
+
+      --  Initialise index permutation; slot 0 is the heapsort scratch element.
       Indices (0) := 0;
       for I in 1 .. N loop Indices (I) := I; end loop;
 
       Heap.Sort (N);
 
-      --  Reorder every column's data vector according to the sorted indices.
+      --  Rebuild every column in sorted order.
       declare
-         Position : Column_Maps.Cursor := Data_Table.First;
+         Pos : Column_Maps.Cursor := Data_Table.First;
       begin
-         while Column_Maps.Has_Element (Position) loop
+         while Column_Maps.Has_Element (Pos) loop
             declare
-               Col      : Column := Column_Maps.Element (Position);
+               Ref : constant Column_Maps.Reference_Type :=
+                  Data_Table.Reference (Pos);
+               Old_Data : Value_Vectors.Vector renames Ref.Element.all.Data;
                New_Data : Value_Vectors.Vector;
             begin
+               New_Data.Reserve_Capacity (Ada.Containers.Count_Type (N));
                for I in 1 .. N loop
-                  New_Data.Append (Col.Data.Element (Indices (I)));
+                  New_Data.Append (Old_Data.Element (Indices (I)));
                end loop;
-               Col.Data := New_Data;
-               Data_Table.Replace_Element (Position, Col);
+               Value_Vectors.Move (Source => New_Data, Target => Old_Data);
             end;
-            Column_Maps.Next (Position);
+            Column_Maps.Next (Pos);
          end loop;
       end;
    end Sort;
@@ -362,40 +394,45 @@ package body SData.Table is
    begin
       if SData.Config.Max_Table_Rows > 0 and then Output_Table_Row_Count >= SData.Config.Max_Table_Rows then
          Ada.Text_IO.Put_Line ("Warning: Table row limit (" & Integer'Image(SData.Config.Max_Table_Rows) & ") exceeded. Memory cache full.");
-         -- In Phase 5, this will spill to disk. For now, we continue but warn.
       end if;
       Output_Table_Row_Count := Output_Table_Row_Count + 1;
-      
       for Pos in Output_Data_Table.Iterate loop
-         declare
-            Col : Column := Column_Maps.Element (Pos);
-         begin
-            Col.Data.Append ((Kind => Val_Missing));
-            Output_Data_Table.Replace_Element (Pos, Col);
-         end;
+         Output_Data_Table.Reference (Pos).Element.all.Data.Append ((Kind => Val_Missing));
       end loop;
    end Add_Output_Row;
 
-   procedure Set_Output_Value (Row : Positive; Column_Name : String; Val : Value) is
-      Upper_Name : constant String := To_Upper (Column_Name);
-      Col : Column;
+   procedure Set_Output_Value_Upper (Row : Positive; Upper_Name : String; Val : Value) is
    begin
       if not Output_Data_Table.Contains (Upper_Name) then
-         return; -- Or throw an error
+         return;
       end if;
-      
-      Col := Output_Data_Table.Element (Upper_Name);
-      
-      if Col.Typ = Col_Numeric and then Val.Kind /= Val_Numeric and then Val.Kind /= Val_Missing then
-         raise Type_Mismatch_Error with "Expected Numeric for column " & Upper_Name;
-      elsif Col.Typ = Col_Integer and then Val.Kind /= Val_Integer and then Val.Kind /= Val_Missing then
-         raise Type_Mismatch_Error with "Expected Integer for column " & Upper_Name;
-      elsif Col.Typ = Col_String and then Val.Kind /= Val_String and then Val.Kind /= Val_Missing then
-         raise Type_Mismatch_Error with "Expected String for column " & Upper_Name;
-      end if;
-      
-      Col.Data.Replace_Element (Row, Val);
-      Output_Data_Table.Replace (Upper_Name, Col);
+      declare
+         Ref : constant Column_Maps.Reference_Type :=
+            Output_Data_Table.Reference (Upper_Name);
+         Col : Column renames Ref.Element.all;
+      begin
+         if Col.Typ = Col_Numeric and then Val.Kind /= Val_Numeric and then Val.Kind /= Val_Missing then
+            if Val.Kind = Val_Integer then
+               Col.Data.Replace_Element (Row, (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val)));
+               return;
+            end if;
+            raise Type_Mismatch_Error with "Expected Numeric for column " & Upper_Name;
+         elsif Col.Typ = Col_Integer and then Val.Kind /= Val_Integer and then Val.Kind /= Val_Missing then
+            if Val.Kind = Val_Numeric then
+               Col.Data.Replace_Element (Row, (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val))));
+               return;
+            end if;
+            raise Type_Mismatch_Error with "Expected Integer for column " & Upper_Name;
+         elsif Col.Typ = Col_String and then Val.Kind /= Val_String and then Val.Kind /= Val_Missing then
+            raise Type_Mismatch_Error with "Expected String for column " & Upper_Name;
+         end if;
+         Col.Data.Replace_Element (Row, Val);
+      end;
+   end Set_Output_Value_Upper;
+
+   procedure Set_Output_Value (Row : Positive; Column_Name : String; Val : Value) is
+   begin
+      Set_Output_Value_Upper (Row, To_Upper (Column_Name), Val);
    end Set_Output_Value;
 
    procedure Commit_Output_Table is

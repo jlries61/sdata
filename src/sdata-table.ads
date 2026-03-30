@@ -40,10 +40,12 @@ package SData.Table is
 
    --  Retrieves the value for a specific row and column.
    function Get_Value (Row : Positive; Column_Name : String) return Value;
+   function Get_Value_Upper (Row : Positive; Upper_Name : String) return Value;
 
    --  Updates the value at a specific row and column. 
    --  Raises Type_Mismatch_Error if the value kind doesn't match the column type.
    procedure Set_Value (Row : Positive; Column_Name : String; Val : Value);
+   procedure Set_Value_Upper (Row : Positive; Upper_Name : String; Val : Value);
 
    --  Renames an existing column.
    procedure Rename_Column (Old_Name, New_Name : String);
@@ -76,6 +78,7 @@ package SData.Table is
    procedure Add_Output_Column (Name : String; Col_Type : Column_Type);
    procedure Add_Output_Row;
    procedure Set_Output_Value (Row : Positive; Column_Name : String; Val : Value);
+   procedure Set_Output_Value_Upper (Row : Positive; Upper_Name : String; Val : Value);
    procedure Commit_Output_Table;
    function Output_Row_Count return Natural;
 

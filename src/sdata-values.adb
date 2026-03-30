@@ -1,6 +1,7 @@
 with Ada.Text_IO;
 with SData.Config;
-with Ada.Strings.Fixed; use Ada.Strings.Fixed;
+with Ada.Strings.Fixed;     use Ada.Strings.Fixed;
+with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 package body SData.Values is
 
@@ -23,7 +24,7 @@ package body SData.Values is
                return Trim (Img, Ada.Strings.Both);
             end;
          when Val_String =>
-            return V.Str_Val (1 .. V.Str_Len);
+            return To_String (V.Str_Val);
          when Val_Missing =>
             return ".";
       end case;
@@ -73,7 +74,7 @@ package body SData.Values is
          when Val_Integer =>
             return V.Int_Val /= 0;
          when Val_String =>
-            return V.Str_Len > 0;
+            return Length (V.Str_Val) > 0;
          when others =>
             return False;
       end case;
@@ -98,8 +99,7 @@ package body SData.Values is
          when Val_Numeric => return L.Num_Val = R.Num_Val;
          when Val_Integer => return L.Int_Val = R.Int_Val;
          when Val_String  =>
-            if L.Str_Len /= R.Str_Len then return False; end if;
-            return L.Str_Val (1 .. L.Str_Len) = R.Str_Val (1 .. R.Str_Len);
+            return L.Str_Val = R.Str_Val;
          when Val_Missing => return True;
       end case;
    end "=";
@@ -129,7 +129,7 @@ package body SData.Values is
          end;
       elsif L.Kind = Val_String then
          if R.Kind = Val_String then
-            return L.Str_Val (1 .. L.Str_Len) < R.Str_Val (1 .. R.Str_Len);
+            return L.Str_Val < R.Str_Val;
          else
             return False; -- String > Numeric
          end if;

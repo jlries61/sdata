@@ -1,5 +1,6 @@
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
+with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
 with SData.Config;
 with SData.Variables; use SData.Variables;
 
@@ -202,8 +203,7 @@ package body SData.Parser is
 
                   when Token_String_Literal =>
                      Node := new Expression (Expr_String_Literal);
-                     Node.Str_Length := Actual_Tok.Length;
-                     Node.Str_Value (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                     Node.Str_Value := To_Unbounded_String (Actual_Tok.Text (1 .. Actual_Tok.Length));
                      return Node;
 
                   when Token_Identifier =>

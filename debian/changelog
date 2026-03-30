@@ -1,3 +1,14 @@
+sdata (0.2.1-1) unstable; urgency=medium
+
+  * Performance optimizations for SORT and data steps.
+  * Replaced bubble sort with heapsort (O(n log n)).
+  * Optimized Value type using Unbounded_String to reduce memory footprint.
+  * Optimized table access using Ada 2012 Reference types.
+  * Fixed FPATH not executing in REPL.
+  * Fixed several CSV parsing and header preservation bugs.
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 30 Mar 2026 11:00:00 -0700
+
 sdata (0.2.0-1) unstable; urgency=medium
 
   * Phase 2 complete: Robust control flow and standardized function library.

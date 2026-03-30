@@ -2,6 +2,8 @@
 --  It provides a variant record type 'Value' that can represent numeric (Float),
 --  integer (Integer), string, or missing values, along with utility functions.
 
+with Ada.Strings.Unbounded;
+
 package SData.Values is
 
    --  Kind of data stored in a Value record.
@@ -15,8 +17,7 @@ package SData.Values is
          when Val_Integer =>
             Int_Val : Integer;
          when Val_String =>
-            Str_Val : String (1 .. 1024);
-            Str_Len : Natural;
+            Str_Val : Ada.Strings.Unbounded.Unbounded_String;
          when Val_Missing =>
             null;
       end case;

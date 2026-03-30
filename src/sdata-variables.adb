@@ -265,7 +265,7 @@ package body SData.Variables is
                Name : constant String := Symbol_Table_Pkg.Key (Pos);
                V    : constant Value := Symbol_Table_Pkg.Element (Pos);
             begin
-               SData.Table.Set_Output_Value (R, Name, V);
+               SData.Table.Set_Output_Value_Upper (R, Name, V);
             end;
          end loop;
       end;

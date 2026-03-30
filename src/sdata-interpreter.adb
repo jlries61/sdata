@@ -883,12 +883,12 @@ package body SData.Interpreter is
                      -- Enforce --clen limit on string values before storing.
                      if Result.Kind = Val_String and then
                         SData.Config.Max_String_Len > 0 and then
-                        Result.Str_Len > SData.Config.Max_String_Len
+                        Length (Result.Str_Val) > SData.Config.Max_String_Len
                      then
                         Put_Line ("Warning: String truncated to " &
                                   Integer'Image (SData.Config.Max_String_Len) &
                                   " characters.");
-                        Result.Str_Len := SData.Config.Max_String_Len;
+                        Result.Str_Val := To_Unbounded_String (Slice (Result.Str_Val, 1, SData.Config.Max_String_Len));
                      end if;
 
                      if Stmt.Kind = Stmt_LET then

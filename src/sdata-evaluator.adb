@@ -9,6 +9,8 @@ with Ada.Text_IO; use Ada.Text_IO;
 with SData.System;
 with Ada.Calendar;
 with Ada.Numerics;
+with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with Ada.Strings.Fixed;
 
 package body SData.Evaluator is
 
@@ -450,7 +452,7 @@ package body SData.Evaluator is
                return V;
             elsif V.Kind = Val_String then
                begin
-                  return (Kind => Val_Numeric, Num_Val => Float'Value (V.Str_Val (1 .. V.Str_Len)));
+                  return (Kind => Val_Numeric, Num_Val => Float'Value (SData.Values.To_String (V)));
                exception
                   when others => return (Kind => Val_Missing);
                end;
@@ -464,9 +466,7 @@ package body SData.Evaluator is
             Result : Value (Val_String);
             Img : constant String := SData.Values.To_String_Formatted (V);
          begin
-            Result.Str_Len := Img'Length;
-            if Result.Str_Len > 1024 then Result.Str_Len := 1024; end if;
-            Result.Str_Val (1 .. Result.Str_Len) := Img (Img'First .. Img'First + Result.Str_Len - 1);
+            Result.Str_Val := To_Unbounded_String (Img);
             return Result;
          end;
 
@@ -505,7 +505,7 @@ package body SData.Evaluator is
       -- String Functions
       elsif Name = "LEN" and then Has_Args (1) then
          declare V : constant Value := All_Vals.Element (1); begin
-            if V.Kind = Val_String then return (Kind => Val_Integer, Int_Val => V.Str_Len);
+            if V.Kind = Val_String then return (Kind => Val_Integer, Int_Val => Length (V.Str_Val));
             else return (Kind => Val_Missing); end if;
          end;
       elsif Name = "LEFT$" and then Has_Args (2) then
@@ -515,8 +515,10 @@ package body SData.Evaluator is
             R : Value (Val_String);
          begin
             if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            R.Str_Len := Integer'Min (N, V.Str_Len);
-            R.Str_Val (1 .. R.Str_Len) := V.Str_Val (1 .. R.Str_Len);
+            if N <= 0 then R.Str_Val := Null_Unbounded_String;
+            elsif N >= Length (V.Str_Val) then R.Str_Val := V.Str_Val;
+            else R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, 1, N));
+            end if;
             return R;
          end;
       elsif Name = "RIGHT$" and then Has_Args (2) then
@@ -527,9 +529,12 @@ package body SData.Evaluator is
             Start : Integer;
          begin
             if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            Start := Integer'Max (1, V.Str_Len - N + 1);
-            R.Str_Len := V.Str_Len - Start + 1;
-            R.Str_Val (1 .. R.Str_Len) := V.Str_Val (Start .. V.Str_Len);
+            if N <= 0 then R.Str_Val := Null_Unbounded_String;
+            elsif N >= Length (V.Str_Val) then R.Str_Val := V.Str_Val;
+            else
+               Start := Length (V.Str_Val) - N + 1;
+               R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, Start, Length (V.Str_Val)));
+            end if;
             return R;
          end;
       elsif Name = "MID$" and then (Has_Args (2) or else Has_Args (3)) then
@@ -538,16 +543,15 @@ package body SData.Evaluator is
             Start : constant Integer := Integer (Convert_To_Float (All_Vals.Element (2)));
             Len   : constant Integer :=
                (if Has_Args (3) then Integer (Convert_To_Float (All_Vals.Element (3)))
-                else V.Str_Len);
+                else Length (V.Str_Val));
             R     : Value (Val_String);
             S, E  : Integer;
          begin
             if V.Kind /= Val_String or else Start < 1 then return (Kind => Val_Missing); end if;
             S := Start;
-            E := Integer'Min (S + Len - 1, V.Str_Len);
-            if S > V.Str_Len then R.Str_Len := 0;
-            else R.Str_Len := E - S + 1;
-                 R.Str_Val (1 .. R.Str_Len) := V.Str_Val (S .. E);
+            E := Integer'Min (S + Len - 1, Length (V.Str_Val));
+            if S > Length (V.Str_Val) then R.Str_Val := Null_Unbounded_String;
+            else R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, S, E));
             end if;
             return R;
          end;
@@ -555,15 +559,14 @@ package body SData.Evaluator is
          declare
             V : constant Value := All_Vals.Element (1);
             R : Value (Val_String);
-            S, E : Integer;
          begin
             if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            S := 1; E := V.Str_Len;
-            while S <= E and then V.Str_Val (S) = ' ' loop S := S + 1; end loop;
-            while E >= S and then V.Str_Val (E) = ' ' loop E := E - 1; end loop;
-            R.Str_Len := Integer'Max (0, E - S + 1);
-            if R.Str_Len > 0 then R.Str_Val (1 .. R.Str_Len) := V.Str_Val (S .. E); end if;
-            return R;
+         declare
+            use Ada.Strings.Fixed;
+         begin
+            R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Both));
+         end;
+         return R;
          end;
       elsif Name = "UCASE$" and then Has_Args (1) then
          declare
@@ -571,10 +574,7 @@ package body SData.Evaluator is
             R : Value (Val_String);
          begin
             if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            R.Str_Len := V.Str_Len;
-            for I in 1 .. R.Str_Len loop
-               R.Str_Val (I) := To_Upper (V.Str_Val (I));
-            end loop;
+            R.Str_Val := To_Unbounded_String (To_Upper (SData.Values.To_String (V)));
             return R;
          end;
       elsif Name = "LCASE$" and then Has_Args (1) then
@@ -583,37 +583,26 @@ package body SData.Evaluator is
             R : Value (Val_String);
          begin
             if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            R.Str_Len := V.Str_Len;
-            for I in 1 .. R.Str_Len loop
-               R.Str_Val (I) := To_Lower (V.Str_Val (I));
-            end loop;
+            R.Str_Val := To_Unbounded_String (To_Lower (SData.Values.To_String (V)));
             return R;
          end;
       elsif Name = "POS" and then Has_Args (2) then
          declare
             Needle   : constant Value := All_Vals.Element (1);
             Haystack : constant Value := All_Vals.Element (2);
-            NL, HL   : Integer;
          begin
             if Needle.Kind /= Val_String or else Haystack.Kind /= Val_String then
                return (Kind => Val_Missing);
             end if;
-            NL := Needle.Str_Len; HL := Haystack.Str_Len;
-            if NL = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
-            for I in 1 .. HL - NL + 1 loop
-               if Haystack.Str_Val (I .. I + NL - 1) = Needle.Str_Val (1 .. NL) then
-                  return (Kind => Val_Integer, Int_Val => I);
-               end if;
-            end loop;
-            return (Kind => Val_Integer, Int_Val => 0);
+            if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
+            return (Kind => Val_Integer, Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
          end;
       elsif Name = "CHR$" and then Has_Args (1) then
          declare
             Code : constant Integer := Integer (Convert_To_Float (All_Vals.Element (1)));
             R    : Value (Val_String);
          begin
-            R.Str_Len := 1;
-            R.Str_Val (1) := Character'Val (Code);
+            R.Str_Val := To_Unbounded_String ("" & Character'Val (Code));
             return R;
          end;
       elsif Name = "STR$" and then Has_Args (1) then
@@ -621,8 +610,7 @@ package body SData.Evaluator is
             Img : constant String := SData.Values.To_String_Formatted (All_Vals.Element (1));
             R   : Value (Val_String);
          begin
-            R.Str_Len := Integer'Min (Img'Length, 1024);
-            R.Str_Val (1 .. R.Str_Len) := Img (Img'First .. Img'First + R.Str_Len - 1);
+            R.Str_Val := To_Unbounded_String (Img);
             return R;
          end;
       elsif Name = "VAL" and then Has_Args (1) then
@@ -632,7 +620,7 @@ package body SData.Evaluator is
             if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
             begin
                return (Kind => Val_Numeric,
-                       Num_Val => Float'Value (V.Str_Val (1 .. V.Str_Len)));
+                       Num_Val => Float'Value (SData.Values.To_String (V)));
             exception
                when others => return (Kind => Val_Missing);
             end;
@@ -661,8 +649,7 @@ package body SData.Evaluator is
                   begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
                end loop;
             end if;
-            R.Str_Len := Len;
-            R.Str_Val (1 .. Len) := Buf (1 .. Len);
+            R.Str_Val := To_Unbounded_String (Buf (1 .. Len));
             return R;
          end;
       elsif Name = "OCT$" and then Has_Args (1) then
@@ -685,8 +672,7 @@ package body SData.Evaluator is
                   begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
                end loop;
             end if;
-            R.Str_Len := Len;
-            R.Str_Val (1 .. Len) := Buf (1 .. Len);
+            R.Str_Val := To_Unbounded_String (Buf (1 .. Len));
             return R;
          end;
       elsif Name = "BIN$" and then Has_Args (1) then
@@ -709,8 +695,7 @@ package body SData.Evaluator is
                   begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
                end loop;
             end if;
-            R.Str_Len := Len;
-            R.Str_Val (1 .. Len) := Buf (1 .. Len);
+            R.Str_Val := To_Unbounded_String (Buf (1 .. Len));
             return R;
          end;
 
@@ -726,13 +711,10 @@ package body SData.Evaluator is
          declare
             Var  : constant Value   := All_Vals.Element (1);
             Idx  : constant Natural := SData.Table.Get_Current_Record_Index;
-            Col  : Value (Val_String);
          begin
             if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            Col.Str_Val (1 .. Var.Str_Len) := Var.Str_Val (1 .. Var.Str_Len);
-            Col.Str_Len := Var.Str_Len;
             if Idx <= 1 then return (Kind => Val_Missing); end if;
-            return SData.Table.Get_Value (Idx - 1, Col.Str_Val (1 .. Col.Str_Len));
+            return SData.Table.Get_Value_Upper (Idx - 1, SData.Values.To_String (Var));
          end;
       elsif (Name = "OBS" or else Name = "OBSC$") and then Has_Args (2) then
          declare
@@ -746,7 +728,7 @@ package body SData.Evaluator is
             if Row < 1 or else Row > SData.Table.Row_Count then
                return (Kind => Val_Missing);
             end if;
-            return SData.Table.Get_Value (Row, Var.Str_Val (1 .. Var.Str_Len));
+            return SData.Table.Get_Value_Upper (Row, SData.Values.To_String (Var));
          end;
 
       -- Date and Time Functions
@@ -762,14 +744,14 @@ package body SData.Evaluator is
          begin
             Ada.Calendar.Split (Now, Y, Mo, D, Sec);
             declare
+               use Ada.Strings.Fixed;
                YS : constant String := Y'Image;
-               MS : constant String := (if Mo < 10 then "0" else "") & Mo'Image (Mo'Image'First + 1 .. Mo'Image'Last);
-               DS : constant String := (if D  < 10 then "0" else "") & D'Image  (D'Image'First  + 1 .. D'Image'Last);
+               MS : constant String := (if Mo < 10 then "0" else "") & Trim(Mo'Image, Ada.Strings.Both);
+               DS : constant String := (if D  < 10 then "0" else "") & Trim(D'Image, Ada.Strings.Both);
             begin
                Buf := YS (YS'Last - 3 .. YS'Last) & "-" & MS & "-" & DS;
             end;
-            R.Str_Len := 10;
-            R.Str_Val (1 .. 10) := Buf;
+            R.Str_Val := To_Unbounded_String (Buf);
             return R;
          end;
       elsif Name = "TIME$" then
@@ -790,14 +772,14 @@ package body SData.Evaluator is
             Mi := (Total_Sec mod 3600) / 60;
             S  := Total_Sec mod 60;
             declare
-               HS  : constant String := (if H  < 10 then "0" else "") & H'Image  (H'Image'First  + 1 .. H'Image'Last);
-               MiS : constant String := (if Mi < 10 then "0" else "") & Mi'Image (Mi'Image'First + 1 .. Mi'Image'Last);
-               SS  : constant String := (if S  < 10 then "0" else "") & S'Image  (S'Image'First  + 1 .. S'Image'Last);
+               use Ada.Strings.Fixed;
+               HS  : constant String := (if H  < 10 then "0" else "") & Trim(H'Image, Ada.Strings.Both);
+               MiS : constant String := (if Mi < 10 then "0" else "") & Trim(Mi'Image, Ada.Strings.Both);
+               SS  : constant String := (if S  < 10 then "0" else "") & Trim(S'Image, Ada.Strings.Both);
             begin
                Buf := HS & ":" & MiS & ":" & SS;
             end;
-            R.Str_Len := 8;
-            R.Str_Val (1 .. 8) := Buf;
+            R.Str_Val := To_Unbounded_String (Buf);
             return R;
          end;
 
@@ -865,8 +847,7 @@ package body SData.Evaluator is
          when Expr_String_Literal =>
             declare V : Value (Val_String);
             begin
-               V.Str_Len := Expr.Str_Length;
-               V.Str_Val (1 .. V.Str_Len) := Expr.Str_Value (1 .. Expr.Str_Length);
+               V.Str_Val := Expr.Str_Value;
                return V;
             end;
 
@@ -1001,25 +982,20 @@ package body SData.Evaluator is
                      when Op_Add =>
                         declare 
                            V : Value (Val_String);
-                           Limit : Natural := 1024;
+                           Limit : Natural := 1024; -- Default limit
                         begin
-                           if SData.Config.Max_String_Len > 0 and then SData.Config.Max_String_Len < 1024 then
+                           if SData.Config.Max_String_Len > 0 then
                               Limit := SData.Config.Max_String_Len;
                            end if;
 
-                           V.Str_Len := L.Str_Len + R.Str_Len;
-                           if V.Str_Len > Limit then 
+                           V.Str_Val := L.Str_Val & R.Str_Val;
+                           if Length (V.Str_Val) > Limit then 
                               Put_Line ("Warning: String truncated to " & Integer'Image(Limit) & " characters.");
-                              V.Str_Len := Limit;
-                           end if;
-                           
-                           V.Str_Val (1 .. L.Str_Len) := L.Str_Val (1 .. L.Str_Len);
-                           if V.Str_Len > L.Str_Len then
-                              V.Str_Val (L.Str_Len + 1 .. V.Str_Len) := R.Str_Val (1 .. V.Str_Len - L.Str_Len);
+                              V.Str_Val := To_Unbounded_String (Slice (V.Str_Val, 1, Limit));
                            end if;
                            return V;
                         end;
-                     when Op_Eq => return (Kind => Val_Integer, Int_Val => (if L.Str_Val (1 .. L.Str_Len) = R.Str_Val (1 .. R.Str_Len) then 1 else 0));
+                     when Op_Eq => return (Kind => Val_Integer, Int_Val => (if L.Str_Val = R.Str_Val then 1 else 0));
                      when others => return (Kind => Val_Missing);
                   end case;
                else return (Kind => Val_Missing); end if;

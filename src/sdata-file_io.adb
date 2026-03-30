@@ -94,9 +94,9 @@ package body SData.File_IO is
             Add_Row; Set_Value (I, "ID", (Kind => Val_Integer, Int_Val => I));
             Set_Value (I, "SALARY", (Kind => Val_Numeric, Num_Val => 50000.0 + Float(I - 1) * 10000.0));
          end loop;
-         Set_Value(1, "NAME", (Kind => Val_String, Str_Val => "Alice" & (1 .. 1019 => ' '), Str_Len => 5));
-         Set_Value(2, "NAME", (Kind => Val_String, Str_Val => "Bob" & (1 .. 1021 => ' '), Str_Len => 3));
-         Set_Value(3, "NAME", (Kind => Val_String, Str_Val => "Charlie" & (1 .. 1017 => ' '), Str_Len => 7));
+         Set_Value(1, "NAME", (Kind => Val_String, Str_Val => To_Unbounded_String ("Alice")));
+         Set_Value(2, "NAME", (Kind => Val_String, Str_Val => To_Unbounded_String ("Bob")));
+         Set_Value(3, "NAME", (Kind => Val_String, Str_Val => To_Unbounded_String ("Charlie")));
          if not SData.Config.Quiet_Mode then
             Put_Line ("Generating mock data...");
          end if;
@@ -217,10 +217,10 @@ package body SData.File_IO is
                         Val := (Kind => Val_Numeric, Num_Val => Float'Value (Val_Str));
                      exception
                         when others =>
-                           Val := (Kind => Val_String, Str_Val => Val_Str & (1 .. 1024 - Val_Str'Length => ' '), Str_Len => Val_Str'Length);
+                           Val := (Kind => Val_String, Str_Val => To_Unbounded_String (Val_Str));
                      end;
                   end if;
-                  Set_Value (Row_Count, Names (I).all, Val);
+                  Set_Value_Upper (Row_Count, Names (I).all, Val);
                end;
             end if;
          end loop;
@@ -331,14 +331,14 @@ package body SData.File_IO is
          for R in 1 .. Row_Count loop
             for C in Col_Names'Range loop
                declare
-                  Val : constant Value := Get_Value (R, Col_Names (C).all);
+                  Val : constant Value := Get_Value_Upper (R, Col_Names (C).all);
                begin
                   if Val.Kind = Val_Numeric then
                      Put (File, Trim (Val.Num_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_Integer then
                      Put (File, Trim (Val.Int_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_String then
-                     Put (File, Val.Str_Val (1 .. Val.Str_Len));
+                     Put (File, SData.Values.To_String (Val));
                   else
                      Put (File, ".");
                   end if;
@@ -395,7 +395,7 @@ package body SData.File_IO is
                   S : constant String := Get_Text (Item (P_List, 0));
                begin
                   Free (P_List);
-                  return (Kind => Val_String, Str_Val => S & (1 .. 1024 - S'Length => ' '), Str_Len => S'Length);
+                  return (Kind => Val_String, Str_Val => To_Unbounded_String (S));
                end;
             end if;
             Free (P_List);
@@ -582,11 +582,11 @@ package body SData.File_IO is
                      begin
                         if Idx < Natural (Shared_Strings.Length) then
                            declare S : constant String := To_String (Shared_Strings.Element (Idx));
-                           begin return (Kind => Val_String, Str_Val => S & (1 .. 1024 - S'Length => ' '), Str_Len => S'Length); end;
+                           begin return (Kind => Val_String, Str_Val => To_Unbounded_String (S)); end;
                         end if;
                      end;
                   elsif T_Attr = "str" then
-                     return (Kind => Val_String, Str_Val => Val_Str & (1 .. 1024 - Val_Str'Length => ' '), Str_Len => Val_Str'Length);
+                     return (Kind => Val_String, Str_Val => To_Unbounded_String (Val_Str));
                   else
                      begin return (Kind => Val_Numeric, Num_Val => Float'Value (Val_Str)); exception when others => null; end;
                   end if;
@@ -598,7 +598,7 @@ package body SData.File_IO is
                   if Length (T_Nodes) > 0 then
                      declare S : constant String := Get_Text (Item (T_Nodes, 0));
                      begin Free (T_Nodes); Free (V_List); Free (IS_List);
-                           return (Kind => Val_String, Str_Val => S & (1 .. 1024 - S'Length => ' '), Str_Len => S'Length); end;
+                           return (Kind => Val_String, Str_Val => To_Unbounded_String (S)); end;
                   end if;
                   Free (T_Nodes);
                end;
@@ -623,7 +623,7 @@ package body SData.File_IO is
             for I in 0 .. Length (Cells) - 1 loop
                declare
                   V : constant Value := Get_Cell_Value (Item (Cells, I));
-                  Name : constant String := (if V.Kind = Val_String then V.Str_Val (1 .. V.Str_Len) else "COL" & Trim (Integer (I + 1)'Img, Ada.Strings.Both));
+                  Name : constant String := (if V.Kind = Val_String then SData.Values.To_String (V) else "COL" & Trim (Integer (I + 1)'Img, Ada.Strings.Both));
                begin
                   Add_Column (Safe_Name (Name, "COL" & Trim (Integer (I + 1)'Img, Ada.Strings.Both)), (if V.Kind = Val_Numeric then Col_Numeric else Col_String));
                end;
@@ -752,7 +752,7 @@ package body SData.File_IO is
                      when Val_Integer =>
                         Append (S1, "<c r=""" & Ref & """><v>" & Trim (V.Int_Val'Img, Ada.Strings.Both) & "</v></c>");
                      when Val_String =>
-                        Append (S1, "<c r=""" & Ref & """ t=""inlineStr""><is><t>" & Escape_XML (V.Str_Val (1 .. V.Str_Len)) & "</t></is></c>");
+                        Append (S1, "<c r=""" & Ref & """ t=""inlineStr""><is><t>" & Escape_XML (SData.Values.To_String (V)) & "</t></is></c>");
                      when Val_Missing =>
                         null; -- Skip empty cells
                   end case;
@@ -833,7 +833,7 @@ package body SData.File_IO is
                         Append (S1, "<table:table-cell office:value-type=""float"" office:value=""" & Trim (V.Int_Val'Img, Ada.Strings.Both) & """>" &
                                 "<text:p>" & Trim (V.Int_Val'Img, Ada.Strings.Both) & "</text:p></table:table-cell>");
                      when Val_String =>
-                        Append (S1, "<table:table-cell office:value-type=""string""><text:p>" & Escape_XML (V.Str_Val (1 .. V.Str_Len)) & "</text:p></table:table-cell>");
+                        Append (S1, "<table:table-cell office:value-type=""string""><text:p>" & Escape_XML (SData.Values.To_String (V)) & "</text:p></table:table-cell>");
                      when Val_Missing =>
                         Append (S1, "<table:table-cell/>");
                   end case;
