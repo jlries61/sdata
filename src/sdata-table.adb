@@ -1,6 +1,7 @@
 with Ada.Text_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers;         use Ada.Containers;
+with GNAT.Heap_Sort_G;
 with SData.Config;
 
 package body SData.Table is
@@ -248,16 +249,30 @@ package body SData.Table is
    -- Sort --
    ----------
    procedure Sort (Criteria : Sort_Criteria_Array) is
-      -- To sort a table, we sort an array of record indices (1..Table_Row_Count)
-      -- based on the values in the table, then reconstruct the data vectors.
-      
-      package Index_Vectors is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Positive);
-      
-      function Compare_Rows (L, R : Positive) return Boolean is
+      --  Sort an array of row indices (1..Table_Row_Count) using
+      --  GNAT.Heap_Sort_G (heapsort, O(n log n) worst case), then
+      --  reconstruct every column's data vector in sorted order.
+      --
+      --  Heap_Sort_G uses index 0 as a scratch element, so the Indices
+      --  array is sized 0..Table_Row_Count; slot 0 is the temporary.
+
+      N : constant Natural := Table_Row_Count;
+      type Index_Array is array (Natural range <>) of Natural;
+      Indices : Index_Array (0 .. N);
+
+      procedure Move (From : Natural; To : Natural) is
+      begin
+         Indices (To) := Indices (From);
+      end Move;
+
+      function Lt (Op1, Op2 : Natural) return Boolean is
+         L : constant Natural := Indices (Op1);
+         R : constant Natural := Indices (Op2);
       begin
          for I in Criteria'Range loop
             declare
-               Col_Name : constant String := To_Upper (Criteria (I).Name (1 .. Criteria (I).Len));
+               Col_Name : constant String :=
+                  To_Upper (Criteria (I).Name (1 .. Criteria (I).Len));
                VL : constant Value := Get_Value (L, Col_Name);
                VR : constant Value := Get_Value (R, Col_Name);
             begin
@@ -270,51 +285,32 @@ package body SData.Table is
                end if;
             end;
          end loop;
-         return False; -- Equal
-      end Compare_Rows;
-      
-      -- package Index_Sort is new Index_Vectors.Generic_Sorting;
-      -- Manual sorting to avoid ambiguous compiler versions of Generic_Sorting
-      procedure Manual_Sort (V : in out Index_Vectors.Vector) is
-         Changed : Boolean;
-      begin
-         loop
-            Changed := False;
-            for I in 1 .. Integer(V.Length) - 1 loop
-               if Compare_Rows (V.Element (I + 1), V.Element (I)) then
-                  declare
-                     T : constant Positive := V.Element (I);
-                  begin
-                     V.Replace_Element (I, V.Element (I + 1));
-                     V.Replace_Element (I + 1, T);
-                     Changed := True;
-                  end;
-               end if;
-            end loop;
-            exit when not Changed;
-         end loop;
-      end Manual_Sort;
-      
-      Indices : Index_Vectors.Vector;
-      
+         --  All sort keys are equal: preserve original order (stable sort).
+         return L < R;
+      end Lt;
+
+      package Heap is new GNAT.Heap_Sort_G (Move, Lt);
+
    begin
-      if Table_Row_Count <= 1 or Criteria'Length = 0 then return; end if;
-      
-      for I in 1 .. Table_Row_Count loop Indices.Append (I); end loop;
-      
-      Manual_Sort (Indices);
-      
-      -- Reorder all columns
+      if N <= 1 or else Criteria'Length = 0 then return; end if;
+
+      --  Initialise index array: slot 0 is the scratch element.
+      Indices (0) := 0;
+      for I in 1 .. N loop Indices (I) := I; end loop;
+
+      Heap.Sort (N);
+
+      --  Reorder every column's data vector according to the sorted indices.
       declare
          Position : Column_Maps.Cursor := Data_Table.First;
       begin
          while Column_Maps.Has_Element (Position) loop
             declare
-               Col : Column := Column_Maps.Element (Position);
+               Col      : Column := Column_Maps.Element (Position);
                New_Data : Value_Vectors.Vector;
             begin
-               for I in 1 .. Table_Row_Count loop
-                  New_Data.Append (Col.Data.Element (Indices.Element (I)));
+               for I in 1 .. N loop
+                  New_Data.Append (Col.Data.Element (Indices (I)));
                end loop;
                Col.Data := New_Data;
                Data_Table.Replace_Element (Position, Col);
