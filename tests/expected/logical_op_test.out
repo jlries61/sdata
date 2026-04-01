@@ -1,0 +1,7 @@
+1 AND 1 IS TRUE
+1 OR 1 IS TRUE
+1 OR 0 IS TRUE
+0 OR 1 IS TRUE
+1 XOR 0 IS TRUE
+0 XOR 1 IS TRUE
+RUN complete. 1 records and 0 variables processed.

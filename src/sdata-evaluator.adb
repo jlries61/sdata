@@ -942,6 +942,9 @@ package body SData.Evaluator is
                            when Op_Le  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val <= R.Int_Val then 1 else 0));
                            when Op_Gt  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val > R.Int_Val then 1 else 0));
                            when Op_Ge  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val >= R.Int_Val then 1 else 0));
+                           when Op_And => return (Kind => Val_Integer, Int_Val => (if L.Int_Val /= 0 and R.Int_Val /= 0 then 1 else 0));
+                           when Op_Or  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val /= 0 or R.Int_Val /= 0 then 1 else 0));
+                           when Op_Xor => return (Kind => Val_Integer, Int_Val => (if (L.Int_Val /= 0) /= (R.Int_Val /= 0) then 1 else 0));
                         end case;
 
                         if Expr.Op in Op_Add .. Op_Mul then
@@ -974,6 +977,9 @@ package body SData.Evaluator is
                            when Op_Le  => return (Kind => Val_Integer, Int_Val => (if FL <= FR then 1 else 0));
                            when Op_Gt  => return (Kind => Val_Integer, Int_Val => (if FL > FR then 1 else 0));
                            when Op_Ge  => return (Kind => Val_Integer, Int_Val => (if FL >= FR then 1 else 0));
+                           when Op_And => return (Kind => Val_Integer, Int_Val => (if FL /= 0.0 and FR /= 0.0 then 1 else 0));
+                           when Op_Or  => return (Kind => Val_Integer, Int_Val => (if FL /= 0.0 or FR /= 0.0 then 1 else 0));
+                           when Op_Xor => return (Kind => Val_Integer, Int_Val => (if (FL /= 0.0) /= (FR /= 0.0) then 1 else 0));
                         end case;
                      end;
                   end if;

@@ -19,7 +19,7 @@ package SData.AST is
    );
 
    --  Arithmetic and logical binary operators.
-   type Binary_Op is (Op_Add, Op_Sub, Op_Mul, Op_Div, Op_Pow, Op_Eq, Op_Ne, Op_Lt, Op_Le, Op_Gt, Op_Ge);
+   type Binary_Op is (Op_Add, Op_Sub, Op_Mul, Op_Div, Op_Pow, Op_Eq, Op_Ne, Op_Lt, Op_Le, Op_Gt, Op_Ge, Op_And, Op_Or, Op_Xor);
    
    --  Unary operators.
    type Unary_Op is (Op_Neg, Op_Not);

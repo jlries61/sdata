@@ -246,6 +246,9 @@ package body SData.Lexer is
                elsif Upper = "DELETE" then T.Kind := Token_DELETE;
                elsif Upper = "RSEED" then T.Kind := Token_RSEED;
                elsif Upper = "NOT" then T.Kind := Token_NOT;
+               elsif Upper = "AND" then T.Kind := Token_AND;
+               elsif Upper = "OR" then T.Kind := Token_OR;
+               elsif Upper = "XOR" then T.Kind := Token_XOR;
                elsif Upper = "OPTIONS" then T.Kind := Token_OPTIONS;
                elsif Upper = "DIGITS" then T.Kind := Token_DIGITS;
                elsif Upper = "FPATH" then T.Kind := Token_FPATH;

@@ -257,6 +257,8 @@ package body SData.Parser is
    function Get_Precedence (Kind : Token_Kind) return Integer is
    begin
       case Kind is
+         when Token_OR | Token_XOR => return 5;
+         when Token_AND => return 6;
          when Token_Equal | Token_Not_Equal | Token_Less | Token_Less_Equal | Token_Greater | Token_Greater_Equal => return 10;
          when Token_Plus | Token_Minus => return 20;
          when Token_Star | Token_Slash => return 30;
@@ -282,6 +284,9 @@ package body SData.Parser is
          when Token_Less_Equal => return Op_Le;
          when Token_Greater => return Op_Gt;
          when Token_Greater_Equal => return Op_Ge;
+         when Token_AND => return Op_And;
+         when Token_OR => return Op_Or;
+         when Token_XOR => return Op_Xor;
          when others => raise Program_Error;
       end case;
    end To_Binary_Op;
