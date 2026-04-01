@@ -123,7 +123,7 @@ slackware: clean
 	 TEMP_DIR=$$(mktemp -d); \
 	 cp sdata-0.2.1.tar.gz "$$TEMP_DIR/"; \
 	 cp slackware/* "$$TEMP_DIR/"; \
-	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz sciada-0.4.0.tar.gz; do \
+	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz; do \
 	   cp "$$TARBALL_DIR/$$tb" "$$TEMP_DIR/"; \
 	 done; \
 	 cd "$$TEMP_DIR" && tar czf sdata-0.2.1-slackbuild.tar.gz *; \

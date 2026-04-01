@@ -39,10 +39,10 @@ tar xvf $CWD/$PRGNAM-$VERSION.tar.gz
 cd $PRGNAM-$VERSION
 
 # Extract vendored dependencies alongside main source code
+# (sciada is not needed — sdata does not use it)
 tar xzf $CWD/zipada-61.0.0.tar.gz
 tar xzf $CWD/xmlada-26.0.0.tar.gz
 tar xzf $CWD/mathpaqs-20260205.0.0.tar.gz
-tar xzf $CWD/sciada-0.4.0.tar.gz
 
 chown -R root:root .
 find -L . \
@@ -51,11 +51,30 @@ find -L . \
  \( -perm 666 -o -perm 664 -o -perm 640 -o -perm 600 -o -perm 444 \
   -o -perm 440 -o -perm 400 \) -exec chmod 644 {} \+
 
-# Tell gprbuild where the vendored dependencies are located
-export GPR_PROJECT_PATH="$TMP/$PRGNAM-$VERSION/zipada_61.0.0_54fc9836:$TMP/$PRGNAM-$VERSION/xmlada_26.0.0_b140ed4a/dom:$TMP/$PRGNAM-$VERSION/xmlada_26.0.0_b140ed4a/input_sources:$TMP/$PRGNAM-$VERSION/mathpaqs_20260205.0.0_abed7ef9:$TMP/$PRGNAM-$VERSION/sciada_0.4.0_af24740d"
+# Build with gnatmake (no gprbuild required).
+# Set paths to the vendored dependency source directories.
+ZIPADA_DIR="zipada_61.0.0_54fc9836"
+XMLADA_DIR="xmlada_26.0.0_b140ed4a"
+MATHPAQS_DIR="mathpaqs_20260205.0.0_abed7ef9"
 
-# Build the project
-make build
+mkdir -p obj bin
+
+# Build from within the obj directory so that all .o and .ali files
+# (including spec-only packages) land there automatically.
+cd obj
+gnatmake \
+  ../src/sdata_main.adb \
+  -o ../bin/sdata \
+  -aI../src -aI../src/ast -aI../src/lexer -aI../src/parser \
+  -aI"../$ZIPADA_DIR/zip_lib" \
+  -aI"../$XMLADA_DIR/unicode" \
+  -aI"../$XMLADA_DIR/sax" \
+  -aI"../$XMLADA_DIR/dom" \
+  -aI"../$XMLADA_DIR/input_sources" \
+  -aI"../$MATHPAQS_DIR/numerics" \
+  -aI"../$MATHPAQS_DIR/random" \
+  -cargs -gnat2012 -gnatwa -gnatwl -gnatwu -g $SLKCFLAGS
+cd ..
 
 # Install to the staging directory
 make install DESTDIR=$PKG PREFIX=/usr
