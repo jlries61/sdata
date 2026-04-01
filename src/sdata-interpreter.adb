@@ -1277,7 +1277,7 @@ package body SData.Interpreter is
                         begin
                            while Cond /= null loop
                               if Is_True (Evaluate (Cond.Expr)) then
-                                 Execute_Statement (Branch.Branch_Body); Matched := True; exit;
+                                 Execute_List (Branch.Branch_Body); Matched := True; exit;
                               end if;
                               Cond := Cond.Next;
                            end loop;
@@ -1288,7 +1288,7 @@ package body SData.Interpreter is
                         begin
                            while Cond /= null loop
                               if Evaluate (Cond.Expr) = Val then
-                                 Execute_Statement (Branch.Branch_Body); Matched := True; exit;
+                                 Execute_List (Branch.Branch_Body); Matched := True; exit;
                               end if;
                               Cond := Cond.Next;
                            end loop;
@@ -1298,7 +1298,7 @@ package body SData.Interpreter is
                      Branch := Branch.Next;
                   end loop;
                   if not Matched and then Stmt.Otherwise_Part /= null then
-                     Execute_Statement (Stmt.Otherwise_Part);
+                     Execute_List (Stmt.Otherwise_Part);
                   end if;
                end;
             when Stmt_DELETE =>

@@ -27,6 +27,31 @@ package body SData.Parser is
    function Parse_If_Body (Ctx      : in out Parser_Context;
                            Term_Kind : out Token_Kind) return Statement_Access;
 
+   function Parse_Select_Body (Ctx : in out Parser_Context) return Statement_Access;
+
+   function Parse_Select_Body (Ctx : in out Parser_Context) return Statement_Access is
+      First, Current, New_Stmt : Statement_Access := null;
+   begin
+      loop
+         --  Skip blank lines / colons.
+         while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline or else
+               Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon loop
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+         end loop;
+         --  Check for next case or end select.
+         declare Peek : constant Token_Kind := Peek_Next_Token (Ctx.Lex_Ctx).Kind; begin
+            exit when Peek = Token_CASE or else Peek = Token_WHEN or else
+                      Peek = Token_OTHERWISE or else Peek = Token_END or else
+                      Peek = Token_EOF;
+         end;
+         New_Stmt := Parse_Statement (Ctx);
+         if New_Stmt = null then return First; end if;
+         if First = null then First := New_Stmt; Current := New_Stmt;
+         else Current.Next := New_Stmt; Current := New_Stmt; end if;
+      end loop;
+      return First;
+   end Parse_Select_Body;
+
    function Parse_If_Body (Ctx      : in out Parser_Context;
                            Term_Kind : out Token_Kind) return Statement_Access is
       First, Current, New_Stmt : Statement_Access := null;
@@ -40,11 +65,13 @@ package body SData.Parser is
          --  Check terminators.
          declare Peek : constant Token_Kind := Peek_Next_Token (Ctx.Lex_Ctx).Kind; begin
             if Peek = Token_ELSE or else Peek = Token_ELSEIF or else
-               Peek = Token_END  or else Peek = Token_EOF
+               Peek = Token_END
             then
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                Term_Kind := Peek;
                return First;
+            elsif Peek = Token_EOF then
+               raise Incomplete_Statement;
             end if;
          end;
          New_Stmt := Parse_Statement (Ctx);
@@ -157,7 +184,7 @@ package body SData.Parser is
             declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
             exit;
          elsif Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_EOF then
-            exit;
+            raise Incomplete_Statement;
          end if;
 
          New_Stmt := Parse_Statement (Ctx);
@@ -737,42 +764,52 @@ package body SData.Parser is
                      declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                   end loop;
 
-                  exit when Tok_Local.Kind = Token_END or else Tok_Local.Kind = Token_EOF;
+                  exit when Tok_Local.Kind = Token_END;
+                  if Tok_Local.Kind = Token_EOF then
+                     raise Incomplete_Statement;
+                  end if;
                   
                   if Tok_Local.Kind = Token_CASE or else Tok_Local.Kind = Token_WHEN then
                      declare
                         Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         Branch : constant Case_Branch := new Case_Branch_Node;
+                        LP : constant Boolean := Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren;
                      begin
-                        if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren then
-                           declare
-                              Discard_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                              Last_Cond : Expression_List := null;
-                           begin
-                              loop
-                                 declare
-                                    E : constant Expression_Access := Parse_Expression (Ctx);
-                                    L : constant Expression_List := new Expression_List_Node'(Expr => E, Next => null);
-                                 begin
-                                    if Branch.Conditions = null then Branch.Conditions := L; else Last_Cond.Next := L; end if;
-                                    Last_Cond := L;
-                                 end;
-                                 exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Comma;
-                                 declare Discard_Comma : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                              end loop;
-                              if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                                 Put_Line ("Error: Expected ')' after CASE conditions");
-                              end if;
-                           end;
+                        if LP then
+                           declare Discard_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                         end if;
-                        Branch.Branch_Body := Parse_Statement (Ctx);
+
+                        declare
+                           Last_Cond : Expression_List := null;
+                        begin
+                           loop
+                              declare
+                                 E : constant Expression_Access := Parse_Expression (Ctx);
+                                 L : constant Expression_List := new Expression_List_Node'(Expr => E, Next => null);
+                              begin
+                                 if Branch.Conditions = null then Branch.Conditions := L; else Last_Cond.Next := L; end if;
+                                 Last_Cond := L;
+                              end;
+                              exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Comma;
+                              declare Discard_Comma : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                           end loop;
+                        end;
+
+                        if LP then
+                           if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
+                              Put_Line ("Error: Expected ')' after CASE conditions");
+                           end if;
+                        end if;
+
+                        Branch.Branch_Body := Parse_Select_Body (Ctx);
                         if First_Branch = null then First_Branch := Branch; else Last_Branch.Next := Branch; end if;
                         Last_Branch := Branch;
                      end;
                   elsif Tok_Local.Kind = Token_OTHERWISE then
                      declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                     begin Stmt.Otherwise_Part := Parse_Statement (Ctx); end;
+                     begin Stmt.Otherwise_Part := Parse_Select_Body (Ctx); end;
                   else
+                     -- Should not happen due to exit when Tok_Local.Kind not case/end
                      declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                   end if;
                end loop;
@@ -885,6 +922,11 @@ package body SData.Parser is
                   Stmt.For_Step := Parse_Expression (Ctx);
                end if;
                Stmt.For_Body := Parse_Block (Ctx, Token_NEXT);
+               
+               --  Skip the optional variable name after NEXT.
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Identifier then
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               end if;
             end;
 
          when Token_END | Token_QUIT | Token_NAMES | Token_NEW | Token_HELP =>

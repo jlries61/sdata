@@ -4,6 +4,7 @@
 
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;
+with Ada.Strings.Unbounded;
 with Ada.Streams.Stream_IO;
 with Ada.Exceptions; use Ada.Exceptions;
 with SData.Parser; use SData.Parser;
@@ -57,18 +58,35 @@ procedure SData_Main is
       Last : Natural;
       Ctx  : Parser_Context;
       Prog : Statement_Access;
+      
+      Buffer : Ada.Strings.Unbounded.Unbounded_String;
    begin
       Set_Interactive (True);
       Put_Line ("SData Statistical Interpreter version " & SData.Config.Version_Str);
       Put_Line ("Interactive Console. Type QUIT to exit.");
+      Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
       REPL : loop
-         Put ("sdata> ");
+         if Ada.Strings.Unbounded.Length (Buffer) = 0 then
+            Put ("sdata> ");
+         else
+            Put ("..> ");
+         end if;
          Flush;
          begin
             Get_Line (Line, Last);
             if Last > 0 then
-               Initialize (Ctx, Line (1 .. Last));
+               Ada.Strings.Unbounded.Append (Buffer, Line (1 .. Last) & ASCII.LF);
+            else
+               Ada.Strings.Unbounded.Append (Buffer, ASCII.LF);
+            end if;
+
+            Initialize (Ctx, Ada.Strings.Unbounded.To_String (Buffer));
+            
+            begin
                Prog := Parse_Program (Ctx);
+               
+               -- If parsing succeeded, we can clear the buffer.
+               Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
 
                while Prog /= null loop
                   declare
@@ -93,15 +111,23 @@ procedure SData_Main is
                   end;
                   Prog := Prog.Next;
                end loop;
-            end if;
+
+            exception
+               when SData.Parser.Incomplete_Statement =>
+                  -- Keep buffer as is, wait for more input on next loop
+                  null;
+            end;
+            
          exception
             when End_Error =>
                New_Line;
                exit REPL;
             when E : SData.Script_Error =>
                Put_Line ("Error: " & Exception_Message (E));
+               Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
             when others =>
                Put_Line ("An unexpected error occurred.");
+               Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
          end;
          exit REPL when not Is_Open (Standard_Input);
       end loop REPL;

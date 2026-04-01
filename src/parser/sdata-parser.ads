@@ -13,6 +13,9 @@ package SData.Parser is
    end record;
 
    --  Initializes the parser and the underlying lexer with the source code.
+   --  Raised when a multi-line statement (IF, FOR, SELECT, etc.) hits EOF
+   Incomplete_Statement : exception;
+
    procedure Initialize (Ctx : in out Parser_Context; Source : String);
 
    --  Parses the entire source code and returns the root of the statement list.

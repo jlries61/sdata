@@ -3,3 +3,11 @@ Generating mock data...
 2 Two
 3 Other
 RUN complete. 3 records and 4 variables processed.
+Generating mock data...
+Matched 1
+1 One
+Matched 2 or 3
+2 Two or Three
+Matched 2 or 3
+3 Two or Three
+RUN complete. 3 records and 4 variables processed.
