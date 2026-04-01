@@ -1,4 +1,5 @@
-with Ada.Text_IO;   use Ada.Text_IO;
+with Ada.Text_IO;
+with SData.IO;        use SData.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
@@ -172,7 +173,7 @@ package body SData.File_IO is
    -- Parse_CSV --
    ---------------
    procedure Parse_CSV (File_Name : String) is
-      File : File_Type;
+      File : Ada.Text_IO.File_Type;
       type String_Array is array (Positive range <>) of Unbounded_String;
       
       function Split (L : String) return String_Array is
@@ -235,15 +236,15 @@ package body SData.File_IO is
       Scan_Lines  : UB_Array (1 .. NSCAN);
       Scan_Count  : Natural := 0;
    begin
-      Open (File, In_File, File_Name);
-      if not End_Of_File (File) then
-         Header_Line := To_Unbounded_String (Get_Line (File));
+      Ada.Text_IO.Open (File, Ada.Text_IO.In_File, File_Name);
+      if not Ada.Text_IO.End_Of_File (File) then
+         Header_Line := To_Unbounded_String (Ada.Text_IO.Get_Line (File));
          Has_Header := True;
       end if;
       --  Read up to NSCAN data lines for type detection
-      while not End_Of_File (File) and then Scan_Count < NSCAN loop
+      while not Ada.Text_IO.End_Of_File (File) and then Scan_Count < NSCAN loop
          Scan_Count := Scan_Count + 1;
-         Scan_Lines (Scan_Count) := To_Unbounded_String (Get_Line (File));
+         Scan_Lines (Scan_Count) := To_Unbounded_String (Ada.Text_IO.Get_Line (File));
       end loop;
       if Has_Header then
          declare
@@ -292,25 +293,25 @@ package body SData.File_IO is
                end;
             end loop;
             if Scan_Count = 0 then
-               Put_Line ("Warning: File contains a header but no data records.");
+               SData.IO.Put_Line_Error ("Warning: File contains a header but no data records.");
             end if;
             --  Process the buffered scan lines
             for R in 1 .. Scan_Count loop
                Process_Row (Split (To_String (Scan_Lines (R))), Names);
             end loop;
             --  Process remaining lines
-            while not End_Of_File (File) loop
-               Process_Row (Split (Get_Line (File)), Names);
+            while not Ada.Text_IO.End_Of_File (File) loop
+               Process_Row (Split (Ada.Text_IO.Get_Line (File)), Names);
             end loop;
             for I in Names'Range loop
                Free (Names (I));
             end loop;
          end;
       end if;
-      Close (File);
+      Ada.Text_IO.Close (File);
    exception
       when others =>
-         if Is_Open (File) then Close (File); end if;
+         if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
          raise;
    end Parse_CSV;
 
@@ -318,41 +319,41 @@ package body SData.File_IO is
    -- Write_CSV --
    ---------------
    procedure Write_CSV (File_Name : String) is
-      File : File_Type;
+      File : Ada.Text_IO.File_Type;
       Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
    begin
-      Create (File, Out_File, File_Name);
+      Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, File_Name);
       if Col_Names /= null then
          for I in Col_Names'Range loop
-            Put (File, Col_Names (I).all);
-            if I /= Col_Names'Last then Put (File, ","); end if;
+            Ada.Text_IO.Put (File, Col_Names (I).all);
+            if I /= Col_Names'Last then Ada.Text_IO.Put (File, ","); end if;
          end loop;
-         New_Line (File);
+         Ada.Text_IO.New_Line (File);
          for R in 1 .. Row_Count loop
             for C in Col_Names'Range loop
                declare
                   Val : constant Value := Get_Value_Upper (R, Col_Names (C).all);
                begin
                   if Val.Kind = Val_Numeric then
-                     Put (File, Trim (Val.Num_Val'Img, Ada.Strings.Both));
+                     Ada.Text_IO.Put (File, Trim (Val.Num_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_Integer then
-                     Put (File, Trim (Val.Int_Val'Img, Ada.Strings.Both));
+                     Ada.Text_IO.Put (File, Trim (Val.Int_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_String then
-                     Put (File, SData.Values.To_String (Val));
+                     Ada.Text_IO.Put (File, SData.Values.To_String (Val));
                   else
-                     Put (File, ".");
+                     Ada.Text_IO.Put (File, ".");
                   end if;
                end;
-               if C /= Col_Names'Last then Put (File, ","); end if;
+               if C /= Col_Names'Last then Ada.Text_IO.Put (File, ","); end if;
             end loop;
-            New_Line (File);
+            Ada.Text_IO.New_Line (File);
          end loop;
       end if;
-      Close (File);
+      Ada.Text_IO.Close (File);
       if Col_Names /= null then GNAT.Strings.Free (Col_Names); end if;
    exception
       when others =>
-         if Is_Open (File) then Close (File); end if;
+         if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
          if Col_Names /= null then GNAT.Strings.Free (Col_Names); end if;
          raise;
    end Write_CSV;

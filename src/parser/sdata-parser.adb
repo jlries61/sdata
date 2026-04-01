@@ -1,4 +1,4 @@
-with Ada.Text_IO; use Ada.Text_IO;
+with SData.IO;        use SData.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
 with SData.Config;
@@ -253,7 +253,7 @@ package body SData.Parser is
                            end if;
 
                            if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Closing then
-                              Put_Line ("Error: Expected matching closing bracket/paren");
+                              Put_Line_Error ("Error: Expected matching closing bracket/paren");
                            end if;
                         end;
                         return Node;
@@ -267,7 +267,7 @@ package body SData.Parser is
                   when Token_Left_Paren =>
                      Node := Parse_Expression (Ctx);
                      if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                        Put_Line ("Error: Expected ')'");
+                        Put_Line_Error ("Error: Expected ')'");
                      end if;
                      return Node;
 
@@ -341,7 +341,7 @@ package body SData.Parser is
                New_Node : Expression_Access;
             begin
                if Right = null then
-                  Put_Line ("Error: Expected expression after operator");
+                  Put_Line_Error ("Error: Expected expression after operator");
                   exit;
                end if;
                New_Node := new Expression (Expr_Binary_Op);
@@ -388,7 +388,7 @@ package body SData.Parser is
                   End_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                begin
                   if End_Tok.Kind /= Token_Identifier then
-                     Put_Line ("Error: Expected identifier after '" & Discard.Kind'Image & "' in range");
+                     Put_Line_Error ("Error: Expected identifier after '" & Discard.Kind'Image & "' in range");
                   else
                      Node.Var.Is_Range := True;
                      Node.Var.End_Name (1 .. End_Tok.Length) := End_Tok.Text (1 .. End_Tok.Length);
@@ -431,12 +431,12 @@ package body SData.Parser is
             Pair.Old_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
             
             if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-               Put_Line ("Error: Expected '=' in RENAME list");
+               Put_Line_Error ("Error: Expected '=' in RENAME list");
             end if;
             
             Tok := Get_Next_Token (Ctx.Lex_Ctx);
             if Tok.Kind /= Token_Identifier then
-               Put_Line ("Error: Expected identifier after '=' in RENAME list");
+               Put_Line_Error ("Error: Expected identifier after '=' in RENAME list");
             end if;
             
             Pair.New_Len := Tok.Length;
@@ -486,13 +486,13 @@ package body SData.Parser is
                   begin
                      A_Idx := Parse_Expression (Ctx);
                      if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Closing then
-                        Put_Line ("Error: Expected matching closing parenthesis/brace in array assignment");
+                        Put_Line_Error ("Error: Expected matching closing parenthesis/brace in array assignment");
                      end if;
                   end;
                end if;
                
                if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                  Put_Line ("Error: Expected '=' in assignment");
+                  Put_Line_Error ("Error: Expected '=' in assignment");
                end if;
 
                Stmt := new Statement ((if Tok.Kind = Token_LET then Stmt_LET else Stmt_SET));
@@ -684,7 +684,7 @@ package body SData.Parser is
                         Tok_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      begin
                         if Tok_LP.Kind /= Token_Left_Paren then
-                           Put_Line ("Error: Expected '(' after DIM array name");
+                           Put_Line_Error ("Error: Expected '(' after DIM array name");
                            return null;
                         end if;
                         
@@ -692,7 +692,7 @@ package body SData.Parser is
                            Tok_Start : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
                            if Tok_Start.Kind /= Token_Numeric_Literal then
-                              Put_Line ("Error: Expected starting index for DIM array");
+                              Put_Line_Error ("Error: Expected starting index for DIM array");
                               return null;
                            end if;
                            Stmt.Arr_Start_Idx := Integer'Value (Tok_Start.Text (1 .. Tok_Start.Length));
@@ -705,12 +705,12 @@ package body SData.Parser is
                                     Tok_End : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                                  begin
                                     if Tok_End.Kind /= Token_Numeric_Literal then
-                                       Put_Line ("Error: Expected ending index for DIM array after TO");
+                                       Put_Line_Error ("Error: Expected ending index for DIM array after TO");
                                        return null;
                                     end if;
                                     Stmt.Arr_End_Idx := Integer'Value (Tok_End.Text (1 .. Tok_End.Length));
                                     if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                                       Put_Line ("Error: Expected ')' after DIM bounds");
+                                       Put_Line_Error ("Error: Expected ')' after DIM bounds");
                                        return null;
                                     end if;
                                  end;
@@ -719,7 +719,7 @@ package body SData.Parser is
                                  Stmt.Arr_End_Idx := Stmt.Arr_Start_Idx;
                                  Stmt.Arr_Start_Idx := 1;
                               else
-                                 Put_Line ("Error: Expected TO or ')' in DIM bounds");
+                                 Put_Line_Error ("Error: Expected TO or ')' in DIM bounds");
                                  return null;
                               end if;
                            end;
@@ -735,7 +735,7 @@ package body SData.Parser is
                            if Tok_Temp.Length >= 4 and then To_Upper (Tok_Temp.Text (1 .. 4)) = "TEMP" then
                               Stmt.Is_Temporary_Dim := True;
                            else
-                              Put_Line ("Error: Expected TEMP after / in DIM statement");
+                              Put_Line_Error ("Error: Expected TEMP after / in DIM statement");
                               return null;
                            end if;
                         end;
@@ -797,7 +797,7 @@ package body SData.Parser is
 
                         if LP then
                            if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                              Put_Line ("Error: Expected ')' after CASE conditions");
+                              Put_Line_Error ("Error: Expected ')' after CASE conditions");
                            end if;
                         end if;
 
@@ -814,7 +814,7 @@ package body SData.Parser is
                   end if;
                end loop;
                if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_END then
-                  Put_Line ("Error: Expected END after SELECT");
+                  Put_Line_Error ("Error: Expected END after SELECT");
                end if;
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_SELECT then
                   declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
@@ -971,7 +971,7 @@ package body SData.Parser is
             return Parse_Statement (Ctx);
 
          when others =>
-            Put_Line ("Error: Unrecognized command: " & Tok.Kind'Image & " at line " & Tok.Line'Image);
+            Put_Line_Error ("Error: Unrecognized command: " & Tok.Kind'Image & " at line " & Tok.Line'Image);
             return null;
       end case;
 

@@ -5,7 +5,7 @@ with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData.Statistics;
 with SData.Table;
 with Ada.Containers.Vectors;
-with Ada.Text_IO; use Ada.Text_IO;
+with SData.IO;        use SData.IO;
 with SData.System;
 with Ada.Calendar;
 with Ada.Numerics;
@@ -23,7 +23,7 @@ package body SData.Evaluator is
    function Handle_Domain_Error (Msg : String) return Value is
    begin
       if SData.Config.Ignore_Math_Errors then
-         Put_Line ("Warning: " & Msg);
+         Put_Line_Error ("Warning: " & Msg);
          return (Kind => Val_Missing);
       else
          raise SData.Script_Error with Msg;
@@ -433,7 +433,7 @@ package body SData.Evaluator is
                                                    Convert_To_Float (All_Vals.Element (2))));
       elsif Name = "SHELL" and then Has_Args (1) then
          if SData.Config.Disable_Shell then
-            Put_Line ("Error: SHELL function is disabled.");
+            Put_Line_Error ("Error: SHELL function is disabled.");
             return (Kind => Val_Missing);
          else
             declare
@@ -996,7 +996,7 @@ package body SData.Evaluator is
 
                            V.Str_Val := L.Str_Val & R.Str_Val;
                            if Length (V.Str_Val) > Limit then 
-                              Put_Line ("Warning: String truncated to " & Integer'Image(Limit) & " characters.");
+                              Put_Line_Error ("Warning: String truncated to " & Integer'Image(Limit) & " characters.");
                               V.Str_Val := To_Unbounded_String (Slice (V.Str_Val, 1, Limit));
                            end if;
                            return V;

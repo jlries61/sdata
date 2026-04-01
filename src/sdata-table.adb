@@ -1,8 +1,8 @@
-with Ada.Text_IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers;         use Ada.Containers;
 with GNAT.Heap_Sort_G;
 with SData.Config;
+with SData.IO;
 
 package body SData.Table is
 
@@ -393,7 +393,7 @@ package body SData.Table is
    procedure Add_Output_Row is
    begin
       if SData.Config.Max_Table_Rows > 0 and then Output_Table_Row_Count >= SData.Config.Max_Table_Rows then
-         Ada.Text_IO.Put_Line ("Warning: Table row limit (" & Integer'Image(SData.Config.Max_Table_Rows) & ") exceeded. Memory cache full.");
+         SData.IO.Put_Line_Error ("Warning: Table row limit (" & Integer'Image(SData.Config.Max_Table_Rows) & ") exceeded. Memory cache full.");
       end if;
       Output_Table_Row_Count := Output_Table_Row_Count + 1;
       for Pos in Output_Data_Table.Iterate loop

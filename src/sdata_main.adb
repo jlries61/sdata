@@ -2,7 +2,7 @@
 --  This procedure handles command-line argument parsing, reads the source command file,
 --  invokes the parser to build the AST, and finally runs the interpreter.
 
-with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings.Unbounded;
 with Ada.Streams.Stream_IO;
@@ -11,7 +11,8 @@ with SData.Parser; use SData.Parser;
 with SData.AST; use SData.AST;
 
 with SData.Interpreter; use SData.Interpreter;
-with SData.Config; use SData.Config;
+with SData.Config;      use SData.Config;
+with SData.IO;          use SData.IO;
 
 procedure SData_Main is
    
@@ -61,19 +62,19 @@ procedure SData_Main is
       
       Buffer : Ada.Strings.Unbounded.Unbounded_String;
    begin
-      Set_Interactive (True);
+      SData.IO.Set_Interactive (True);
       Put_Line ("SData Statistical Interpreter version " & SData.Config.Version_Str);
       Put_Line ("Interactive Console. Type QUIT to exit.");
       Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
       REPL : loop
          if Ada.Strings.Unbounded.Length (Buffer) = 0 then
-            Put ("sdata> ");
+            Ada.Text_IO.Put ("sdata> ");
          else
-            Put ("..> ");
+            Ada.Text_IO.Put ("..> ");
          end if;
-         Flush;
+         Ada.Text_IO.Flush;
          begin
-            Get_Line (Line, Last);
+            Ada.Text_IO.Get_Line (Line, Last);
             if Last > 0 then
                Ada.Strings.Unbounded.Append (Buffer, Line (1 .. Last) & ASCII.LF);
             else
@@ -119,17 +120,17 @@ procedure SData_Main is
             end;
             
          exception
-            when End_Error =>
-               New_Line;
+            when Ada.Text_IO.End_Error =>
+               Ada.Text_IO.New_Line;
                exit REPL;
             when E : SData.Script_Error =>
-               Put_Line ("Error: " & Exception_Message (E));
+               Put_Line_Error ("Error: " & Exception_Message (E));
                Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
             when others =>
-               Put_Line ("An unexpected error occurred.");
+               Put_Line_Error ("An unexpected error occurred.");
                Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
          end;
-         exit REPL when not Is_Open (Standard_Input);
+         exit REPL when not Ada.Text_IO.Is_Open (Ada.Text_IO.Standard_Input);
       end loop REPL;
    end Run_REPL;
 
@@ -257,6 +258,11 @@ begin
       Idx := Idx + 1;
    end loop;
 
+   --  Handle output redirection if specified on command line.
+   if Output_File_Len > 0 then
+      SData.IO.Open_Output (Output_File (1 .. Output_File_Len));
+   end if;
+
    --  Verify that a command file was provided.
    if Input_File_Len > 0 then
       declare
@@ -288,9 +294,13 @@ begin
       Execute (Prog);
    end;
 
+   if SData.IO.Is_Redirected then
+      SData.IO.Close_Output;
+   end if;
+
 exception
    when E : SData.Script_Error =>
-      Put_Line ("Error: " & Exception_Message (E));
+      Put_Line_Error ("Error: " & Exception_Message (E));
    when E : others =>
-      Put_Line ("An error occurred: " & Exception_Name (E) & ": " & Exception_Message (E));
+      Put_Line_Error ("An error occurred: " & Exception_Name (E) & ": " & Exception_Message (E));
 end SData_Main;

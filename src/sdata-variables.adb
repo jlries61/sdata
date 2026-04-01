@@ -2,8 +2,8 @@ with Ada.Characters.Handling; use Ada.Characters.Handling;
 with GNAT.Strings; use GNAT.Strings;
 with Ada.Containers; use Ada.Containers; -- For Count_Type
 with Ada.Strings.Fixed;
-with Ada.Text_IO;
 with SData.Config;
+with SData.IO;
 
 package body SData.Variables is
 
@@ -42,7 +42,7 @@ package body SData.Variables is
    begin
       --  Rule: SET implicitly drops permanent variable from table (Exclusivity)
       if SData.Table.Has_Column (Upper_Name) then
-         Ada.Text_IO.Put_Line ("Warning: Column '" & Upper_Name & "' dropped from table and converted to session variable.");
+         SData.IO.Put_Line_Error ("Warning: Column '" & Upper_Name & "' dropped from table and converted to session variable.");
          SData.Table.Drop_Column (Upper_Name);
       end if;
 

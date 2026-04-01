@@ -1,4 +1,3 @@
-with Ada.Text_IO;   use Ada.Text_IO;
 with SData.Table;     use SData.Table;
 with SData.Values;    use SData.Values;
 with SData.Variables; use SData.Variables;
@@ -11,6 +10,7 @@ with Ada.Streams.Stream_IO;
 with Ada.Exceptions;
 with SData.File_IO;
 with SData.Config;    use SData.Config;
+with SData.IO;        use SData.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Vectors;
@@ -19,71 +19,10 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 package body SData.Interpreter is
 
-   -- Redirection State
-   Redirect_File : Ada.Text_IO.File_Type;
-   Is_Redirected : Boolean := False;
-   Local_Echo    : Boolean := True;
-
-   -- Pager State
-   Lines_On_Page : constant := 24;
-   Lines_Printed : Natural := 0;
-   Interactive_Mode : Boolean := False;
-
    procedure Set_Interactive (Val : Boolean) is
    begin
-      Interactive_Mode := Val;
+      SData.IO.Set_Interactive (Val);
    end Set_Interactive;
-
-   procedure Check_Pager is
-      Dummy : String (1 .. 10);
-      Last  : Natural;
-   begin
-      if Interactive_Mode and then Local_Echo and then Lines_Printed >= Lines_On_Page then
-         Ada.Text_IO.Put ("-- More -- (Press Enter)");
-         Ada.Text_IO.Get_Line (Dummy, Last);
-         Lines_Printed := 0;
-      end if;
-   end Check_Pager;
-
-   procedure Put_Line (Item : String) is
-   begin
-      if Is_Redirected then
-         Ada.Text_IO.Put_Line (Redirect_File, Item);
-         Ada.Text_IO.Flush (Redirect_File);
-      end if;
-      
-      if Local_Echo and then not SData.Config.Quiet_Mode then
-         Ada.Text_IO.Put_Line (Item);
-         Lines_Printed := Lines_Printed + 1;
-         Check_Pager;
-      end if;
-   end Put_Line;
-
-   procedure Put (Item : String) is
-   begin
-      if Is_Redirected then
-         Ada.Text_IO.Put (Redirect_File, Item);
-         Ada.Text_IO.Flush (Redirect_File);
-      end if;
-
-      if Local_Echo and then not SData.Config.Quiet_Mode then
-         Ada.Text_IO.Put (Item);
-      end if;
-   end Put;
-
-   procedure My_New_Line is
-   begin
-      if Is_Redirected then
-         Ada.Text_IO.Put_Line (Redirect_File, "");
-         Ada.Text_IO.Flush (Redirect_File);
-      end if;
-
-      if Local_Echo and then not SData.Config.Quiet_Mode then
-         Ada.Text_IO.New_Line;
-         Lines_Printed := Lines_Printed + 1;
-         Check_Pager;
-      end if;
-   end My_New_Line;
 
    --  Forward declarations for internal logic.
    procedure Execute_Statement (Stmt : Statement_Access);
@@ -387,7 +326,7 @@ package body SData.Interpreter is
             Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
             Put_Line ("  Files/paths: FPATH");
             Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
-            My_New_Line;
+            New_Line;
             Put_Line ("Available Functions:");
             Put_Line ("  Math:        ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
             Put_Line ("  Trig (rad):  SIN, COS, TAN, ATN, ATAN2, SINH, COSH, TANH");
@@ -406,7 +345,7 @@ package body SData.Interpreter is
             Put_Line ("               LIF, PIF");
             Put_Line ("  Stat RN:     ZRN, NRN, URN, ERN, PRN, GRN, MRN, XRN, TRN,");
             Put_Line ("               FRN, WRN, LRN, RAN, RANDOM");
-            My_New_Line;
+            New_Line;
             Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
          elsif T = "USE" then
             Put_Line ("Command: USE [MOCK | ""filename""] [/FMT=format] [/NSCAN=n]");
@@ -804,11 +743,11 @@ package body SData.Interpreter is
             begin
                Put_Line ("=== COMMAND REFERENCE ===");
                for I in Cmds'Range loop
-                  Print_Help (Cmds (I).all); My_New_Line;
+                  Print_Help (Cmds (I).all); New_Line;
                end loop;
                Put_Line ("=== FUNCTION REFERENCE ===");
                for I in Funcs'Range loop
-                  Print_Help (Funcs (I).all); My_New_Line;
+                  Print_Help (Funcs (I).all); New_Line;
                end loop;
                for I in Cmds'Range  loop declare Old : GNAT.Strings.String_Access := Cmds (I);  begin GNAT.Strings.Free (Old); end; end loop;
                for I in Funcs'Range loop declare Old : GNAT.Strings.String_Access := Funcs (I); begin GNAT.Strings.Free (Old); end; end loop;
@@ -885,7 +824,7 @@ package body SData.Interpreter is
                         SData.Config.Max_String_Len > 0 and then
                         Length (Result.Str_Val) > SData.Config.Max_String_Len
                      then
-                        Put_Line ("Warning: String truncated to " &
+                        Put_Line_Error ("Warning: String truncated to " &
                                   Integer'Image (SData.Config.Max_String_Len) &
                                   " characters.");
                         Result.Str_Val := To_Unbounded_String (Slice (Result.Str_Val, 1, SData.Config.Max_String_Len));
@@ -921,7 +860,7 @@ package body SData.Interpreter is
                               Put (Name & ": " & To_String_Formatted (Val) & "  ");
                            end;
                         end loop;
-                        My_New_Line;
+                        New_Line;
                         declare
                            Old_List : String_List_Access := Col_Names;
                         begin
@@ -957,7 +896,7 @@ package body SData.Interpreter is
                         if Current_Arg.Next /= null then Put (" "); end if;
                         Current_Arg := Current_Arg.Next;
                      end loop;
-                     My_New_Line;
+                     New_Line;
                   end;
                end if;
             when Stmt_USE =>
@@ -1190,7 +1129,7 @@ package body SData.Interpreter is
                      for I in T_Names'Range loop
                         Put (T_Names (I).all & " ");
                      end loop;
-                     My_New_Line;
+                     New_Line;
                   else
                      Put_Line ("(none)");
                   end if;
@@ -1200,7 +1139,7 @@ package body SData.Interpreter is
                      for I in S_Names'Range loop
                         Put (S_Names (I).all & " ");
                      end loop;
-                     My_New_Line;
+                     New_Line;
                   else
                      Put_Line ("(none)");
                   end if;
@@ -1256,7 +1195,7 @@ package body SData.Interpreter is
                   end;
             when Stmt_SYSTEM =>
                if SData.Config.Disable_Shell then
-                  Put_Line ("Error: SYSTEM command is disabled.");
+                  Put_Line_Error ("Error: SYSTEM command is disabled.");
                else
                   declare
                      Success : Boolean;
@@ -1307,24 +1246,22 @@ package body SData.Interpreter is
                SData.Variables.Flush_PDV_To_Output;
                SData.Table.Set_Record_Explicitly_Written (True);
             when Stmt_OUTPUT =>
-               if Is_Redirected then
-                  Ada.Text_IO.Close (Redirect_File);
-                  Is_Redirected := False;
+               if SData.IO.Is_Redirected then
+                  SData.IO.Close_Output;
                end if;
 
                if Stmt.File_Len > 0 then
                   declare
                      Final_Path : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT");
                   begin
-                     Ada.Text_IO.Create (Redirect_File, Ada.Text_IO.Out_File, Final_Path);
-                     Is_Redirected := True;
+                     SData.IO.Open_Output (Final_Path);
                   exception
                      when others =>
-                        Ada.Text_IO.Put_Line ("Error: Could not create output file " & Final_Path);
+                        SData.IO.Put_Line_Error ("Error: Could not create output file " & Final_Path);
                   end;
                end if;
             when Stmt_ECHO =>
-               Local_Echo := Stmt.Echo_State;
+               SData.IO.Set_Local_Echo (Stmt.Echo_State);
             when Stmt_IF =>
                if Is_True (Evaluate (Stmt.Condition)) then Execute_List (Stmt.Then_Branch);
                elsif Stmt.Else_Branch /= null then Execute_List (Stmt.Else_Branch); end if;
@@ -1507,13 +1444,14 @@ package body SData.Interpreter is
                         exception
                            when E : Script_Error =>
                               if SData.Config.Continue_On_Error then
-                                 Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
+                                 Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
                               else
                                  raise;
                               end if;
                            when E : others =>
-                              Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
-                              if not SData.Config.Continue_On_Error then
+                              if SData.Config.Continue_On_Error then
+                                 Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                              else
                                  raise Script_Error with Ada.Exceptions.Exception_Message (E);
                               end if;
                         end;
@@ -1564,13 +1502,14 @@ package body SData.Interpreter is
             exception
                when E : Script_Error =>
                   if SData.Config.Continue_On_Error then
-                     Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
+                     Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
                   else
                      raise;
                   end if;
                when E : others =>
-                  Put_Line ("Error: " & Ada.Exceptions.Exception_Message (E));
-                  if not SData.Config.Continue_On_Error then
+                  if SData.Config.Continue_On_Error then
+                     Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                  else
                      raise Script_Error with Ada.Exceptions.Exception_Message (E);
                   end if;
             end;
