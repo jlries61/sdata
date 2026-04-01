@@ -725,7 +725,13 @@ package body SData.Parser is
                end if;
                
                loop
-                  Tok_Local := Peek_Next_Token (Ctx.Lex_Ctx);
+                  -- Skip separators.
+                  loop
+                     Tok_Local := Peek_Next_Token (Ctx.Lex_Ctx);
+                     exit when Tok_Local.Kind /= Token_Newline and then Tok_Local.Kind /= Token_Colon;
+                     declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                  end loop;
+
                   exit when Tok_Local.Kind = Token_END or else Tok_Local.Kind = Token_EOF;
                   
                   if Tok_Local.Kind = Token_CASE or else Tok_Local.Kind = Token_WHEN then
@@ -767,6 +773,9 @@ package body SData.Parser is
                end loop;
                if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_END then
                   Put_Line ("Error: Expected END after SELECT");
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_SELECT then
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                end if;
                Stmt.Branches := First_Branch;
             end;
