@@ -18,6 +18,3 @@ xmlada = "^21.0.0"
 
 [[depends-on]]
 mathpaqs = "^20230121.0.0"
-
-[[depends-on]]
-sciada = "~0.4.0"

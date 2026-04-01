@@ -18,6 +18,6 @@ Files: mathpaqs_*
 Copyright: Gautier de Montmollin
 License: MIT
 
-Files: sciada_*
-Copyright: Stephane Carrez
-License: Apache-2.0
+Files: debian/*
+Copyright: 2026 John L. Ries <john@theyarnbard.com>
+License: MIT

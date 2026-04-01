@@ -13,8 +13,7 @@ DEP_BASE := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 _ZIPADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/zipada_*))
 _XMLADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/xmlada_*))
 _MATHPAQS_DIR  := $(firstword $(wildcard $(DEP_BASE)/mathpaqs_*))
-_SCIADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/sciada_*))
-_LOCAL_GPR_PATH := $(_ZIPADA_DIR):$(_XMLADA_DIR)/dom:$(_XMLADA_DIR)/input_sources:$(_MATHPAQS_DIR):$(_SCIADA_DIR)
+_LOCAL_GPR_PATH := $(_ZIPADA_DIR):$(_XMLADA_DIR)/dom:$(_XMLADA_DIR)/input_sources:$(_MATHPAQS_DIR)
 export GPR_PROJECT_PATH ?= $(_LOCAL_GPR_PATH)
 PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
@@ -79,7 +78,7 @@ srpm: clean
 	@cp sdata.spec rpmbuild/SPECS/
 	@# Copy vendored Ada library tarballs from their canonical location.
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
-	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz sciada-0.4.0.tar.gz; do \
+	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz; do \
 	   if [ ! -f "$$TARBALL_DIR/$$tb" ]; then \
 	     echo "ERROR: dependency tarball not found: $$TARBALL_DIR/$$tb"; exit 1; \
 	   fi; \
@@ -99,7 +98,7 @@ dsc: clean
 	 SRC_DIR="$$TEMP_DIR/$$BASE_DIR"; \
 	 mkdir -p "$$SRC_DIR"; \
 	 cp -r * "$$SRC_DIR/"; \
-	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz sciada-0.4.0.tar.gz; do \
+	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz; do \
 	   tar xzf "$$TARBALL_DIR/$$tb" -C "$$SRC_DIR/"; \
 	 done; \
 	 cd "$$TEMP_DIR" && tar czf "sdata_0.2.1.orig.tar.gz" "$$BASE_DIR"; \

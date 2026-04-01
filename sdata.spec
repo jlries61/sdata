@@ -9,7 +9,6 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        zipada-61.0.0.tar.gz
 Source2:        xmlada-26.0.0.tar.gz
 Source3:        mathpaqs-20260205.0.0.tar.gz
-Source4:        sciada-0.4.0.tar.gz
 
 # GNAT (Ada compiler) package name differs across RPM distributions:
 #   gcc-ada   — openSUSE, SLES
@@ -30,12 +29,11 @@ aggregate functions, and advanced variable handling.
 tar xzf %{SOURCE1} -C %{_builddir}
 tar xzf %{SOURCE2} -C %{_builddir}
 tar xzf %{SOURCE3} -C %{_builddir}
-tar xzf %{SOURCE4} -C %{_builddir}
 
 %build
 # Point gprbuild at the vendored dependency .gpr files.
 # xmlada keeps dom and input_sources in separate subdirectories.
-export GPR_PROJECT_PATH="%{_builddir}/zipada_61.0.0_54fc9836:%{_builddir}/xmlada_26.0.0_b140ed4a/dom:%{_builddir}/xmlada_26.0.0_b140ed4a/input_sources:%{_builddir}/mathpaqs_20260205.0.0_abed7ef9:%{_builddir}/sciada_0.4.0_af24740d"
+export GPR_PROJECT_PATH="%{_builddir}/zipada_61.0.0_54fc9836:%{_builddir}/xmlada_26.0.0_b140ed4a/dom:%{_builddir}/xmlada_26.0.0_b140ed4a/input_sources:%{_builddir}/mathpaqs_20260205.0.0_abed7ef9"
 make %{?_smp_mflags}
 
 %install
@@ -61,7 +59,7 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 - Finalize Phase 1 with corrected memory architecture and parser.
 
 * Tue Mar 17 2026 John L. Ries <john@theyarnbard.com> - 0.1-1
-- Bundle Ada library dependencies (zipada, xmlada, mathpaqs, sciada)
+- Bundle Ada library dependencies (zipada, xmlada, mathpaqs)
   as vendored sources so the build requires only gcc-gnat/gcc-ada and
   make with no additional Ada library packages.
 - Use (gcc-ada or gcc-gnat) boolean dependency to support both
