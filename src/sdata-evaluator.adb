@@ -1,3 +1,4 @@
+with SData.Interpreter;
 with SData.Variables; use SData.Variables;
 with SData.Config;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
@@ -62,6 +63,7 @@ package body SData.Evaluator is
       
       All_Vals : Value_Vectors.Vector;
       Current  : Expression_List := Args;
+      Arg_Index : Natural := 0;
 
       function Has_Args (N : Positive) return Boolean is
       begin
@@ -77,10 +79,27 @@ package body SData.Evaluator is
          return (Kind => Val_Numeric, Num_Val => V);
       end Num_Result;
 
+      --  Functions that treat their first argument as a variable name if it's an identifier.
+      function Is_Identifier_Ref_Function (N : String) return Boolean is
+         U : constant String := To_Upper (N);
+      begin
+         return U = "LAG" or else U = "LAGC$" or else U = "NEXT" or else U = "NEXTC$" 
+                or else U = "OBS" or else U = "OBSC$";
+      end Is_Identifier_Ref_Function;
+
    begin
       -- Flatten arguments, expanding arrays if necessary
       while Current /= null loop
-         if Current.Expr.Kind = Expr_Variable then
+         Arg_Index := Arg_Index + 1;
+         if Is_Identifier_Ref_Function (Name) and then Arg_Index = 1 and then Current.Expr.Kind = Expr_Variable then
+            -- For these functions, if the first argument is a variable reference,
+            -- use the name of the variable instead of its current value.
+            declare
+               VName : constant String := To_Upper (Current.Expr.Var_Name (1 .. Current.Expr.Var_Len));
+            begin
+               All_Vals.Append ((Kind => Val_String, Str_Val => To_Unbounded_String (VName)));
+            end;
+         elsif Current.Expr.Kind = Expr_Variable then
             declare
                VName : constant String := To_Upper (Current.Expr.Var_Name (1 .. Current.Expr.Var_Len));
             begin
@@ -132,7 +151,13 @@ package body SData.Evaluator is
       end loop;
 
       --  Math Functions
-      if Name = "ABS" and then Has_Args (1) then
+      if Name = "IF" and then Has_Args (3) then
+         if Is_True (All_Vals.Element (1)) then
+            return All_Vals.Element (2);
+         else
+            return All_Vals.Element (3);
+         end if;
+      elsif Name = "ABS" and then Has_Args (1) then
          if All_Vals.Element (1).Kind = Val_Integer then
             return (Kind => Val_Integer, Int_Val => abs All_Vals.Element (1).Int_Val);
          else
@@ -707,14 +732,35 @@ package body SData.Evaluator is
          return (Kind => Val_Integer,
                  Int_Val => (if SData.Table.Get_Current_Record_Index >= SData.Table.Row_Count
                              then 1 else 0));
-      elsif (Name = "LAG" or else Name = "LAGC$") and then Has_Args (1) then
+      elsif (Name = "LAG" or else Name = "LAGC$") and then (Has_Args (1) or else Has_Args (2)) then
          declare
             Var  : constant Value   := All_Vals.Element (1);
+            N_Val : constant Value  := (if Has_Args (2) then All_Vals.Element (2) else (Kind => Val_Integer, Int_Val => 1));
+            N    : Integer;
             Idx  : constant Natural := SData.Table.Get_Current_Record_Index;
          begin
             if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            if Idx <= 1 then return (Kind => Val_Missing); end if;
-            return SData.Table.Get_Value_Upper (Idx - 1, To_Upper (SData.Values.To_String (Var)));
+            N := Integer (Convert_To_Float (N_Val));
+            if N <= 0 or else Idx <= N then return (Kind => Val_Missing); end if;
+            if not SData.Interpreter.In_Same_Group (Idx, Idx - N) then
+               return (Kind => Val_Missing);
+            end if;
+            return SData.Table.Get_Value_Upper (Idx - N, To_Upper (SData.Values.To_String (Var)));
+         end;
+      elsif (Name = "NEXT" or else Name = "NEXTC$") and then (Has_Args (1) or else Has_Args (2)) then
+         declare
+            Var  : constant Value   := All_Vals.Element (1);
+            N_Val : constant Value  := (if Has_Args (2) then All_Vals.Element (2) else (Kind => Val_Integer, Int_Val => 1));
+            N    : Integer;
+            Idx  : constant Natural := SData.Table.Get_Current_Record_Index;
+         begin
+            if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            N := Integer (Convert_To_Float (N_Val));
+            if N <= 0 or else (Idx + N) > SData.Table.Row_Count then return (Kind => Val_Missing); end if;
+            if not SData.Interpreter.In_Same_Group (Idx, Idx + N) then
+               return (Kind => Val_Missing);
+            end if;
+            return SData.Table.Get_Value_Upper (Idx + N, To_Upper (SData.Values.To_String (Var)));
          end;
       elsif (Name = "OBS" or else Name = "OBSC$") and then Has_Args (2) then
          declare

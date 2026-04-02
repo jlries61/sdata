@@ -20,6 +20,31 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 package body SData.Interpreter is
 
+   package By_Group_Names is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
+   Current_By_Vars : By_Group_Names.Vector;
+
+   function In_Same_Group (Idx1, Idx2 : Positive) return Boolean is
+      use SData.Table;
+      Num_Recs : constant Natural := Row_Count;
+   begin
+      if Current_By_Vars.Is_Empty then return True; end if;
+      if Idx1 = Idx2 then return True; end if;
+      if Idx1 > Num_Recs or else Idx2 > Num_Recs then return False; end if;
+      
+      for V of Current_By_Vars loop
+         declare
+            Name : constant String := To_String(V);
+            Val1 : constant Value  := Get_Value (Idx1, Name);
+            Val2 : constant Value  := Get_Value (Idx2, Name);
+         begin
+            if not (Val1 = Val2) then
+               return False;
+            end if;
+         end;
+      end loop;
+      return True;
+   end In_Same_Group;
+
    procedure Set_Interactive (Val : Boolean) is
    begin
       SData.IO.Set_Interactive (Val);
@@ -58,9 +83,6 @@ package body SData.Interpreter is
    Current_Record_Deleted : Boolean := False;
    
 
-   -- For BY statement processing
-   package By_Group_Names is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
-   Current_By_Vars : By_Group_Names.Vector;
    
    -- Global program for REPL mode.
    Active_Program_Head : Statement_Access := null;

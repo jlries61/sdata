@@ -233,7 +233,7 @@ package body SData.Parser is
                      Node.Str_Value := To_Unbounded_String (Actual_Tok.Text (1 .. Actual_Tok.Length));
                      return Node;
 
-                  when Token_Identifier =>
+                  when Token_Identifier | Token_NEXT | Token_IF =>
                      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren or else
                         Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
                         declare

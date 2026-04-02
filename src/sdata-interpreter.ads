@@ -19,6 +19,9 @@ package SData.Interpreter is
    --  Executes the global active program.
    procedure Run_Active_Program;
 
+   --  Checks if two records belong to the same BY group.
+   function In_Same_Group (Idx1, Idx2 : Positive) return Boolean;
+
    procedure Set_Interactive (Val : Boolean);
 
 end SData.Interpreter;
