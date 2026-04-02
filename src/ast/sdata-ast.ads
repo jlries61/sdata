@@ -178,8 +178,8 @@ package SData.AST is
             Arr_Name_Len : Natural;
             Arr_Dim      : Positive; -- Number of elements (for simple arrays) - this will become derived for DIM
             Arr_Vars     : Variable_List;
-            Arr_Start_Idx : Integer;   -- For DIM array custom subscripts
-            Arr_End_Idx   : Integer;     -- For DIM array custom subscripts
+            Arr_Start_Expr : Expression_Access;  -- For DIM array lower bound
+            Arr_End_Expr   : Expression_Access;  -- For DIM array upper bound
             Is_Custom_Subscripts : Boolean := False; -- For DIM arrays (e.g., (0:11))
             Is_Temporary_Dim     : Boolean := False; -- For DIM arrays /TEMP flag
          when Stmt_RENAME =>

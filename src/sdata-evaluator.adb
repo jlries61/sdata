@@ -714,7 +714,7 @@ package body SData.Evaluator is
          begin
             if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
             if Idx <= 1 then return (Kind => Val_Missing); end if;
-            return SData.Table.Get_Value_Upper (Idx - 1, SData.Values.To_String (Var));
+            return SData.Table.Get_Value_Upper (Idx - 1, To_Upper (SData.Values.To_String (Var)));
          end;
       elsif (Name = "OBS" or else Name = "OBSC$") and then Has_Args (2) then
          declare
@@ -728,7 +728,7 @@ package body SData.Evaluator is
             if Row < 1 or else Row > SData.Table.Row_Count then
                return (Kind => Val_Missing);
             end if;
-            return SData.Table.Get_Value_Upper (Row, SData.Values.To_String (Var));
+            return SData.Table.Get_Value_Upper (Row, To_Upper (SData.Values.To_String (Var)));
          end;
 
       -- Date and Time Functions

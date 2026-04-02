@@ -688,41 +688,36 @@ package body SData.Parser is
                            return null;
                         end if;
                         
+                        -- Parse first bound expression
+                        Stmt.Arr_Start_Expr := Parse_Expression (Ctx);
+                        if Stmt.Arr_Start_Expr = null then
+                           Put_Line_Error ("Error: Expected bound expression in DIM");
+                           return null;
+                        end if;
+                        
                         declare
-                           Tok_Start : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Tok_Next : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
-                           if Tok_Start.Kind /= Token_Numeric_Literal then
-                              Put_Line_Error ("Error: Expected starting index for DIM array");
-                              return null;
-                           end if;
-                           Stmt.Arr_Start_Idx := Integer'Value (Tok_Start.Text (1 .. Tok_Start.Length));
-                           
-                           declare
-                              Tok_Next : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                           begin
-                              if Tok_Next.Kind = Token_TO then
-                                 declare
-                                    Tok_End : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                                 begin
-                                    if Tok_End.Kind /= Token_Numeric_Literal then
-                                       Put_Line_Error ("Error: Expected ending index for DIM array after TO");
-                                       return null;
-                                    end if;
-                                    Stmt.Arr_End_Idx := Integer'Value (Tok_End.Text (1 .. Tok_End.Length));
-                                    if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                                       Put_Line_Error ("Error: Expected ')' after DIM bounds");
-                                       return null;
-                                    end if;
-                                 end;
-                              elsif Tok_Next.Kind = Token_Right_Paren then
-                                 -- Simple dimension: DIM X(10) means 1 to 10
-                                 Stmt.Arr_End_Idx := Stmt.Arr_Start_Idx;
-                                 Stmt.Arr_Start_Idx := 1;
-                              else
-                                 Put_Line_Error ("Error: Expected TO or ')' in DIM bounds");
+                           if Tok_Next.Kind = Token_TO then
+                              -- DIM X(lower TO upper)
+                              Stmt.Arr_End_Expr := Parse_Expression (Ctx);
+                              if Stmt.Arr_End_Expr = null then
+                                 Put_Line_Error ("Error: Expected upper bound expression after TO");
                                  return null;
                               end if;
-                           end;
+                              if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
+                                 Put_Line_Error ("Error: Expected ')' after DIM bounds");
+                                 return null;
+                              end if;
+                           elsif Tok_Next.Kind = Token_Right_Paren then
+                              -- Simple dimension: DIM X(n) means 1 to n
+                              Stmt.Arr_End_Expr := Stmt.Arr_Start_Expr;
+                              Stmt.Arr_Start_Expr := new Expression (Expr_Numeric_Literal);
+                              Stmt.Arr_Start_Expr.Value := 1.0;
+                           else
+                              Put_Line_Error ("Error: Expected TO or ')' in DIM bounds");
+                              return null;
+                           end if;
                         end;
                      end;
                      

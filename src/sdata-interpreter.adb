@@ -1113,7 +1113,25 @@ package body SData.Interpreter is
                         Define_Array (S.Arr_Name (1 .. S.Arr_Name_Len), V);
                      end;
                   else -- Stmt_DIM
-                     Dim_Array (S.Arr_Name (1 .. S.Arr_Name_Len), S.Arr_Start_Idx, S.Arr_End_Idx, S.Is_Temporary_Dim);
+                     declare
+                        function Eval_Bound (Expr : Expression_Access; Label : String) return Integer is
+                           V : constant Value := Evaluate (Expr);
+                        begin
+                           if V.Kind = Val_Integer then
+                              return V.Int_Val;
+                           elsif V.Kind = Val_Numeric then
+                              return Integer (Float'Floor (V.Num_Val));
+                           elsif V.Kind = Val_String then
+                              raise Script_Error with Label & " bound must be numeric, not character";
+                           else
+                              raise Script_Error with Label & " bound is missing";
+                           end if;
+                        end Eval_Bound;
+                        Start_Idx : constant Integer := Eval_Bound (S.Arr_Start_Expr, "Lower");
+                        End_Idx   : constant Integer := Eval_Bound (S.Arr_End_Expr, "Upper");
+                     begin
+                        Dim_Array (S.Arr_Name (1 .. S.Arr_Name_Len), Start_Idx, End_Idx, S.Is_Temporary_Dim);
+                     end;
                   end if;
                exception
                   when E : others =>
@@ -1496,7 +1514,7 @@ package body SData.Interpreter is
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
             Step_Start := Current.Next;
-         elsif Current.Kind /= Stmt_RUN and then Current.Kind /= Stmt_LET and then Current.Kind /= Stmt_SET and then Current.Kind /= Stmt_PRINT and then Current.Kind /= Stmt_IF and then Current.Kind /= Stmt_FOR and then Current.Kind /= Stmt_WHILE and then Current.Kind /= Stmt_LOOP_REPEAT and then Current.Kind /= Stmt_SELECT and then Current.Kind /= Stmt_DELETE and then Current.Kind /= Stmt_WRITE then
+         elsif Current.Kind /= Stmt_RUN and then Current.Kind /= Stmt_LET and then Current.Kind /= Stmt_SET and then Current.Kind /= Stmt_PRINT and then Current.Kind /= Stmt_IF and then Current.Kind /= Stmt_FOR and then Current.Kind /= Stmt_WHILE and then Current.Kind /= Stmt_LOOP_REPEAT and then Current.Kind /= Stmt_SELECT and then Current.Kind /= Stmt_DELETE and then Current.Kind /= Stmt_WRITE and then Current.Kind /= Stmt_DIM and then Current.Kind /= Stmt_ARRAY then
             begin
                Execute_Statement (Current);
             exception
