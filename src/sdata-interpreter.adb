@@ -957,6 +957,19 @@ package body SData.Interpreter is
                         Sort (Crit);
                      end;
                   end if;
+                  declare
+                     RC : constant String := Natural'Image (SData.Table.Row_Count);
+                     VC : constant String := Natural'Image (SData.Table.Column_Count);
+                  begin
+                     Put_Line ("SORT complete. " &
+                               RC (RC'First + 1 .. RC'Last) & " records and " &
+                               VC (VC'First + 1 .. VC'Last) & " variables processed.");
+                  end;
+                  if SData.Config.Save_File_Active then
+                     SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt);
+                     if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
+                     SData.Config.Save_File_Active := False;
+                  end if;
                end;
             when Stmt_BY =>
                Current_By_Vars.Clear;
@@ -1468,7 +1481,7 @@ package body SData.Interpreter is
             else
                while Iter /= null and then Iter /= Boundary loop
                   case Iter.Kind is
-                     when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_SORT | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
+                     when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                         begin
                            Execute_Statement(Iter);
                         exception

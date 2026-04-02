@@ -1,4 +1,5 @@
 RUN complete. 5 records and 1 variables processed.
+SORT complete. 5 records and 1 variables processed.
 RUN complete. 5 records and 1 variables processed.
 1.00000
 2.00000
@@ -7,6 +8,7 @@ RUN complete. 5 records and 1 variables processed.
 5.00000
 RUN complete. 5 records and 1 variables processed.
 RUN complete. 6 records and 2 variables processed.
+SORT complete. 6 records and 2 variables processed.
 RUN complete. 6 records and 2 variables processed.
 1.00000 1.00000
 1.00000 2.00000
