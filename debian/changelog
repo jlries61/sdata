@@ -1,3 +1,20 @@
+sdata (0.2.2-1) unstable; urgency=medium
+
+  * Implement AND, OR, and XOR boolean operators.
+  * Fix END SELECT parsing and blank line handling inside SELECT blocks.
+  * Fix SELECT block parsing and multi-line support in REPL.
+  * Route error/warning messages to both output file and stderr.
+  * Allow variable and expression bounds in DIM command.
+  * Fix case-sensitivity bug in OBS and LAG functions.
+  * Expand arrays in ARRAY command constituent list.
+  * Fix SORT to save output dataset and print completion message.
+  * Replace heapsort with stable merge sort.
+  * SlackBuild: use gnatmake instead of gprbuild.
+  * Remove unused sciada dependency from all build systems.
+  * Add README.md.
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 02 Apr 2026 12:00:00 -0700
+
 sdata (0.2.1-1) unstable; urgency=medium
 
   * Performance optimizations for SORT and data steps.

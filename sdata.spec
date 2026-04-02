@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.2.1
+Version:        0.2.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -44,7 +44,7 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_bindir}/sdata
 
 %changelog
-* Mon Mar 30 2026 John L. Ries <john@theyarnbard.com> - 0.2.1-1
+* Mon Mar 30 2026 John L. Ries <john@theyarnbard.com> - 0.2.2-1
 - Performance optimizations for SORT and data steps.
 - Replaced bubble sort with heapsort (O(n log n)).
 - Optimized Value type using Unbounded_String to reduce memory footprint.
