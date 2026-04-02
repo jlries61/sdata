@@ -1,6 +1,5 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers;         use Ada.Containers;
-with GNAT.Heap_Sort_G;
 with SData.Config;
 with SData.IO;
 
@@ -238,42 +237,29 @@ package body SData.Table is
    -- Sort --
    ----------
    procedure Sort (Criteria : Sort_Criteria_Array) is
-      --  Sort an array of row indices (1..Table_Row_Count) using
-      --  GNAT.Heap_Sort_G (heapsort, O(n log n) worst case), then
-      --  reconstruct every column's data vector in sorted order.
+      --  Sort an array of row indices (1..Table_Row_Count) using a stable
+      --  merge sort, then reconstruct every column's data vector in sorted
+      --  order.  Merge sort guarantees that records with equal sort keys
+      --  retain their original relative order.
       --
-      --  Performance note: calling Get_Value inside the comparator would copy
-      --  the entire column vector on every comparison (O(n log n) full-column
-      --  copies).  Instead, we pre-extract the sort-key values into plain
-      --  arrays before the sort so that each comparison is just two array
-      --  accesses.  Total data movement drops from O(n² log n) to O(n).
-      --
-      --  Heap_Sort_G uses index 0 as a scratch element, so Indices is sized
-      --  0..N; slot 0 is the temporary.
+      --  Performance note: sort-key values are pre-extracted into plain
+      --  arrays so that each comparison is just two array accesses.
 
       N : constant Natural := Table_Row_Count;
 
       --  One pre-extracted value array per sort criterion.
-      --  Index 0 is a dummy Val_Missing for the heapsort scratch slot.
       type Value_Row     is array (Natural range <>) of Value;
       type Value_Row_Acc is access Value_Row;
       Key_Data : array (Criteria'Range) of Value_Row_Acc;
 
-      type Index_Array is array (Natural range <>) of Natural;
-      Indices : Index_Array (0 .. N);
+      type Index_Array is array (Positive range <>) of Natural;
+      type Index_Array_Acc is access Index_Array;
+      Indices : Index_Array_Acc;
+      Temp    : Index_Array_Acc;
 
-      procedure Move (From : Natural; To : Natural) is
-      begin
-         Indices (To) := Indices (From);
-      end Move;
-      pragma Inline (Move);
-
-      function Lt (Op1, Op2 : Natural) return Boolean is
-         L : constant Natural := Indices (Op1);
-         R : constant Natural := Indices (Op2);
+      function Lt (L, R : Natural) return Boolean is
       begin
          for C in Criteria'Range loop
-            --  Use renames rather than copies to avoid copying Values.
             declare
                VL : Value renames Key_Data (C)(L);
                VR : Value renames Key_Data (C)(R);
@@ -287,12 +273,32 @@ package body SData.Table is
                end if;
             end;
          end loop;
-         --  All sort keys equal: fall back to original row order (stable).
          return L < R;
       end Lt;
       pragma Inline (Lt);
 
-      package Heap is new GNAT.Heap_Sort_G (Move, Lt);
+      procedure Merge_Sort (Lo, Hi : Positive) is
+         Mid : Positive;
+         I, J, K : Positive;
+      begin
+         if Lo >= Hi then return; end if;
+         Mid := Lo + (Hi - Lo) / 2;
+         Merge_Sort (Lo, Mid);
+         Merge_Sort (Mid + 1, Hi);
+         --  Merge
+         for X in Lo .. Hi loop Temp (X) := Indices (X); end loop;
+         I := Lo; J := Mid + 1; K := Lo;
+         while I <= Mid and then J <= Hi loop
+            if not Lt (Temp (J), Temp (I)) then
+               Indices (K) := Temp (I); I := I + 1;
+            else
+               Indices (K) := Temp (J); J := J + 1;
+            end if;
+            K := K + 1;
+         end loop;
+         while I <= Mid loop Indices (K) := Temp (I); I := I + 1; K := K + 1; end loop;
+         --  No need to copy remaining J..Hi, they're already in place.
+      end Merge_Sort;
 
    begin
       if N <= 1 or else Criteria'Length = 0 then return; end if;
@@ -324,11 +330,12 @@ package body SData.Table is
          end;
       end loop;
 
-      --  Initialise index permutation; slot 0 is the heapsort scratch element.
-      Indices (0) := 0;
+      --  Initialise index permutation.
+      Indices := new Index_Array (1 .. N);
+      Temp    := new Index_Array (1 .. N);
       for I in 1 .. N loop Indices (I) := I; end loop;
 
-      Heap.Sort (N);
+      Merge_Sort (1, N);
 
       --  Rebuild every column in sorted order.
       declare
