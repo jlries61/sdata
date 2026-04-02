@@ -15,6 +15,7 @@ with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
+with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 package body SData.Interpreter is
@@ -1088,7 +1089,18 @@ package body SData.Interpreter is
                            Start_Idx, End_Idx : Natural := 0;
                         begin
                            if not Range_Spec.Is_Range then
-                              V.Append (To_Unbounded_String (Start_Name));
+                              if Has_Array (Start_Name) then
+                                 declare
+                                    Lo, Hi : Integer;
+                                 begin
+                                    Get_Array_Bounds (Start_Name, Lo, Hi);
+                                    for I in Lo .. Hi loop
+                                       V.Append (To_Unbounded_String (Start_Name & "(" & Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both) & ")"));
+                                    end loop;
+                                 end;
+                              else
+                                 V.Append (To_Unbounded_String (Start_Name));
+                              end if;
                            elsif Col_Names /= null then
                               for I in Col_Names'Range loop
                                  if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
