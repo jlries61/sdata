@@ -1,0 +1,13 @@
+RUN complete. 10 records and 2 variables processed.
+X: 1.00000 RECNO: 1 BOF: 1 EOF: 0 LAG: . NEXT: 3.00000
+X: 3.00000 RECNO: 2 BOF: 0 EOF: 0 LAG: 1.00000 NEXT: 5.00000
+X: 5.00000 RECNO: 3 BOF: 0 EOF: 0 LAG: 3.00000 NEXT: 7.00000
+X: 7.00000 RECNO: 4 BOF: 0 EOF: 0 LAG: 5.00000 NEXT: 9.00000
+X: 9.00000 RECNO: 5 BOF: 0 EOF: 1 LAG: 7.00000 NEXT: .
+RUN complete. 5 records and 2 variables processed.
+X: 1.00000 GRP: 1.00000 BOG: 1 EOG: 0
+X: 3.00000 GRP: 1.00000 BOG: 0 EOG: 0
+X: 5.00000 GRP: 1.00000 BOG: 0 EOG: 1
+X: 7.00000 GRP: 2.00000 BOG: 1 EOG: 0
+X: 9.00000 GRP: 2.00000 BOG: 0 EOG: 1
+RUN complete. 5 records and 2 variables processed.
