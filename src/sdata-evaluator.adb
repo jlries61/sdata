@@ -13,8 +13,31 @@ with Ada.Numerics;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Strings.Fixed;
 
+--  SData.Evaluator — expression evaluator and built-in function dispatcher.
+--
+--  Entry points:
+--    Evaluate           evaluates an Expression node to a Value
+--    Evaluate_Function  dispatches a named function call
+--    Is_True            coerces a Value to a Boolean (non-zero / non-empty)
+--
+--  Design notes:
+--    * Missing value propagation: most functions return Val_Missing when any
+--      required argument is missing.  Has_Args(N) encapsulates this check.
+--    * LAG, NEXT, OBS and their string variants receive their first argument
+--      as a variable *name* (a string) rather than the variable's current
+--      value.  Is_Identifier_Ref_Function gates this special treatment.
+--    * RECNO, BOF, and EOF operate in logical (filtered-view) space when a
+--      SELECT filter is active; they query Logical_Record_Index rather than
+--      Current_Record_Index.
+--    * LAG and NEXT likewise navigate by logical offset and then map each
+--      logical position to a physical row via Logical_To_Physical, so that
+--      filtered-out rows are invisible to both functions.
+
 package body SData.Evaluator is
 
+   --  BOG_Flag / EOG_Flag: per-record beginning-of-group / end-of-group
+   --  indicators.  Set by the interpreter's data step loop before each
+   --  record's program body executes; read by BOG() and EOG() functions.
    BOG_Flag : Boolean := False;
    EOG_Flag : Boolean := False;
 
@@ -65,6 +88,11 @@ package body SData.Evaluator is
       Current  : Expression_List := Args;
       Arg_Index : Natural := 0;
 
+      --  Has_Args(N): returns True iff at least N arguments were supplied and
+      --  none of the first N is missing.  A missing argument is treated the
+      --  same as an absent one so that missing propagation is automatic for
+      --  all functions that guard on Has_Args rather than inspecting each
+      --  argument individually.
       function Has_Args (N : Positive) return Boolean is
       begin
          if All_Vals.Length < Ada.Containers.Count_Type(N) then return False; end if;
@@ -233,7 +261,12 @@ package body SData.Evaluator is
             else return Handle_Domain_Error ("Argument to SQRT must be non-negative."); end if;
          end;
 
-      -- Aggregate Functions (Row-wise)
+      --  Aggregate Functions (row-wise, operating on the argument list for
+      --  the current record).  All eight functions share a single pass that
+      --  accumulates count, sum, sum-of-squares, min, and max simultaneously;
+      --  Long_Float is used to reduce cancellation error in VAR/STD.
+      --  STD/VAR return missing when N < 2 (sample formula requires at least
+      --  two non-missing values).
       elsif Name = "SUM" or Name = "MEAN" or Name = "STD" or Name = "VAR" or
             Name = "MIN" or Name = "MAX" or Name = "N" or Name = "NMISS" then
          declare
@@ -727,7 +760,11 @@ package body SData.Evaluator is
             return R;
          end;
 
-      -- Record Navigation Functions
+      --  ── Record Navigation Functions ──────────────────────────────────────
+      --  All of the following operate in *logical* space when a SELECT filter
+      --  is active.  "Logical" means the 1-based position within the filtered
+      --  view; "physical" means the actual row index in the Data Table.
+      --  When no filter is active, logical == physical.
       elsif Name = "BOF" then
          return (Kind => Val_Integer,
                  Int_Val => (if SData.Table.Is_Filtered

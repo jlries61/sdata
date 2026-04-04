@@ -18,11 +18,45 @@ with Ada.Strings.Hash;
 with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
+--  SData.Interpreter — statement executor and data step engine.
+--
+--  Execution model (three tiers):
+--    Declarative       Commands such as USE, BY, SELECT, REPEAT, SAVE, FPATH
+--                      execute immediately and configure interpreter state.
+--    Immediate         RUN, SORT, NEW, NAMES, SYSTEM, HELP execute immediately
+--                      but are not purely declarative.
+--    Deferred          LET, SET, PRINT, IF, FOR, WHILE, WRITE, DELETE are
+--                      queued in the statement list between two RUN markers and
+--                      executed once per record inside Run_One_Step.
+--
+--  Data step (Run_One_Step):
+--    1. Optionally rebuild the SELECT filter index map.
+--    2. Determine the iteration count (logical row count when filtered,
+--       Repeat_Count when REPEAT is active, or Row_Count otherwise).
+--    3. For each logical row: load the PDV, set BOG/EOG indicators, execute
+--       the deferred statement body, then flush the PDV to the output table
+--       (unless an explicit WRITE has already done so or the record was
+--       deleted).
+--    4. Commit the output table, clear the stale filter map, and reset
+--       Repeat_Active so subsequent RUNs iterate the committed table.
+--
+--  SELECT filter:
+--    Select_Filter_Expr stores the filter expression persistently across RUNs.
+--    At the start of each Run_One_Step the expression is re-evaluated for
+--    every physical row to build a fresh Index_Array (logical→physical map).
+--    All navigation functions (RECNO, BOF, EOF, BOG, EOG, LAG, NEXT) then
+--    operate in logical space; filtered-out rows are completely invisible.
+
 package body SData.Interpreter is
 
    package By_Group_Names is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
+   --  Ordered list of BY variable names (upper-cased).  Empty when no BY
+   --  grouping is active.  Populated by Stmt_BY; cleared by bare BY or NEW.
    Current_By_Vars : By_Group_Names.Vector;
 
+   --  In_Same_Group: both Idx1 and Idx2 are *physical* row indices.
+   --  Returns True when the two rows have identical values for every BY
+   --  variable, or when no BY grouping is active (vacuously true).
    function In_Same_Group (Idx1, Idx2 : Positive) return Boolean is
       Num_Recs : constant Natural := Row_Count;
    begin
@@ -164,6 +198,11 @@ package body SData.Interpreter is
       end loop;
    end Clear_Pending_Mods;
 
+   --  Apply_Pending_Mods — two-pass KEEP-then-DROP logic.
+   --  Pass 1: if any Mod_Keep entry exists, build a keep list and drop every
+   --          column NOT in that list (implementing KEEP semantics).
+   --  Pass 2: apply any explicit Mod_Drop entries.
+   --  This ordering ensures KEEP and DROP can coexist without surprises.
    procedure Apply_Pending_Mods is
       Keep_Mods_Exist : Boolean := False;
       Keep_List : Name_Sets.Set;
@@ -235,6 +274,10 @@ package body SData.Interpreter is
       end if;
    end Expand_Range;
 
+   --  Has_Output_Statement — pre-scan to detect any explicit WRITE within the
+   --  current data step body (between two RUN markers).  When a WRITE is found,
+   --  the automatic end-of-record flush is suppressed so the step has full
+   --  control over which records are written and when.
    function Has_Output_Statement (Stmt : Statement_Access; Boundary : Statement_Access := null) return Boolean is
       Curr : Statement_Access := Stmt;
    begin
@@ -1627,6 +1670,9 @@ package body SData.Interpreter is
                end loop;
             end if;
 
+            --  Automatic flush: if the step contains no explicit WRITE and the
+            --  record was not deleted, write the final PDV state to the output
+            --  table.  When WRITE is present, the step controls output itself.
             if not Current_Record_Deleted and then not Global_Has_Write then
                SData.Variables.Flush_PDV_To_Output;
             end if;
@@ -1657,6 +1703,12 @@ package body SData.Interpreter is
          return;
       end if;
 
+      --  Walk the statement list, partitioning it into data steps.
+      --  A Stmt_RUN node acts as a step boundary: everything between two RUN
+      --  markers is a deferred body executed by Run_One_Step.  Any statement
+      --  that is NOT in the deferred set (i.e. not LET/SET/PRINT/IF/FOR/WHILE/
+      --  LOOP_REPEAT/SELECT/DELETE/WRITE/DIM/ARRAY) is a declarative or
+      --  immediate statement executed directly here, outside any data step.
       Current := Prog;
       while Current /= null loop
          if Current.Kind = Stmt_RUN then
