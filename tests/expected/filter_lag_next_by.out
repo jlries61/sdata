@@ -1,0 +1,7 @@
+RUN complete. 10 records and 2 variables processed.
+X: 1.00000 LAG1: . LAG2: . NEXT1: 3.00000 NEXT2: 5.00000
+X: 3.00000 LAG1: 1.00000 LAG2: . NEXT1: 5.00000 NEXT2: .
+X: 5.00000 LAG1: 3.00000 LAG2: 1.00000 NEXT1: . NEXT2: .
+X: 7.00000 LAG1: . LAG2: . NEXT1: 9.00000 NEXT2: .
+X: 9.00000 LAG1: 7.00000 LAG2: . NEXT1: . NEXT2: .
+RUN complete. 5 records and 2 variables processed.
