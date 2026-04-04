@@ -24,13 +24,12 @@ package body SData.Interpreter is
    Current_By_Vars : By_Group_Names.Vector;
 
    function In_Same_Group (Idx1, Idx2 : Positive) return Boolean is
-      use SData.Table;
       Num_Recs : constant Natural := Row_Count;
    begin
       if Current_By_Vars.Is_Empty then return True; end if;
       if Idx1 = Idx2 then return True; end if;
       if Idx1 > Num_Recs or else Idx2 > Num_Recs then return False; end if;
-      
+
       for V of Current_By_Vars loop
          declare
             Name : constant String := To_String(V);
@@ -53,7 +52,7 @@ package body SData.Interpreter is
    --  Forward declarations for internal logic.
    procedure Execute_Statement (Stmt : Statement_Access);
    procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null);
-   
+
    function Full_Path (Path : String; Category : String) return String;
 
    --  Set to track columns provided by the input file (to skip reset).
@@ -81,9 +80,14 @@ package body SData.Interpreter is
 
    --  State for Data Step record processing.
    Current_Record_Deleted : Boolean := False;
-   
 
-   
+   --  Persistent SELECT filter expression.  Set by Stmt_SELECT_FILTER and
+   --  cleared by NEW.  The filter map is rebuilt from this expression at the
+   --  start of every RUN so that it is always valid against the current table.
+   Select_Filter_Expr : Expression_Access := null;
+
+
+
    -- Global program for REPL mode.
    Active_Program_Head : Statement_Access := null;
    Active_Program_Tail : Statement_Access := null;
@@ -105,6 +109,8 @@ package body SData.Interpreter is
    begin
       Active_Program_Head := null;
       Active_Program_Tail := null;
+      Select_Filter_Expr := null;
+      SData.Table.Clear_Index_Map;
    end Clear_Active_Program;
 
    procedure Run_Active_Program is
@@ -117,7 +123,7 @@ package body SData.Interpreter is
          begin
             --  Cap the chain with a synthetic Stmt_RUN so that Execute's
             --  outer loop calls Run_One_Step on the queued deferred
-            --  statements.  The program is NOT cleared — it persists so
+            --  statements.  The program is NOT cleared - it persists so
             --  that subsequent RUN commands re-execute the same program.
             --  Only NEW, USE, or REPEAT should replace the program.
             while Tail.Next /= null loop
@@ -233,7 +239,7 @@ package body SData.Interpreter is
    begin
       while Curr /= null and then Curr /= Boundary loop
          if Curr.Kind = Stmt_WRITE then return True; end if;
-         
+
          case Curr.Kind is
             when Stmt_IF =>
                if Has_Output_Statement (Curr.Then_Branch) or else
@@ -263,8 +269,8 @@ package body SData.Interpreter is
       return False;
    end Has_Output_Statement;
 
-   
-   
+
+
 
    function Full_Path (Path : String; Category : String) return String is
       Cat  : constant String := To_Upper (Category);
@@ -805,7 +811,7 @@ package body SData.Interpreter is
                      begin
                         if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
                         elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
-                        else 
+                        else
                            raise Program_Error with "Invalid array index";
                         end if;
 
@@ -813,7 +819,7 @@ package body SData.Interpreter is
                      end;
                   else
                      Expected := Get_Expected_Kind (Var_Name_Str);
-                     
+
                      -- Check for existence and type if already permanent
                      declare
                         Existing_Kind : constant Value_Kind := Get_Type (Var_Name_Str);
@@ -841,7 +847,7 @@ package body SData.Interpreter is
                            raise SData.Table.Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
                         end if;
                      end if;
-                     
+
                      -- Enforce --clen limit on string values before storing.
                      if Result.Kind = Val_String and then
                         SData.Config.Max_String_Len > 0 and then
@@ -925,7 +931,7 @@ package body SData.Interpreter is
             when Stmt_USE =>
                SData.Config.Repeat_Active := False;
                SData.Config.Repeat_Count := 0;
-               declare 
+               declare
                   File_Name : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
                   Expanded : String (1 .. 1024);
                   Exp_Len  : Natural := 0;
@@ -939,7 +945,7 @@ package body SData.Interpreter is
                         Expanded (1 .. Exp_Len) := Full;
                      end;
                   end if;
-                  SData.File_IO.Open_Input (Expanded(1 .. Exp_Len), 
+                  SData.File_IO.Open_Input (Expanded(1 .. Exp_Len),
                     (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format));
                end;
                Input_File_Columns.Clear;
@@ -951,7 +957,7 @@ package body SData.Interpreter is
                      GNAT.Strings.Free (Col_Names);
                   end if;
                end;
-               if not SData.Config.Quiet_Mode and then Stmt.File_Path(1 .. Stmt.File_Len) /= "MOCK_DATA" 
+               if not SData.Config.Quiet_Mode and then Stmt.File_Path(1 .. Stmt.File_Len) /= "MOCK_DATA"
                  and then Stmt.File_Path(1 .. Stmt.File_Len) /= "MOCK" then
                   --  Open_Input already prints success for some formats.
                   null;
@@ -1305,6 +1311,12 @@ package body SData.Interpreter is
                      Execute_List (Stmt.Otherwise_Part);
                   end if;
                end;
+            when Stmt_SELECT_FILTER =>
+               --  Store the expression so every subsequent RUN can rebuild the
+               --  filter map against the then-current table.  A null expression
+               --  (bare SELECT with no condition) cancels any active filter.
+               Select_Filter_Expr := Stmt.Expr;
+               SData.Table.Clear_Index_Map;
             when Stmt_DELETE =>
                Current_Record_Deleted := True;
             when Stmt_WRITE =>
@@ -1366,17 +1378,17 @@ package body SData.Interpreter is
                   Path : constant String := (if Stmt.File_Len > 0 then Stmt.File_Path (1 .. Stmt.File_Len) else "");
                   Reset_All : constant Boolean := not (Stmt.Use_Flag or Stmt.Save_Flag or Stmt.Submit_Flag or Stmt.Output_Flag);
                begin
-                  if Reset_All or Stmt.Use_Flag then 
-                     SData.Config.FPath_Use := To_Unbounded_String (Path); 
+                  if Reset_All or Stmt.Use_Flag then
+                     SData.Config.FPath_Use := To_Unbounded_String (Path);
                   end if;
-                  if Reset_All or Stmt.Save_Flag then 
-                     SData.Config.FPath_Save := To_Unbounded_String (Path); 
+                  if Reset_All or Stmt.Save_Flag then
+                     SData.Config.FPath_Save := To_Unbounded_String (Path);
                   end if;
-                  if Reset_All or Stmt.Submit_Flag then 
-                     SData.Config.FPath_Submit := To_Unbounded_String (Path); 
+                  if Reset_All or Stmt.Submit_Flag then
+                     SData.Config.FPath_Submit := To_Unbounded_String (Path);
                   end if;
-                  if Reset_All or Stmt.Output_Flag then 
-                     SData.Config.FPath_Output := To_Unbounded_String (Path); 
+                  if Reset_All or Stmt.Output_Flag then
+                     SData.Config.FPath_Output := To_Unbounded_String (Path);
                   end if;
                end;
             when Stmt_RSEED =>
@@ -1422,33 +1434,43 @@ package body SData.Interpreter is
          Iter : Statement_Access;
          Global_Has_Write : constant Boolean := Has_Output_Statement (Start, Boundary);
 
-         function Is_First_In_Group (Idx : Positive) return Boolean is
-            Prev_Value : Value;
+         --  Is_First/Last_In_Group operate in logical space when a filter is
+         --  active: Logical_Idx is a 1-based position into the filtered view,
+         --  and Logical_To_Physical maps it to the actual table row for value
+         --  comparisons.  When unfiltered, logical == physical.
+         function Is_First_In_Group (Logical_Idx : Positive) return Boolean is
+            Phys_Curr  : constant Positive := SData.Table.Logical_To_Physical (Logical_Idx);
+            Phys_Prev  : Positive;
             Curr_Value : Value;
+            Prev_Value : Value;
          begin
-            if Idx = 1 then return True; end if;
+            if Logical_Idx = 1 then return True; end if;
             if Current_By_Vars.Is_Empty then return False; end if;
+            Phys_Prev := SData.Table.Logical_To_Physical (Logical_Idx - 1);
             for V of Current_By_Vars loop
-               Prev_Value := Get_Value (Idx - 1, To_String(V));
-               Curr_Value := Get_Value (Idx, To_String(V));
-               if not (Curr_Value = Prev_Value) then 
-                  return True; 
+               Prev_Value := Get_Value (Phys_Prev, To_String (V));
+               Curr_Value := Get_Value (Phys_Curr, To_String (V));
+               if not (Curr_Value = Prev_Value) then
+                  return True;
                end if;
             end loop;
             return False;
          end Is_First_In_Group;
 
-         function Is_Last_In_Group (Idx : Positive) return Boolean is
+         function Is_Last_In_Group (Logical_Idx : Positive; Logical_Count : Natural) return Boolean is
+            Phys_Curr  : constant Positive := SData.Table.Logical_To_Physical (Logical_Idx);
+            Phys_Next  : Positive;
             Curr_Value : Value;
             Next_Value : Value;
          begin
-            if Idx = Num_Records then return True; end if;
+            if Logical_Idx = Logical_Count then return True; end if;
             if Current_By_Vars.Is_Empty then return False; end if;
+            Phys_Next := SData.Table.Logical_To_Physical (Logical_Idx + 1);
             for V of Current_By_Vars loop
-               Curr_Value := Get_Value (Idx, To_String(V));
-               Next_Value := Get_Value (Idx + 1, To_String(V));
-               if not (Curr_Value = Next_Value) then 
-                  return True; 
+               Curr_Value := Get_Value (Phys_Curr, To_String (V));
+               Next_Value := Get_Value (Phys_Next, To_String (V));
+               if not (Curr_Value = Next_Value) then
+                  return True;
                end if;
             end loop;
             return False;
@@ -1464,18 +1486,61 @@ package body SData.Interpreter is
             Num_Records := (if Row_Count > 0 then Row_Count else 1);
          end if;
 
-         for I in 1 .. Num_Records loop
-            Set_Current_Record_Index (I);
+         --  Rebuild the SELECT filter map against the current table at the
+         --  start of every RUN.  The previous map (from an earlier RUN) has
+         --  been cleared by Commit_Output_Table, so we always work against
+         --  the up-to-date physical row set.
+         if Select_Filter_Expr /= null then
+            declare
+               Total          : constant Natural := Row_Count;
+               Saved_Physical : constant Natural := SData.Table.Get_Current_Record_Index;
+            begin
+               if Total = 0 then
+                  SData.Table.Clear_Index_Map;
+               else
+                  declare
+                     Passing : SData.Table.Index_Array (1 .. Total);
+                     Count   : Natural := 0;
+                  begin
+                     for R in 1 .. Total loop
+                        SData.Table.Set_Current_Record_Index (R);
+                        SData.Variables.Load_PDV_From_Table (R);
+                        if Is_True (Evaluate (Select_Filter_Expr)) then
+                           Count := Count + 1;
+                           Passing (Count) := R;
+                        end if;
+                     end loop;
+                     SData.Table.Set_Current_Record_Index (Saved_Physical);
+                     SData.Table.Set_Index_Map (Passing (1 .. Count));
+                  end;
+               end if;
+            end;
+         end if;
+
+         --  When a SELECT filter is active, iterate over the logical (filtered)
+         --  row count.  Each logical index maps to a physical row via
+         --  Logical_To_Physical.  When unfiltered, logical == physical.
+         declare
+            Logical_Count : constant Natural :=
+               (if SData.Table.Is_Filtered then SData.Table.Logical_Row_Count
+                else Num_Records);
+         begin
+         for Logical_I in 1 .. Logical_Count loop
+            declare
+               Phys_I : constant Positive := SData.Table.Logical_To_Physical (Logical_I);
+            begin
+            Set_Current_Record_Index (Phys_I);
+            SData.Table.Set_Logical_Record_Index (Logical_I);
 
             -- Step 1: Initialize PDV for this record
             Reset_PDV_Non_Held;
-            Load_PDV_From_Table (I);
+            Load_PDV_From_Table (Phys_I);
 
             -- Set First. and Last. indicators
             if not Current_By_Vars.Is_Empty then
                declare
-                  BOG_Val : constant Boolean := Is_First_In_Group (I);
-                  EOG_Val : constant Boolean := Is_Last_In_Group (I);
+                  BOG_Val : constant Boolean := Is_First_In_Group (Logical_I);
+                  EOG_Val : constant Boolean := Is_Last_In_Group (Logical_I, Logical_Count);
                begin
                   Set_BOG (BOG_Val);
                   Set_EOG (EOG_Val);
@@ -1489,8 +1554,8 @@ package body SData.Interpreter is
                   end loop;
                end;
             else
-               Set_BOG (I = 1);
-               Set_EOG (I = Num_Records);
+               Set_BOG (Logical_I = 1);
+               Set_EOG (Logical_I = Logical_Count);
             end if;
 
             Iter := Start;
@@ -1526,13 +1591,19 @@ package body SData.Interpreter is
                   Iter := Iter.Next;
                end loop;
             end if;
-            
+
             if not Current_Record_Deleted and then not Global_Has_Write then
                SData.Variables.Flush_PDV_To_Output;
             end if;
+            end; -- Phys_I declare
          end loop;
-         
+         end; -- Logical_Count declare
+
+         SData.Table.Set_Logical_Record_Index (0);
          SData.Table.Commit_Output_Table;
+         --  The committed table is a new physical row set; clear the stale map
+         --  so it is rebuilt fresh at the start of the next RUN.
+         SData.Table.Clear_Index_Map;
          Set_Current_Record_Index (0);
          Apply_Pending_Mods;
          if SData.Config.Save_File_Active then

@@ -132,6 +132,7 @@ package SData.AST is
       Stmt_SORT,   -- Sort the dataset
       Stmt_BY,     -- Group processing
       Stmt_SELECT, -- Multi-way branch
+      Stmt_SELECT_FILTER, -- Record filter (declarative)
       Stmt_DELETE, -- Drop current record
       Stmt_WRITE,  -- Explicit record output (was Stmt_OUTPUT)
       Stmt_OUTPUT, -- Console output redirection

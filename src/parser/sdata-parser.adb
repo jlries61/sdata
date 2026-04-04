@@ -743,78 +743,101 @@ package body SData.Parser is
             declare
                First_Branch, Last_Branch : Case_Branch := null;
                Tok_Local : Token;
+               Saved_Expr : Expression_Access := null;
+               Is_Block : Boolean := False;
             begin
-               Stmt := new Statement (Stmt_SELECT);
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_CASE and then
                   Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_WHEN and then
                   Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_OTHERWISE then
-                  Stmt.Selector := Parse_Expression (Ctx);
+                  Saved_Expr := Parse_Expression (Ctx);
                end if;
                
+               -- Skip separators to see if a CASE/WHEN/OTHERWISE follows.
                loop
-                  -- Skip separators.
+                  Tok_Local := Peek_Next_Token (Ctx.Lex_Ctx);
+                  exit when Tok_Local.Kind /= Token_Newline and then Tok_Local.Kind /= Token_Colon;
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               end loop;
+
+               Is_Block := Tok_Local.Kind = Token_CASE or else 
+                           Tok_Local.Kind = Token_WHEN or else 
+                           Tok_Local.Kind = Token_OTHERWISE;
+
+               if not Is_Block then
+                  -- Record filter form: SELECT <expr>
+                  Stmt := new Statement (Stmt_SELECT_FILTER);
+                  Stmt.Expr := Saved_Expr;
+               else
+                  -- Control structure form: SELECT [<expr>] CASE...
+                  Stmt := new Statement (Stmt_SELECT);
+                  Stmt.Selector := Saved_Expr;
+                  
                   loop
-                     Tok_Local := Peek_Next_Token (Ctx.Lex_Ctx);
-                     exit when Tok_Local.Kind /= Token_Newline and then Tok_Local.Kind /= Token_Colon;
-                     declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                     exit when Tok_Local.Kind = Token_END;
+                     if Tok_Local.Kind = Token_EOF then
+                        raise Incomplete_Statement;
+                     end if;
+                     
+                     if Tok_Local.Kind = Token_CASE or else Tok_Local.Kind = Token_WHEN then
+                        declare
+                           Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Branch : constant Case_Branch := new Case_Branch_Node;
+                           LP : constant Boolean := Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren;
+                        begin
+                           if LP then
+                              declare Discard_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                           end if;
+
+                           declare
+                              Last_Cond : Expression_List := null;
+                           begin
+                              loop
+                                 declare
+                                    E : constant Expression_Access := Parse_Expression (Ctx);
+                                    L : constant Expression_List := new Expression_List_Node'(Expr => E, Next => null);
+                                 begin
+                                    if Branch.Conditions = null then Branch.Conditions := L; else Last_Cond.Next := L; end if;
+                                    Last_Cond := L;
+                                 end;
+                                 exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Comma;
+                                 declare Discard_Comma : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                              end loop;
+                           end;
+
+                           if LP then
+                              if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
+                                 Put_Line_Error ("Error: Expected ')' after CASE conditions");
+                              end if;
+                           end if;
+
+                           Branch.Branch_Body := Parse_Select_Body (Ctx);
+                           if First_Branch = null then First_Branch := Branch; else Last_Branch.Next := Branch; end if;
+                           Last_Branch := Branch;
+                        end;
+                     elsif Tok_Local.Kind = Token_OTHERWISE then
+                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        begin Stmt.Otherwise_Part := Parse_Select_Body (Ctx); end;
+                     else
+                        -- Should not happen due to exit when Tok_Local.Kind not case/end
+                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                     end if;
+
+                     -- Skip separators for next iteration.
+                     loop
+                        Tok_Local := Peek_Next_Token (Ctx.Lex_Ctx);
+                        exit when Tok_Local.Kind /= Token_Newline and then Tok_Local.Kind /= Token_Colon;
+                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                     end loop;
                   end loop;
 
-                  exit when Tok_Local.Kind = Token_END;
-                  if Tok_Local.Kind = Token_EOF then
-                     raise Incomplete_Statement;
+                  if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_END then
+                     Put_Line_Error ("Error: Expected END after SELECT");
                   end if;
-                  
-                  if Tok_Local.Kind = Token_CASE or else Tok_Local.Kind = Token_WHEN then
-                     declare
-                        Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                        Branch : constant Case_Branch := new Case_Branch_Node;
-                        LP : constant Boolean := Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren;
-                     begin
-                        if LP then
-                           declare Discard_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                        end if;
-
-                        declare
-                           Last_Cond : Expression_List := null;
-                        begin
-                           loop
-                              declare
-                                 E : constant Expression_Access := Parse_Expression (Ctx);
-                                 L : constant Expression_List := new Expression_List_Node'(Expr => E, Next => null);
-                              begin
-                                 if Branch.Conditions = null then Branch.Conditions := L; else Last_Cond.Next := L; end if;
-                                 Last_Cond := L;
-                              end;
-                              exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Comma;
-                              declare Discard_Comma : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                           end loop;
-                        end;
-
-                        if LP then
-                           if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                              Put_Line_Error ("Error: Expected ')' after CASE conditions");
-                           end if;
-                        end if;
-
-                        Branch.Branch_Body := Parse_Select_Body (Ctx);
-                        if First_Branch = null then First_Branch := Branch; else Last_Branch.Next := Branch; end if;
-                        Last_Branch := Branch;
-                     end;
-                  elsif Tok_Local.Kind = Token_OTHERWISE then
-                     declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                     begin Stmt.Otherwise_Part := Parse_Select_Body (Ctx); end;
-                  else
-                     -- Should not happen due to exit when Tok_Local.Kind not case/end
+                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_SELECT then
                      declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                   end if;
-               end loop;
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_END then
-                  Put_Line_Error ("Error: Expected END after SELECT");
+                  Stmt.Branches := First_Branch;
                end if;
-               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_SELECT then
-                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-               end if;
-               Stmt.Branches := First_Branch;
             end;
 
          when Token_SORT | Token_BY =>

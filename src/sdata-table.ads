@@ -71,6 +71,17 @@ package SData.Table is
    --  Sets/Gets the pointer to the current record during data step iteration.
    procedure Set_Current_Record_Index (Index : Natural);
    function Get_Current_Record_Index return Natural;
+
+   procedure Set_Logical_Record_Index (Index : Natural);
+   function Get_Logical_Record_Index return Natural;
+
+   --  Filtered view support (SELECT filter)
+   type Index_Array is array (Positive range <>) of Positive;
+   procedure Set_Index_Map (Map : Index_Array);
+   procedure Clear_Index_Map;
+   function Logical_To_Physical (Logical : Positive) return Positive;
+   function Logical_Row_Count return Natural;
+   function Is_Filtered return Boolean;
    
 
    --  Output Table Management
@@ -125,5 +136,8 @@ private
 
    --  Current record pointer for the interpreter.
    Current_Record : Natural := 0;
+   
+   -- Logical record number (respecting filters)
+   Logical_Record : Natural := 0;
 
 end SData.Table;

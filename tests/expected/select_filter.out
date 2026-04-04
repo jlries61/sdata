@@ -1,0 +1,16 @@
+RUN complete. 10 records and 1 variables processed.
+RUN complete. 5 records and 1 variables processed.
+ODD: 1.00000
+ODD: 3.00000
+ODD: 5.00000
+ODD: 7.00000
+ODD: 9.00000
+RUN complete. 5 records and 1 variables processed.
+RUN complete. 10 records and 1 variables processed.
+RUN complete. 5 records and 1 variables processed.
+X <= 5: 1.00000
+X <= 5: 2.00000
+X <= 5: 3.00000
+X <= 5: 4.00000
+X <= 5: 5.00000
+RUN complete. 5 records and 1 variables processed.

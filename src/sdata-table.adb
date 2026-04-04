@@ -3,7 +3,13 @@ with Ada.Containers;         use Ada.Containers;
 with SData.Config;
 with SData.IO;
 
+with Ada.Unchecked_Deallocation;
+
 package body SData.Table is
+
+   -- Filtered View Mapping
+   type Index_Array_Access is access Index_Array;
+   Filter_Map : Index_Array_Access := null;
 
    -----------
    -- Clear --
@@ -14,6 +20,7 @@ package body SData.Table is
       Column_Order.Clear;
       Table_Row_Count := 0;
       Current_Record := 0;
+      Clear_Index_Map;
    end Clear;
 
    ----------------
@@ -366,6 +373,72 @@ package body SData.Table is
    begin
       return Current_Record;
    end Get_Current_Record_Index;
+
+   procedure Set_Logical_Record_Index (Index : Natural) is
+   begin
+      Logical_Record := Index;
+   end Set_Logical_Record_Index;
+
+   function Get_Logical_Record_Index return Natural is
+   begin
+      return Logical_Record;
+   end Get_Logical_Record_Index;
+
+   -------------------
+   -- Set_Index_Map --
+   -------------------
+   procedure Set_Index_Map (Map : Index_Array) is
+   begin
+      Clear_Index_Map;
+      if Map'Length > 0 then
+         Filter_Map := new Index_Array'(Map);
+      end if;
+   end Set_Index_Map;
+
+   ---------------------
+   -- Clear_Index_Map --
+   ---------------------
+   procedure Clear_Index_Map is
+      procedure Free is new Ada.Unchecked_Deallocation (Index_Array, Index_Array_Access);
+   begin
+      if Filter_Map /= null then
+         Free (Filter_Map);
+      end if;
+   end Clear_Index_Map;
+
+   -------------------------
+   -- Logical_To_Physical --
+   -------------------------
+   function Logical_To_Physical (Logical : Positive) return Positive is
+   begin
+      if Filter_Map = null then
+         return Logical;
+      elsif Logical <= Filter_Map'Length then
+         return Filter_Map (Logical);
+      else
+         return Logical; -- Fallback
+      end if;
+   end Logical_To_Physical;
+
+   ------------------------
+   -- Logical_Row_Count --
+   ------------------------
+   function Logical_Row_Count return Natural is
+   begin
+      if Filter_Map = null then
+         return Table_Row_Count;
+      else
+         return Filter_Map'Length;
+      end if;
+   end Logical_Row_Count;
+
+   -----------------
+   -- Is_Filtered --
+   -----------------
+   function Is_Filtered return Boolean is
+   begin
+      return Filter_Map /= null;
+   end Is_Filtered;
 
 
    -----------------------------

@@ -253,6 +253,7 @@ package body SData.Lexer is
                elsif Upper = "DIGITS" then T.Kind := Token_DIGITS;
                elsif Upper = "FPATH" then T.Kind := Token_FPATH;
                elsif Upper = "HEADER" then T.Kind := Token_HEADER;
+               elsif Upper = "ALL" or Upper = "/ALL" then T.Kind := Token_ALL;
                elsif Upper = "REM" then 
                   T.Kind := Token_REM;
                   -- Skip rest of line for REM command (comment).
