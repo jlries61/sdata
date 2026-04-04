@@ -215,7 +215,10 @@ package body SData.Evaluator is
             else return Handle_Domain_Error ("Division by zero in MOD."); end if;
          end;
       elsif Name = "RECNO" then
-         return (Kind => Val_Integer, Int_Val => Integer (SData.Table.Get_Current_Record_Index));
+         return (Kind => Val_Integer,
+                 Int_Val => (if SData.Table.Is_Filtered
+                             then Integer (SData.Table.Get_Logical_Record_Index)
+                             else Integer (SData.Table.Get_Current_Record_Index)));
       elsif Name = "BOG" then
          return (Kind => Val_Integer, Int_Val => (if BOG_Flag then 1 else 0));
       elsif Name = "EOG" then
@@ -727,40 +730,61 @@ package body SData.Evaluator is
       -- Record Navigation Functions
       elsif Name = "BOF" then
          return (Kind => Val_Integer,
-                 Int_Val => (if SData.Table.Get_Current_Record_Index <= 1 then 1 else 0));
+                 Int_Val => (if SData.Table.Is_Filtered
+                             then (if SData.Table.Get_Logical_Record_Index <= 1 then 1 else 0)
+                             else (if SData.Table.Get_Current_Record_Index <= 1 then 1 else 0)));
       elsif Name = "EOF" then
          return (Kind => Val_Integer,
-                 Int_Val => (if SData.Table.Get_Current_Record_Index >= SData.Table.Row_Count
-                             then 1 else 0));
+                 Int_Val => (if SData.Table.Is_Filtered
+                             then (if SData.Table.Get_Logical_Record_Index >= SData.Table.Logical_Row_Count then 1 else 0)
+                             else (if SData.Table.Get_Current_Record_Index >= SData.Table.Row_Count then 1 else 0)));
       elsif (Name = "LAG" or else Name = "LAGC$") and then (Has_Args (1) or else Has_Args (2)) then
          declare
-            Var  : constant Value   := All_Vals.Element (1);
-            N_Val : constant Value  := (if Has_Args (2) then All_Vals.Element (2) else (Kind => Val_Integer, Int_Val => 1));
-            N    : Integer;
-            Idx  : constant Natural := SData.Table.Get_Current_Record_Index;
+            Var    : constant Value   := All_Vals.Element (1);
+            N_Val  : constant Value   := (if Has_Args (2) then All_Vals.Element (2) else (Kind => Val_Integer, Int_Val => 1));
+            N      : Integer;
+            --  In filtered mode, navigate in logical space; physical is derived via Logical_To_Physical.
+            Log_Idx : constant Natural :=
+               (if SData.Table.Is_Filtered then SData.Table.Get_Logical_Record_Index
+                else SData.Table.Get_Current_Record_Index);
          begin
             if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
             N := Integer (Convert_To_Float (N_Val));
-            if N <= 0 or else Idx <= N then return (Kind => Val_Missing); end if;
-            if not SData.Interpreter.In_Same_Group (Idx, Idx - N) then
-               return (Kind => Val_Missing);
-            end if;
-            return SData.Table.Get_Value_Upper (Idx - N, To_Upper (SData.Values.To_String (Var)));
+            if N <= 0 or else Log_Idx <= N then return (Kind => Val_Missing); end if;
+            declare
+               Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Log_Idx);
+               Phys_Prev : constant Positive := SData.Table.Logical_To_Physical (Log_Idx - N);
+            begin
+               if not SData.Interpreter.In_Same_Group (Phys_Curr, Phys_Prev) then
+                  return (Kind => Val_Missing);
+               end if;
+               return SData.Table.Get_Value_Upper (Phys_Prev, To_Upper (SData.Values.To_String (Var)));
+            end;
          end;
       elsif (Name = "NEXT" or else Name = "NEXTC$") and then (Has_Args (1) or else Has_Args (2)) then
          declare
-            Var  : constant Value   := All_Vals.Element (1);
-            N_Val : constant Value  := (if Has_Args (2) then All_Vals.Element (2) else (Kind => Val_Integer, Int_Val => 1));
-            N    : Integer;
-            Idx  : constant Natural := SData.Table.Get_Current_Record_Index;
+            Var    : constant Value   := All_Vals.Element (1);
+            N_Val  : constant Value   := (if Has_Args (2) then All_Vals.Element (2) else (Kind => Val_Integer, Int_Val => 1));
+            N      : Integer;
+            Log_Idx : constant Natural :=
+               (if SData.Table.Is_Filtered then SData.Table.Get_Logical_Record_Index
+                else SData.Table.Get_Current_Record_Index);
+            Log_Count : constant Natural :=
+               (if SData.Table.Is_Filtered then SData.Table.Logical_Row_Count
+                else SData.Table.Row_Count);
          begin
             if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
             N := Integer (Convert_To_Float (N_Val));
-            if N <= 0 or else (Idx + N) > SData.Table.Row_Count then return (Kind => Val_Missing); end if;
-            if not SData.Interpreter.In_Same_Group (Idx, Idx + N) then
-               return (Kind => Val_Missing);
-            end if;
-            return SData.Table.Get_Value_Upper (Idx + N, To_Upper (SData.Values.To_String (Var)));
+            if N <= 0 or else (Log_Idx + N) > Log_Count then return (Kind => Val_Missing); end if;
+            declare
+               Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Log_Idx);
+               Phys_Next : constant Positive := SData.Table.Logical_To_Physical (Log_Idx + N);
+            begin
+               if not SData.Interpreter.In_Same_Group (Phys_Curr, Phys_Next) then
+                  return (Kind => Val_Missing);
+               end if;
+               return SData.Table.Get_Value_Upper (Phys_Next, To_Upper (SData.Values.To_String (Var)));
+            end;
          end;
       elsif (Name = "OBS" or else Name = "OBSC$") and then Has_Args (2) then
          declare
