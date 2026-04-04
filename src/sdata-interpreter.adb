@@ -418,6 +418,7 @@ package body SData.Interpreter is
             Put_Line ("               LIF, PIF");
             Put_Line ("  Stat RN:     ZRN, NRN, URN, ERN, PRN, GRN, MRN, XRN, TRN,");
             Put_Line ("               FRN, WRN, LRN, RAN, RANDOM");
+            Put_Line ("  (Use HELP DISTRIBUTIONS for an overview of naming conventions.)");
             New_Line;
             Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
          elsif T = "USE" then
@@ -516,6 +517,10 @@ package body SData.Interpreter is
             Put_Line ("  ELSE");
             Put_Line ("    LET STATUS$ = ""SENIOR""");
             Put_Line ("  END IF");
+            New_Line;
+            Put_Line ("Also usable as a function: IF(condition, true_value, false_value)");
+            Put_Line ("Returns true_value when condition is non-zero/non-empty, else false_value.");
+            Put_Line ("Example: LET STATUS$ = IF(AGE < 18, ""MINOR"", ""ADULT"")");
          elsif T = "SELECT" then
             Put_Line ("Command (record filter): SELECT expression  |  SELECT /ALL");
             Put_Line ("Activates a virtual record filter for subsequent RUNs.");
@@ -588,11 +593,15 @@ package body SData.Interpreter is
             Put_Line ("Command: QUIT | END");
             Put_Line ("Exits the interpreter.");
          elsif T = "MEAN" then
-            Put_Line ("Function: MEAN(v1, [v2, ...])");
-            Put_Line ("Returns the row-wise mean of the specified values or arrays.");
+            Put_Line ("Function: MEAN(v1 [, v2, ...])");
+            Put_Line ("Returns the arithmetic mean of non-missing values across the arguments.");
+            Put_Line ("Missing values are excluded; the divisor is the non-missing count.");
+            Put_Line ("Arguments may be individual values or array names (expanded automatically).");
          elsif T = "SUM" then
-            Put_Line ("Function: SUM(v1, [v2, ...])");
-            Put_Line ("Returns the row-wise sum of the specified values or arrays.");
+            Put_Line ("Function: SUM(v1 [, v2, ...])");
+            Put_Line ("Returns the sum of non-missing values across the arguments.");
+            Put_Line ("Missing values are skipped; SUM of all-missing arguments returns 0.");
+            Put_Line ("Arguments may be individual values or array names (expanded automatically).");
          elsif T = "ABS" then
             Put_Line ("Function: ABS(x)");
             Put_Line ("Returns the absolute value of x.");
@@ -624,23 +633,31 @@ package body SData.Interpreter is
             Put_Line ("Function: MOD(x, y)");
             Put_Line ("Returns the remainder of x divided by y.");
          elsif T = "STD" then
-            Put_Line ("Function: STD(v1, [v2, ...])");
-            Put_Line ("Returns the row-wise standard deviation.");
+            Put_Line ("Function: STD(v1 [, v2, ...])");
+            Put_Line ("Returns the sample standard deviation (n-1 denominator) of non-missing values.");
+            Put_Line ("Returns missing when fewer than 2 non-missing values are supplied.");
+            Put_Line ("Arguments may be individual values or array names (expanded automatically).");
          elsif T = "VAR" then
-            Put_Line ("Function: VAR(v1, [v2, ...])");
-            Put_Line ("Returns the row-wise variance.");
+            Put_Line ("Function: VAR(v1 [, v2, ...])");
+            Put_Line ("Returns the sample variance (n-1 denominator) of non-missing values.");
+            Put_Line ("Returns missing when fewer than 2 non-missing values are supplied.");
+            Put_Line ("Arguments may be individual values or array names (expanded automatically).");
          elsif T = "N" then
-            Put_Line ("Function: N(v1, [v2, ...])");
-            Put_Line ("Returns the count of non-missing values in the current row.");
+            Put_Line ("Function: N(v1 [, v2, ...])");
+            Put_Line ("Returns the count of non-missing values across the supplied arguments.");
+            Put_Line ("Arguments may be individual values or array names (expanded automatically).");
          elsif T = "NMISS" then
-            Put_Line ("Function: NMISS(v1, [v2, ...])");
-            Put_Line ("Returns the count of missing values in the current row.");
+            Put_Line ("Function: NMISS(v1 [, v2, ...])");
+            Put_Line ("Returns the count of missing values across the supplied arguments.");
+            Put_Line ("Arguments may be individual values or array names (expanded automatically).");
          elsif T = "MAX" then
-            Put_Line ("Function: MAX(v1, [v2, ...])");
-            Put_Line ("Returns the maximum value across the specified arguments.");
+            Put_Line ("Function: MAX(v1 [, v2, ...])");
+            Put_Line ("Returns the largest non-missing value across the arguments.");
+            Put_Line ("Returns missing if all arguments are missing.");
          elsif T = "MIN" then
-            Put_Line ("Function: MIN(v1, [v2, ...])");
-            Put_Line ("Returns the minimum value across the specified arguments.");
+            Put_Line ("Function: MIN(v1 [, v2, ...])");
+            Put_Line ("Returns the smallest non-missing value across the arguments.");
+            Put_Line ("Returns missing if all arguments are missing.");
          elsif T = "HOLD" then
             Put_Line ("Command: HOLD [variable(s)]");
             Put_Line ("Retains values of variables across records in a Data Step.");
@@ -724,19 +741,28 @@ package body SData.Interpreter is
             Put_Line ("  Operates in logical space; filtered-out records are invisible.");
          elsif T = "LAG" or else T = "LAGC$" then
             Put_Line ("Function: LAG(""varname"" [, n]) / LAGC$(""varname"" [, n])");
-            Put_Line ("  Returns the value of the named variable n records back (default n=1).");
-            Put_Line ("  Returns missing at the start of the dataset or BY group.");
-            Put_Line ("  When a SELECT filter is active, only visible records are counted;");
-            Put_Line ("  filtered-out rows are skipped.");
+            Put_Line ("Returns the value of the named variable n records back (default n=1).");
+            Put_Line ("Returns missing at the start of the dataset or at a BY-group boundary.");
+            Put_Line ("When a SELECT filter is active, only visible (logical) records are counted;");
+            Put_Line ("filtered-out rows are completely invisible to LAG.");
+            Put_Line ("The variable name may be given unquoted: LAG(X) is equivalent to LAG(""X"").");
+            Put_Line ("LAG returns a numeric value; LAGC$ returns a string value.");
          elsif T = "NEXT" or else T = "NEXTC$" then
             Put_Line ("Function: NEXT(""varname"" [, n]) / NEXTC$(""varname"" [, n])");
-            Put_Line ("  Returns the value of the named variable n records ahead (default n=1).");
-            Put_Line ("  Returns missing at the end of the dataset or BY group.");
-            Put_Line ("  When a SELECT filter is active, only visible records are counted;");
-            Put_Line ("  filtered-out rows are skipped.");
+            Put_Line ("Returns the value of the named variable n records ahead (default n=1).");
+            Put_Line ("Returns missing at the end of the dataset or at a BY-group boundary.");
+            Put_Line ("When a SELECT filter is active, only visible (logical) records are counted;");
+            Put_Line ("filtered-out rows are completely invisible to NEXT.");
+            Put_Line ("The variable name may be given unquoted: NEXT(X) is equivalent to NEXT(""X"").");
+            Put_Line ("NEXT returns a numeric value; NEXTC$ returns a string value.");
          elsif T = "OBS" or else T = "OBSC$" then
             Put_Line ("Function: OBS(""varname"", row) / OBSC$(""varname"", row)");
-            Put_Line ("  Returns the value of the named variable from the given physical row.");
+            Put_Line ("Returns the value of the named variable from the specified physical row.");
+            Put_Line ("row: 1-based row index in the Data Table, counting all rows regardless of");
+            Put_Line ("any active SELECT filter (i.e. OBS ignores the logical/filtered view).");
+            Put_Line ("Returns missing if row < 1 or row > total row count.");
+            Put_Line ("The variable name may be given unquoted: OBS(X, 3) is equivalent to OBS(""X"", 3).");
+            Put_Line ("OBS returns a numeric value; OBSC$ returns a string value.");
 
          -- ── Special functions ─────────────────────────────────────────────
          elsif T = "MISSING" then Put_Line ("Function: MISSING(x)  ->  1 if x is missing, else 0");
@@ -756,40 +782,146 @@ package body SData.Interpreter is
          elsif T = "VAR"    then Put_Line ("Function: VAR(v1, ...)    ->  sample variance");
          elsif T = "MIN"    then Put_Line ("Function: MIN(v1, ...)    ->  minimum non-missing value");
          elsif T = "MAX"    then Put_Line ("Function: MAX(v1, ...)    ->  maximum non-missing value");
-         elsif T = "MEDIAN" then Put_Line ("Function: MEDIAN(v1, ...) ->  median of non-missing values");
+         elsif T = "MEDIAN" then
+            Put_Line ("Function: MEDIAN(v1 [, v2, ...])");
+            Put_Line ("Returns the median of non-missing values across the arguments.");
+            Put_Line ("Values are sorted internally; missing values are excluded.");
+            Put_Line ("Returns missing if all arguments are missing.");
+            Put_Line ("Arguments may be individual values or array names (expanded automatically).");
          elsif T = "N"      then Put_Line ("Function: N(v1, ...)      ->  count of non-missing values");
 
          -- ── Statistical distributions ─────────────────────────────────────
-         --  Naming: Z=Normal, N=Normal(mu,sigma), U=Uniform, E=Exponential,
+         --  Naming: Z=Normal(0,1), N=Normal(mu,sigma), U=Uniform, E=Exponential,
          --          B=Beta, P=Poisson, G=Gamma, X=Chi-square, T=Student-T,
          --          F=F, M=Binomial, W=Weibull, L=Laplace
-         --  Suffix: DF=PDF, CF=CDF, IF=IDF(quantile), RN=random variate
+         --  Suffix: DF=density/PMF, CF=CDF, IF=inverse CDF (quantile), RN=random variate
+         elsif T = "DISTRIBUTIONS" or T = "DIST" then
+            Put_Line ("Statistical distribution functions follow a uniform naming convention.");
+            New_Line;
+            Put_Line ("Function suffix meanings:");
+            Put_Line ("  DF   Probability density function (PDF) or probability mass (PMF)");
+            Put_Line ("  CF   Cumulative distribution function: P(X <= x)");
+            Put_Line ("  IF   Inverse CDF (quantile): value x such that P(X <= x) = p  (0 < p < 1)");
+            Put_Line ("  RN   Generate a random variate from the distribution");
+            New_Line;
+            Put_Line ("Common argument names:");
+            Put_Line ("  x      Continuous variate value");
+            Put_Line ("  k      Discrete variate value (non-negative integer)");
+            Put_Line ("  p      Probability for inverse CDF  (0 < p < 1)");
+            New_Line;
+            Put_Line ("Distribution prefixes:");
+            Put_Line ("  Z  Standard Normal (fixed mu=0, sigma=1)");
+            Put_Line ("  N  Normal with parameters mu, sigma");
+            Put_Line ("  U  Uniform on [lo, hi]");
+            Put_Line ("  E  Exponential with rate parameter");
+            Put_Line ("  B  Beta  (shape parameters a, b)");
+            Put_Line ("  P  Poisson  (mean lambda)");
+            Put_Line ("  G  Gamma  (shape, rate)");
+            Put_Line ("  X  Chi-square  (df degrees of freedom)");
+            Put_Line ("  T  Student's t  (df degrees of freedom)");
+            Put_Line ("  F  F distribution  (df1, df2 degrees of freedom)");
+            Put_Line ("  M  Binomial  (n trials, prob success probability)");
+            Put_Line ("  W  Weibull  (scale, shape)");
+            Put_Line ("  L  Laplace / double-exponential  (loc, scale)");
+            New_Line;
+            Put_Line ("Use HELP <prefix>DF for full details on each family.");
          elsif T = "ZDF" or T = "ZCF" or T = "ZIF" or T = "ZRN" then
-            Put_Line ("Standard Normal (mu=0, sigma=1): ZDF(x) ZCF(x) ZIF(p) ZRN()");
+            Put_Line ("Standard Normal distribution  (mu = 0, sigma = 1):");
+            Put_Line ("  ZDF(x)   probability density at x");
+            Put_Line ("  ZCF(x)   cumulative probability P(X <= x)");
+            Put_Line ("  ZIF(p)   quantile: x such that P(X <= x) = p  (0 < p < 1)");
+            Put_Line ("  ZRN()    random variate");
+            Put_Line ("See also: NDF for Normal with arbitrary mu and sigma.");
          elsif T = "NDF" or T = "NCF" or T = "NIF" or T = "NRN" then
-            Put_Line ("Normal: NDF(x,mu,sigma) NCF(x,mu,sigma) NIF(p,mu,sigma) NRN(mu,sigma)");
+            Put_Line ("Normal distribution:");
+            Put_Line ("  NDF(x, mu, sigma)   probability density at x");
+            Put_Line ("  NCF(x, mu, sigma)   cumulative probability P(X <= x)");
+            Put_Line ("  NIF(p, mu, sigma)   quantile  (0 < p < 1)");
+            Put_Line ("  NRN(mu, sigma)      random variate");
+            Put_Line ("  mu: mean; sigma: standard deviation (sigma > 0)");
          elsif T = "UDF" or T = "UCF" or T = "UIF" or T = "URN" then
-            Put_Line ("Uniform: UDF(x,lo,hi) UCF(x,lo,hi) UIF(p,lo,hi) URN(lo,hi)");
+            Put_Line ("Uniform distribution on [lo, hi]:");
+            Put_Line ("  UDF(x, lo, hi)   probability density (1/(hi-lo) for lo <= x <= hi)");
+            Put_Line ("  UCF(x, lo, hi)   cumulative probability P(X <= x)");
+            Put_Line ("  UIF(p, lo, hi)   quantile  (0 < p < 1)");
+            Put_Line ("  URN(lo, hi)      random variate");
+            Put_Line ("  lo, hi: interval bounds (lo < hi)");
          elsif T = "EDF" or T = "ECF" or T = "EIF" or T = "ERN" then
-            Put_Line ("Exponential: EDF(x,rate) ECF(x,rate) EIF(p,rate) ERN(rate)");
+            Put_Line ("Exponential distribution:");
+            Put_Line ("  EDF(x, rate)   probability density (rate*exp(-rate*x), x >= 0)");
+            Put_Line ("  ECF(x, rate)   cumulative probability P(X <= x)");
+            Put_Line ("  EIF(p, rate)   quantile  (0 < p < 1)");
+            Put_Line ("  ERN(rate)      random variate");
+            Put_Line ("  rate: rate parameter lambda (rate > 0); mean = 1/rate");
          elsif T = "BDF" or T = "BCF" or T = "BIF" or T = "BRN" then
-            Put_Line ("Beta: BDF(x,a,b) BCF(x,a,b) BIF(p,a,b)  [no BRN]");
+            Put_Line ("Beta distribution on [0, 1]:");
+            Put_Line ("  BDF(x, a, b)   probability density");
+            Put_Line ("  BCF(x, a, b)   cumulative probability P(X <= x)");
+            Put_Line ("  BIF(p, a, b)   quantile  (0 < p < 1)");
+            Put_Line ("  a, b: shape parameters (both > 0)");
+            Put_Line ("  Note: no random variate generator (BRN) is available.");
          elsif T = "PDF" or T = "PCF" or T = "PIF" or T = "PRN" then
-            Put_Line ("Poisson: PDF(k,lambda) PCF(k,lambda) PIF(p,lambda) PRN(lambda)");
+            Put_Line ("Poisson distribution (discrete):");
+            Put_Line ("  PDF(k, lambda)   probability mass P(X = k)  (k non-negative integer)");
+            Put_Line ("  PCF(k, lambda)   cumulative probability P(X <= k)");
+            Put_Line ("  PIF(p, lambda)   quantile  (0 < p < 1)");
+            Put_Line ("  PRN(lambda)      random variate");
+            Put_Line ("  lambda: mean arrival rate (lambda > 0)");
          elsif T = "GDF" or T = "GCF" or T = "GIF" or T = "GRN" then
-            Put_Line ("Gamma: GDF(x,shape,rate) GCF(x,shape,rate) GIF(p,shape,rate) GRN(shape,rate)");
+            Put_Line ("Gamma distribution:");
+            Put_Line ("  GDF(x, shape, rate)   probability density (x >= 0)");
+            Put_Line ("  GCF(x, shape, rate)   cumulative probability P(X <= x)");
+            Put_Line ("  GIF(p, shape, rate)   quantile  (0 < p < 1)");
+            Put_Line ("  GRN(shape, rate)      random variate");
+            Put_Line ("  shape: shape parameter k (> 0); rate: rate parameter (> 0)");
+            Put_Line ("  mean = shape/rate;  variance = shape/rate^2");
          elsif T = "XDF" or T = "XCF" or T = "XIF" or T = "XRN" then
-            Put_Line ("Chi-square: XDF(x,df) XCF(x,df) XIF(p,df) XRN(df)");
+            Put_Line ("Chi-square distribution:");
+            Put_Line ("  XDF(x, df)   probability density (x >= 0)");
+            Put_Line ("  XCF(x, df)   cumulative probability P(X <= x)");
+            Put_Line ("  XIF(p, df)   quantile  (0 < p < 1)");
+            Put_Line ("  XRN(df)      random variate");
+            Put_Line ("  df: degrees of freedom (positive integer)");
+            Put_Line ("  mean = df;  variance = 2*df");
          elsif T = "TDF" or T = "TCF" or T = "TIF" or T = "TRN" then
-            Put_Line ("Student-T: TDF(x,df) TCF(x,df) TIF(p,df) TRN(df)");
+            Put_Line ("Student's t distribution:");
+            Put_Line ("  TDF(x, df)   probability density");
+            Put_Line ("  TCF(x, df)   cumulative probability P(T <= x)");
+            Put_Line ("  TIF(p, df)   quantile  (0 < p < 1)");
+            Put_Line ("  TRN(df)      random variate");
+            Put_Line ("  df: degrees of freedom (df > 0; need not be an integer)");
          elsif T = "FDF" or T = "FCF" or T = "FIF" or T = "FRN" then
-            Put_Line ("F: FDF(x,df1,df2) FCF(x,df1,df2) FIF(p,df1,df2) FRN(df1,df2)");
+            Put_Line ("F distribution:");
+            Put_Line ("  FDF(x, df1, df2)   probability density (x >= 0)");
+            Put_Line ("  FCF(x, df1, df2)   cumulative probability P(F <= x)");
+            Put_Line ("  FIF(p, df1, df2)   quantile  (0 < p < 1)");
+            Put_Line ("  FRN(df1, df2)      random variate");
+            Put_Line ("  df1: numerator degrees of freedom; df2: denominator degrees of freedom");
+            Put_Line ("  (both > 0; need not be integers)");
          elsif T = "MDF" or T = "MCF" or T = "MIF" or T = "MRN" then
-            Put_Line ("Binomial: MDF(k,n,p) MCF(k,n,p) MIF(p,n,prob)  [no MRN]");
+            Put_Line ("Binomial distribution (discrete):");
+            Put_Line ("  MDF(k, n, prob)   probability mass P(X = k)  (k = 0, 1, ..., n)");
+            Put_Line ("  MCF(k, n, prob)   cumulative probability P(X <= k)");
+            Put_Line ("  MIF(p, n, prob)   quantile  (0 < p < 1)");
+            Put_Line ("  n: number of trials (positive integer)");
+            Put_Line ("  prob: success probability per trial (0 <= prob <= 1)");
+            Put_Line ("  Note: no random variate generator (MRN) is available.");
          elsif T = "WDF" or T = "WCF" or T = "WIF" or T = "WRN" then
-            Put_Line ("Weibull: WDF(x,scale,shape) WCF(x,scale,shape) WIF(p,scale,shape) WRN(scale,shape)");
+            Put_Line ("Weibull distribution:");
+            Put_Line ("  WDF(x, scale, shape)   probability density (x >= 0)");
+            Put_Line ("  WCF(x, scale, shape)   cumulative probability P(X <= x)");
+            Put_Line ("  WIF(p, scale, shape)   quantile  (0 < p < 1)");
+            Put_Line ("  WRN(scale, shape)      random variate");
+            Put_Line ("  scale: scale parameter lambda (> 0); shape: shape parameter k (> 0)");
+            Put_Line ("  Exponential is the special case shape = 1.");
          elsif T = "LDF" or T = "LCF" or T = "LIF" or T = "LRN" then
-            Put_Line ("Laplace: LDF(x,loc,scale) LCF(x,loc,scale) LIF(p,loc,scale) LRN(loc,scale)");
+            Put_Line ("Laplace (double-exponential) distribution:");
+            Put_Line ("  LDF(x, loc, scale)   probability density");
+            Put_Line ("  LCF(x, loc, scale)   cumulative probability P(X <= x)");
+            Put_Line ("  LIF(p, loc, scale)   quantile  (0 < p < 1)");
+            Put_Line ("  LRN(loc, scale)      random variate");
+            Put_Line ("  loc: location parameter (mean); scale: scale parameter b (> 0)");
+            Put_Line ("  std dev = sqrt(2) * b");
 
          elsif T = "OPTIONS" then
             Put_Line ("Runtime Configuration Flags:");
@@ -837,7 +969,7 @@ package body SData.Interpreter is
                   new String'("TIME$"), new String'("SHELL"), new String'("SUM"),
                   new String'("MEAN"), new String'("STD"), new String'("VAR"),
                   new String'("MIN"), new String'("MAX"), new String'("MEDIAN"),
-                  new String'("N"), new String'("ZDF"), new String'("NDF"),
+                  new String'("N"), new String'("DISTRIBUTIONS"), new String'("ZDF"), new String'("NDF"),
                   new String'("UDF"), new String'("EDF"), new String'("BDF"),
                   new String'("PDF"), new String'("GDF"), new String'("XDF"),
                   new String'("TDF"), new String'("FDF"), new String'("MDF"),
