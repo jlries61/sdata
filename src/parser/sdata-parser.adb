@@ -4,6 +4,29 @@ with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
 with SData.Config;
 with SData.Variables; use SData.Variables;
 
+--  SData.Parser — recursive-descent parser for the SData command language.
+--
+--  Entry points:
+--    Parse_Statement  parse one statement from an already-initialised context
+--    Parse_Program    parse a complete statement list until EOF
+--
+--  Expression parsing uses a precedence-climbing (Pratt) algorithm:
+--    Parse_Expression → Parse_Expression_1(min_prec=1) → Parse_Primary
+--  Get_Precedence maps each binary operator token to a numeric level; higher
+--  numbers bind more tightly.  Parse_Expression_1 recurses with (prec+1) for
+--  left-associative operators so that equal-precedence operators associate left.
+--
+--  Statements are a flat case dispatch in Parse_Statement.  Some statements
+--  (IF, FOR, WHILE, SELECT) recurse back into Parse_Statement / Parse_Block /
+--  Parse_If_Body to collect their sub-statement lists.
+--
+--  The SELECT token is overloaded across three distinct forms:
+--    SELECT /ALL          → Stmt_SELECT_FILTER with null Expr (cancel filter)
+--    SELECT <expr>        → Stmt_SELECT_FILTER with non-null Expr (set filter)
+--    SELECT [<expr>] CASE → Stmt_SELECT (control structure / multi-way branch)
+--  The parser distinguishes these by peeking at the token after the optional
+--  expression.
+
 package body SData.Parser is
 
    ------------------
@@ -204,6 +227,13 @@ package body SData.Parser is
    -------------------
    -- Parse_Primary --
    -------------------
+   --  Parses the smallest complete unit of an expression: a literal, a
+   --  parenthesised sub-expression, a variable reference, or a function call.
+   --
+   --  Token_NEXT and Token_IF are lexed as keywords but can also appear as
+   --  function calls (e.g. NEXT("X") or IF(cond, t, f)).  They are therefore
+   --  handled identically to Token_Identifier here: if followed by '(' or '{'
+   --  they become an Expr_Function_Call node; otherwise an Expr_Variable node.
    function Parse_Primary (Ctx : in out Parser_Context) return Expression_Access is
       Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
       Node : Expression_Access;
@@ -321,6 +351,12 @@ package body SData.Parser is
    ------------------------
    -- Parse_Expression_1 --
    ------------------------
+   --  Precedence-climbing (Pratt) binary-operator parser.
+   --  Starts by parsing a primary, then repeatedly peeks at the next token:
+   --    * If its precedence is below Min_Precedence, stop.
+   --    * Otherwise consume the operator and recurse with (prec + 1) as the
+   --      new minimum, which makes all built-in operators left-associative
+   --      (a right-associative operator would recurse with the same prec).
    function Parse_Expression_1 (Ctx : in out Parser_Context; Min_Precedence : Integer) return Expression_Access is
       Left : Expression_Access := Parse_Primary (Ctx);
    begin
@@ -366,6 +402,11 @@ package body SData.Parser is
    -------------------------
    -- Parse_Variable_List --
    -------------------------
+   --  Parses a whitespace- or comma-separated list of variable names, with
+   --  optional range syntax.  A range is written as either A-Z or A:Z and
+   --  expands at execution time to all columns between the two named columns
+   --  in their current table order.  Each entry is stored as a Variable_Range
+   --  node; Is_Range is True only for the two-name form.
    function Parse_Variable_List (Ctx : in out Parser_Context) return Variable_List is
       First : Variable_List := null;
       Last  : Variable_List := null;
@@ -740,6 +781,12 @@ package body SData.Parser is
             end;
 
          when Token_SELECT =>
+            --  Three-way disambiguation (see package header for overview):
+            --    1. SELECT /ALL  — slash token comes first; no expression.
+            --    2. SELECT CASE / SELECT WHEN — no leading expression, or an
+            --       expression immediately followed by CASE/WHEN/OTHERWISE.
+            --    3. SELECT <expr> — expression not followed by CASE/WHEN;
+            --       treated as a record-filter predicate.
             declare
                First_Branch, Last_Branch : Case_Branch := null;
                Tok_Local : Token;
@@ -1001,6 +1048,10 @@ package body SData.Parser is
             end;
 
          when Token_REM =>
+            --  REM (or its "--" alias, already converted by the lexer) introduces
+            --  a comment that runs to end-of-line.  The lexer consumes the rest of
+            --  the token text as the REM token itself, so skipping it and parsing
+            --  the next statement is all that is needed here.
             return Parse_Statement (Ctx);
 
          when others =>
