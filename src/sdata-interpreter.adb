@@ -111,6 +111,7 @@ package body SData.Interpreter is
       Active_Program_Tail := null;
       Select_Filter_Expr := null;
       SData.Table.Clear_Index_Map;
+      Current_By_Vars.Clear;
    end Clear_Active_Program;
 
    procedure Run_Active_Program is
@@ -1604,6 +1605,9 @@ package body SData.Interpreter is
          --  The committed table is a new physical row set; clear the stale map
          --  so it is rebuilt fresh at the start of the next RUN.
          SData.Table.Clear_Index_Map;
+         --  REPEAT generates records for exactly one RUN.  Subsequent RUNs
+         --  must iterate the committed table, not re-use Repeat_Count.
+         SData.Config.Repeat_Active := False;
          Set_Current_Record_Index (0);
          Apply_Pending_Mods;
          if SData.Config.Save_File_Active then

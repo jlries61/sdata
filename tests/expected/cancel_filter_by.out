@@ -1,0 +1,25 @@
+RUN complete. 6 records and 2 variables processed.
+FILTERED+GROUPED  X: 1.00000 RECNO: 1 BOG: 1 EOG: 0
+FILTERED+GROUPED  X: 3.00000 RECNO: 2 BOG: 0 EOG: 1
+FILTERED+GROUPED  X: 2.00000 RECNO: 3 BOG: 1 EOG: 0
+FILTERED+GROUPED  X: 4.00000 RECNO: 4 BOG: 0 EOG: 1
+RUN complete. 4 records and 2 variables processed.
+UNFILTERED+GROUPED  X: 1.00000 RECNO: 1 BOG: 1 EOG: 0
+UNFILTERED+GROUPED  X: 3.00000 RECNO: 2 BOG: 0 EOG: 1
+UNFILTERED+GROUPED  X: 2.00000 RECNO: 3 BOG: 1 EOG: 0
+UNFILTERED+GROUPED  X: 4.00000 RECNO: 4 BOG: 0 EOG: 1
+RUN complete. 4 records and 2 variables processed.
+UNFILTERED+UNGROUPED  X: 1.00000 RECNO: 1 BOG: 1 EOG: 0
+UNFILTERED+UNGROUPED  X: 3.00000 RECNO: 2 BOG: 0 EOG: 0
+UNFILTERED+UNGROUPED  X: 2.00000 RECNO: 3 BOG: 0 EOG: 0
+UNFILTERED+UNGROUPED  X: 4.00000 RECNO: 4 BOG: 0 EOG: 1
+RUN complete. 4 records and 2 variables processed.
+RUN complete. 4 records and 1 variables processed.
+NEW FILTERED+GROUPED  X: 1.00000 RECNO: 1
+NEW FILTERED+GROUPED  X: 2.00000 RECNO: 2
+RUN complete. 2 records and 1 variables processed.
+RUN complete. 3 records and 1 variables processed.
+AFTER NEW  X: 1.00000 RECNO: 1 BOG: 1 EOG: 0
+AFTER NEW  X: 2.00000 RECNO: 2 BOG: 0 EOG: 0
+AFTER NEW  X: 3.00000 RECNO: 3 BOG: 0 EOG: 1
+RUN complete. 3 records and 1 variables processed.

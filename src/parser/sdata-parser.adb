@@ -746,6 +746,20 @@ package body SData.Parser is
                Saved_Expr : Expression_Access := null;
                Is_Block : Boolean := False;
             begin
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash then
+                  --  SELECT /ALL cancels any active record filter.
+                  --  Consume the slash, then the ALL flag.
+                  declare
+                     Discard_Slash : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     Flag_Tok      : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if Flag_Tok.Kind /= Token_ALL then
+                        Put_Line_Error ("Error: Expected ALL after SELECT /");
+                     end if;
+                  end;
+                  Stmt := new Statement (Stmt_SELECT_FILTER);
+                  --  Stmt.Expr remains null, signalling filter cancellation.
+               else
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_CASE and then
                   Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_WHEN and then
                   Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_OTHERWISE then
@@ -838,6 +852,7 @@ package body SData.Parser is
                   end if;
                   Stmt.Branches := First_Branch;
                end if;
+               end if; --  end else (not Token_ALL)
             end;
 
          when Token_SORT | Token_BY =>
