@@ -351,8 +351,8 @@ package body SData.Interpreter is
             Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE");
             Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
             Put_Line ("  Arrays:      ARRAY, DIM");
-            Put_Line ("  Control:     IF, SELECT, FOR, WHILE, REPEAT");
-            Put_Line ("  Data step:   BY, SORT, REPEAT");
+            Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT");
+            Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, REPEAT");
             Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
             Put_Line ("  Files/paths: FPATH");
             Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
@@ -364,7 +364,7 @@ package body SData.Interpreter is
             Put_Line ("  String:      LEN, LEFT$, RIGHT$, MID$, TRIM$, UCASE$, LCASE$,");
             Put_Line ("               POS, CHR$, STR$, VAL, NUM$");
             Put_Line ("  Conversion:  NUM, HEX$, OCT$, BIN$");
-            Put_Line ("  Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, OBS, OBSC$");
+            Put_Line ("  Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, NEXT, NEXTC$, OBS, OBSC$");
             Put_Line ("  Special:     MISSING, NMISS, RAN, RANDOM, DATE$, TIME$, SHELL");
             Put_Line ("  Aggregate:   SUM, MEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS");
             Put_Line ("  Stat PDF:    ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF,");
@@ -429,14 +429,18 @@ package body SData.Interpreter is
             Put_Line ("Elements are initialized to missing. /TEMP makes it temporary.");
             Put_Line ("A DIM statement that references an existing variable or array shall fail.");
          elsif T = "BY" then
-            Put_Line ("Command: BY variable(s)");
-            Put_Line ("Groups data by variables. Enables FIRST. and LAST. indicators.");
+            Put_Line ("Command: BY variable(s)  |  BY");
+            Put_Line ("Groups data by the named variables for the next RUN.");
+            Put_Line ("Sets BOG/EOG indicators and makes BY-group boundaries visible to");
+            Put_Line ("LAG, NEXT, and BOG/EOG functions.");
+            Put_Line ("Bare BY (no variables) cancels the active grouping.");
          elsif T = "SORT" then
             Put_Line ("Command: SORT variable(s)");
             Put_Line ("Reorders the Data Table based on the specified variables.");
          elsif T = "NEW" then
             Put_Line ("Command: NEW");
             Put_Line ("Clears the Data Table, all variables, and the queued program.");
+            Put_Line ("Also resets the active SELECT record filter and BY grouping.");
          elsif T = "NAMES" then
             Put_Line ("Command: NAMES");
             Put_Line ("Lists currently defined permanent and temporary variables.");
@@ -470,8 +474,20 @@ package body SData.Interpreter is
             Put_Line ("    LET STATUS$ = ""SENIOR""");
             Put_Line ("  END IF");
          elsif T = "SELECT" then
-            Put_Line ("Command: SELECT [expression]");
-            Put_Line ("Multi-way branch using CASE (value) or WHEN (condition).");
+            Put_Line ("Command (record filter): SELECT expression  |  SELECT /ALL");
+            Put_Line ("Activates a virtual record filter for subsequent RUNs.");
+            Put_Line ("Only records for which <expression> is true are visible;");
+            Put_Line ("RECNO, BOF, EOF, BOG, EOG, LAG, and NEXT all operate within");
+            Put_Line ("the filtered view (logical indices).  The filter is rebuilt");
+            Put_Line ("automatically at the start of every RUN.");
+            Put_Line ("SELECT /ALL cancels the active filter and restores all records.");
+            Put_Line ("The filter persists until SELECT /ALL or NEW is executed.");
+            New_Line;
+            Put_Line ("Command (multi-way branch): SELECT [expression]");
+            Put_Line ("  CASE value : statement");
+            Put_Line ("  WHEN condition : statement");
+            Put_Line ("  OTHERWISE : statement");
+            Put_Line ("END SELECT");
             Put_Line ("Example:");
             Put_Line ("  SELECT GRADE$");
             Put_Line ("    CASE ""A"" : PRINT ""EXCELLENT""");
@@ -648,18 +664,36 @@ package body SData.Interpreter is
          elsif T = "BIN$" then Put_Line ("Function: BIN$(n)  ->  binary string for integer n");
 
          -- ── Record navigation ─────────────────────────────────────────────
-         elsif T = "RECNO" then Put_Line ("Function: RECNO()  ->  current record number (1-based)");
-         elsif T = "BOF"   then Put_Line ("Function: BOF()  ->  1 if first record, else 0");
-         elsif T = "EOF"   then Put_Line ("Function: EOF()  ->  1 if last record, else 0");
-         elsif T = "BOG"   then Put_Line ("Function: BOG()  ->  1 at start of BY group, else 0");
-         elsif T = "EOG"   then Put_Line ("Function: EOG()  ->  1 at end of BY group, else 0");
+         elsif T = "RECNO" then
+            Put_Line ("Function: RECNO()  ->  current logical record number (1-based)");
+            Put_Line ("  When a SELECT filter is active, RECNO counts only visible records.");
+         elsif T = "BOF" then
+            Put_Line ("Function: BOF()  ->  1 if this is the first visible record, else 0");
+            Put_Line ("  Respects any active SELECT filter (logical first record).");
+         elsif T = "EOF" then
+            Put_Line ("Function: EOF()  ->  1 if this is the last visible record, else 0");
+            Put_Line ("  Respects any active SELECT filter (logical last record).");
+         elsif T = "BOG" then
+            Put_Line ("Function: BOG()  ->  1 at the start of a BY group, else 0");
+            Put_Line ("  Operates in logical space; filtered-out records are invisible.");
+         elsif T = "EOG" then
+            Put_Line ("Function: EOG()  ->  1 at the end of a BY group, else 0");
+            Put_Line ("  Operates in logical space; filtered-out records are invisible.");
          elsif T = "LAG" or else T = "LAGC$" then
-            Put_Line ("Function: LAG(""varname"") / LAGC$(""varname"")");
-            Put_Line ("  Returns the value of the named variable from the previous record.");
-            Put_Line ("  Returns missing for the first record.");
+            Put_Line ("Function: LAG(""varname"" [, n]) / LAGC$(""varname"" [, n])");
+            Put_Line ("  Returns the value of the named variable n records back (default n=1).");
+            Put_Line ("  Returns missing at the start of the dataset or BY group.");
+            Put_Line ("  When a SELECT filter is active, only visible records are counted;");
+            Put_Line ("  filtered-out rows are skipped.");
+         elsif T = "NEXT" or else T = "NEXTC$" then
+            Put_Line ("Function: NEXT(""varname"" [, n]) / NEXTC$(""varname"" [, n])");
+            Put_Line ("  Returns the value of the named variable n records ahead (default n=1).");
+            Put_Line ("  Returns missing at the end of the dataset or BY group.");
+            Put_Line ("  When a SELECT filter is active, only visible records are counted;");
+            Put_Line ("  filtered-out rows are skipped.");
          elsif T = "OBS" or else T = "OBSC$" then
             Put_Line ("Function: OBS(""varname"", row) / OBSC$(""varname"", row)");
-            Put_Line ("  Returns the value of the named variable from the given row.");
+            Put_Line ("  Returns the value of the named variable from the given physical row.");
 
          -- ── Special functions ─────────────────────────────────────────────
          elsif T = "MISSING" then Put_Line ("Function: MISSING(x)  ->  1 if x is missing, else 0");
@@ -755,7 +789,7 @@ package body SData.Interpreter is
                   new String'("NUM"), new String'("HEX$"), new String'("OCT$"),
                   new String'("BIN$"), new String'("RECNO"), new String'("BOF"),
                   new String'("EOF"), new String'("BOG"), new String'("EOG"),
-                  new String'("LAG"), new String'("OBS"), new String'("MISSING"),
+                  new String'("LAG"), new String'("NEXT"), new String'("OBS"), new String'("MISSING"),
                   new String'("NMISS"), new String'("RAN"), new String'("DATE$"),
                   new String'("TIME$"), new String'("SHELL"), new String'("SUM"),
                   new String'("MEAN"), new String'("STD"), new String'("VAR"),
