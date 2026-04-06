@@ -45,7 +45,7 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
-* Sun Apr 06 2026 John L. Ries <john@theyarnbard.com> - 0.3.0-1
+* Mon Apr 06 2026 John L. Ries <john@theyarnbard.com> - 0.3.0-1
 - Phase 3 complete: SELECT row filter, BY-group processing, filter-aware
   LAG/NEXT/RECNO/BOF/EOF, SELECT /ALL, bare BY to cancel grouping, NEW
   resets both filter and grouping.
