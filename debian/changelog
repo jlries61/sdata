@@ -1,3 +1,13 @@
+sdata (0.3.0-1) unstable; urgency=medium
+
+  * Phase 3 complete: SELECT row filter, BY-group processing, filter-aware
+    LAG/NEXT/RECNO/BOF/EOF, SELECT /ALL and bare BY to cancel filter/grouping.
+  * Add manpage (sdata.1).
+  * Expand HELP text for aggregate and statistical functions.
+  * Add explanatory comments throughout interpreter, evaluator, and parser.
+
+ -- John L. Ries <john@theyarnbard.com>  Sun, 06 Apr 2026 22:00:00 -0700
+
 sdata (0.2.2-1) unstable; urgency=medium
 
   * Implement AND, OR, and XOR boolean operators.

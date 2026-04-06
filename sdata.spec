@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.2.2
+Version:        0.3.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -42,8 +42,17 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 
 %files
 %{_bindir}/sdata
+%{_mandir}/man1/sdata.1*
 
 %changelog
+* Sun Apr 06 2026 John L. Ries <john@theyarnbard.com> - 0.3.0-1
+- Phase 3 complete: SELECT row filter, BY-group processing, filter-aware
+  LAG/NEXT/RECNO/BOF/EOF, SELECT /ALL, bare BY to cancel grouping, NEW
+  resets both filter and grouping.
+- Add manpage (man/man1/sdata.1).
+- Expand HELP text for aggregate and statistical functions.
+- Add explanatory comments to interpreter, evaluator, and parser.
+
 * Mon Mar 30 2026 John L. Ries <john@theyarnbard.com> - 0.2.2-1
 - Performance optimizations for SORT and data steps.
 - Replaced bubble sort with heapsort (O(n log n)).

@@ -1,0 +1,454 @@
+.TH SDATA 1 "2026-04-06" "sdata 0.3.0" "User Commands"
+.SH NAME
+sdata \- statistical data interpreter for tabular data processing
+.SH SYNOPSIS
+.B sdata
+.RI [ options ]
+.RI [ script ]
+.SH DESCRIPTION
+.B sdata
+is an interactive interpreter for data step\-based processing of tabular
+datasets.
+It is inspired by the Systat BASIC data step model and operates on a
+two\-dimensional table of rows (records) and columns (variables).
+.PP
+When invoked without a script argument,
+.B sdata
+enters an interactive read\-eval\-print loop (REPL).
+When a script file is provided it is executed non\-interactively and the
+interpreter exits when the script completes.
+.PP
+Data can be read from and written to CSV, ODF, and OOXML (Excel) files.
+A built\-in suite of statistical functions covers probability distributions,
+aggregate statistics, and record navigation.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Print a usage summary and exit.
+.TP
+.BR \-v ", " \-\-version
+Print the version string and exit.
+.TP
+.BI \-m " size"
+Set the maximum number of rows the in\-memory data table may hold.
+.TP
+.BI \-t " count"
+Set the maximum number of temporary variables per data step.
+.TP
+.BI \-\-clen " len"
+Set the maximum length of character (string) variables in bytes.
+.TP
+.B \-\-noshell
+Disable the
+.B SYSTEM
+command and the
+.B SHELL()
+function.
+Useful in restricted or multi\-user environments.
+.TP
+.BR \-k ", " \-\-continue\-on\-error
+Continue executing the script after a statement\-level error rather than
+aborting.
+The error message is printed to standard error and processing resumes with
+the next statement.
+.TP
+.B \-\-ignore\-math\-errors
+Instead of halting on a floating\-point domain error (e.g. LOG of a negative
+number), emit a warning and return the missing value.
+.TP
+.BI \-o " file"
+Redirect console output to
+.IR file
+in addition to standard output.
+.TP
+.B \-q
+Quiet mode: suppress console output.
+Error messages are still written to standard error.
+.TP
+.BI \-u ", " \-\-infmt " format"
+Override the input dataset format.
+Accepted values:
+.BR CSV ", " ODF ", " OOXML .
+.TP
+.BI \-s ", " \-\-outfmt " format"
+Override the output dataset format.
+Accepted values:
+.BR CSV ", " ODF ", " OOXML .
+.SH LANGUAGE OVERVIEW
+The
+.B sdata
+command language is statement\-based.
+Statements fall into three categories:
+.SS Declarative commands
+Execute immediately and configure state for the next data step.
+.RS
+.TP
+.B USE \fIfile\fR [\fB/FMT=\fIformat\fR] [\fB/NSCAN=\fIn\fR]
+Load a dataset from a CSV, ODF, or OOXML file.
+.TP
+.B SAVE \fIfile\fR [\fB/FMT=\fIformat\fR] [\fB/HEADER=YES|NO\fR]
+Queue the current data table to be saved after the next
+.B RUN.
+.TP
+.B BY \fIvar\fR [\fIvar\fR ...]
+Define BY\-group variables.
+The indicators
+.BR BOG() " and " EOG()
+and the
+.BR FIRST.\fIvar\fR " and " LAST.\fIvar
+flags are set accordingly for each record.
+Bare
+.B BY
+(no variables) cancels an active grouping.
+.TP
+.B SELECT \fIexpr\fR
+Activate a row filter: only records for which
+.I expr
+is true are visible to subsequent data steps.
+All record\-navigation functions
+.RB ( RECNO ", " BOF ", " EOF ", " LAG ", " NEXT )
+operate within the filtered (logical) view.
+The filter is rebuilt automatically at the start of every
+.BR RUN .
+.TP
+.B SELECT /ALL
+Cancel the active row filter; all records become visible again.
+.TP
+.B SORT \fIvar\fR [\fIvar\fR ...]
+Sort the data table on the named variables.
+.TP
+.B REPEAT \fIn\fR
+Create
+.I n
+output records in the next data step (REPEAT mode).
+.TP
+.B FPATH \fIpath\fR /\fBUSE\fR|\fBSAVE\fR|\fBSUBMIT\fR|\fBOUTPUT\fR
+Set the default directory for the specified file category.
+.RE
+.SS Immediate commands
+Execute immediately; not part of the data step body.
+.RS
+.TP
+.B RUN
+Execute all deferred statements once per record (data step), then commit
+the output table.
+.TP
+.B NEW
+Clear the data table, all variables, the queued program, and any active
+SELECT filter or BY grouping.
+.TP
+.B SORT \fIvar\fR [\fIvar\fR ...]
+Re\-order the data table.
+.TP
+.B NAMES
+List all permanent and temporary variables currently defined.
+.TP
+.B SUBMIT \fIfile\fR
+Execute commands from an external script file (default extension
+.BR .CMD ).
+.TP
+.B SYSTEM \fIcmd\fR
+Run an external shell command.
+Disabled by
+.BR \-\-noshell .
+.TP
+.BR HELP " [\fItopic\fR | " /ALL ]
+Display built\-in help.
+Without an argument, list all commands and functions.
+With
+.B /ALL
+print the full reference.
+.TP
+.BR QUIT " | " END
+Exit the interpreter.
+.RE
+.SS Deferred statements
+Queued between two
+.B RUN
+commands and executed once per record during the data step.
+.RS
+.TP
+.B LET \fIvar\fR = \fIexpr\fR
+Assign a permanent (table) variable.
+.TP
+.B SET \fIvar\fR = \fIexpr\fR
+Assign a temporary variable (not written to the output table).
+.TP
+.B PRINT [\fIexpr\fR ...]
+Print values to the console.
+With no arguments, prints all permanent variables for the current record.
+.TP
+.B IF \fIcond\fR THEN \fIstmt\fR [ELSEIF \fIcond\fR THEN \fIstmt\fR] [ELSE \fIstmt\fR]
+Conditional execution.
+Block form (terminated by
+.BR "END IF" )
+is also supported.
+.TP
+.B SELECT [\fIexpr\fR] CASE \fIval\fR : \fIstmt\fR ... END SELECT
+Multi\-way branch.
+.TP
+.B FOR \fIvar\fR = \fIstart\fR TO \fIend\fR [STEP \fIs\fR] ... NEXT
+Counter\-controlled loop.
+.TP
+.B WHILE \fIcond\fR ... WEND
+Condition\-controlled loop.
+.TP
+.B REPEAT ... UNTIL \fIcond\fR
+Post\-test loop.
+.TP
+.B DELETE
+Discard the current record; no output is written for it.
+.TP
+.B WRITE
+Explicitly write the current PDV to the output table.
+Suppresses the automatic end\-of\-record flush for that iteration.
+.TP
+.BR KEEP " | " DROP " \fIvar\fR [\fIvar\fR ...]"
+Retain or remove columns from the output table after the next
+.BR RUN .
+.TP
+.B HOLD [\fIvar\fR ...]
+Retain variable values across records (instead of resetting to missing).
+.TP
+.B RENAME \fIold\fR=\fInew\fR [, \fIold\fR=\fInew\fR ...]
+Rename columns.
+.TP
+.B ARRAY \fIname\fR \fIvar\fR [\fIvar\fR ...]
+Create a virtual array providing indexed access to existing variables.
+.TP
+.B DIM \fIname\fR (\fIlo\fR TO \fIhi\fR) [/TEMP]
+Create a numeric array with real storage.
+Elements are initialised to missing.
+.RE
+.SH FUNCTIONS
+Functions may appear anywhere in an expression.
+Missing\-value propagation is automatic: if any required argument is missing
+the result is missing, unless noted otherwise.
+.SS Mathematical
+.BR ABS (x),\  SQRT (x),\  EXP (x),\  LOG (x),\  LOG10 (x)
+.br
+.BR INT (x),\  CEIL (x),\  FLOOR (x),\  ROUND (x[,n]),\  MOD (x,y)
+.SS Trigonometric
+Radian variants:
+.BR SIN ,\  COS ,\  TAN ,\  ATN ,\  ATAN2 ,\  SINH ,\  COSH ,\  TANH .
+.br
+Degree variants:
+.BR SIND ,\  COSD ,\  TAND ,\  ATND ,\  ATAN2D .
+.SS String
+.BR LEN (s$),\  LEFT$ (s$,n),\  RIGHT$ (s$,n),\  MID$ (s$,start[,len])
+.br
+.BR TRIM$ (s$),\  UCASE$ (s$),\  LCASE$ (s$),\  POS (needle$,haystack$)
+.br
+.BR CHR$ (n),\  STR$ (x),\  NUM$ (x),\  VAL (s$),\  NUM (x)
+.SS Base conversion
+.BR HEX$ (n),\  OCT$ (n),\  BIN$ (n)
+.SS Aggregate (row\-wise, across argument list)
+.BR SUM ,\  MEAN ,\  STD ,\  VAR ,\  MIN ,\  MAX ,\  MEDIAN ,\  N ,\  NMISS
+.PP
+.B STD
+and
+.B VAR
+use the sample formula (n\-1 denominator) and return missing when
+fewer than two non\-missing values are supplied.
+.SS Record navigation
+All of the following operate in
+.I logical
+space when a
+.B SELECT
+filter is active; filtered\-out rows are invisible.
+.TP
+.BR RECNO ()
+Current logical record number (1\-based).
+.TP
+.BR BOF ()
+1 if this is the first visible record, else 0.
+.TP
+.BR EOF ()
+1 if this is the last visible record, else 0.
+.TP
+.BR BOG ()
+1 at the beginning of a BY group, else 0.
+.TP
+.BR EOG ()
+1 at the end of a BY group, else 0.
+.TP
+.BI LAG( var [,n] )\ /\ LAGC$( var [,n] )
+Value of
+.I var
+in the record
+.I n
+positions back (default 1).
+Returns missing at a dataset or BY\-group boundary.
+The variable name may be given unquoted:
+.B LAG(X)
+is equivalent to
+.BR LAG(""X"") .
+.TP
+.BI NEXT( var [,n] )\ /\ NEXTC$( var [,n] )
+Value of
+.I var
+in the record
+.I n
+positions ahead (default 1).
+Returns missing at a dataset or BY\-group boundary.
+.TP
+.BI OBS( var ,row )\ /\ OBSC$( var ,row )
+Value of
+.I var
+in the physical row
+.I row
+(1\-based, ignores the SELECT filter).
+Returns missing if
+.I row
+is out of range.
+.SS Conditional function
+.BI IF( cond , true_val , false_val )
+.br
+Returns
+.I true_val
+when
+.I cond
+is non\-zero or non\-empty, else
+.IR false_val .
+.SS Special
+.BR MISSING (x)
+\(em 1 if x is missing, else 0.
+.br
+.BR RAN ()\ /\ RANDOM ()
+\(em uniform random number in [0,\ 1).
+.br
+.BR DATE$ ()
+\(em current date as
+.IR YYYY\-MM\-DD .
+.br
+.BR TIME$ ()
+\(em current time as
+.IR HH:MM:SS .
+.br
+.BR SHELL( cmd$ )
+\(em run a shell command; returns 0 on success (disabled by
+.BR \-\-noshell ).
+.SS Statistical distributions
+Each distribution family provides four function variants.
+The one\-letter prefix identifies the distribution; the suffix identifies
+the variant:
+.TP
+.B DF
+Probability density function (or probability mass function for discrete
+distributions).
+.TP
+.B CF
+Cumulative distribution function: P(X\ \(<=\ x).
+.TP
+.B IF
+Inverse CDF (quantile function): value x such that P(X\ \(<=\ x)\ =\ p,
+where 0\ <\ p\ <\ 1.
+.TP
+.B RN
+Generate a random variate.
+.PP
+Available distribution families:
+.TS
+tab(|);
+lb lb lb
+l l l.
+Prefix|Distribution|Parameters
+Z|Standard Normal|none (mu=0, sigma=1)
+N|Normal|\fImu\fR, \fIsigma\fR
+U|Uniform|\fIlo\fR, \fIhi\fR
+E|Exponential|\fIrate\fR
+B|Beta|\fIa\fR, \fIb\fR (shape; no RN)
+P|Poisson|\fIlambda\fR (discrete; k = integer)
+G|Gamma|\fIshape\fR, \fIrate\fR
+X|Chi\-square|\fIdf\fR
+T|Student's t|\fIdf\fR
+F|F distribution|\fIdf1\fR, \fIdf2\fR
+M|Binomial|\fIn\fR, \fIprob\fR (discrete; no RN)
+W|Weibull|\fIscale\fR, \fIshape\fR
+L|Laplace|\fIloc\fR, \fIscale\fR
+.TE
+.PP
+For each family the density/mass variant takes
+.I x
+(or
+.I k
+for discrete families) as its first argument, followed by the distribution
+parameters.
+The CDF and IDF variants have the same parameter order; the RN variant
+takes only the distribution parameters.
+.PP
+Use
+.B HELP DISTRIBUTIONS
+from within
+.B sdata
+for a complete listing.
+.SH FILE FORMATS
+.TP
+.B CSV
+Comma\-separated values (default delimiter comma).
+The delimiter can be changed with the
+.B /DLM=
+option on
+.BR USE .
+.TP
+.B ODF / ODS
+OpenDocument Spreadsheet (ISO/IEC 26300).
+.TP
+.B OOXML / XLSX
+Office Open XML spreadsheet (ECMA\-376 / ISO/IEC 29500).
+.PP
+File format is auto\-detected from the file extension when not specified
+explicitly.
+Script files conventionally use the extension
+.BR .CMD .
+.SH EXAMPLES
+.SS Interactive session
+.nf
+$ sdata
+sdata> use "sales.csv"
+sdata> by region$
+sdata> let total = price * qty
+sdata> run
+sdata> save "summary.csv"
+sdata> quit
+.fi
+.SS Batch script
+.nf
+$ cat report.cmd
+use "survey.csv"
+select age >= 18
+by state$
+let income_k = income / 1000
+print state$, mean(income_k), std(income_k), n(income_k)
+run
+save "report.csv"
+
+$ sdata report.cmd
+.fi
+.SS Creating a synthetic dataset
+.nf
+$ sdata
+sdata> repeat 100
+sdata> let x = ran()
+sdata> let y = 2*x + nrn(0, 0.1)
+sdata> run
+sdata> save "simdata.csv"
+sdata> quit
+.fi
+.SH EXIT STATUS
+.TP
+.B 0
+Successful completion.
+.TP
+.B 1
+An error occurred (parse error, file not found, unhandled exception, etc.).
+.SH SEE ALSO
+.BR awk (1),
+.BR gawk (1),
+.BR csvkit (1),
+.BR R (1)
+.SH AUTHOR
+John L. Ries <john@theyarnbard.com>
+.SH COPYRIGHT
+Copyright \(co 2026 John L. Ries.
+Released under the MIT License.
