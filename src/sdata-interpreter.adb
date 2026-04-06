@@ -421,6 +421,7 @@ package body SData.Interpreter is
             Put_Line ("  (Use HELP DISTRIBUTIONS for an overview of naming conventions.)");
             New_Line;
             Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
+            Put_Line ("Use HELP EXECUTION for an explanation of the three execution tiers.");
          elsif T = "USE" then
             Put_Line ("Command: USE [MOCK | ""filename""] [/FMT=format] [/NSCAN=n]");
             Put_Line ("Loads a dataset from CSV, ODF, or OOXML files into the Data Table.");
@@ -429,6 +430,7 @@ package body SData.Interpreter is
             Put_Line ("  /FMT=format  Specifies the file format (CSV, ODF, OOXML).");
             Put_Line ("               Default is auto-detected from file extension.");
             Put_Line ("  /NSCAN=n     Number of rows to scan for type detection (default: 20).");
+            Put_Line ("Execution: Immediate — loads the dataset at once.");
          elsif T = "SAVE" then
             Put_Line ("Command: SAVE ""filename"" [/FMT=format] [/HEADER=YES|NO]");
             Put_Line ("Queues the current Data Table to be saved after the next RUN command.");
@@ -436,76 +438,97 @@ package body SData.Interpreter is
             Put_Line ("  /FMT=format  Specifies the output format (CSV, ODF, OOXML).");
             Put_Line ("               Default is auto-detected from file extension.");
             Put_Line ("  /HEADER=val  Whether to write a header row (YES or NO). Default: YES.");
+            Put_Line ("Execution: Declarative — the file is written at the end of the next RUN.");
          elsif T = "WRITE" then
             Put_Line ("Command: WRITE");
             Put_Line ("Explicitly writes the current PDV record to the output table.");
             Put_Line ("Suppresses the automatic end-of-step write for that record.");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "SUBMIT" then
             Put_Line ("Command: SUBMIT ""filename""");
             Put_Line ("Executes commands from an external script file. Default extension: .CMD.");
             Put_Line ("Provides cycle detection to prevent recursive submission.");
+            Put_Line ("Execution: Immediate — the script is run at once.");
          elsif T = "SYSTEM" then
             Put_Line ("Command: SYSTEM ""command""");
             Put_Line ("Executes an external shell command. Disabled by --noshell.");
             Put_Line ("Uses /bin/sh on POSIX systems to avoid profile script side-effects.");
+            Put_Line ("Execution: Immediate — the shell command is launched at once.");
          elsif T = "PRINT" then
             Put_Line ("Command: PRINT [expr [[,] | [;] expr] ...]");
             Put_Line ("Outputs values to the console, separated by spaces.");
             Put_Line ("No arguments: Prints all permanent variables for the current record.");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "RUN" then
             Put_Line ("Command: RUN");
             Put_Line ("Triggers the execution of the Data Step and any deferred SAVE operations.");
+            Put_Line ("Execution: Immediate — triggers the data step at once.");
          elsif T = "LET" then
             Put_Line ("Command: LET variable = expression");
             Put_Line ("Creates a permanent column in the table or updates an existing one.");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "SET" then
             Put_Line ("Command: SET variable = expression");
             Put_Line ("Creates a temporary variable that persists only during the Data Step.");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "UNSET" then
             Put_Line ("Command: UNSET variable(s)");
             Put_Line ("Removes one or more session variables from memory.");
+            Put_Line ("Execution: Immediate — takes effect at once.");
          elsif T = "ARRAY" then
             Put_Line ("Command: ARRAY array_name variable(s)");
             Put_Line ("Creates a virtual array providing indexed access to existing variables.");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "DIM" then
             Put_Line ("Command: DIM <arrayname> (<lower> [TO <upper>]) [/TEMP]");
             Put_Line ("Creates a permanent or temporary array (real variables).");
             Put_Line ("Elements are initialized to missing. /TEMP makes it temporary.");
             Put_Line ("A DIM statement that references an existing variable or array shall fail.");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "BY" then
             Put_Line ("Command: BY variable(s)  |  BY");
             Put_Line ("Groups data by the named variables for the next RUN.");
             Put_Line ("Sets BOG/EOG indicators and makes BY-group boundaries visible to");
             Put_Line ("LAG, NEXT, and BOG/EOG functions.");
             Put_Line ("Bare BY (no variables) cancels the active grouping.");
+            Put_Line ("Execution: Declarative — grouping is active for all subsequent RUNs.");
          elsif T = "SORT" then
             Put_Line ("Command: SORT variable(s)");
             Put_Line ("Reorders the Data Table based on the specified variables.");
+            Put_Line ("Execution: Immediate — re-orders the table at once.");
          elsif T = "NEW" then
             Put_Line ("Command: NEW");
             Put_Line ("Clears the Data Table, all variables, and the queued program.");
             Put_Line ("Also resets the active SELECT record filter and BY grouping.");
+            Put_Line ("Execution: Immediate — takes effect at once.");
          elsif T = "NAMES" then
             Put_Line ("Command: NAMES");
             Put_Line ("Lists currently defined permanent and temporary variables.");
+            Put_Line ("Execution: Immediate — takes effect at once.");
          elsif T = "DELETE" then
             Put_Line ("Command: DELETE");
             Put_Line ("Discards the current record; processing moves to the next record.");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "HOLD" then
             Put_Line ("Command: HOLD [variable(s)]");
             Put_Line ("Retains the listed permanent variables across records.");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "UNHOLD" then
             Put_Line ("Command: UNHOLD [variable(s)]");
             Put_Line ("Cancels a previous HOLD. No args = unhold all.");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "KEEP" then
             Put_Line ("Command: KEEP variable(s)");
             Put_Line ("Drops all permanent variables NOT listed after the next RUN.");
+            Put_Line ("Execution: Declarative — columns are removed at the end of the next RUN.");
          elsif T = "DROP" then
             Put_Line ("Command: DROP variable(s)");
             Put_Line ("Drops the listed permanent variables after the next RUN.");
+            Put_Line ("Execution: Declarative — columns are removed at the end of the next RUN.");
          elsif T = "RENAME" then
             Put_Line ("Command: RENAME old=new [, old=new ...]");
             Put_Line ("Renames columns in the Data Table.");
+            Put_Line ("Execution: Immediate — takes effect at once.");
          elsif T = "IF" or else T = "ELSEIF" then
             Put_Line ("Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]");
             Put_Line ("Conditional execution. Supports single-line and multi-line block forms.");
@@ -521,17 +544,25 @@ package body SData.Interpreter is
             Put_Line ("Also usable as a function: IF(condition, true_value, false_value)");
             Put_Line ("Returns true_value when condition is non-zero/non-empty, else false_value.");
             Put_Line ("Example: LET STATUS$ = IF(AGE < 18, ""MINOR"", ""ADULT"")");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "SELECT" then
-            Put_Line ("Command (record filter): SELECT expression  |  SELECT /ALL");
+            Put_Line ("── Record filter form ─────────────────────────────────────────");
+            Put_Line ("Command: SELECT expression  |  SELECT /ALL");
             Put_Line ("Activates a virtual record filter for subsequent RUNs.");
             Put_Line ("Only records for which <expression> is true are visible;");
             Put_Line ("RECNO, BOF, EOF, BOG, EOG, LAG, and NEXT all operate within");
-            Put_Line ("the filtered view (logical indices).  The filter is rebuilt");
-            Put_Line ("automatically at the start of every RUN.");
+            Put_Line ("the filtered (logical) view.  The filter is rebuilt automatically");
+            Put_Line ("at the start of every RUN against the current table.");
             Put_Line ("SELECT /ALL cancels the active filter and restores all records.");
             Put_Line ("The filter persists until SELECT /ALL or NEW is executed.");
+            Put_Line ("Example:");
+            Put_Line ("  select score > 70   -- keep only high scorers");
+            Put_Line ("  run");
+            Put_Line ("  select /all         -- cancel filter");
+            Put_Line ("Execution: Declarative — filter is active for all subsequent RUNs.");
             New_Line;
-            Put_Line ("Command (multi-way branch): SELECT [expression]");
+            Put_Line ("── Multi-way branch form ──────────────────────────────────────");
+            Put_Line ("Command: SELECT [expression]");
             Put_Line ("  CASE value : statement");
             Put_Line ("  WHEN condition : statement");
             Put_Line ("  OTHERWISE : statement");
@@ -542,6 +573,7 @@ package body SData.Interpreter is
             Put_Line ("    CASE ""B"" : PRINT ""GOOD""");
             Put_Line ("    OTHERWISE : PRINT ""SEE ME""");
             Put_Line ("  END SELECT");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "FOR" then
             Put_Line ("Command: FOR var = start TO end [STEP s] ... NEXT");
             Put_Line ("Counter-controlled loop.");
@@ -549,6 +581,7 @@ package body SData.Interpreter is
             Put_Line ("  FOR I = 1 TO 10 STEP 2");
             Put_Line ("    PRINT I");
             Put_Line ("  NEXT I");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "WHILE" then
             Put_Line ("Command: WHILE condition ... WEND");
             Put_Line ("Condition-controlled loop; executes while condition is true.");
@@ -558,15 +591,20 @@ package body SData.Interpreter is
             Put_Line ("    PRINT I");
             Put_Line ("    SET I = I + 1");
             Put_Line ("  WEND");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "REPEAT" then
             Put_Line ("Command (data step): REPEAT n  (creates n records)");
-            Put_Line ("Command (loop):      REPEAT ... UNTIL condition");
+            Put_Line ("Execution: Declarative — the n-record mode is active for the next RUN.");
+            New_Line;
+            Put_Line ("Command (loop): REPEAT ... UNTIL condition");
+            Put_Line ("Post-test loop; always executes the body at least once.");
             Put_Line ("Example:");
             Put_Line ("  SET I = 1");
             Put_Line ("  REPEAT");
             Put_Line ("    PRINT I");
             Put_Line ("    SET I = I + 1");
             Put_Line ("  UNTIL I > 10");
+            Put_Line ("Execution: Deferred — executed once per record inside the data step.");
          elsif T = "OUTPUT" then
             Put_Line ("Command: OUTPUT [""filename""] [/CHARSET=...] [/FMT=...]");
             Put_Line ("Redirects all console output to a file (written to file AND stdout).");
@@ -574,24 +612,31 @@ package body SData.Interpreter is
             Put_Line ("Options:");
             Put_Line ("  /CHARSET=cs  Specifies the character set (e.g., UTF-8, ASCII).");
             Put_Line ("  /FMT=format  Specifies the file format (e.g., CSV, ODF).");
+            Put_Line ("Execution: Immediate — takes effect at once.");
          elsif T = "ECHO" then
             Put_Line ("Command: ECHO ON | OFF");
             Put_Line ("Enables or disables writing console output to stdout.");
+            Put_Line ("Execution: Immediate — takes effect at once.");
          elsif T = "DIGITS" then
             Put_Line ("Command: DIGITS n");
             Put_Line ("Sets decimal places for floating-point output (default 5).");
+            Put_Line ("Execution: Immediate — takes effect at once.");
          elsif T = "FPATH" then
             Put_Line ("Command: FPATH [path] [/ USE | SAVE | SUBMIT | OUTPUT]");
             Put_Line ("Sets the default directory for the specified command(s).");
+            Put_Line ("Execution: Declarative — applies to all subsequent file commands.");
          elsif T = "RSEED" then
             Put_Line ("Command: RSEED n");
             Put_Line ("Seeds the random number generator with integer n.");
+            Put_Line ("Execution: Immediate — takes effect at once.");
          elsif T = "HELP" then
             Put_Line ("Command: HELP [topic | /ALL]");
             Put_Line ("Displays help. HELP /ALL prints the full reference.");
+            Put_Line ("Execution: Immediate — takes effect at once.");
          elsif T = "QUIT" or else T = "END" then
             Put_Line ("Command: QUIT | END");
             Put_Line ("Exits the interpreter.");
+            Put_Line ("Execution: Immediate — exits at once.");
          elsif T = "MEAN" then
             Put_Line ("Function: MEAN(v1 [, v2, ...])");
             Put_Line ("Returns the arithmetic mean of non-missing values across the arguments.");
@@ -923,6 +968,33 @@ package body SData.Interpreter is
             Put_Line ("  loc: location parameter (mean); scale: scale parameter b (> 0)");
             Put_Line ("  std dev = sqrt(2) * b");
 
+         elsif T = "EXECUTION" then
+            Put_Line ("Execution Tiers");
+            Put_Line ("sdata commands fall into three execution tiers:");
+            New_Line;
+            Put_Line ("  Declarative — configure state for the next RUN.");
+            Put_Line ("    These commands take effect immediately but their primary");
+            Put_Line ("    action occurs when RUN is executed.");
+            Put_Line ("    Commands: USE, SAVE, BY, SELECT (filter), SELECT /ALL,");
+            Put_Line ("              REPEAT n, KEEP, DROP, FPATH");
+            New_Line;
+            Put_Line ("  Immediate — execute at once, outside any data step.");
+            Put_Line ("    Commands: RUN, SORT, NEW, NAMES, UNSET, RENAME, SYSTEM,");
+            Put_Line ("              SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,");
+            Put_Line ("              QUIT, END");
+            New_Line;
+            Put_Line ("  Deferred — queued between RUN markers; executed once per");
+            Put_Line ("    record during the data step.");
+            Put_Line ("    Commands: LET, SET, PRINT, IF, FOR, WHILE, REPEAT/UNTIL,");
+            Put_Line ("              SELECT/CASE, DELETE, WRITE, HOLD, UNHOLD,");
+            Put_Line ("              ARRAY, DIM");
+            New_Line;
+            Put_Line ("Note: SELECT has two forms with different tiers:");
+            Put_Line ("  SELECT <expr> / SELECT /ALL  — Declarative (row filter)");
+            Put_Line ("  SELECT CASE ... END SELECT   — Deferred (multi-way branch)");
+            New_Line;
+            Put_Line ("The HELP entry for each command includes an ""Execution:"" line");
+            Put_Line ("identifying which tier it belongs to.");
          elsif T = "OPTIONS" then
             Put_Line ("Runtime Configuration Flags:");
             Put_Line ("  --noshell            : Disable SYSTEM/SHELL");
@@ -946,7 +1018,8 @@ package body SData.Interpreter is
                   new String'("BY"), new String'("SORT"), new String'("PRINT"),
                   new String'("OUTPUT"), new String'("ECHO"), new String'("DIGITS"),
                   new String'("FPATH"), new String'("RSEED"), new String'("SYSTEM"),
-                  new String'("SUBMIT"), new String'("HELP"), new String'("QUIT"), new String'("OPTIONS")
+                  new String'("SUBMIT"), new String'("HELP"), new String'("QUIT"),
+                  new String'("OPTIONS"), new String'("EXECUTION")
                );
                Funcs : constant Topic_Array := (
                   new String'("ABS"), new String'("SQRT"), new String'("LOG"),
