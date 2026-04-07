@@ -591,7 +591,7 @@ package body SData.File_IO is
                   elsif T_Attr = "str" then
                      return (Kind => Val_String, Str_Val => To_Unbounded_String (Val_Str));
                   else
-                     begin return (Kind => Val_Numeric, Num_Val => Float'Value (Val_Str)); exception when others => null; end;
+                     begin return (Kind => Val_Numeric, Num_Val => Float'Value (Val_Str)); exception when Constraint_Error => null; end;
                   end if;
                end;
             elsif Length (IS_List) > 0 then
