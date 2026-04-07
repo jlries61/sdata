@@ -90,7 +90,7 @@ package body SData.Table is
    procedure Add_Row is
    begin
       if SData.Config.Max_Table_Rows > 0 and then Table_Row_Count >= SData.Config.Max_Table_Rows then
-         raise Program_Error with "Table row limit (" & Integer'Image(SData.Config.Max_Table_Rows) & ") exceeded.";
+         raise SData.Script_Error with "Table row limit (" & Integer'Image(SData.Config.Max_Table_Rows) & ") exceeded.";
       end if;
       Table_Row_Count := Table_Row_Count + 1;
       for Pos in Data_Table.Iterate loop
