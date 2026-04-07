@@ -126,8 +126,8 @@ procedure SData_Main is
             when E : SData.Script_Error =>
                Put_Line_Error ("Error: " & Exception_Message (E));
                Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
-            when others =>
-               Put_Line_Error ("An unexpected error occurred.");
+            when E : others =>
+               Put_Line_Error ("Internal error: " & Exception_Name (E) & ": " & Exception_Message (E));
                Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
          end;
          exit REPL when not Ada.Text_IO.Is_Open (Ada.Text_IO.Standard_Input);

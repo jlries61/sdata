@@ -235,7 +235,9 @@ package body SData.Statistics is
    --------------
    function Beta_PDF (X, Alpha, Beta : Float) return Float is
    begin
-      if Alpha <= 0.0 or Beta <= 0.0 then raise Constraint_Error with "Parameters must be positive"; end if;
+      if Alpha <= 0.0 or Beta <= 0.0 then raise Constraint_Error with
+         "Beta distribution: shape parameters must be positive (a=" &
+         Float'Image (Alpha) & ", b=" & Float'Image (Beta) & ")"; end if;
       if X < 0.0 or X > 1.0 then return 0.0; end if;
       return Float ((Long_Float (X)**(Long_Float (Alpha) - 1.0) * (1.0 - Long_Float (X))**(Long_Float (Beta) - 1.0)) / Long_Beta.Beta (Long_Float (Alpha), Long_Float (Beta)));
    end Beta_PDF;
@@ -300,7 +302,9 @@ package body SData.Statistics is
    ---------------
    function Gamma_PDF (X, Alpha, Beta : Float) return Float is
    begin
-      if Alpha <= 0.0 or Beta <= 0.0 then raise Constraint_Error with "Parameters must be positive"; end if;
+      if Alpha <= 0.0 or Beta <= 0.0 then raise Constraint_Error with
+         "Gamma distribution: shape and rate must be positive (shape=" &
+         Float'Image (Alpha) & ", rate=" & Float'Image (Beta) & ")"; end if;
       if X <= 0.0 then return 0.0; end if;
       return Float (Exp (Long_Float (Alpha) * Log (Long_Float (Beta)) + (Long_Float (Alpha) - 1.0) * Log (Long_Float (X)) - Long_Float (Beta) * Long_Float (X) - Long_Gamma.Log_Gamma (Long_Float (Alpha))));
    end Gamma_PDF;
@@ -421,7 +425,9 @@ package body SData.Statistics is
       NI : constant Long_Float := Long_Float (Float'Floor (N));
       PF : constant Long_Float := Long_Float (P);
    begin
-      if PF < 0.0 or PF > 1.0 or NI < 0.0 then raise Constraint_Error with "Invalid Binomial parameters"; end if;
+      if PF < 0.0 or PF > 1.0 or NI < 0.0 then raise Constraint_Error with
+         "Binomial PMF: n must be non-negative and prob must be in [0,1] (n=" &
+         Float'Image (N) & ", prob=" & Float'Image (P) & ")"; end if;
       if KI < 0.0 or KI > NI then return 0.0; end if;
       if PF = 0.0 then return (if KI = 0.0 then 1.0 else 0.0); end if;
       if PF = 1.0 then return (if KI = NI then 1.0 else 0.0); end if;
@@ -438,7 +444,9 @@ package body SData.Statistics is
       NI : constant Long_Float := Long_Float (Float'Floor (N));
       PF : constant Long_Float := Long_Float (P);
    begin
-      if PF < 0.0 or PF > 1.0 or NI < 0.0 then raise Constraint_Error with "Invalid Binomial parameters"; end if;
+      if PF < 0.0 or PF > 1.0 or NI < 0.0 then raise Constraint_Error with
+         "Binomial CDF: n must be non-negative and prob must be in [0,1] (n=" &
+         Float'Image (N) & ", prob=" & Float'Image (P) & ")"; end if;
       if KI < 0.0 then return 0.0; elsif KI >= NI then return 1.0; end if;
       return Float (Long_Beta.Regularized_Beta (1.0 - PF, NI - KI, KI + 1.0));
    end Binomial_CDF;

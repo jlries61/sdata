@@ -1095,7 +1095,9 @@ package body SData.Interpreter is
                         if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
                         elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
                         else
-                           raise Program_Error with "Invalid array index";
+                           raise Script_Error with "Array index for """ & Var_Name_Str &
+                              """ must be numeric, not " &
+                              (if Idx_Val.Kind = Val_Missing then "missing" else "a string");
                         end if;
 
                         Set_Array_Element (Var_Name_Str, Idx, Result);

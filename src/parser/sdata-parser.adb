@@ -283,7 +283,10 @@ package body SData.Parser is
                            end if;
 
                            if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Closing then
-                              Put_Line_Error ("Error: Expected matching closing bracket/paren");
+                              Put_Line_Error ("Error: Expected closing '" &
+                                 (if Closing = Token_Right_Paren then ")" else "]") &
+                                 "' after arguments of """ &
+                                 Actual_Tok.Text (1 .. Actual_Tok.Length) & """");
                            end if;
                         end;
                         return Node;
@@ -297,7 +300,7 @@ package body SData.Parser is
                   when Token_Left_Paren =>
                      Node := Parse_Expression (Ctx);
                      if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                        Put_Line_Error ("Error: Expected ')'");
+                        Put_Line_Error ("Error: Expected ')' to close parenthesised expression");
                      end if;
                      return Node;
 
@@ -533,7 +536,9 @@ package body SData.Parser is
                end if;
                
                if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                  Put_Line_Error ("Error: Expected '=' in assignment");
+                  Put_Line_Error ("Error: Expected '=' after variable name """ &
+                     Var_Tok.Text (1 .. Var_Tok.Length) & """ in " &
+                     (if Tok.Kind = Token_LET then "LET" else "SET") & " statement");
                end if;
 
                Stmt := new Statement ((if Tok.Kind = Token_LET then Stmt_LET else Stmt_SET));
@@ -1055,7 +1060,8 @@ package body SData.Parser is
             return Parse_Statement (Ctx);
 
          when others =>
-            Put_Line_Error ("Error: Unrecognized command: " & Tok.Kind'Image & " at line " & Tok.Line'Image);
+            Put_Line_Error ("Error: Unrecognized command """ & Tok.Text (1 .. Tok.Length) &
+               """ at line " & Tok.Line'Image & " — type HELP for a list of commands");
             return null;
       end case;
 

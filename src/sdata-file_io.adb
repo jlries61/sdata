@@ -1,4 +1,5 @@
 with Ada.Text_IO;
+with Ada.Exceptions;
 with SData.IO;        use SData.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
@@ -504,9 +505,10 @@ package body SData.File_IO is
       Zip.Load (Zip_Info, File_Name);
       Load_Content (Zip_Info);
    exception
-      when others =>
+      when E : others =>
          if GNAT.OS_Lib.Is_Regular_File (Temp_XML) then declare OK : Boolean; begin GNAT.OS_Lib.Delete_File (Temp_XML, OK); end; end if;
-         raise Program_Error with "Failed to parse ODS file: " & File_Name;
+         raise Program_Error with "Failed to parse ODS file """ & File_Name & """: " &
+            Ada.Exceptions.Exception_Message (E);
    end Parse_ODF;
 
    -----------------
@@ -665,10 +667,11 @@ package body SData.File_IO is
       Load_Shared_Strings (Zip_Info);
       Load_Sheet (Zip_Info);
    exception
-      when others =>
+      when E : others =>
          if GNAT.OS_Lib.Is_Regular_File (Temp_Shared) then declare OK : Boolean; begin GNAT.OS_Lib.Delete_File (Temp_Shared, OK); end; end if;
          if GNAT.OS_Lib.Is_Regular_File (Temp_Sheet) then declare OK : Boolean; begin GNAT.OS_Lib.Delete_File (Temp_Sheet, OK); end; end if;
-         raise Program_Error with "Failed to parse OOXML file: " & File_Name;
+         raise Program_Error with "Failed to parse OOXML file """ & File_Name & """: " &
+            Ada.Exceptions.Exception_Message (E);
    end Parse_OOXML;
 
    -----------------
