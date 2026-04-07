@@ -6,14 +6,21 @@
 *.tmp
 *.diff
 *.actual
+tests/output_test_capture.dat
+tests/data/output.csv
+tests/data/test1_output.csv
+
+# Packaging artifacts
+*.tar.gz
+*.tar.xz
+*.dsc
+*.src.rpm
+CHASX.DAT
+CHASX*.CSV
 
 # Other temp files
 *.swp
 *~
-*.src.rpm
-sdata_0.1*
-sdata-0.1.tar.gz
-sdata-0.1-slackbuild.tar.gz
 debian/files
 debian/sdata/
 debian/sdata.substvars

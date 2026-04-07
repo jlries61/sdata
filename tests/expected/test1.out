@@ -1,6 +1,6 @@
-Dataset opened: data.csv
+Dataset opened: tests/data/data.csv
 .
 .
 .
-Dataset saved: output.csv
+Dataset saved: tests/data/test1_output.csv
 RUN complete. 3 records and 0 variables processed.
