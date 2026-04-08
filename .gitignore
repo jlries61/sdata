@@ -2,6 +2,10 @@
 /obj/
 /bin/
 
+# Alire-generated directories
+/alire/
+/config/
+
 # Test outputs
 *.tmp
 *.diff
