@@ -579,7 +579,8 @@ package body SData.Parser is
                   declare
                      P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin
-                     exit when P.Kind = Token_Newline or else P.Kind = Token_Colon or else P.Kind = Token_EOF;
+                     exit when P.Kind = Token_Newline or else P.Kind = Token_Colon or else P.Kind = Token_EOF
+                               or else P.Kind = Token_ELSE or else P.Kind = Token_ELSEIF;
                      if P.Kind = Token_Comma or else P.Kind = Token_Semicolon then
                         declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                      end if;

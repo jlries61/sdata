@@ -1,0 +1,45 @@
+-- Test HOLD and UNHOLD commands
+
+-- HOLD retains a variable's value across records
+REPEAT 4
+HOLD TOTAL
+IF MISSING(TOTAL) THEN LET TOTAL = 0
+LET TOTAL = TOTAL + 1
+PRINT RECNO() TOTAL
+RUN
+
+-- UNHOLD resets the variable to missing each record
+NEW
+REPEAT 4
+HOLD TOTAL
+UNHOLD TOTAL
+IF MISSING(TOTAL) THEN LET TOTAL = 0
+LET TOTAL = TOTAL + 1
+PRINT RECNO() TOTAL
+RUN
+
+-- HOLD multiple variables; UNHOLD one of them
+NEW
+REPEAT 3
+HOLD A B
+UNHOLD B
+IF MISSING(A) THEN LET A = 0
+IF MISSING(B) THEN LET B = 0
+LET A = A + 10
+LET B = B + 1
+PRINT A B
+RUN
+
+-- UNHOLD with no args cancels all holds
+NEW
+REPEAT 3
+HOLD X Y
+UNHOLD
+IF MISSING(X) THEN LET X = 0
+IF MISSING(Y) THEN LET Y = 0
+LET X = X + 1
+LET Y = Y + 1
+PRINT X Y
+RUN
+
+QUIT
