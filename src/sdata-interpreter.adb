@@ -93,6 +93,7 @@ package body SData.Interpreter is
    procedure Execute_Metadata     (Stmt : Statement_Access);
    procedure Execute_Declarative  (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
+   procedure Run_One_Step         (Start, Boundary : Statement_Access);
 
    function Full_Path (Path : String; Category : String) return String;
 
@@ -997,241 +998,225 @@ package body SData.Interpreter is
       end loop;
    end Execute_List;
 
-   procedure Execute (Prog : Statement_Access) is
-      Step_Start : Statement_Access := Prog;
-      Current    : Statement_Access;
-      Num_Records : Natural;
+   --  Run_One_Step — executes the deferred statement list once per record.
+   --  Start..Boundary is the slice of the statement list belonging to this RUN.
+   procedure Run_One_Step (Start, Boundary : Statement_Access) is
+      Num_Records      : Natural;
+      Iter             : Statement_Access;
+      Global_Has_Write : constant Boolean := Has_Output_Statement (Start, Boundary);
 
-      procedure Run_One_Step (Start, Boundary : Statement_Access) is
-         Iter : Statement_Access;
-         Global_Has_Write : constant Boolean := Has_Output_Statement (Start, Boundary);
-
-         --  Is_First/Last_In_Group operate in logical space when a filter is
-         --  active: Logical_Idx is a 1-based position into the filtered view,
-         --  and Logical_To_Physical maps it to the actual table row for value
-         --  comparisons.  When unfiltered, logical == physical.
-         function Is_First_In_Group (Logical_Idx : Positive) return Boolean is
-            Phys_Curr  : constant Positive := SData.Table.Logical_To_Physical (Logical_Idx);
-            Phys_Prev  : Positive;
-            Curr_Value : Value;
-            Prev_Value : Value;
-         begin
-            if Logical_Idx = 1 then return True; end if;
-            if Current_By_Vars.Is_Empty then return False; end if;
-            Phys_Prev := SData.Table.Logical_To_Physical (Logical_Idx - 1);
-            for V of Current_By_Vars loop
-               Prev_Value := Get_Value (Phys_Prev, To_String (V));
-               Curr_Value := Get_Value (Phys_Curr, To_String (V));
-               if not (Curr_Value = Prev_Value) then
-                  return True;
-               end if;
-            end loop;
-            return False;
-         end Is_First_In_Group;
-
-         function Is_Last_In_Group (Logical_Idx : Positive; Logical_Count : Natural) return Boolean is
-            Phys_Curr  : constant Positive := SData.Table.Logical_To_Physical (Logical_Idx);
-            Phys_Next  : Positive;
-            Curr_Value : Value;
-            Next_Value : Value;
-         begin
-            if Logical_Idx = Logical_Count then return True; end if;
-            if Current_By_Vars.Is_Empty then return False; end if;
-            Phys_Next := SData.Table.Logical_To_Physical (Logical_Idx + 1);
-            for V of Current_By_Vars loop
-               Curr_Value := Get_Value (Phys_Curr, To_String (V));
-               Next_Value := Get_Value (Phys_Next, To_String (V));
-               if not (Curr_Value = Next_Value) then
-                  return True;
-               end if;
-            end loop;
-            return False;
-         end Is_Last_In_Group;
-
+      --  Is_First/Last_In_Group operate in logical space when a filter is
+      --  active: Logical_Idx is a 1-based position into the filtered view,
+      --  and Logical_To_Physical maps it to the actual table row for value
+      --  comparisons.  When unfiltered, logical == physical.
+      function Is_First_In_Group (Logical_Idx : Positive) return Boolean is
+         Phys_Curr  : constant Positive := SData.Table.Logical_To_Physical (Logical_Idx);
+         Phys_Prev  : Positive;
+         Curr_Value : Value;
+         Prev_Value : Value;
       begin
-         Initialize_PDV;
-         SData.Table.Initialize_Output_Table;
+         if Logical_Idx = 1 then return True; end if;
+         if Current_By_Vars.Is_Empty then return False; end if;
+         Phys_Prev := SData.Table.Logical_To_Physical (Logical_Idx - 1);
+         for V of Current_By_Vars loop
+            Prev_Value := Get_Value (Phys_Prev, To_String (V));
+            Curr_Value := Get_Value (Phys_Curr, To_String (V));
+            if not (Curr_Value = Prev_Value) then return True; end if;
+         end loop;
+         return False;
+      end Is_First_In_Group;
 
-         if SData.Config.Repeat_Active then
-            Num_Records := SData.Config.Repeat_Count;
-         else
-            Num_Records := (if Row_Count > 0 then Row_Count else 1);
-         end if;
+      function Is_Last_In_Group (Logical_Idx : Positive; Logical_Count : Natural) return Boolean is
+         Phys_Curr  : constant Positive := SData.Table.Logical_To_Physical (Logical_Idx);
+         Phys_Next  : Positive;
+         Curr_Value : Value;
+         Next_Value : Value;
+      begin
+         if Logical_Idx = Logical_Count then return True; end if;
+         if Current_By_Vars.Is_Empty then return False; end if;
+         Phys_Next := SData.Table.Logical_To_Physical (Logical_Idx + 1);
+         for V of Current_By_Vars loop
+            Curr_Value := Get_Value (Phys_Curr, To_String (V));
+            Next_Value := Get_Value (Phys_Next, To_String (V));
+            if not (Curr_Value = Next_Value) then return True; end if;
+         end loop;
+         return False;
+      end Is_Last_In_Group;
 
-         --  Rebuild the SELECT filter map against the current table at the
-         --  start of every RUN.  The previous map (from an earlier RUN) has
-         --  been cleared by Commit_Output_Table, so we always work against
-         --  the up-to-date physical row set.
-         if Select_Filter_Expr /= null then
-            declare
-               Total          : constant Natural := Row_Count;
-               Saved_Physical : constant Natural := SData.Table.Get_Current_Record_Index;
-            begin
-               if Total = 0 then
-                  SData.Table.Clear_Index_Map;
-               else
-                  declare
-                     Passing : SData.Table.Index_Array (1 .. Total);
-                     Count   : Natural := 0;
-                  begin
-                     for R in 1 .. Total loop
-                        SData.Table.Set_Current_Record_Index (R);
-                        SData.Variables.Load_PDV_From_Table (R);
-                        if Is_True (Evaluate (Select_Filter_Expr)) then
-                           Count := Count + 1;
-                           Passing (Count) := R;
-                        end if;
-                     end loop;
-                     SData.Table.Set_Current_Record_Index (Saved_Physical);
-                     SData.Table.Set_Index_Map (Passing (1 .. Count));
-                  end;
-               end if;
-            end;
-         end if;
+   begin
+      Initialize_PDV;
+      SData.Table.Initialize_Output_Table;
 
-         --  When a SELECT filter is active, iterate over the logical (filtered)
-         --  row count.  Each logical index maps to a physical row via
-         --  Logical_To_Physical.  When unfiltered, logical == physical.
+      Num_Records := (if SData.Config.Repeat_Active then SData.Config.Repeat_Count
+                      else (if Row_Count > 0 then Row_Count else 1));
+
+      --  Rebuild the SELECT filter map against the current table at the
+      --  start of every RUN.  The previous map (from an earlier RUN) has
+      --  been cleared by Commit_Output_Table, so we always work against
+      --  the up-to-date physical row set.
+      if Select_Filter_Expr /= null then
          declare
-            Logical_Count : constant Natural :=
-               (if SData.Table.Is_Filtered then SData.Table.Logical_Row_Count
-                else Num_Records);
+            Total          : constant Natural := Row_Count;
+            Saved_Physical : constant Natural := SData.Table.Get_Current_Record_Index;
          begin
+            if Total = 0 then
+               SData.Table.Clear_Index_Map;
+            else
+               declare
+                  Passing : SData.Table.Index_Array (1 .. Total);
+                  Count   : Natural := 0;
+               begin
+                  for R in 1 .. Total loop
+                     SData.Table.Set_Current_Record_Index (R);
+                     SData.Variables.Load_PDV_From_Table (R);
+                     if Is_True (Evaluate (Select_Filter_Expr)) then
+                        Count := Count + 1;
+                        Passing (Count) := R;
+                     end if;
+                  end loop;
+                  SData.Table.Set_Current_Record_Index (Saved_Physical);
+                  SData.Table.Set_Index_Map (Passing (1 .. Count));
+               end;
+            end if;
+         end;
+      end if;
+
+      --  When a SELECT filter is active, iterate over the logical (filtered)
+      --  row count.  Each logical index maps to a physical row via
+      --  Logical_To_Physical.  When unfiltered, logical == physical.
+      declare
+         Logical_Count : constant Natural :=
+            (if SData.Table.Is_Filtered then SData.Table.Logical_Row_Count
+             else Num_Records);
+      begin
          for Logical_I in 1 .. Logical_Count loop
             declare
                Phys_I : constant Positive := SData.Table.Logical_To_Physical (Logical_I);
             begin
-            Set_Current_Record_Index (Phys_I);
-            SData.Table.Set_Logical_Record_Index (Logical_I);
+               Set_Current_Record_Index (Phys_I);
+               SData.Table.Set_Logical_Record_Index (Logical_I);
 
-            -- Step 1: Initialize PDV for this record
-            Reset_PDV_Non_Held;
-            Load_PDV_From_Table (Phys_I);
+               Reset_PDV_Non_Held;
+               Load_PDV_From_Table (Phys_I);
 
-            -- Set First. and Last. indicators
-            if not Current_By_Vars.Is_Empty then
-               declare
-                  BOG_Val : constant Boolean := Is_First_In_Group (Logical_I);
-                  EOG_Val : constant Boolean := Is_Last_In_Group (Logical_I, Logical_Count);
-               begin
-                  Set_BOG (BOG_Val);
-                  Set_EOG (EOG_Val);
-                  for V of Current_By_Vars loop
-                     declare
-                        Name : constant String := To_String (V);
-                     begin
-                        Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if BOG_Val then 1 else 0)));
-                        Set_Temporary ("LAST." & Name, (Kind => Val_Integer, Int_Val => (if EOG_Val then 1 else 0)));
-                     end;
-                  end loop;
-               end;
-            else
-               Set_BOG (Logical_I = 1);
-               Set_EOG (Logical_I = Logical_Count);
-            end if;
+               if not Current_By_Vars.Is_Empty then
+                  declare
+                     BOG_Val : constant Boolean := Is_First_In_Group (Logical_I);
+                     EOG_Val : constant Boolean := Is_Last_In_Group (Logical_I, Logical_Count);
+                  begin
+                     Set_BOG (BOG_Val);
+                     Set_EOG (EOG_Val);
+                     for V of Current_By_Vars loop
+                        declare Name : constant String := To_String (V); begin
+                           Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if BOG_Val then 1 else 0)));
+                           Set_Temporary ("LAST."  & Name, (Kind => Val_Integer, Int_Val => (if EOG_Val then 1 else 0)));
+                        end;
+                     end loop;
+                  end;
+               else
+                  Set_BOG (Logical_I = 1);
+                  Set_EOG (Logical_I = Logical_Count);
+               end if;
 
-            Iter := Start;
-            Current_Record_Deleted := False;
-            SData.Table.Set_Record_Explicitly_Written (False);
+               Iter := Start;
+               Current_Record_Deleted := False;
+               SData.Table.Set_Record_Explicitly_Written (False);
 
-            if Iter = null and then Boundary = null then
-               -- Empty RUN: no statements to execute, but still snapshot the current PDV
-               null;
-            else
                while Iter /= null and then Iter /= Boundary loop
                   case Iter.Kind is
-                     when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
+                     when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
+                        | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT
+                        | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO
+                        | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM
+                        | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                         begin
-                           Execute_Statement(Iter);
+                           Execute_Statement (Iter);
                         exception
                            when E : Script_Error =>
                               if SData.Config.Continue_On_Error then
                                  Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                              else
-                                 raise;
-                              end if;
+                              else raise; end if;
                            when E : others =>
                               if SData.Config.Continue_On_Error then
                                  Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                              else
-                                 raise Script_Error with Ada.Exceptions.Exception_Message (E);
-                              end if;
+                              else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
                         end;
                      when others => null;
                   end case;
                   exit when Current_Record_Deleted;
                   Iter := Iter.Next;
                end loop;
-            end if;
 
-            --  Automatic flush: if the step contains no explicit WRITE and the
-            --  record was not deleted, write the final PDV state to the output
-            --  table.  When WRITE is present, the step controls output itself.
-            if not Current_Record_Deleted and then not Global_Has_Write then
-               SData.Variables.Flush_PDV_To_Output;
-            end if;
-            end; -- Phys_I declare
+               --  Automatic flush: if the step contains no explicit WRITE and
+               --  the record was not deleted, write the final PDV state.
+               if not Current_Record_Deleted and then not Global_Has_Write then
+                  SData.Variables.Flush_PDV_To_Output;
+               end if;
+            end;
          end loop;
-         end; -- Logical_Count declare
+      end;
 
-         SData.Table.Set_Logical_Record_Index (0);
-         SData.Table.Commit_Output_Table;
-         --  The committed table is a new physical row set; clear the stale map
-         --  so it is rebuilt fresh at the start of the next RUN.
-         SData.Table.Clear_Index_Map;
-         --  REPEAT generates records for exactly one RUN.  Subsequent RUNs
-         --  must iterate the committed table, not re-use Repeat_Count.
-         SData.Config.Repeat_Active := False;
-         Set_Current_Record_Index (0);
-         Apply_Pending_Mods;
-         if SData.Config.Save_File_Active then
-            SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt);
-            if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
-            SData.Config.Save_File_Active := False;
-         end if;
-      end Run_One_Step;
+      SData.Table.Set_Logical_Record_Index (0);
+      SData.Table.Commit_Output_Table;
+      --  The committed table is a new physical row set; clear the stale map
+      --  so it is rebuilt fresh at the start of the next RUN.
+      SData.Table.Clear_Index_Map;
+      --  REPEAT generates records for exactly one RUN.  Subsequent RUNs
+      --  must iterate the committed table, not re-use Repeat_Count.
+      SData.Config.Repeat_Active := False;
+      Set_Current_Record_Index (0);
+      Apply_Pending_Mods;
+      if SData.Config.Save_File_Active then
+         SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt);
+         if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
+         SData.Config.Save_File_Active := False;
+      end if;
+   end Run_One_Step;
 
+   --  Execute — walk the statement list, partitioning it into data steps.
+   --  A Stmt_RUN node acts as a step boundary: everything between two RUN
+   --  markers is a deferred body executed by Run_One_Step.  Declarative and
+   --  immediate statements are executed directly here, outside any data step.
+   procedure Execute (Prog : Statement_Access) is
+      Step_Start : Statement_Access := Prog;
+      Current    : Statement_Access;
    begin
       if Prog = null then
          Run_One_Step (null, null);
          return;
       end if;
 
-      --  Walk the statement list, partitioning it into data steps.
-      --  A Stmt_RUN node acts as a step boundary: everything between two RUN
-      --  markers is a deferred body executed by Run_One_Step.  Any statement
-      --  that is NOT in the deferred set (i.e. not LET/SET/PRINT/IF/FOR/WHILE/
-      --  LOOP_REPEAT/SELECT/DELETE/WRITE/DIM/ARRAY) is a declarative or
-      --  immediate statement executed directly here, outside any data step.
       Current := Prog;
       while Current /= null loop
          if Current.Kind = Stmt_RUN then
             Run_One_Step (Step_Start, Current);
             declare
-               RC  : constant String := Natural'Image (SData.Table.Row_Count);
-               VC  : constant String := Natural'Image (SData.Table.Column_Count);
+               RC : constant String := Natural'Image (SData.Table.Row_Count);
+               VC : constant String := Natural'Image (SData.Table.Column_Count);
             begin
                Put_Line ("RUN complete. " &
                          RC (RC'First + 1 .. RC'Last) & " records and " &
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
             Step_Start := Current.Next;
-         elsif Current.Kind /= Stmt_RUN and then Current.Kind /= Stmt_LET and then Current.Kind /= Stmt_SET and then Current.Kind /= Stmt_PRINT and then Current.Kind /= Stmt_IF and then Current.Kind /= Stmt_FOR and then Current.Kind /= Stmt_WHILE and then Current.Kind /= Stmt_LOOP_REPEAT and then Current.Kind /= Stmt_SELECT and then Current.Kind /= Stmt_DELETE and then Current.Kind /= Stmt_WRITE and then Current.Kind /= Stmt_DIM and then Current.Kind /= Stmt_ARRAY then
+         elsif Current.Kind /= Stmt_LET and then Current.Kind /= Stmt_SET
+            and then Current.Kind /= Stmt_PRINT  and then Current.Kind /= Stmt_IF
+            and then Current.Kind /= Stmt_FOR     and then Current.Kind /= Stmt_WHILE
+            and then Current.Kind /= Stmt_LOOP_REPEAT and then Current.Kind /= Stmt_SELECT
+            and then Current.Kind /= Stmt_DELETE  and then Current.Kind /= Stmt_WRITE
+            and then Current.Kind /= Stmt_DIM     and then Current.Kind /= Stmt_ARRAY
+         then
             begin
                Execute_Statement (Current);
             exception
                when E : Script_Error =>
                   if SData.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                  else
-                     raise;
-                  end if;
+                  else raise; end if;
                when E : others =>
                   if SData.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                  else
-                     raise Script_Error with Ada.Exceptions.Exception_Message (E);
-                  end if;
+                  else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
             end;
          end if;
          Current := Current.Next;
