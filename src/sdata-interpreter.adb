@@ -85,8 +85,14 @@ package body SData.Interpreter is
    end Set_Interactive;
 
    --  Forward declarations for internal logic.
-   procedure Execute_Statement (Stmt : Statement_Access);
-   procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null);
+   procedure Execute_Statement    (Stmt : Statement_Access);
+   procedure Execute_List         (List : Statement_Access; Boundary : Statement_Access := null);
+   procedure Execute_Assignment   (Stmt : Statement_Access);
+   procedure Execute_Print        (Stmt : Statement_Access);
+   procedure Execute_Control_Flow (Stmt : Statement_Access);
+   procedure Execute_Metadata     (Stmt : Statement_Access);
+   procedure Execute_Declarative  (Stmt : Statement_Access);
+   procedure Execute_IO           (Stmt : Statement_Access);
 
    function Full_Path (Path : String; Category : String) return String;
 
@@ -384,633 +390,599 @@ package body SData.Interpreter is
       end;
    end Full_Path;
 
+   --  LET / SET — variable assignment with type coercion and clen enforcement.
+   procedure Execute_Assignment (Stmt : Statement_Access) is
+      Var_Name_Str : constant String := Stmt.Var_Name (1 .. Stmt.Var_Len);
+      Expected     : Value_Kind;
+      Result       : Value;  --  Initialised in body so exceptions are caught below
+   begin
+      Result := Evaluate (Stmt.Expr);
+      if Stmt.Is_Array then
+         declare
+            Idx_Val : constant Value := Evaluate (Stmt.Arr_Idx);
+            Idx : Integer;
+         begin
+            if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
+            elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
+            else
+               raise Script_Error with "Array index for """ & Var_Name_Str &
+                  """ must be numeric, not " &
+                  (if Idx_Val.Kind = Val_Missing then "missing" else "a string");
+            end if;
+            Set_Array_Element (Var_Name_Str, Idx, Result);
+         end;
+      else
+         Expected := Get_Expected_Kind (Var_Name_Str);
+         declare
+            Existing_Kind : constant Value_Kind := Get_Type (Var_Name_Str);
+         begin
+            if Existing_Kind /= Val_Missing then
+               if Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
+                  raise SData.Table.Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+               end if;
+               if Existing_Kind = Val_String and Result.Kind /= Val_String then
+                  raise SData.Table.Type_Mismatch_Error with "Cannot assign numeric to string variable " & Var_Name_Str;
+               elsif Existing_Kind /= Val_String and Result.Kind = Val_String then
+                  raise SData.Table.Type_Mismatch_Error with "Cannot assign string to numeric variable " & Var_Name_Str;
+               end if;
+            end if;
+         end;
+         if Result.Kind /= Val_Missing then
+            if Expected = Val_Integer and Result.Kind /= Val_Integer then
+               Result := (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Convert_To_Float(Result))));
+            elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
+               Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
+            elsif Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
+               raise SData.Table.Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+            end if;
+         end if;
+         if Result.Kind = Val_String and then
+            SData.Config.Max_String_Len > 0 and then
+            Length (Result.Str_Val) > SData.Config.Max_String_Len
+         then
+            Put_Line_Error ("Warning: String truncated to " &
+                      Integer'Image (SData.Config.Max_String_Len) & " characters.");
+            Result.Str_Val := To_Unbounded_String (Slice (Result.Str_Val, 1, SData.Config.Max_String_Len));
+         end if;
+         if Stmt.Kind = Stmt_LET then
+            Set_Permanent (Var_Name_Str, Result);
+         else
+            Set_Temporary (Var_Name_Str, Result);
+         end if;
+      end if;
+   exception
+      when E : SData.Table.Type_Mismatch_Error =>
+         raise Script_Error with "Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
+      when Script_Error => raise;
+      when E : others =>
+         raise Script_Error with "Assignment failed for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
+   end Execute_Assignment;
+
+   --  PRINT — format and emit expression list or bare column dump.
+   procedure Execute_Print (Stmt : Statement_Access) is
+   begin
+      if Stmt.Print_Args = null then
+         declare
+            Col_Names : constant String_List_Access := Get_Column_Names;
+         begin
+            if Col_Names /= null then
+               for I in Col_Names'Range loop
+                  declare
+                     Name : constant String := To_Upper (Col_Names (I).all);
+                     Val  : constant Value  := Get (Name);
+                  begin
+                     Put (Name & ": " & To_String_Formatted (Val) & "  ");
+                  end;
+               end loop;
+               New_Line;
+               declare Old_List : String_List_Access := Col_Names;
+               begin GNAT.Strings.Free (Old_List); end;
+            end if;
+         end;
+      else
+         declare Current_Arg : Expression_List := Stmt.Print_Args;
+         begin
+            while Current_Arg /= null loop
+               if Current_Arg.Expr.Kind = Expr_Variable then
+                  declare
+                     VName : constant String := To_Upper (Current_Arg.Expr.Var_Name (1 .. Current_Arg.Expr.Var_Len));
+                  begin
+                     if Has_Array (VName) then
+                        declare Start_Idx, End_Idx : Integer;
+                        begin
+                           Get_Array_Bounds (VName, Start_Idx, End_Idx);
+                           for I in Start_Idx .. End_Idx loop
+                              Put (To_String_Formatted (Get_Array_Element (VName, I)));
+                              if I /= End_Idx then Put (" "); end if;
+                           end loop;
+                        end;
+                     else
+                        Put (To_String_Formatted (Evaluate (Current_Arg.Expr)));
+                     end if;
+                  end;
+               else
+                  Put (To_String_Formatted (Evaluate (Current_Arg.Expr)));
+               end if;
+               if Current_Arg.Next /= null then Put (" "); end if;
+               Current_Arg := Current_Arg.Next;
+            end loop;
+            New_Line;
+         end;
+      end if;
+   end Execute_Print;
+
+   --  IF / WHILE / FOR / LOOP_REPEAT / SELECT — all control flow constructs.
+   procedure Execute_Control_Flow (Stmt : Statement_Access) is
+   begin
+      case Stmt.Kind is
+         when Stmt_IF =>
+            if Is_True (Evaluate (Stmt.Condition)) then Execute_List (Stmt.Then_Branch);
+            elsif Stmt.Else_Branch /= null then Execute_List (Stmt.Else_Branch); end if;
+         when Stmt_WHILE =>
+            while Is_True (Evaluate (Stmt.While_Cond)) loop Execute_List (Stmt.While_Body); end loop;
+         when Stmt_FOR =>
+            declare Start_Val : constant Value := Evaluate (Stmt.For_Start);
+                    End_Val   : constant Value := Evaluate (Stmt.For_End);
+                    Step_Val  : Value := (Kind => Val_Numeric, Num_Val => 1.0);
+                    Current_I : Float;
+            begin
+               if Stmt.For_Step /= null then Step_Val := Evaluate (Stmt.For_Step); end if;
+               declare
+                  S  : constant Float := Convert_To_Float (Start_Val);
+                  E  : constant Float := Convert_To_Float (End_Val);
+                  ST : constant Float := Convert_To_Float (Step_Val);
+               begin
+                  Current_I := S;
+                  while (ST > 0.0 and then Current_I <= E) or else (ST < 0.0 and then Current_I >= E) loop
+                     Set_Permanent (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
+                     Execute_List (Stmt.For_Body);
+                     Current_I := Current_I + ST;
+                  end loop;
+               end;
+            end;
+         when Stmt_LOOP_REPEAT =>
+            loop
+               Execute_List (Stmt.Repeat_Body);
+               exit when Is_True (Evaluate (Stmt.Until_Cond));
+            end loop;
+         when Stmt_SELECT =>
+            declare
+               Val     : constant Value := (if Stmt.Selector /= null then Evaluate (Stmt.Selector) else (Kind => Val_Missing));
+               Branch  : Case_Branch := Stmt.Branches;
+               Matched : Boolean := False;
+            begin
+               while Branch /= null loop
+                  if Stmt.Selector = null then
+                     declare Cond : Expression_List := Branch.Conditions;
+                     begin
+                        while Cond /= null loop
+                           if Is_True (Evaluate (Cond.Expr)) then
+                              Execute_List (Branch.Branch_Body); Matched := True; exit;
+                           end if;
+                           Cond := Cond.Next;
+                        end loop;
+                     end;
+                  else
+                     declare Cond : Expression_List := Branch.Conditions;
+                     begin
+                        while Cond /= null loop
+                           if Evaluate (Cond.Expr) = Val then
+                              Execute_List (Branch.Branch_Body); Matched := True; exit;
+                           end if;
+                           Cond := Cond.Next;
+                        end loop;
+                     end;
+                  end if;
+                  exit when Matched;
+                  Branch := Branch.Next;
+               end loop;
+               if not Matched and then Stmt.Otherwise_Part /= null then
+                  Execute_List (Stmt.Otherwise_Part);
+               end if;
+            end;
+         when others => null;
+      end case;
+   end Execute_Control_Flow;
+
+   --  KEEP / DROP / HOLD / UNHOLD / UNSET / RENAME / ARRAY / DIM / NAMES.
+   procedure Execute_Metadata (Stmt : Statement_Access) is
+   begin
+      case Stmt.Kind is
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET =>
+            declare Curr_Var : Variable_List := Stmt.Vars;
+            begin
+               if Stmt.Kind = Stmt_UNSET then
+                  while Curr_Var /= null loop
+                     SData.Variables.Unset (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
+                     Curr_Var := Curr_Var.Next;
+                  end loop;
+               elsif Stmt.Kind = Stmt_KEEP or Stmt.Kind = Stmt_DROP then
+                  declare K : constant Column_Mod_Kind := (if Stmt.Kind = Stmt_KEEP then Mod_Keep else Mod_Drop);
+                  begin
+                     while Curr_Var /= null loop
+                        Expand_Range (K, Curr_Var.Var);
+                        Curr_Var := Curr_Var.Next;
+                     end loop;
+                  end;
+               else
+                  declare
+                     State : constant Boolean := (Stmt.Kind = Stmt_HOLD);
+                     procedure Set_Hold_For_Range (Range_Spec : Variable_Range) is
+                        Col_Names  : constant GNAT.Strings.String_List_Access := Get_Column_Names;
+                        Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                        End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                        Start_Idx, End_Idx : Natural := 0;
+                     begin
+                        if not Range_Spec.Is_Range then
+                           Set_Hold (Start_Name, State);
+                        elsif Col_Names /= null then
+                           for I in Col_Names'Range loop
+                              if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
+                              if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+                           end loop;
+                           if Start_Idx > 0 and End_Idx > 0 then
+                              if Start_Idx > End_Idx then
+                                 declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                              end if;
+                              for I in Start_Idx .. End_Idx loop Set_Hold (Col_Names (I).all, State); end loop;
+                           end if;
+                           declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
+                        end if;
+                     end Set_Hold_For_Range;
+                  begin
+                     if Curr_Var = null then
+                        declare Col_Names : constant String_List_Access := Get_Column_Names;
+                        begin
+                           if Col_Names /= null then
+                              for I in Col_Names'Range loop Set_Hold (Col_Names (I).all, State); end loop;
+                              declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
+                           end if;
+                        end;
+                     else
+                        while Curr_Var /= null loop
+                           Set_Hold_For_Range (Curr_Var.Var);
+                           Curr_Var := Curr_Var.Next;
+                        end loop;
+                     end if;
+                  end;
+               end if;
+            end;
+         when Stmt_RENAME =>
+            declare Curr : Rename_List := Stmt.Rename_Pairs;
+            begin
+               while Curr /= null loop
+                  Rename_Column (Curr.Old_Name (1 .. Curr.Old_Len), Curr.New_Name (1 .. Curr.New_Len));
+                  Curr := Curr.Next;
+               end loop;
+            end;
+         when Stmt_ARRAY =>
+            declare
+               V        : Name_Vectors.Vector;
+               Curr_Var : Variable_List := Stmt.Arr_Vars;
+               procedure Resolve_Range (Range_Spec : Variable_Range) is
+                  Col_Names  : constant GNAT.Strings.String_List_Access := Get_Column_Names;
+                  Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                  End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                  Start_Idx, End_Idx : Natural := 0;
+               begin
+                  if not Range_Spec.Is_Range then
+                     if Has_Array (Start_Name) then
+                        declare Lo, Hi : Integer;
+                        begin
+                           Get_Array_Bounds (Start_Name, Lo, Hi);
+                           for I in Lo .. Hi loop
+                              V.Append (To_Unbounded_String (Start_Name & "(" & Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both) & ")"));
+                           end loop;
+                        end;
+                     else
+                        V.Append (To_Unbounded_String (Start_Name));
+                     end if;
+                  elsif Col_Names /= null then
+                     for I in Col_Names'Range loop
+                        if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
+                        if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+                     end loop;
+                     if Start_Idx > 0 and End_Idx > 0 then
+                        if Start_Idx > End_Idx then
+                           declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                        end if;
+                        for I in Start_Idx .. End_Idx loop V.Append (To_Unbounded_String (Col_Names (I).all)); end loop;
+                     end if;
+                     declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
+                  end if;
+               end Resolve_Range;
+            begin
+               while Curr_Var /= null loop
+                  Resolve_Range (Curr_Var.Var);
+                  Curr_Var := Curr_Var.Next;
+               end loop;
+               Define_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len), V);
+            exception
+               when E : others =>
+                  raise Script_Error with "Error defining array " & Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
+            end;
+         when Stmt_DIM =>
+            declare
+               function Eval_Bound (Expr : Expression_Access; Label : String) return Integer is
+                  V : constant Value := Evaluate (Expr);
+               begin
+                  if V.Kind = Val_Integer then return V.Int_Val;
+                  elsif V.Kind = Val_Numeric then return Integer (Float'Floor (V.Num_Val));
+                  elsif V.Kind = Val_String then raise Script_Error with Label & " bound must be numeric, not character";
+                  else raise Script_Error with Label & " bound is missing";
+                  end if;
+               end Eval_Bound;
+               Start_Idx : constant Integer := Eval_Bound (Stmt.Arr_Start_Expr, "Lower");
+               End_Idx   : constant Integer := Eval_Bound (Stmt.Arr_End_Expr, "Upper");
+            begin
+               Dim_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len), Start_Idx, End_Idx, Stmt.Is_Temporary_Dim);
+            exception
+               when E : others =>
+                  raise Script_Error with "Error defining array " & Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
+            end;
+         when Stmt_NAMES =>
+            declare
+               T_Names : constant String_List_Access := Get_Column_Names;
+               S_Names : constant String_List_Access := Get_Session_Names;
+            begin
+               Put_Line ("Permanent Variables (Table Columns):");
+               if T_Names /= null and then T_Names'Length > 0 then
+                  for I in T_Names'Range loop Put (T_Names (I).all & " "); end loop;
+                  New_Line;
+               else Put_Line ("(none)"); end if;
+               Put_Line ("Session Variables (SET):");
+               if S_Names /= null and then S_Names'Length > 0 then
+                  for I in S_Names'Range loop Put (S_Names (I).all & " "); end loop;
+                  New_Line;
+               else Put_Line ("(none)"); end if;
+               if T_Names /= null then declare Old : String_List_Access := T_Names; begin GNAT.Strings.Free (Old); end; end if;
+               if S_Names /= null then declare Old : String_List_Access := S_Names; begin GNAT.Strings.Free (Old); end; end if;
+            end;
+         when others => null;
+      end case;
+   end Execute_Metadata;
+
+   --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW.
+   procedure Execute_Declarative (Stmt : Statement_Access) is
+   begin
+      case Stmt.Kind is
+         when Stmt_USE =>
+            SData.Config.Repeat_Active := False;
+            SData.Config.Repeat_Count := 0;
+            declare
+               File_Name : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
+               Expanded  : String (1 .. 1024);
+               Exp_Len   : Natural := 0;
+            begin
+               if Stmt.Is_Mock then
+                  Exp_Len := 4; Expanded (1 .. 4) := "MOCK";
+               else
+                  declare Full : constant String := Full_Path (File_Name, "USE");
+                  begin Exp_Len := Full'Length; Expanded (1 .. Exp_Len) := Full; end;
+               end if;
+               SData.File_IO.Open_Input (Expanded (1 .. Exp_Len),
+                 (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format));
+            end;
+            Input_File_Columns.Clear;
+            Refresh_PDV_Names;
+            declare Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+            begin
+               if Col_Names /= null then
+                  for I in Col_Names'Range loop Input_File_Columns.Include (To_Upper (Col_Names (I).all)); end loop;
+                  GNAT.Strings.Free (Col_Names);
+               end if;
+            end;
+         when Stmt_SAVE =>
+            declare
+               Full : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
+            begin
+               SData.Config.Save_File_Path (1 .. Full'Length) := Full;
+               SData.Config.Save_File_Len := Full'Length;
+               SData.Config.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
+               SData.Config.Save_File_Active := True;
+            end;
+         when Stmt_SORT =>
+            declare
+               Curr_Var : Variable_List := Stmt.Sort_Vars;
+               Count    : Natural := 0;
+               Tmp      : Variable_List := Curr_Var;
+            begin
+               while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
+               if Count > 0 then
+                  declare
+                     Crit : Sort_Criteria_Array (1 .. Count);
+                     Idx  : Positive := 1;
+                  begin
+                     while Curr_Var /= null loop
+                        Crit (Idx).Name := (others => ' ');
+                        Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
+                        Crit (Idx).Len := Curr_Var.Var.Start_Len;
+                        Crit (Idx).Dir := Ascending;
+                        Idx := Idx + 1; Curr_Var := Curr_Var.Next;
+                     end loop;
+                     Sort (Crit);
+                  end;
+               end if;
+               declare
+                  RC : constant String := Natural'Image (SData.Table.Row_Count);
+                  VC : constant String := Natural'Image (SData.Table.Column_Count);
+               begin
+                  Put_Line ("SORT complete. " &
+                            RC (RC'First + 1 .. RC'Last) & " records and " &
+                            VC (VC'First + 1 .. VC'Last) & " variables processed.");
+               end;
+               if SData.Config.Save_File_Active then
+                  SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt);
+                  if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
+                  SData.Config.Save_File_Active := False;
+               end if;
+            end;
+         when Stmt_BY =>
+            Current_By_Vars.Clear;
+            declare
+               Curr_Var : Variable_List := Stmt.Sort_Vars;
+               Count    : Natural := 0;
+               Tmp      : Variable_List := Curr_Var;
+            begin
+               while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
+               if Count > 0 then
+                  declare
+                     Crit : Sort_Criteria_Array (1 .. Count);
+                     Idx  : Positive := 1;
+                  begin
+                     while Curr_Var /= null loop
+                        Crit (Idx).Name := (others => ' ');
+                        Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
+                        Crit (Idx).Len := Curr_Var.Var.Start_Len;
+                        Crit (Idx).Dir := Ascending;
+                        Current_By_Vars.Append (To_Unbounded_String (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len))));
+                        Idx := Idx + 1; Curr_Var := Curr_Var.Next;
+                     end loop;
+                     Sort (Crit);
+                  end;
+               end if;
+            end;
+         when Stmt_REPEAT =>
+            SData.Table.Clear;
+            SData.Config.Repeat_Active := True;
+            SData.Config.Repeat_Count := Stmt.Count;
+            Input_File_Columns.Clear;
+         when Stmt_SELECT_FILTER =>
+            Select_Filter_Expr := Stmt.Expr;
+            SData.Table.Clear_Index_Map;
+         when Stmt_DIGITS =>
+            SData.Config.Print_Digits := Stmt.Digits_Count;
+         when Stmt_RSEED =>
+            declare
+               V : constant Value := Evaluate (Stmt.Seed_Expr);
+               S : constant Integer :=
+                  (if V.Kind = Val_Integer then V.Int_Val
+                   else Integer (Convert_To_Float (V)));
+            begin
+               SData.Statistics.Set_Seed (S);
+            end;
+         when Stmt_NEW =>
+            SData.Table.Clear;
+            SData.Variables.Clear_Temporary;
+            SData.Variables.Initialize_PDV;
+            Clear_Active_Program;
+            SData.Config.Repeat_Active := False;
+            SData.Config.Repeat_Count := 0;
+            SData.Config.Save_File_Active := False;
+         when others => null;
+      end case;
+   end Execute_Declarative;
+
+   --  SUBMIT / SYSTEM / OUTPUT / FPATH — external interaction and I/O routing.
+   procedure Execute_IO (Stmt : Statement_Access) is
+   begin
+      case Stmt.Kind is
+         when Stmt_SUBMIT =>
+            declare
+               Final : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SUBMIT");
+            begin
+               if Submit_Chain.Contains (Final) then
+                  raise Script_Error with "Recursive SUBMIT detected: " & Final;
+               end if;
+               Submit_Chain.Insert (Final);
+               declare
+                  File   : Ada.Streams.Stream_IO.File_Type;
+                  Stream : Ada.Streams.Stream_IO.Stream_Access;
+               begin
+                  Ada.Streams.Stream_IO.Open (File, Ada.Streams.Stream_IO.In_File, Final);
+                  Stream := Ada.Streams.Stream_IO.Stream (File);
+                  declare
+                     Contents : String (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
+                  begin
+                     String'Read (Stream, Contents);
+                     Ada.Streams.Stream_IO.Close (File);
+                     declare
+                        Sub_Ctx  : Parser_Context;
+                        Sub_Prog : Statement_Access;
+                     begin
+                        Initialize (Sub_Ctx, Contents);
+                        Sub_Prog := Parse_Program (Sub_Ctx);
+                        Execute (Sub_Prog);
+                     end;
+                  end;
+               exception
+                  when Ada.Streams.Stream_IO.Name_Error =>
+                     Submit_Chain.Delete (Final);
+                     raise Script_Error with "SUBMIT: file not found: " & Final;
+                  when others =>
+                     Submit_Chain.Delete (Final);
+                     raise;
+               end;
+               Submit_Chain.Delete (Final);
+            end;
+         when Stmt_SYSTEM =>
+            if SData.Config.Disable_Shell then
+               Put_Line_Error ("Error: SYSTEM command is disabled.");
+            else
+               declare Success : Boolean;
+               begin
+                  SData.System.Shell_Execute (Stmt.File_Path (1 .. Stmt.File_Len), Success);
+               end;
+            end if;
+         when Stmt_OUTPUT =>
+            if SData.IO.Is_Redirected then SData.IO.Close_Output; end if;
+            if Stmt.File_Len > 0 then
+               declare Final_Path : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT");
+               begin
+                  SData.IO.Open_Output (Final_Path);
+               exception
+                  when others => SData.IO.Put_Line_Error ("Error: Could not create output file " & Final_Path);
+               end;
+            end if;
+         when Stmt_FPATH =>
+            declare
+               Path      : constant String  := (if Stmt.File_Len > 0 then Stmt.File_Path (1 .. Stmt.File_Len) else "");
+               Reset_All : constant Boolean := not (Stmt.Use_Flag or Stmt.Save_Flag or Stmt.Submit_Flag or Stmt.Output_Flag);
+            begin
+               if Reset_All or Stmt.Use_Flag    then SData.Config.FPath_Use    := To_Unbounded_String (Path); end if;
+               if Reset_All or Stmt.Save_Flag   then SData.Config.FPath_Save   := To_Unbounded_String (Path); end if;
+               if Reset_All or Stmt.Submit_Flag then SData.Config.FPath_Submit := To_Unbounded_String (Path); end if;
+               if Reset_All or Stmt.Output_Flag then SData.Config.FPath_Output := To_Unbounded_String (Path); end if;
+            end;
+         when others => null;
+      end case;
+   end Execute_IO;
+
    procedure Execute_Statement (Stmt : Statement_Access) is
 
    begin
       if Stmt = null then return; end if;
       case Stmt.Kind is
-            when Stmt_HELP =>
-               SData.Help.Print_Help (Stmt.Var_Name (1 .. Stmt.Var_Len));
-            when Stmt_RUN =>
-               Run_Active_Program;
-            when Stmt_QUIT | Stmt_END =>
-               null; -- Handled by loop termination
-            when Stmt_LET | Stmt_SET =>
-               declare
-                  Var_Name_Str : constant String := Stmt.Var_Name(1 .. Stmt.Var_Len);
-                  Expected     : Value_Kind;
-                  Result       : Value;  -- Initialised in body so exceptions are caught below
-               begin
-                  Result := Evaluate (Stmt.Expr);
-                  if Stmt.Is_Array then
-                     declare
-                        Idx_Val : constant Value := Evaluate (Stmt.Arr_Idx);
-                        Idx : Integer;
-                     begin
-                        if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
-                        elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
-                        else
-                           raise Script_Error with "Array index for """ & Var_Name_Str &
-                              """ must be numeric, not " &
-                              (if Idx_Val.Kind = Val_Missing then "missing" else "a string");
-                        end if;
-
-                        Set_Array_Element (Var_Name_Str, Idx, Result);
-                     end;
-                  else
-                     Expected := Get_Expected_Kind (Var_Name_Str);
-
-                     -- Check for existence and type if already permanent
-                     declare
-                        Existing_Kind : constant Value_Kind := Get_Type (Var_Name_Str);
-                     begin
-                        if Existing_Kind /= Val_Missing then
-                           if Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
-                              raise SData.Table.Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
-                           end if;
-                           -- Double check actual kind for dynamic variables without suffixes
-                           if Existing_Kind = Val_String and Result.Kind /= Val_String then
-                              raise SData.Table.Type_Mismatch_Error with "Cannot assign numeric to string variable " & Var_Name_Str;
-                           elsif Existing_Kind /= Val_String and Result.Kind = Val_String then
-                              raise SData.Table.Type_Mismatch_Error with "Cannot assign string to numeric variable " & Var_Name_Str;
-                           end if;
-                        end if;
-                     end;
-
-                     if Result.Kind /= Val_Missing then
-                        if Expected = Val_Integer and Result.Kind /= Val_Integer then
-                           Result := (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Convert_To_Float(Result))));
-                        elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
-                           -- Promote integer to float.
-                           Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
-                        elsif Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
-                           raise SData.Table.Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
-                        end if;
-                     end if;
-
-                     -- Enforce --clen limit on string values before storing.
-                     if Result.Kind = Val_String and then
-                        SData.Config.Max_String_Len > 0 and then
-                        Length (Result.Str_Val) > SData.Config.Max_String_Len
-                     then
-                        Put_Line_Error ("Warning: String truncated to " &
-                                  Integer'Image (SData.Config.Max_String_Len) &
-                                  " characters.");
-                        Result.Str_Val := To_Unbounded_String (Slice (Result.Str_Val, 1, SData.Config.Max_String_Len));
-                     end if;
-
-                     if Stmt.Kind = Stmt_LET then
-                        Set_Permanent (Var_Name_Str, Result);
-                     else
-                        Set_Temporary (Var_Name_Str, Result);
-                     end if;
-                  end if;
-               exception
-                  when E : SData.Table.Type_Mismatch_Error =>
-                     raise Script_Error with "Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
-                  when Script_Error =>
-                     --  Script_Error from evaluator (e.g. div-by-zero, domain error):
-                     --  re-raise to let the top-level handler print it.
-                     raise;
-                  when E : others =>
-                     raise Script_Error with "Assignment failed for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
-               end;
-            when Stmt_PRINT =>
-               if Stmt.Print_Args = null then
-                  declare
-                     Col_Names : constant String_List_Access := Get_Column_Names;
-                  begin
-                     if Col_Names /= null then
-                        for I in Col_Names'Range loop
-                           declare
-                              Name : constant String := To_Upper (Col_Names (I).all);
-                              Val  : constant Value  := Get (Name);
-                           begin
-                              Put (Name & ": " & To_String_Formatted (Val) & "  ");
-                           end;
-                        end loop;
-                        New_Line;
-                        declare
-                           Old_List : String_List_Access := Col_Names;
-                        begin
-                           GNAT.Strings.Free (Old_List);
-                        end;
-                     end if;
-                  end;
-               else
-                  declare Current_Arg : Expression_List := Stmt.Print_Args;
-                  begin
-                     while Current_Arg /= null loop
-                        if Current_Arg.Expr.Kind = Expr_Variable then
-                           declare
-                              VName : constant String := To_Upper (Current_Arg.Expr.Var_Name (1 .. Current_Arg.Expr.Var_Len));
-                           begin
-                              if Has_Array (VName) then
-                                 declare
-                                    Start_Idx, End_Idx : Integer;
-                                 begin
-                                    Get_Array_Bounds (VName, Start_Idx, End_Idx);
-                                    for I in Start_Idx .. End_Idx loop
-                                       Put (To_String_Formatted (Get_Array_Element (VName, I)));
-                                       if I /= End_Idx then Put (" "); end if;
-                                    end loop;
-                                 end;
-                              else
-                                 Put (To_String_Formatted (Evaluate (Current_Arg.Expr)));
-                              end if;
-                           end;
-                        else
-                           Put (To_String_Formatted (Evaluate (Current_Arg.Expr)));
-                        end if;
-                        if Current_Arg.Next /= null then Put (" "); end if;
-                        Current_Arg := Current_Arg.Next;
-                     end loop;
-                     New_Line;
-                  end;
-               end if;
-            when Stmt_USE =>
-               SData.Config.Repeat_Active := False;
-               SData.Config.Repeat_Count := 0;
-               declare
-                  File_Name : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
-                  Expanded : String (1 .. 1024);
-                  Exp_Len  : Natural := 0;
-               begin
-                  if Stmt.Is_Mock then
-                     Exp_Len := 4;
-                     Expanded (1 .. 4) := "MOCK";
-                  else
-                     declare Full : constant String := Full_Path (File_Name, "USE"); begin
-                        Exp_Len := Full'Length;
-                        Expanded (1 .. Exp_Len) := Full;
-                     end;
-                  end if;
-                  SData.File_IO.Open_Input (Expanded(1 .. Exp_Len),
-                    (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format));
-               end;
-               Input_File_Columns.Clear;
-               Refresh_PDV_Names;
-               declare Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-               begin
-                  if Col_Names /= null then
-                     for I in Col_Names'Range loop Input_File_Columns.Include (To_Upper (Col_Names (I).all)); end loop;
-                     GNAT.Strings.Free (Col_Names);
-                  end if;
-               end;
-               if not SData.Config.Quiet_Mode and then Stmt.File_Path(1 .. Stmt.File_Len) /= "MOCK_DATA"
-                 and then Stmt.File_Path(1 .. Stmt.File_Len) /= "MOCK" then
-                  --  Open_Input already prints success for some formats.
-                  null;
-               end if;
-            when Stmt_SORT =>
-               declare
-                  Curr_Var : Variable_List := Stmt.Sort_Vars;
-                  -- Count vars
-                  Count : Natural := 0;
-                  Tmp : Variable_List := Curr_Var;
-               begin
-                  while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
-                  if Count > 0 then
-                     declare
-                        Crit : Sort_Criteria_Array (1 .. Count);
-                        Idx : Positive := 1;
-                     begin
-                        while Curr_Var /= null loop
-                           Crit (Idx).Name := (others => ' ');
-                           Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
-                           Crit (Idx).Len := Curr_Var.Var.Start_Len;
-                           Crit (Idx).Dir := Ascending; -- For now, all ascending.
-                           Idx := Idx + 1; Curr_Var := Curr_Var.Next;
-                        end loop;
-                        Sort (Crit);
-                     end;
-                  end if;
-                  declare
-                     RC : constant String := Natural'Image (SData.Table.Row_Count);
-                     VC : constant String := Natural'Image (SData.Table.Column_Count);
-                  begin
-                     Put_Line ("SORT complete. " &
-                               RC (RC'First + 1 .. RC'Last) & " records and " &
-                               VC (VC'First + 1 .. VC'Last) & " variables processed.");
-                  end;
-                  if SData.Config.Save_File_Active then
-                     SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt);
-                     if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
-                     SData.Config.Save_File_Active := False;
-                  end if;
-               end;
-            when Stmt_BY =>
-               Current_By_Vars.Clear;
-               declare
-                  Curr_Var : Variable_List := Stmt.Sort_Vars;
-                  -- Count vars
-                  Count : Natural := 0;
-                  Tmp : Variable_List := Curr_Var;
-               begin
-                  while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
-                  if Count > 0 then
-                     declare
-                        Crit : Sort_Criteria_Array (1 .. Count);
-                        Idx : Positive := 1;
-                     begin
-                        while Curr_Var /= null loop
-                           Crit (Idx).Name := (others => ' ');
-                           Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
-                           Crit (Idx).Len := Curr_Var.Var.Start_Len;
-                           Crit (Idx).Dir := Ascending;
-                           Current_By_Vars.Append (To_Unbounded_String (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len))));
-                           Idx := Idx + 1; Curr_Var := Curr_Var.Next;
-                        end loop;
-                        Sort (Crit);
-                     end;
-                  end if;
-               end;
-            when Stmt_REPEAT =>
-               SData.Table.Clear; -- REPEAT cancels USE by clearing the table.
-               SData.Config.Repeat_Active := True;
-               SData.Config.Repeat_Count := Stmt.Count;
-               Input_File_Columns.Clear;
-            when Stmt_SAVE =>
-               declare
-                  File_Name : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
-                  Full      : constant String := Full_Path (File_Name, "SAVE");
-               begin
-                  SData.Config.Save_File_Path (1 .. Full'Length) := Full;
-                  SData.Config.Save_File_Len := Full'Length;
-                  SData.Config.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
-                  SData.Config.Save_File_Active := True;
-               end;
-            when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET =>
-               declare
-                  Curr_Var : Variable_List := Stmt.Vars;
-               begin
-                  if Stmt.Kind = Stmt_UNSET then
-                     while Curr_Var /= null loop
-                        SData.Variables.Unset (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
-                        Curr_Var := Curr_Var.Next;
-                     end loop;
-                  elsif Stmt.Kind = Stmt_KEEP or Stmt.Kind = Stmt_DROP then
-                     declare K : constant Column_Mod_Kind := (if Stmt.Kind = Stmt_KEEP then Mod_Keep else Mod_Drop);
-                     begin
-                        while Curr_Var /= null loop
-                           Expand_Range (K, Curr_Var.Var);
-                           Curr_Var := Curr_Var.Next;
-                        end loop;
-                     end;
-                  else
-                     declare
-                        State : constant Boolean := (Stmt.Kind = Stmt_HOLD);
-                        procedure Set_Hold_For_Range (Range_Spec : Variable_Range) is
-                           Col_Names : constant GNAT.Strings.String_List_Access := Get_Column_Names;
-                           Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
-                           End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
-                           Start_Idx, End_Idx : Natural := 0;
-                        begin
-                           if not Range_Spec.Is_Range then
-                              Set_Hold (Start_Name, State);
-                           elsif Col_Names /= null then
-                              for I in Col_Names'Range loop
-                                 if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
-                                 if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
-                              end loop;
-                              if Start_Idx > 0 and End_Idx > 0 then
-                                 if Start_Idx > End_Idx then
-                                    declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
-                                 end if;
-                                 for I in Start_Idx .. End_Idx loop
-                                    Set_Hold (Col_Names (I).all, State);
-                                 end loop;
-                              end if;
-                              declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
-                           end if;
-                        end Set_Hold_For_Range;
-                     begin
-                        if Curr_Var = null then
-                           -- No arguments: HOLD all currently defined columns
-                           declare
-                              Col_Names : constant String_List_Access := Get_Column_Names;
-                           begin
-                              if Col_Names /= null then
-                                 for I in Col_Names'Range loop
-                                    Set_Hold (Col_Names (I).all, State);
-                                 end loop;
-                                 declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
-                              end if;
-                           end;
-                        else
-                           while Curr_Var /= null loop
-                              Set_Hold_For_Range (Curr_Var.Var);
-                              Curr_Var := Curr_Var.Next;
-                           end loop;
-                        end if;
-                     end;
-                  end if;
-               end;
-            when Stmt_RENAME =>
-               declare Curr : Rename_List := Stmt.Rename_Pairs;
-               begin
-                  while Curr /= null loop
-                     Rename_Column (Curr.Old_Name (1 .. Curr.Old_Len), Curr.New_Name (1 .. Curr.New_Len));
-                     Curr := Curr.Next;
-                  end loop;
-               end;
-            when Stmt_ARRAY | Stmt_DIM =>
-               declare
-                  S : constant Statement_Access := Stmt;
-               begin
-                  if S.Kind = Stmt_ARRAY then
-                     declare
-                        V : Name_Vectors.Vector;
-                        Curr_Var : Variable_List := S.Arr_Vars;
-
-                        procedure Resolve_Range (Range_Spec : Variable_Range) is
-                           Col_Names : constant GNAT.Strings.String_List_Access := Get_Column_Names;
-                           Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
-                           End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
-                           Start_Idx, End_Idx : Natural := 0;
-                        begin
-                           if not Range_Spec.Is_Range then
-                              if Has_Array (Start_Name) then
-                                 declare
-                                    Lo, Hi : Integer;
-                                 begin
-                                    Get_Array_Bounds (Start_Name, Lo, Hi);
-                                    for I in Lo .. Hi loop
-                                       V.Append (To_Unbounded_String (Start_Name & "(" & Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both) & ")"));
-                                    end loop;
-                                 end;
-                              else
-                                 V.Append (To_Unbounded_String (Start_Name));
-                              end if;
-                           elsif Col_Names /= null then
-                              for I in Col_Names'Range loop
-                                 if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
-                                 if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
-                              end loop;
-                              if Start_Idx > 0 and End_Idx > 0 then
-                                 if Start_Idx > End_Idx then
-                                    declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
-                                 end if;
-                                 for I in Start_Idx .. End_Idx loop
-                                    V.Append (To_Unbounded_String (Col_Names (I).all));
-                                 end loop;
-                              end if;
-                              declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
-                           end if;
-                        end Resolve_Range;
-                     begin
-                        while Curr_Var /= null loop
-                           Resolve_Range (Curr_Var.Var);
-                           Curr_Var := Curr_Var.Next;
-                        end loop;
-                        Define_Array (S.Arr_Name (1 .. S.Arr_Name_Len), V);
-                     end;
-                  else -- Stmt_DIM
-                     declare
-                        function Eval_Bound (Expr : Expression_Access; Label : String) return Integer is
-                           V : constant Value := Evaluate (Expr);
-                        begin
-                           if V.Kind = Val_Integer then
-                              return V.Int_Val;
-                           elsif V.Kind = Val_Numeric then
-                              return Integer (Float'Floor (V.Num_Val));
-                           elsif V.Kind = Val_String then
-                              raise Script_Error with Label & " bound must be numeric, not character";
-                           else
-                              raise Script_Error with Label & " bound is missing";
-                           end if;
-                        end Eval_Bound;
-                        Start_Idx : constant Integer := Eval_Bound (S.Arr_Start_Expr, "Lower");
-                        End_Idx   : constant Integer := Eval_Bound (S.Arr_End_Expr, "Upper");
-                     begin
-                        Dim_Array (S.Arr_Name (1 .. S.Arr_Name_Len), Start_Idx, End_Idx, S.Is_Temporary_Dim);
-                     end;
-                  end if;
-               exception
-                  when E : others =>
-                     raise Script_Error with "Error defining array " & S.Arr_Name (1 .. S.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
-               end;
-            when Stmt_NAMES =>
-               declare
-                  T_Names : constant String_List_Access := Get_Column_Names;
-                  S_Names : constant String_List_Access := Get_Session_Names;
-               begin
-                  Put_Line ("Permanent Variables (Table Columns):");
-                  if T_Names /= null and then T_Names'Length > 0 then
-                     for I in T_Names'Range loop
-                        Put (T_Names (I).all & " ");
-                     end loop;
-                     New_Line;
-                  else
-                     Put_Line ("(none)");
-                  end if;
-
-                  Put_Line ("Session Variables (SET):");
-                  if S_Names /= null and then S_Names'Length > 0 then
-                     for I in S_Names'Range loop
-                        Put (S_Names (I).all & " ");
-                     end loop;
-                     New_Line;
-                  else
-                     Put_Line ("(none)");
-                  end if;
-
-                  if T_Names /= null then
-                     declare Old : String_List_Access := T_Names; begin GNAT.Strings.Free (Old); end;
-                  end if;
-                  if S_Names /= null then
-                     declare Old : String_List_Access := S_Names; begin GNAT.Strings.Free (Old); end;
-                  end if;
-               end;
-            when Stmt_SUBMIT =>
-               declare
-                  Final : constant String :=
-                     Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SUBMIT");
-               begin
-                  if Submit_Chain.Contains (Final) then
-                     raise Script_Error with
-                        "Recursive SUBMIT detected: " & Final;
-                  end if;
-                  Submit_Chain.Insert (Final);
-                  declare
-                     File   : Ada.Streams.Stream_IO.File_Type;
-                     Stream : Ada.Streams.Stream_IO.Stream_Access;
-                  begin
-                     Ada.Streams.Stream_IO.Open
-                        (File, Ada.Streams.Stream_IO.In_File, Final);
-                     Stream := Ada.Streams.Stream_IO.Stream (File);
-                        declare
-                           Contents : String
-                              (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
-                        begin
-                           String'Read (Stream, Contents);
-                           Ada.Streams.Stream_IO.Close (File);
-                           declare
-                              Sub_Ctx  : Parser_Context;
-                              Sub_Prog : Statement_Access;
-                           begin
-                              Initialize (Sub_Ctx, Contents);
-                              Sub_Prog := Parse_Program (Sub_Ctx);
-                              Execute (Sub_Prog);
-                           end;
-                        end;
-                     exception
-                        when Ada.Streams.Stream_IO.Name_Error =>
-                           Submit_Chain.Delete (Final);
-                           raise Script_Error with "SUBMIT: file not found: " & Final;
-                        when others =>
-                           Submit_Chain.Delete (Final);
-                           raise;
-                     end;
-                     Submit_Chain.Delete (Final);
-                  end;
-            when Stmt_SYSTEM =>
-               if SData.Config.Disable_Shell then
-                  Put_Line_Error ("Error: SYSTEM command is disabled.");
-               else
-                  declare
-                     Success : Boolean;
-                  begin
-                     SData.System.Shell_Execute (Stmt.File_Path(1 .. Stmt.File_Len), Success);
-                  end;
-               end if;
-            when Stmt_SELECT =>
-               declare
-                  Val : constant Value := (if Stmt.Selector /= null then Evaluate (Stmt.Selector) else (Kind => Val_Missing));
-                  Branch : Case_Branch := Stmt.Branches;
-                  Matched : Boolean := False;
-               begin
-                  while Branch /= null loop
-                     if Stmt.Selector = null then
-                        -- CASE (condition) - execute first matched condition
-                        declare Cond : Expression_List := Branch.Conditions;
-                        begin
-                           while Cond /= null loop
-                              if Is_True (Evaluate (Cond.Expr)) then
-                                 Execute_List (Branch.Branch_Body); Matched := True; exit;
-                              end if;
-                              Cond := Cond.Next;
-                           end loop;
-                        end;
-                     else
-                        -- SELECT (val) CASE (v1, v2)
-                        declare Cond : Expression_List := Branch.Conditions;
-                        begin
-                           while Cond /= null loop
-                              if Evaluate (Cond.Expr) = Val then
-                                 Execute_List (Branch.Branch_Body); Matched := True; exit;
-                              end if;
-                              Cond := Cond.Next;
-                           end loop;
-                        end;
-                     end if;
-                     exit when Matched;
-                     Branch := Branch.Next;
-                  end loop;
-                  if not Matched and then Stmt.Otherwise_Part /= null then
-                     Execute_List (Stmt.Otherwise_Part);
-                  end if;
-               end;
-            when Stmt_SELECT_FILTER =>
-               --  Store the expression so every subsequent RUN can rebuild the
-               --  filter map against the then-current table.  A null expression
-               --  (bare SELECT with no condition) cancels any active filter.
-               Select_Filter_Expr := Stmt.Expr;
-               SData.Table.Clear_Index_Map;
-            when Stmt_DELETE =>
-               Current_Record_Deleted := True;
-            when Stmt_WRITE =>
-               SData.Variables.Flush_PDV_To_Output;
-               SData.Table.Set_Record_Explicitly_Written (True);
-            when Stmt_OUTPUT =>
-               if SData.IO.Is_Redirected then
-                  SData.IO.Close_Output;
-               end if;
-
-               if Stmt.File_Len > 0 then
-                  declare
-                     Final_Path : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT");
-                  begin
-                     SData.IO.Open_Output (Final_Path);
-                  exception
-                     when others =>
-                        SData.IO.Put_Line_Error ("Error: Could not create output file " & Final_Path);
-                  end;
-               end if;
-            when Stmt_ECHO =>
-               SData.IO.Set_Local_Echo (Stmt.Echo_State);
-            when Stmt_IF =>
-               if Is_True (Evaluate (Stmt.Condition)) then Execute_List (Stmt.Then_Branch);
-               elsif Stmt.Else_Branch /= null then Execute_List (Stmt.Else_Branch); end if;
-            when Stmt_WHILE =>
-               while Is_True (Evaluate (Stmt.While_Cond)) loop Execute_List (Stmt.While_Body); end loop;
-            when Stmt_FOR =>
-               declare Start_Val : constant Value := Evaluate (Stmt.For_Start);
-                       End_Val   : constant Value := Evaluate (Stmt.For_End);
-                       Step_Val  : Value := (Kind => Val_Numeric, Num_Val => 1.0);
-                       Current_I : Float;
-               begin
-                  if Stmt.For_Step /= null then Step_Val := Evaluate (Stmt.For_Step); end if;
-                  begin
-                     declare
-                        S : constant Float := Convert_To_Float (Start_Val);
-                        E : constant Float := Convert_To_Float (End_Val);
-                        ST : constant Float := Convert_To_Float (Step_Val);
-                     begin
-                        Current_I := S;
-                        while (ST > 0.0 and then Current_I <= E) or else (ST < 0.0 and then Current_I >= E) loop
-                           Set_Permanent (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
-                           Execute_List (Stmt.For_Body);
-                           Current_I := Current_I + ST;
-                        end loop;
-                     end;
-                  end;
-               end;
-            when Stmt_LOOP_REPEAT =>
-               loop
-                  Execute_List (Stmt.Repeat_Body);
-                  exit when Is_True (Evaluate (Stmt.Until_Cond));
-               end loop;
-            when Stmt_DIGITS =>
-               SData.Config.Print_Digits := Stmt.Digits_Count;
-            when Stmt_FPATH =>
-               declare
-                  Path : constant String := (if Stmt.File_Len > 0 then Stmt.File_Path (1 .. Stmt.File_Len) else "");
-                  Reset_All : constant Boolean := not (Stmt.Use_Flag or Stmt.Save_Flag or Stmt.Submit_Flag or Stmt.Output_Flag);
-               begin
-                  if Reset_All or Stmt.Use_Flag then
-                     SData.Config.FPath_Use := To_Unbounded_String (Path);
-                  end if;
-                  if Reset_All or Stmt.Save_Flag then
-                     SData.Config.FPath_Save := To_Unbounded_String (Path);
-                  end if;
-                  if Reset_All or Stmt.Submit_Flag then
-                     SData.Config.FPath_Submit := To_Unbounded_String (Path);
-                  end if;
-                  if Reset_All or Stmt.Output_Flag then
-                     SData.Config.FPath_Output := To_Unbounded_String (Path);
-                  end if;
-               end;
-            when Stmt_RSEED =>
-               declare
-                  V : constant Value := Evaluate (Stmt.Seed_Expr);
-                  S : constant Integer :=
-                     (if V.Kind = Val_Integer then V.Int_Val
-                      else Integer (Convert_To_Float (V)));
-               begin
-                  SData.Statistics.Set_Seed (S);
-               end;
-            when Stmt_NEW =>
-               SData.Table.Clear;
-               SData.Variables.Clear_Temporary;
-               SData.Variables.Initialize_PDV;
-               Clear_Active_Program;
-               SData.Config.Repeat_Active := False;
-               SData.Config.Repeat_Count := 0;
-               SData.Config.Save_File_Active := False;
-            pragma Warnings (Off, "choice is redundant");
-            when others => null;  -- REPEAT, LOOP_REPEAT handled at the Execute level.
-            pragma Warnings (On, "choice is redundant");
+         when Stmt_HELP =>
+            SData.Help.Print_Help (Stmt.Var_Name (1 .. Stmt.Var_Len));
+         when Stmt_RUN =>
+            Run_Active_Program;
+         when Stmt_QUIT | Stmt_END =>
+            null;  --  Handled by loop termination in Execute.
+         when Stmt_DELETE =>
+            Current_Record_Deleted := True;
+         when Stmt_WRITE =>
+            SData.Variables.Flush_PDV_To_Output;
+            SData.Table.Set_Record_Explicitly_Written (True);
+         when Stmt_ECHO =>
+            SData.IO.Set_Local_Echo (Stmt.Echo_State);
+         when Stmt_LET | Stmt_SET =>
+            Execute_Assignment (Stmt);
+         when Stmt_PRINT =>
+            Execute_Print (Stmt);
+         when Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT =>
+            Execute_Control_Flow (Stmt);
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET
+            | Stmt_RENAME | Stmt_ARRAY | Stmt_DIM | Stmt_NAMES =>
+            Execute_Metadata (Stmt);
+         when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
+            | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW =>
+            Execute_Declarative (Stmt);
+         when Stmt_SUBMIT | Stmt_SYSTEM | Stmt_OUTPUT | Stmt_FPATH =>
+            Execute_IO (Stmt);
+         pragma Warnings (Off, "choice is redundant");
+         when others => null;
+         pragma Warnings (On, "choice is redundant");
       end case;
    end Execute_Statement;
 
