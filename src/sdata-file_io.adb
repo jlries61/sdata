@@ -370,6 +370,7 @@ package body SData.File_IO is
       Temp_XML : constant String := File_Name & ".content.xml";
 
       procedure Load_Content (Zip_Info : Zip.Zip_Info) is
+         package Name_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
          Reader : DOM.Readers.Tree_Reader;
          Input  : Input_Sources.File.File_Input;
          Doc    : DOM.Core.Document;
@@ -422,30 +423,60 @@ package body SData.File_IO is
          Clear;
 
          if Length (Rows) > 0 then
-            -- Headers from the first row
+            --  Collect column names from header row, infer types from first
+            --  data row, then create columns with the correct types.
+            declare
+               Col_Name_Vec : Name_Vecs.Vector;
+            begin
             Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 0)), "table:table-cell");
             for I in 0 .. Length (Cells) - 1 loop
                declare
                   Cell : constant Node := Item (Cells, I);
-                  Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
-                  Repeat_Count : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
+                  Repeat_Attr   : constant String   := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
+                  Repeat_Count  : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
                   P_Nodes_Local : Node_List := Get_Elements_By_Tag_Name (DOM.Core.Element (Cell), "text:p");
-                  Base_Name : constant String := (if Length (P_Nodes_Local) > 0 then Get_Text (Item (P_Nodes_Local, 0)) else "");
+                  Base_Name     : constant String   := (if Length (P_Nodes_Local) > 0 then Get_Text (Item (P_Nodes_Local, 0)) else "");
                begin
                   Free (P_Nodes_Local);
                   for K in 1 .. Repeat_Count loop
-                     -- Stop if we hit too many empty columns (ODS often has thousands)
                      exit when Base_Name = "" and K > 1;
                      declare
-                        Idx : constant String := Trim (Natural (Column_Count + 1)'Img, Ada.Strings.Both);
-                        Final_Name : constant String := (if Base_Name = "" then "COL" & Idx else Base_Name & (if Repeat_Count > 1 then "_" & Trim (K'Img, Ada.Strings.Both) else ""));
+                        Idx_Num    : constant Natural := Natural (Col_Name_Vec.Length) + 1;
+                        Idx        : constant String := Trim (Idx_Num'Img, Ada.Strings.Both);
+                        Final_Name : constant String := (if Base_Name = "" then "COL" & Idx
+                                                         else Base_Name & (if Repeat_Count > 1 then "_" & Trim (K'Img, Ada.Strings.Both) else ""));
                      begin
-                        Add_Column (Safe_Name (Final_Name, "COL" & Idx), Col_String);
+                        Col_Name_Vec.Append (To_Unbounded_String (Safe_Name (Final_Name, "COL" & Idx)));
                      end;
                   end loop;
                end;
             end loop;
             Free (Cells);
+
+            --  Infer column types from the first data row using ODF's explicit
+            --  office:value-type attribute.  Default to Col_Numeric; switch to
+            --  Col_String only when a cell value is non-numeric.
+            declare
+               N         : constant Natural := Positive (Col_Name_Vec.Length);
+               Col_Types : array (1 .. N) of Column_Type := (others => Col_Numeric);
+               Data_Cells : Node_List;
+               Col_Idx    : Natural := 0;
+            begin
+               if Length (Rows) > 1 then
+                  Data_Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 1)), "table:table-cell");
+                  for J in 0 .. Length (Data_Cells) - 1 loop
+                     Col_Idx := Col_Idx + 1;
+                     exit when Col_Idx > N;
+                     declare V : constant Value := Get_Cell_Value (Item (Data_Cells, J)); begin
+                        if V.Kind = Val_String then Col_Types (Col_Idx) := Col_String; end if;
+                     end;
+                  end loop;
+                  Free (Data_Cells);
+               end if;
+               for I in 1 .. N loop
+                  Add_Column (To_String (Col_Name_Vec (I)), Col_Types (I));
+               end loop;
+            end;
             Header_Names := Get_Column_Names;
 
             -- Data Rows
@@ -477,7 +508,13 @@ package body SData.File_IO is
                                        begin
                                           Set_Value (Row_Count, Header_Names (Col_Idx).all, Val);
                                        exception
-                                          when others => null;
+                                          when E : others =>
+                                             if not SData.Config.Quiet_Mode then
+                                                Put_Line_Error ("Warning: ODF import skipped cell at row" &
+                                                   Row_Count'Image & ", column """ &
+                                                   Header_Names (Col_Idx).all & """: " &
+                                                   Ada.Exceptions.Exception_Message (E));
+                                             end if;
                                        end;
                                     end if;
                                     Col_Idx := Col_Idx + 1;
@@ -492,6 +529,7 @@ package body SData.File_IO is
                end;
             end loop;
             GNAT.Strings.Free (Header_Names);
+         end;
          end if;
 
          Free (Rows);
@@ -558,7 +596,11 @@ package body SData.File_IO is
          DOM.Readers.Free (Reader);
          GNAT.OS_Lib.Delete_File (Temp_Shared, Success);
       exception
-         when others => null;
+         when E : others =>
+            if not SData.Config.Quiet_Mode then
+               Put_Line_Error ("Warning: OOXML shared strings failed to load; string cells will be missing: " &
+                  Ada.Exceptions.Exception_Message (E));
+            end if;
       end Load_Shared_Strings;
 
       procedure Load_Sheet (Zip_Info : Zip.Zip_Info) is
@@ -568,6 +610,7 @@ package body SData.File_IO is
          Rows, Cells : Node_List;
          Success : Boolean;
          Header_Names : GNAT.Strings.String_List_Access;
+         package Name_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
 
          function Get_Cell_Value (Cell_Node : Node) return Value is
             T_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell_Node), "t");
@@ -621,17 +664,48 @@ package body SData.File_IO is
          Clear;
 
          if Length (Rows) > 0 then
-            -- Headers
-            Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 0)), "c");
-            for I in 0 .. Length (Cells) - 1 loop
+            --  Collect column names from header row, infer types from first
+            --  data row, then create columns with the correct types.
+            declare
+               Col_Name_Vec : Name_Vecs.Vector;
+            begin
+               Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 0)), "c");
+               for I in 0 .. Length (Cells) - 1 loop
+                  declare
+                     V    : constant Value  := Get_Cell_Value (Item (Cells, I));
+                     Idx  : constant String := Trim (Integer (I + 1)'Img, Ada.Strings.Both);
+                     Name : constant String := (if V.Kind = Val_String
+                                                then SData.Values.To_String (V)
+                                                else "COL" & Idx);
+                  begin
+                     Col_Name_Vec.Append (To_Unbounded_String (Safe_Name (Name, "COL" & Idx)));
+                  end;
+               end loop;
+               Free (Cells);
+
+               --  Infer column types from the first data row.
                declare
-                  V : constant Value := Get_Cell_Value (Item (Cells, I));
-                  Name : constant String := (if V.Kind = Val_String then SData.Values.To_String (V) else "COL" & Trim (Integer (I + 1)'Img, Ada.Strings.Both));
+                  N          : constant Natural := Natural (Col_Name_Vec.Length);
+                  Col_Types  : array (1 .. N) of Column_Type := (others => Col_Numeric);
+                  Data_Cells : Node_List;
+                  Col_Idx    : Natural := 0;
                begin
-                  Add_Column (Safe_Name (Name, "COL" & Trim (Integer (I + 1)'Img, Ada.Strings.Both)), (if V.Kind = Val_Numeric then Col_Numeric else Col_String));
+                  if Length (Rows) > 1 then
+                     Data_Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 1)), "c");
+                     for J in 0 .. Length (Data_Cells) - 1 loop
+                        Col_Idx := Col_Idx + 1;
+                        exit when Col_Idx > N;
+                        declare V : constant Value := Get_Cell_Value (Item (Data_Cells, J)); begin
+                           if V.Kind = Val_String then Col_Types (Col_Idx) := Col_String; end if;
+                        end;
+                     end loop;
+                     Free (Data_Cells);
+                  end if;
+                  for I in 1 .. N loop
+                     Add_Column (To_String (Col_Name_Vec (I)), Col_Types (I));
+                  end loop;
                end;
-            end loop;
-            Free (Cells);
+            end;
             Header_Names := Get_Column_Names;
 
             -- Data Rows
@@ -647,7 +721,13 @@ package body SData.File_IO is
                            Set_Value (Row_Count, Header_Names (J + 1).all, V);
                         end if;
                      exception
-                        when others => null; -- Handle type mismatch or other errors gracefully
+                        when E : others =>
+                           if not SData.Config.Quiet_Mode then
+                              Put_Line_Error ("Warning: OOXML import skipped cell at row" &
+                                 Row_Count'Image & ", column """ &
+                                 Header_Names (J + 1).all & """: " &
+                                 Ada.Exceptions.Exception_Message (E));
+                           end if;
                      end;
                   end if;
                end loop;
