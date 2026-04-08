@@ -51,6 +51,7 @@ procedure SData_Main is
       Put_Line ("  -o <file>                Console output file");
       Put_Line ("  -q                       Suppress console output (Quiet Mode)");
       Put_Line ("  -p                       Pager specification (not yet implemented)");
+      Put_Line ("  --debug                  Trace each statement and record number to stderr");
    end Print_Usage;
 
    --  Runs the Interactive REPL.
@@ -225,6 +226,8 @@ begin
             Disable_Shell := True;
          elsif Arg = "--ignore-math-errors" then
             Ignore_Math_Errors := True;
+         elsif Arg = "--debug" then
+            Debug_Mode := True;
          elsif Arg = "-k" or else Arg = "--continue-on-error" then
             Continue_On_Error := True;
          elsif Arg(1) /= '-' then

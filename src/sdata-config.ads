@@ -51,6 +51,7 @@ package SData.Config is
    Disable_Shell      : Boolean := False;
    Continue_On_Error  : Boolean := False;
    Ignore_Math_Errors : Boolean := False; -- If True, domain errors return Val_Missing instead of halting.
+   Debug_Mode         : Boolean := False; -- If True, trace each statement and record to stderr.
 
    --  Version information
    Version_Major : constant := 0;
