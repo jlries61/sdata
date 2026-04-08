@@ -1,3 +1,14 @@
+sdata (0.3.1-1) unstable; urgency=medium
+
+  * Code quality: refactor Print_Help into data-driven SData.Help package;
+    eliminates 685-line if/elsif chain and ~18 unreachable duplicate entries.
+  * Bug fix: table row limit now raises Script_Error instead of Program_Error.
+  * Bug fix: narrow OOXML cell parse exception handler to Constraint_Error.
+  * Add CI workflow to run make check on push and pull request.
+  * Repo cleanup: remove stale root-level data files; move test data to tests/data/.
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 07 Apr 2026 22:00:00 -0700
+
 sdata (0.3.0-1) unstable; urgency=medium
 
   * Phase 3 complete: SELECT row filter, BY-group processing, filter-aware

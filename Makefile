@@ -68,7 +68,7 @@ srpm: clean
 	@echo "Creating source tarball..."
 	@{ \
 		if [ -z "$$(git status --untracked-files=no --porcelain)" ]; then \
-			git archive --format=tar --prefix=sdata-0.3.0/ HEAD | gzip > sdata-0.3.0.tar.gz; \
+			git archive --format=tar --prefix=sdata-0.3.1/ HEAD | gzip > sdata-0.3.1.tar.gz; \
 		else \
 			echo "ERROR: Working directory is not clean. Please commit changes before creating a source package."; \
 			exit 1; \
@@ -76,7 +76,7 @@ srpm: clean
 	}
 	@echo "Building SRPM..."
 	@mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-	@mv sdata-0.3.0.tar.gz rpmbuild/SOURCES/
+	@mv sdata-0.3.1.tar.gz rpmbuild/SOURCES/
 	@cp sdata.spec rpmbuild/SPECS/
 	@# Copy vendored Ada library tarballs from their canonical location.
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
@@ -87,33 +87,33 @@ srpm: clean
 	   cp "$$TARBALL_DIR/$$tb" rpmbuild/SOURCES/; \
 	 done
 	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir %(pwd)/rpmbuild"
-	@mv rpmbuild/SRPMS/sdata-0.3.0-1.src.rpm .
+	@mv rpmbuild/SRPMS/sdata-0.3.1-1.src.rpm .
 	@rm -rf rpmbuild
-	@echo "SRPM created: sdata-0.3.0-1.src.rpm"
+	@echo "SRPM created: sdata-0.3.1-1.src.rpm"
 
 dsc: clean
 	@echo "Creating Debian Source Package..."
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
 	 CUR_DIR=$$(pwd); \
 	 TEMP_DIR=$$(mktemp -d); \
-	 BASE_DIR="sdata-0.3.0"; \
+	 BASE_DIR="sdata-0.3.1"; \
 	 SRC_DIR="$$TEMP_DIR/$$BASE_DIR"; \
 	 mkdir -p "$$SRC_DIR"; \
 	 cp -r * "$$SRC_DIR/"; \
 	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz; do \
 	   tar xzf "$$TARBALL_DIR/$$tb" -C "$$SRC_DIR/"; \
 	 done; \
-	 cd "$$TEMP_DIR" && tar czf "sdata_0.3.0.orig.tar.gz" "$$BASE_DIR"; \
+	 cd "$$TEMP_DIR" && tar czf "sdata_0.3.1.orig.tar.gz" "$$BASE_DIR"; \
 	 cd "$$SRC_DIR" && dpkg-source -b .; \
-	 mv "$$TEMP_DIR"/sdata_0.3.0* "$$CUR_DIR/" ; \
+	 mv "$$TEMP_DIR"/sdata_0.3.1* "$$CUR_DIR/" ; \
 	 rm -rf "$$TEMP_DIR"
-	@echo "Debian Source Package created (sdata_0.3.0-1.dsc, sdata_0.3.0.orig.tar.gz, etc.)"
+	@echo "Debian Source Package created (sdata_0.3.1-1.dsc, sdata_0.3.1.orig.tar.gz, etc.)"
 
 slackware: clean
 	@echo "Creating SlackBuild tarball..."
 	@{ \
 		if [ -z "$$(git status --untracked-files=no --porcelain)" ]; then \
-			git archive --format=tar --prefix=sdata-0.3.0/ HEAD | gzip > sdata-0.3.0.tar.gz; \
+			git archive --format=tar --prefix=sdata-0.3.1/ HEAD | gzip > sdata-0.3.1.tar.gz; \
 		else \
 			echo "ERROR: Working directory is not clean. Please commit changes before creating a source package."; \
 			exit 1; \
@@ -122,15 +122,15 @@ slackware: clean
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
 	 CUR_DIR=$$(pwd); \
 	 TEMP_DIR=$$(mktemp -d); \
-	 cp sdata-0.3.0.tar.gz "$$TEMP_DIR/"; \
+	 cp sdata-0.3.1.tar.gz "$$TEMP_DIR/"; \
 	 cp slackware/* "$$TEMP_DIR/"; \
 	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz; do \
 	   cp "$$TARBALL_DIR/$$tb" "$$TEMP_DIR/"; \
 	 done; \
-	 cd "$$TEMP_DIR" && tar czf sdata-0.3.0-slackbuild.tar.gz *; \
-	 mv "$$TEMP_DIR/sdata-0.3.0-slackbuild.tar.gz" "$$CUR_DIR/"; \
+	 cd "$$TEMP_DIR" && tar czf sdata-0.3.1-slackbuild.tar.gz *; \
+	 mv "$$TEMP_DIR/sdata-0.3.1-slackbuild.tar.gz" "$$CUR_DIR/"; \
 	 rm -rf "$$TEMP_DIR"
-	@echo "SlackBuild package created: sdata-0.3.0-slackbuild.tar.gz"
+	@echo "SlackBuild package created: sdata-0.3.1-slackbuild.tar.gz"
 
 
 pkg: build
@@ -146,11 +146,11 @@ pkg: build
 	 pkgbuild \
 	   --root "$$PKG_ROOT" \
 	   --identifier com.sdata.pkg \
-	   --version 0.3.0 \
+	   --version 0.3.1 \
 	   --install-location / \
-	   sdata-0.3.0.pkg; \
+	   sdata-0.3.1.pkg; \
 	 rm -rf "$$TEMP_DIR"
-	@echo "macOS package created: sdata-0.3.0.pkg"
+	@echo "macOS package created: sdata-0.3.1.pkg"
 
 install:
 	@test -x bin/sdata || { echo "Error: bin/sdata not found. Run 'make' first."; exit 1; }

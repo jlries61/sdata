@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.3.0
+Version:        0.3.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -45,6 +45,14 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Tue Apr 07 2026 John L. Ries <john@theyarnbard.com> - 0.3.1-1
+- Code quality: refactor Print_Help into data-driven SData.Help package;
+  eliminates 685-line if/elsif chain and ~18 unreachable duplicate entries.
+- Bug fix: table row limit now raises Script_Error instead of Program_Error.
+- Bug fix: narrow OOXML cell parse exception handler to Constraint_Error.
+- Add CI workflow (.github/workflows/test.yml) to run make check on push/PR.
+- Repo cleanup: remove stale root-level data files; move test data to tests/data/.
+
 * Mon Apr 06 2026 John L. Ries <john@theyarnbard.com> - 0.3.0-1
 - Phase 3 complete: SELECT row filter, BY-group processing, filter-aware
   LAG/NEXT/RECNO/BOF/EOF, SELECT /ALL, bare BY to cancel grouping, NEW
