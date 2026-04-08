@@ -301,6 +301,8 @@ begin
 exception
    when E : SData.Script_Error =>
       Put_Line_Error ("Error: " & Exception_Message (E));
+      Set_Exit_Status (Failure);
    when E : others =>
       Put_Line_Error ("An error occurred: " & Exception_Name (E) & ": " & Exception_Message (E));
+      Set_Exit_Status (Failure);
 end SData_Main;

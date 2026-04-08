@@ -40,9 +40,13 @@ check: build
 		extra_flags=""; \
 		if [ -f "$$flags" ]; then extra_flags=$$(cat "$$flags"); fi; \
 		echo -n "Testing $$f... "; \
+		exitcode_file="tests/$$base.exitcode"; \
+		expected_exit=0; \
+		if [ -f "$$exitcode_file" ]; then expected_exit=$$(cat "$$exitcode_file"); fi; \
 		./bin/sdata $$extra_flags $$f > tests/$$base.tmp 2>&1; \
-		if [ $$? -ne 0 ]; then \
-			echo "FAILED (Execution Error)"; \
+		actual_exit=$$?; \
+		if [ $$actual_exit -ne $$expected_exit ]; then \
+			echo "FAILED (Exit code $$actual_exit, expected $$expected_exit)"; \
 			rm tests/$$base.tmp; \
 			exit 1; \
 		fi; \
