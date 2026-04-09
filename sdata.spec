@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.3.1
+Version:        0.3.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -45,6 +45,13 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Wed Apr 08 2026 John L. Ries <john@theyarnbard.com> - 0.3.2-1
+- Fix ODF/OOXML import: infer column types from first data row; warn on skipped cells.
+- Refactor Execute_Statement into named handler procedures; promote Run_One_Step.
+- Add --debug flag to trace statement execution and record numbers to stderr.
+- Set POSIX exit status on script errors; add .exitcode support to test harness.
+- Add doc/architecture.md describing the three-tier execution model.
+
 * Tue Apr 07 2026 John L. Ries <john@theyarnbard.com> - 0.3.1-1
 - Code quality: refactor Print_Help into data-driven SData.Help package;
   eliminates 685-line if/elsif chain and ~18 unreachable duplicate entries.
