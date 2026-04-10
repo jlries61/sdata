@@ -55,6 +55,15 @@ package body SData.Interpreter is
    --  grouping is active.  Populated by Stmt_BY; cleared by bare BY or NEW.
    Current_By_Vars : By_Group_Names.Vector;
 
+   function Is_Immediate (Kind : Statement_Kind) return Boolean is
+   begin
+      return Kind in
+         Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP |
+         Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END |
+         Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
+         Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH;
+   end Is_Immediate;
+
    --  In_Same_Group: both Idx1 and Idx2 are *physical* row indices.
    --  Returns True when the two rows have identical values for every BY
    --  variable, or when no BY grouping is active (vacuously true).

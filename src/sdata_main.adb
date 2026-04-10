@@ -105,14 +105,8 @@ procedure SData_Main is
                Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
 
                while Prog /= null loop
-                  declare
-                     Is_Declarative : constant Boolean :=
-                        Prog.Kind in Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP |
-                                     Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END |
-                                     Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
-                                     Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH;
                   begin
-                     if Is_Declarative then
+                     if Is_Immediate (Prog.Kind) then
                         if Prog.Kind = Stmt_RUN then
                            Run_Active_Program;
                         elsif Prog.Kind = Stmt_QUIT or else Prog.Kind = Stmt_END then

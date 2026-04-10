@@ -19,6 +19,11 @@ package SData.Interpreter is
    --  Executes the global active program.
    procedure Run_Active_Program;
 
+   --  Returns True if a statement of the given kind executes immediately in
+   --  the REPL rather than being queued for the next RUN (data step).
+   --  Add new statement kinds here when they should not be deferred.
+   function Is_Immediate (Kind : Statement_Kind) return Boolean;
+
    --  Checks if two records belong to the same BY group.
    function In_Same_Group (Idx1, Idx2 : Positive) return Boolean;
 
