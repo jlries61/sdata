@@ -13,7 +13,13 @@ GPRBUILD ?= $(firstword $(shell which gprbuild 2>/dev/null) gprbuild)
 
 # GPR_PROJECT_PATH: tells gprbuild where to find dependency .gpr files.
 # If already set in the environment (e.g. by the RPM spec), use that.
-# Otherwise auto-detect from sibling Alire-managed directories.
+# Otherwise auto-detect from the sibling source directories in the parent.
+#
+# Note: these sibling directories (zipada_*, xmlada_*, mathpaqs_*) are the
+# library sources used for 'make build' and for packaging targets (srpm, dsc,
+# slackware).  They are separate from the copies that 'alr build' manages in
+# ~/.local/share/alire/builds/ -- both paths use the same library versions,
+# they are just physically independent.
 DEP_BASE := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 _ZIPADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/zipada_*))
 _XMLADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/xmlada_*))
