@@ -164,7 +164,7 @@ package body SData.Evaluator is
                         else Idx := Integer (Float'Floor (Convert_To_Float (Idx_Val))); end if;
                         All_Vals.Append (Get_Array_Element (AName, idx));
                      exception
-                        when others => All_Vals.Append ((Kind => Val_Missing));
+                        when Constraint_Error => All_Vals.Append ((Kind => Val_Missing));
                      end;
                      Sub_List := Sub_List.Next;
                   end loop;
@@ -515,7 +515,7 @@ package body SData.Evaluator is
                begin
                   return (Kind => Val_Numeric, Num_Val => Float'Value (SData.Values.To_String (V)));
                exception
-                  when others => return (Kind => Val_Missing);
+                  when Constraint_Error => return (Kind => Val_Missing);
                end;
             else
                return (Kind => Val_Missing);
@@ -683,7 +683,7 @@ package body SData.Evaluator is
                return (Kind => Val_Numeric,
                        Num_Val => Float'Value (SData.Values.To_String (V)));
             exception
-               when others => return (Kind => Val_Missing);
+               when Constraint_Error => return (Kind => Val_Missing);
             end;
          end;
 
