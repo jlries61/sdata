@@ -11,10 +11,10 @@ tags = []
 executables = ["sdata"]
 
 [[depends-on]]
-zipada = "^62.0.0"
+zipada = "^61.0.0"
 
 [[depends-on]]
-xmlada = "^21.0.0"
+xmlada = "^26.0.0"
 
 [[depends-on]]
-mathpaqs = "^20230121.0.0"
+mathpaqs = "^20260205.0.0"
