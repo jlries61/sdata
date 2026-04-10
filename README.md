@@ -167,7 +167,7 @@ HELP /ALL         — Full reference for all commands and functions
 
 ## License
 
-MIT
+GPL-3.0. See [LICENSE](LICENSE) for the full text.
 
 ## Author
 

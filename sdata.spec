@@ -3,7 +3,7 @@ Version:        0.3.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
-License:        MIT
+License:        GPLv3
 URL:            https://github.com/user/sdata
 Source0:        %{name}-%{version}.tar.gz
 Source1:        zipada-61.0.0.tar.gz

@@ -4,7 +4,7 @@ version = "0.3.2"
 
 authors = ["John L. Ries"]
 maintainers = ["John L. Ries <john@theyarnbard.com>"]
-licenses = "MIT"
+licenses = "GPL-3.0-only"
 website = ""
 tags = []
 

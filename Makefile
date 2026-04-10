@@ -1,10 +1,15 @@
 # Makefile for SData
 
+VERSION          := 0.3.2
+ZIPADA_VERSION   := 61.0.0
+XMLADA_VERSION   := 26.0.0
+MATHPAQS_VERSION := 20260205.0.0
+
 GPR_FILE = sdata.gpr
-# Prefer the Alire-managed gprbuild if present, fall back to system gprbuild.
-ALIRE_GPRBUILD := /home/jries/.local/share/alire/toolchains/gprbuild_25.0.2.1_9a2e6cfb/bin/gprbuild
-# Try Alire, then 'which', then default to 'gprbuild' and let the shell decide.
-GPRBUILD_ALIRE_PATH := $(firstword $(wildcard $(ALIRE_GPRBUILD)) $(shell which gprbuild 2>/dev/null) gprbuild)
+# Use GPRBUILD from the environment or command line if set; otherwise detect
+# from PATH.  When working with an Alire-managed toolchain, run 'alr build'
+# directly, or ensure the toolchain is on PATH via 'eval $(alr printenv)'.
+GPRBUILD ?= $(firstword $(shell which gprbuild 2>/dev/null) gprbuild)
 
 # GPR_PROJECT_PATH: tells gprbuild where to find dependency .gpr files.
 # If already set in the environment (e.g. by the RPM spec), use that.
@@ -26,7 +31,7 @@ MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 all: build
 
 build:
-	$(GPRBUILD_ALIRE_PATH) -P $(GPR_FILE)
+	$(GPRBUILD) -P $(GPR_FILE)
 
 run: build
 	./bin/sdata tests/test1.cmd
@@ -72,7 +77,7 @@ srpm: clean
 	@echo "Creating source tarball..."
 	@{ \
 		if [ -z "$$(git status --untracked-files=no --porcelain)" ]; then \
-			git archive --format=tar --prefix=sdata-0.3.2/ HEAD | gzip > sdata-0.3.2.tar.gz; \
+			git archive --format=tar --prefix=sdata-$(VERSION)/ HEAD | gzip > sdata-$(VERSION).tar.gz; \
 		else \
 			echo "ERROR: Working directory is not clean. Please commit changes before creating a source package."; \
 			exit 1; \
@@ -80,44 +85,44 @@ srpm: clean
 	}
 	@echo "Building SRPM..."
 	@mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-	@mv sdata-0.3.2.tar.gz rpmbuild/SOURCES/
+	@mv sdata-$(VERSION).tar.gz rpmbuild/SOURCES/
 	@cp sdata.spec rpmbuild/SPECS/
 	@# Copy vendored Ada library tarballs from their canonical location.
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
-	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz; do \
+	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz; do \
 	   if [ ! -f "$$TARBALL_DIR/$$tb" ]; then \
 	     echo "ERROR: dependency tarball not found: $$TARBALL_DIR/$$tb"; exit 1; \
 	   fi; \
 	   cp "$$TARBALL_DIR/$$tb" rpmbuild/SOURCES/; \
 	 done
 	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir %(pwd)/rpmbuild"
-	@mv rpmbuild/SRPMS/sdata-0.3.2-1.src.rpm .
+	@mv rpmbuild/SRPMS/sdata-$(VERSION)-1.src.rpm .
 	@rm -rf rpmbuild
-	@echo "SRPM created: sdata-0.3.2-1.src.rpm"
+	@echo "SRPM created: sdata-$(VERSION)-1.src.rpm"
 
 dsc: clean
 	@echo "Creating Debian Source Package..."
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
 	 CUR_DIR=$$(pwd); \
 	 TEMP_DIR=$$(mktemp -d); \
-	 BASE_DIR="sdata-0.3.2"; \
+	 BASE_DIR="sdata-$(VERSION)"; \
 	 SRC_DIR="$$TEMP_DIR/$$BASE_DIR"; \
 	 mkdir -p "$$SRC_DIR"; \
 	 cp -r * "$$SRC_DIR/"; \
-	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz; do \
+	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz; do \
 	   tar xzf "$$TARBALL_DIR/$$tb" -C "$$SRC_DIR/"; \
 	 done; \
-	 cd "$$TEMP_DIR" && tar czf "sdata_0.3.2.orig.tar.gz" "$$BASE_DIR"; \
+	 cd "$$TEMP_DIR" && tar czf "sdata_$(VERSION).orig.tar.gz" "$$BASE_DIR"; \
 	 cd "$$SRC_DIR" && dpkg-source -b .; \
-	 mv "$$TEMP_DIR"/sdata_0.3.2* "$$CUR_DIR/" ; \
+	 mv "$$TEMP_DIR"/sdata_$(VERSION)* "$$CUR_DIR/" ; \
 	 rm -rf "$$TEMP_DIR"
-	@echo "Debian Source Package created (sdata_0.3.2-1.dsc, sdata_0.3.2.orig.tar.gz, etc.)"
+	@echo "Debian Source Package created (sdata_$(VERSION)-1.dsc, sdata_$(VERSION).orig.tar.gz, etc.)"
 
 slackware: clean
 	@echo "Creating SlackBuild tarball..."
 	@{ \
 		if [ -z "$$(git status --untracked-files=no --porcelain)" ]; then \
-			git archive --format=tar --prefix=sdata-0.3.2/ HEAD | gzip > sdata-0.3.2.tar.gz; \
+			git archive --format=tar --prefix=sdata-$(VERSION)/ HEAD | gzip > sdata-$(VERSION).tar.gz; \
 		else \
 			echo "ERROR: Working directory is not clean. Please commit changes before creating a source package."; \
 			exit 1; \
@@ -126,15 +131,15 @@ slackware: clean
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
 	 CUR_DIR=$$(pwd); \
 	 TEMP_DIR=$$(mktemp -d); \
-	 cp sdata-0.3.2.tar.gz "$$TEMP_DIR/"; \
+	 cp sdata-$(VERSION).tar.gz "$$TEMP_DIR/"; \
 	 cp slackware/* "$$TEMP_DIR/"; \
-	 for tb in zipada-61.0.0.tar.gz xmlada-26.0.0.tar.gz mathpaqs-20260205.0.0.tar.gz; do \
+	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz; do \
 	   cp "$$TARBALL_DIR/$$tb" "$$TEMP_DIR/"; \
 	 done; \
-	 cd "$$TEMP_DIR" && tar czf sdata-0.3.2-slackbuild.tar.gz *; \
-	 mv "$$TEMP_DIR/sdata-0.3.2-slackbuild.tar.gz" "$$CUR_DIR/"; \
+	 cd "$$TEMP_DIR" && tar czf sdata-$(VERSION)-slackbuild.tar.gz *; \
+	 mv "$$TEMP_DIR/sdata-$(VERSION)-slackbuild.tar.gz" "$$CUR_DIR/"; \
 	 rm -rf "$$TEMP_DIR"
-	@echo "SlackBuild package created: sdata-0.3.2-slackbuild.tar.gz"
+	@echo "SlackBuild package created: sdata-$(VERSION)-slackbuild.tar.gz"
 
 
 pkg: build
@@ -150,11 +155,11 @@ pkg: build
 	 pkgbuild \
 	   --root "$$PKG_ROOT" \
 	   --identifier com.sdata.pkg \
-	   --version 0.3.2 \
+	   --version $(VERSION) \
 	   --install-location / \
-	   sdata-0.3.2.pkg; \
+	   sdata-$(VERSION).pkg; \
 	 rm -rf "$$TEMP_DIR"
-	@echo "macOS package created: sdata-0.3.2.pkg"
+	@echo "macOS package created: sdata-$(VERSION).pkg"
 
 install:
 	@test -x bin/sdata || { echo "Error: bin/sdata not found. Run 'make' first."; exit 1; }

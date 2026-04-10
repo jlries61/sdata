@@ -18,18 +18,32 @@ procedure SData_Main is
    
    --  Helper to read the entire contents of a file into a single String buffer.
    function Read_File (Filename : String) return String is
-      File : Ada.Streams.Stream_IO.File_Type;
+      File   : Ada.Streams.Stream_IO.File_Type;
       Stream : Ada.Streams.Stream_IO.Stream_Access;
    begin
-      Ada.Streams.Stream_IO.Open (File, Ada.Streams.Stream_IO.In_File, Filename);
-      Stream := Ada.Streams.Stream_IO.Stream (File);
-      declare
-         -- Create a string of the exact size needed.
-         Result : String (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
       begin
-         String'Read (Stream, Result);
-         Ada.Streams.Stream_IO.Close (File);
-         return Result;
+         Ada.Streams.Stream_IO.Open (File, Ada.Streams.Stream_IO.In_File, Filename);
+      exception
+         when Ada.Streams.Stream_IO.Name_Error =>
+            raise SData.Script_Error with "cannot open """ & Filename & """: file not found";
+         when Ada.Streams.Stream_IO.Use_Error =>
+            raise SData.Script_Error with "cannot open """ & Filename & """: permission denied";
+      end;
+      declare
+         Size : constant Ada.Streams.Stream_IO.Count := Ada.Streams.Stream_IO.Size (File);
+      begin
+         if Integer (Size) = 0 then
+            Ada.Streams.Stream_IO.Close (File);
+            return "";
+         end if;
+         Stream := Ada.Streams.Stream_IO.Stream (File);
+         declare
+            Result : String (1 .. Integer (Size));
+         begin
+            String'Read (Stream, Result);
+            Ada.Streams.Stream_IO.Close (File);
+            return Result;
+         end;
       end;
    end Read_File;
 
@@ -167,6 +181,12 @@ begin
                declare
                   Val : constant String := Argument (Idx);
                begin
+                  if Val'Length > Output_File'Length then
+                     Put_Line_Error ("Error: argument to -o is too long (max"
+                                     & Output_File'Length'Image & " characters)");
+                     Set_Exit_Status (Failure);
+                     return;
+                  end if;
                   Output_File (1 .. Val'Length) := Val;
                   Output_File_Len := Val'Length;
                end;
@@ -177,6 +197,12 @@ begin
                declare
                   Val : constant String := Argument (Idx);
                begin
+                  if Val'Length > Input_File_Path'Length then
+                     Put_Line_Error ("Error: argument to -u is too long (max"
+                                     & Input_File_Path'Length'Image & " characters)");
+                     Set_Exit_Status (Failure);
+                     return;
+                  end if;
                   Input_File_Path (1 .. Val'Length) := Val;
                   Input_File_Len := Val'Length;
                end;
@@ -230,8 +256,14 @@ begin
             Debug_Mode := True;
          elsif Arg = "-k" or else Arg = "--continue-on-error" then
             Continue_On_Error := True;
-         elsif Arg(1) /= '-' then
+         elsif Arg'Length > 0 and then Arg (1) /= '-' then
             -- This is the main command file to execute.
+            if Arg'Length > Filename'Length then
+               Put_Line_Error ("Error: filename is too long (max"
+                               & Filename'Length'Image & " characters)");
+               Set_Exit_Status (Failure);
+               return;
+            end if;
             Filename (1 .. Arg'Length) := Arg;
             Filename_Len := Arg'Length;
             
