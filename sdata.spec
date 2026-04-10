@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.3.2
+Version:        0.3.3
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -45,6 +45,15 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Thu Apr 10 2026 John L. Ries <john@theyarnbard.com> - 0.3.3-1
+- Add GPL-3.0 license file; update license declarations throughout.
+- Fix Makefile: remove hardcoded Alire path; centralize VERSION and tarball version variables.
+- Harden sdata_main.adb: safe Read_File, bounds checks on command-line path arguments.
+- Extract Is_Immediate predicate into SData.Interpreter; fix missing ECHO/SORT/BY/SELECT_FILTER.
+- Add AST memory management: Free_Program recursively frees all AST node types.
+- Narrow broad 'when others' exception handlers in sdata-evaluator.adb to Constraint_Error.
+- Sync alire.toml dependency versions with installed libraries.
+
 * Wed Apr 08 2026 John L. Ries <john@theyarnbard.com> - 0.3.2-1
 - Fix ODF/OOXML import: infer column types from first data row; warn on skipped cells.
 - Refactor Execute_Statement into named handler procedures; promote Run_One_Step.
