@@ -219,4 +219,9 @@ package SData.AST is
       end case;
    end record;
 
+   --  Recursively free an entire statement list (program) and all AST nodes
+   --  reachable from it (expressions, sub-bodies, variable lists, etc.).
+   --  Sets Prog to null on return.  Safe to call with Prog = null.
+   procedure Free_Program (Prog : in out Statement_Access);
+
 end SData.AST;

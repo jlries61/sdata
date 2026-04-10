@@ -295,11 +295,12 @@ begin
    --  Verify that a command file was provided.
    if Input_File_Len > 0 then
       declare
-         Stmt : constant Statement_Access := new Statement (Stmt_USE);
+         Stmt : Statement_Access := new Statement (Stmt_USE);
       begin
          Stmt.File_Path (1 .. Input_File_Len) := Input_File_Path (1 .. Input_File_Len);
          Stmt.File_Len := Input_File_Len;
          SData.Interpreter.Execute (Stmt);
+         SData.AST.Free_Program (Stmt);
       end;
    end if;
 
@@ -321,6 +322,9 @@ begin
       
       -- 4. Execute the program using the interpreter.
       Execute (Prog);
+
+      -- 5. Free the AST now that execution is complete.
+      SData.AST.Free_Program (Prog);
    end;
 
    if SData.IO.Is_Redirected then

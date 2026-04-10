@@ -61,7 +61,8 @@ package body SData.Interpreter is
          Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP |
          Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END |
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
-         Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH;
+         Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
+         Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER;
    end Is_Immediate;
 
    --  In_Same_Group: both Idx1 and Idx2 are *physical* row indices.
@@ -158,9 +159,11 @@ package body SData.Interpreter is
 
    procedure Clear_Active_Program is
    begin
-      Active_Program_Head := null;
-      Active_Program_Tail := null;
+      --  Null the borrowed filter pointer before freeing the program that owns
+      --  it, so there is no window where it points to freed memory.
       Select_Filter_Expr := null;
+      SData.AST.Free_Program (Active_Program_Head);
+      Active_Program_Tail := null;
       SData.Table.Clear_Index_Map;
       Current_By_Vars.Clear;
    end Clear_Active_Program;
@@ -171,7 +174,7 @@ package body SData.Interpreter is
          declare
             Prog    : constant Statement_Access := Active_Program_Head;
             Tail    : Statement_Access := Prog;
-            Run_Cap : constant Statement_Access := new Statement (Stmt_RUN);
+            Run_Cap : Statement_Access := new Statement (Stmt_RUN);
          begin
             --  Cap the chain with a synthetic Stmt_RUN so that Execute's
             --  outer loop calls Run_One_Step on the queued deferred
@@ -183,8 +186,9 @@ package body SData.Interpreter is
             end loop;
             Tail.Next := Run_Cap;
             Execute (Prog);
-            --  Remove the synthetic cap so the chain is clean for next time.
+            --  Remove and free the synthetic cap.
             Tail.Next := null;
+            SData.AST.Free_Program (Run_Cap);
          end;
       else
          -- No program queued: execute an empty step (e.g. bare RUN in REPL).
@@ -913,6 +917,7 @@ package body SData.Interpreter is
                         Initialize (Sub_Ctx, Contents);
                         Sub_Prog := Parse_Program (Sub_Ctx);
                         Execute (Sub_Prog);
+                        SData.AST.Free_Program (Sub_Prog);
                      end;
                   end;
                exception
