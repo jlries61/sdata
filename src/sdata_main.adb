@@ -3,8 +3,9 @@
 --  invokes the parser to build the AST, and finally runs the interpreter.
 
 with Ada.Text_IO;
+with Ada.Text_IO.Unbounded_IO;
 with Ada.Command_Line; use Ada.Command_Line;
-with Ada.Strings.Unbounded;
+with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Streams.Stream_IO;
 with Ada.Exceptions; use Ada.Exceptions;
 with SData.Parser; use SData.Parser;
@@ -70,39 +71,33 @@ procedure SData_Main is
 
    --  Runs the Interactive REPL.
    procedure Run_REPL is
-      Line : String (1 .. 16384);
-      Last : Natural;
-      Ctx  : Parser_Context;
-      Prog : Statement_Access;
-      
-      Buffer : Ada.Strings.Unbounded.Unbounded_String;
+      Line   : Unbounded_String;
+      Ctx    : Parser_Context;
+      Prog   : Statement_Access;
+      Buffer : Unbounded_String;
    begin
       SData.IO.Set_Interactive (True);
       Put_Line ("SData Statistical Interpreter version " & SData.Config.Version_Str);
       Put_Line ("Interactive Console. Type QUIT to exit.");
-      Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
+      Buffer := Null_Unbounded_String;
       REPL : loop
-         if Ada.Strings.Unbounded.Length (Buffer) = 0 then
+         if Length (Buffer) = 0 then
             Ada.Text_IO.Put ("sdata> ");
          else
             Ada.Text_IO.Put ("..> ");
          end if;
          Ada.Text_IO.Flush;
          begin
-            Ada.Text_IO.Get_Line (Line, Last);
-            if Last > 0 then
-               Ada.Strings.Unbounded.Append (Buffer, Line (1 .. Last) & ASCII.LF);
-            else
-               Ada.Strings.Unbounded.Append (Buffer, ASCII.LF);
-            end if;
+            Ada.Text_IO.Unbounded_IO.Get_Line (Line);
+            Append (Buffer, Line & ASCII.LF);
 
-            Initialize (Ctx, Ada.Strings.Unbounded.To_String (Buffer));
+            Initialize (Ctx, To_String (Buffer));
             
             begin
                Prog := Parse_Program (Ctx);
                
                -- If parsing succeeded, we can clear the buffer.
-               Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
+               Buffer := Null_Unbounded_String;
 
                while Prog /= null loop
                   begin
@@ -134,10 +129,10 @@ procedure SData_Main is
                exit REPL;
             when E : SData.Script_Error =>
                Put_Line_Error ("Error: " & Exception_Message (E));
-               Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
+               Buffer := Null_Unbounded_String;
             when E : others =>
                Put_Line_Error ("Internal error: " & Exception_Name (E) & ": " & Exception_Message (E));
-               Buffer := Ada.Strings.Unbounded.Null_Unbounded_String;
+               Buffer := Null_Unbounded_String;
          end;
          exit REPL when not Ada.Text_IO.Is_Open (Ada.Text_IO.Standard_Input);
       end loop REPL;
@@ -230,17 +225,38 @@ begin
          elsif Arg = "-m" then
             if Idx < Argument_Count then
                Idx := Idx + 1;
-               Max_Table_Rows := Natural'Value (Argument (Idx));
+               begin
+                  Max_Table_Rows := Natural'Value (Argument (Idx));
+               exception
+                  when Constraint_Error =>
+                     Put_Line_Error ("Error: argument to -m must be a non-negative integer");
+                     Set_Exit_Status (Failure);
+                     return;
+               end;
             end if;
          elsif Arg = "-t" then
             if Idx < Argument_Count then
                Idx := Idx + 1;
-               Max_Temp_Vars := Natural'Value (Argument (Idx));
+               begin
+                  Max_Temp_Vars := Natural'Value (Argument (Idx));
+               exception
+                  when Constraint_Error =>
+                     Put_Line_Error ("Error: argument to -t must be a non-negative integer");
+                     Set_Exit_Status (Failure);
+                     return;
+               end;
             end if;
          elsif Arg = "--clen" then
             if Idx < Argument_Count then
                Idx := Idx + 1;
-               Max_String_Len := Natural'Value (Argument (Idx));
+               begin
+                  Max_String_Len := Natural'Value (Argument (Idx));
+               exception
+                  when Constraint_Error =>
+                     Put_Line_Error ("Error: argument to --clen must be a non-negative integer");
+                     Set_Exit_Status (Failure);
+                     return;
+               end;
             end if;
          elsif Arg = "--noshell" then
             Disable_Shell := True;
