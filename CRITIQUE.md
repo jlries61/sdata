@@ -24,16 +24,14 @@ The project is now significantly more contributor-friendly and maintainable. How
 
 #### 1. REPL Line Buffer Fixed at 16384 Characters
 **File:** `src/sdata_main.adb`, line 73  
-**Status:** Not fixed  
+**Status:** ✅ Fixed in v0.3.4  
 **Description:**  
 ```ada
 Line : String (1 .. 16384);
 ```
 If a user types a line longer than 16384 characters in interactive mode, `Ada.Text_IO.Get_Line` raises `Constraint_Error` and crashes the REPL.
 
-**Recommendation:**
-- Use `Ada.Strings.Unbounded.Unbounded_String` for input, OR
-- Catch the exception and emit a user-friendly error message
+**Resolution:** Switched to `Ada.Strings.Unbounded.Unbounded_String` with `Ada.Text_IO.Unbounded_IO.Get_Line`.
 
 **Effort:** 1–2 hours  
 **Severity:** Medium (unlikely in practice but breaks robustness)
@@ -42,7 +40,7 @@ If a user types a line longer than 16384 characters in interactive mode, `Ada.Te
 
 #### 2. Numeric Argument Parsing Lacks Exception Handling
 **File:** `src/sdata_main.adb`, lines 233, 238, 243  
-**Status:** Not fixed  
+**Status:** ✅ Fixed in v0.3.4  
 **Description:**  
 ```ada
 Max_Table_Rows := Natural'Value (Argument (Idx));
@@ -51,18 +49,7 @@ Max_String_Len := Natural'Value (Argument (Idx));
 ```
 If the user passes invalid arguments (e.g., `sdata -m abc`), `Natural'Value` raises `Constraint_Error`, crashing the program with an internal error rather than a user-friendly message.
 
-**Recommendation:**
-```ada
-begin
-   Max_Table_Rows := Natural'Value (Argument (Idx));
-exception
-   when Constraint_Error =>
-      Put_Line_Error ("Error: argument to -m must be a non-negative integer");
-      Set_Exit_Status (Failure);
-      return;
-end;
-```
-Apply similar wrapping to all three numeric argument parsers.
+**Resolution:** All three numeric argument parsers now wrap `Natural'Value` in `Constraint_Error` handlers that emit a user-friendly error and exit cleanly.
 
 **Effort:** 1 hour  
 **Severity:** High (user-facing robustness)
@@ -73,16 +60,14 @@ Apply similar wrapping to all three numeric argument parsers.
 
 #### 3. Is_Immediate Predicate Undocumented
 **File:** `src/sdata_main.adb`, line 109  
-**Status:** Not reviewed  
+**Status:** ✅ Fixed in v0.3.3  
 **Description:**  
 ```ada
 if Is_Immediate (Prog.Kind) then
 ```
 This predicate is called but not defined in the shown code. Its behavior must be verified.
 
-**Recommendation:**
-- Check that `Is_Immediate` correctly identifies all statement types that execute immediately (RUN, QUIT, END, declarative commands).
-- Add a comment documenting which statement kinds it returns true for.
+**Resolution:** `Is_Immediate` is now a named function declared in `src/sdata-interpreter.ads` with a comment directing maintainers to update the membership test there. The complete set of immediate statement kinds is documented in the function body in `sdata-interpreter.adb`. Several missing kinds (ECHO, SORT, BY, SELECT_FILTER) were also added in v0.3.3.
 
 **Effort:** 30 minutes  
 **Severity:** Low (code review/clarity)
@@ -91,7 +76,7 @@ This predicate is called but not defined in the shown code. Its behavior must be
 
 #### 4. Missing CONTRIBUTING.md and Issue Templates
 **Files:** Repository root  
-**Status:** Not added  
+**Status:** Deferred — private repo, single contributor  
 **Description:**  
 The repo now has LICENSE and CI, but lacks:
 - CONTRIBUTING.md
@@ -112,7 +97,7 @@ Add a brief CONTRIBUTING.md (~50 lines) covering:
 
 #### 5. CI Workflow Runs on Single Platform Only
 **File:** `.github/workflows/test.yml`  
-**Status:** Ubuntu-only  
+**Status:** Deferred — assess when macOS/Windows support becomes a target  
 **Description:**  
 The test workflow only runs on `ubuntu-latest`. No macOS or Windows coverage.
 
@@ -132,13 +117,11 @@ strategy:
 
 #### 6. README Version Hardcoding
 **File:** `README.md`, lines 79, 102, 114, 125  
-**Status:** Not fixed  
+**Status:** ✅ Resolved in v0.3.4 via scripts/bump-version.sh  
 **Description:**  
-Version 0.3.3 is hardcoded in README examples. If you bump the version in Makefile, README must be manually updated.
+Version was hardcoded in README examples. If bumped in Makefile, README required manual updates.
 
-**Recommendation:**
-- Document that README version examples must be updated during releases, OR
-- Generate README from a template using Makefile variables
+**Resolution:** `scripts/bump-version.sh` now updates all version strings in `README.md` (and seven other files) atomically as part of the release process.
 
 **Effort:** 30 minutes to 1 hour  
 **Severity:** Low (release process issue)
@@ -149,7 +132,7 @@ Version 0.3.3 is hardcoded in README examples. If you bump the version in Makefi
 
 #### 7. No Test Timeout or TAP Output in CI
 **File:** `Makefile`, lines 45–80  
-**Status:** Not implemented  
+**Status:** Deferred  
 **Description:**  
 The test harness lacks:
 - Timeout protection (tests could hang forever)
@@ -166,7 +149,7 @@ The test harness lacks:
 
 #### 8. sdata.gpr Compiler Flags Could Be Tuned
 **File:** `sdata.gpr`, line 13  
-**Status:** Not addressed  
+**Status:** Deferred  
 **Description:**  
 ```ada
 for Default_Switches ("Ada") use ("-gnat2012", "-gnatwa", "-gnatwl", "-gnatwu", "-g");
@@ -185,7 +168,7 @@ Missing optimization flags or release-specific tuning.
 
 #### 9. No Documentation Link in README
 **File:** `README.md`  
-**Status:** Not added  
+**Status:** Deferred  
 **Description:**  
 README mentions man pages but doesn't link to or describe them.
 
@@ -199,7 +182,7 @@ Add a "Documentation" section pointing to man pages and other resources.
 
 #### 10. No CI Badge in README
 **File:** `README.md`, top section  
-**Status:** Not added  
+**Status:** Deferred — repo is private; revisit when public  
 **Description:**  
 Once CI is stable, a build badge provides immediate status visibility.
 
@@ -216,18 +199,18 @@ Add after next release:
 
 ## Summary Table
 
-| Priority | Issue | Effort | Impact |
+| Priority | Issue | Effort | Status |
 |----------|-------|--------|--------|
-| HIGH | Numeric arg parsing exception handling | 1 hr | User-facing robustness |
-| HIGH | REPL line buffer overflow handling | 1–2 hrs | Interactive robustness |
-| MEDIUM | Document Is_Immediate predicate | 30 min | Code clarity |
-| MEDIUM | Add CONTRIBUTING.md & issue templates | 1 hr | Contributor experience |
-| MEDIUM | CI multi-platform testing | 30 min | Platform coverage |
-| LOW | README version management | 30 min–1 hr | Release process |
-| LOW | Test timeout & TAP output | 2–3 hrs | CI maturity |
-| LOW | Compiler flags tuning | 30 min | Optimization |
-| LOW | Documentation section in README | 30 min | Discoverability |
-| LOW | CI badge | 5 min | Marketing |
+| HIGH | Numeric arg parsing exception handling | 1 hr | ✅ Fixed v0.3.4 |
+| HIGH | REPL line buffer overflow handling | 1–2 hrs | ✅ Fixed v0.3.4 |
+| MEDIUM | Document Is_Immediate predicate | 30 min | ✅ Fixed v0.3.3 |
+| MEDIUM | Add CONTRIBUTING.md & issue templates | 1 hr | Deferred (private repo) |
+| MEDIUM | CI multi-platform testing | 30 min | Deferred |
+| LOW | README version management | 30 min–1 hr | ✅ Resolved v0.3.4 (bump-version.sh) |
+| LOW | Test timeout & TAP output | 2–3 hrs | Deferred |
+| LOW | Compiler flags tuning | 30 min | Deferred |
+| LOW | Documentation section in README | 30 min | Deferred |
+| LOW | CI badge | 5 min | Deferred (private repo) |
 
 ---
 
@@ -270,18 +253,15 @@ Add after next release:
 
 ## Next Steps (Recommended Order)
 
-### Immediate (Next Commit)
-1. Fix numeric argument parsing with exception handlers
-2. Improve REPL line input handling
+### When Repo Goes Public
+1. Add CONTRIBUTING.md and issue templates
+2. Add CI badge
+3. Optionally extend CI to macOS
 
-### Short-term (Next Few Commits)
-3. Add CONTRIBUTING.md
-4. Optionally extend CI to macOS
-
-### Nice-to-Have
-5. Add documentation section to README
-6. Add CI badge once stable
-7. Enhance test harness with timeouts
+### Nice-to-Have (Any Time)
+4. Add documentation section to README (man page pointer)
+5. Enhance test harness with timeouts
+6. Compiler flags tuning for release builds
 
 ---
 

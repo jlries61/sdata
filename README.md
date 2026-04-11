@@ -114,6 +114,27 @@ make pkg
 This creates `sdata-0.3.4.pkg`. The `sdata` binary must already be built
 (`make` first). Requires the `pkgbuild` tool (included with Xcode).
 
+## Release Management
+
+The `scripts/bump-version.sh` script updates the version string in all nine
+tracked locations atomically (source, Makefile, alire.toml, SlackBuild, man
+page, README, RPM spec, and Debian changelog), then optionally builds, tests,
+commits, and tags.
+
+```sh
+scripts/bump-version.sh <new-version> "<changelog-summary>"
+```
+
+For example:
+
+```sh
+scripts/bump-version.sh 0.4.0 "Add spreadsheet formula evaluation and multi-sheet support."
+```
+
+The script validates the `N.N.N` version format, detects the current version
+from `src/sdata-config.ads`, and warns if any old version strings remain after
+the update (expected in changelog history).
+
 ## Quick Start
 
 ### Interactive Mode
