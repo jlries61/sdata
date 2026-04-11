@@ -56,7 +56,7 @@ package SData.Config is
    --  Version information
    Version_Major : constant := 0;
    Version_Minor : constant := 3;
-   Version_Patch : constant := 3;
-   Version_Str   : constant String := "0.3.3";
+   Version_Patch : constant := 4;
+   Version_Str   : constant String := "0.3.4";
 
 end SData.Config;
