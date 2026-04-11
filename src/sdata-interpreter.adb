@@ -775,7 +775,8 @@ package body SData.Interpreter is
                   begin Exp_Len := Full'Length; Expanded (1 .. Exp_Len) := Full; end;
                end if;
                SData.File_IO.Open_Input (Expanded (1 .. Exp_Len),
-                 (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format));
+                 (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format),
+                 Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len));
             end;
             Input_File_Columns.Clear;
             Refresh_PDV_Names;
@@ -788,11 +789,14 @@ package body SData.Interpreter is
             end;
          when Stmt_SAVE =>
             declare
-               Full : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
+               Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
+               SLen  : constant Natural := Stmt.Sheet_Name_Len;
             begin
                SData.Config.Save_File_Path (1 .. Full'Length) := Full;
                SData.Config.Save_File_Len := Full'Length;
                SData.Config.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
+               SData.Config.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
+               SData.Config.Save_Sheet_Name_Len := SLen;
                SData.Config.Save_File_Active := True;
             end;
          when Stmt_SORT =>
@@ -826,7 +830,7 @@ package body SData.Interpreter is
                             VC (VC'First + 1 .. VC'Last) & " variables processed.");
                end;
                if SData.Config.Save_File_Active then
-                  SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt);
+                  SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt, SData.Config.Save_Sheet_Name (1 .. SData.Config.Save_Sheet_Name_Len));
                   if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
                   SData.Config.Save_File_Active := False;
                end if;
@@ -1194,7 +1198,7 @@ package body SData.Interpreter is
       Set_Current_Record_Index (0);
       Apply_Pending_Mods;
       if SData.Config.Save_File_Active then
-         SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt);
+         SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt, SData.Config.Save_Sheet_Name (1 .. SData.Config.Save_Sheet_Name_Len));
          if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
          SData.Config.Save_File_Active := False;
       end if;

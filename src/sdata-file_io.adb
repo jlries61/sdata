@@ -85,7 +85,94 @@ package body SData.File_IO is
       return To_String (Res);
    end Escape_XML;
 
-   procedure Open_Input (File_Name : String; Fmt : Format_Type) is
+   --  Returns the base filename (without directory) of a path.
+   function File_Base (File_Name : String) return String is
+   begin
+      for I in reverse File_Name'Range loop
+         if File_Name (I) = '/' or File_Name (I) = '\' then
+            return File_Name (I + 1 .. File_Name'Last);
+         end if;
+      end loop;
+      return File_Name;
+   end File_Base;
+
+   --  Returns the stem of a filename (base name without extension).
+   function File_Stem (Base : String) return String is
+   begin
+      for I in reverse Base'Range loop
+         if Base (I) = '.' then
+            return Base (Base'First .. I - 1);
+         end if;
+      end loop;
+      return Base;
+   end File_Stem;
+
+   --  Quick scan: returns True if the named (already-extracted) XML temp file
+   --  contains any spreadsheet formula marker ("<f>" or "<f " for OOXML,
+   --  "table:formula=" for ODF).
+   function Has_Formulas_XML (Temp_File : String; Is_ODF : Boolean) return Boolean is
+      File   : Ada.Text_IO.File_Type;
+      Line   : String (1 .. 8192);
+      Last   : Natural;
+      Marker : constant String := (if Is_ODF then "table:formula=" else "<f");
+   begin
+      Ada.Text_IO.Open (File, Ada.Text_IO.In_File, Temp_File);
+      while not Ada.Text_IO.End_Of_File (File) loop
+         Ada.Text_IO.Get_Line (File, Line, Last);
+         if Ada.Strings.Fixed.Index (Line (1 .. Last), Marker) > 0 then
+            Ada.Text_IO.Close (File);
+            return True;
+         end if;
+      end loop;
+      Ada.Text_IO.Close (File);
+      return False;
+   exception
+      when others =>
+         if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
+         return False;
+   end Has_Formulas_XML;
+
+   --  Attempt to recalculate formulas by converting the spreadsheet via LibreOffice
+   --  headless mode.  Returns the path of the freshly-converted file (caller must
+   --  delete it), or "" when LibreOffice is unavailable or the conversion fails.
+   --
+   --  Strategy: convert to the OPPOSITE format (xlsx→ods or ods→xlsx) so the output
+   --  filename never collides with the source.  The converted file has all formulas
+   --  replaced by their calculated results as cached values, which our parser reads.
+   function Convert_Via_LibreOffice
+     (File_Name : String; Fmt : Format_Type) return String
+   is
+      --  Avoid String_Access ambiguity with GNAT.Strings by qualifying explicitly.
+      Soffice_Acc : GNAT.OS_Lib.String_Access :=
+         GNAT.OS_Lib.Locate_Exec_On_Path ("soffice");
+      Target_Ext : constant String := (if Fmt = ODF then "xlsx" else "ods");
+      Dir        : constant String := "/tmp/";
+      Base_Stem  : constant String := File_Stem (File_Base (File_Name));
+      Converted  : constant String := Dir & Base_Stem & "." & Target_Ext;
+
+      --  Build Argument_List with explicitly-typed access values.
+      A1 : GNAT.OS_Lib.String_Access := new String'("--headless");
+      A2 : GNAT.OS_Lib.String_Access := new String'("--convert-to");
+      A3 : GNAT.OS_Lib.String_Access := new String'(Target_Ext);
+      A4 : GNAT.OS_Lib.String_Access := new String'("--outdir");
+      A5 : GNAT.OS_Lib.String_Access := new String'(Dir);
+      Args : constant GNAT.OS_Lib.Argument_List := (1 => A1, 2 => A2, 3 => A3, 4 => A4, 5 => A5);
+      Status : Integer;
+   begin
+      if Soffice_Acc = null then
+         return "";
+      end if;
+      Status := GNAT.OS_Lib.Spawn (Soffice_Acc.all, Args);
+      GNAT.OS_Lib.Free (Soffice_Acc);
+      GNAT.OS_Lib.Free (A1); GNAT.OS_Lib.Free (A2); GNAT.OS_Lib.Free (A3);
+      GNAT.OS_Lib.Free (A4); GNAT.OS_Lib.Free (A5);
+      if Status = 0 and then GNAT.OS_Lib.Is_Regular_File (Converted) then
+         return Converted;
+      end if;
+      return "";
+   end Convert_Via_LibreOffice;
+
+   procedure Open_Input (File_Name : String; Fmt : Format_Type; Sheet_Name : String := "") is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       U_Name  : constant String := To_Upper (File_Name);
@@ -111,7 +198,7 @@ package body SData.File_IO is
             exit;
          end if;
       end loop;
-      
+
       if Ext_Idx > 0 then
          declare
             Ext : constant String := File_Name (Ext_Idx + 1 .. File_Name'Last);
@@ -126,9 +213,9 @@ package body SData.File_IO is
          when CSV =>
             Parse_CSV (File_Name);
          when ODF =>
-            Parse_ODF (File_Name);
+            Parse_ODF (File_Name, Sheet_Name);
          when OOXML =>
-            Parse_OOXML (File_Name);
+            Parse_OOXML (File_Name, Sheet_Name);
       end case;
 
       if not SData.Config.Quiet_Mode then
@@ -139,9 +226,10 @@ package body SData.File_IO is
    -----------------
    -- Open_Output --
    -----------------
-   procedure Open_Output (File_Name : String; Fmt : Format_Type) is
+   procedure Open_Output (File_Name : String; Fmt : Format_Type; Sheet_Name : String := "") is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
+      Sname   : constant String := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
    begin
       for I in reverse File_Name'Range loop
          if File_Name (I) = '.' then
@@ -149,7 +237,7 @@ package body SData.File_IO is
             exit;
          end if;
       end loop;
-      
+
       if Ext_Idx > 0 then
          declare
             Ext : constant String := File_Name (Ext_Idx + 1 .. File_Name'Last);
@@ -164,9 +252,9 @@ package body SData.File_IO is
          when CSV =>
             Write_CSV (File_Name);
          when ODF =>
-            Write_ODF (File_Name);
+            Write_ODF (File_Name, Sname);
          when OOXML =>
-            Write_OOXML (File_Name);
+            Write_OOXML (File_Name, Sname);
       end case;
    end Open_Output;
 
@@ -362,7 +450,7 @@ package body SData.File_IO is
    ------------------
    --  Parse_ODF  --
    ------------------
-   procedure Parse_ODF (File_Name : String) is
+   procedure Parse_ODF (File_Name : String; Sheet_Name : String := "") is
       use DOM.Core;
       use DOM.Core.Nodes;
       use DOM.Core.Elements;
@@ -407,6 +495,30 @@ package body SData.File_IO is
 
       begin
          UnZip.Extract (from => Zip_Info, what => "content.xml", rename => Temp_XML);
+
+         --  Formula detection: scan content.xml for ODF formula attributes.
+         --  If found, try LibreOffice to recalculate before parsing.
+         if Has_Formulas_XML (Temp_XML, Is_ODF => True) then
+            declare
+               Converted : constant String :=
+                  Convert_Via_LibreOffice (File_Name, ODF);
+               OK        : Boolean;
+            begin
+               if Converted /= "" then
+                  --  Re-entered via the converted xlsx; clean up and return.
+                  GNAT.OS_Lib.Delete_File (Temp_XML, OK);
+                  DOM.Readers.Free (Reader);
+                  Parse_OOXML (Converted);
+                  GNAT.OS_Lib.Delete_File (Converted, OK);
+                  return;
+               end if;
+               if not SData.Config.Quiet_Mode then
+                  Put_Line_Error ("Warning: formula cells found in ODS file but LibreOffice " &
+                     "is not available; using cached values.");
+               end if;
+            end;
+         end if;
+
          Input_Sources.File.Open (Temp_XML, Input);
          DOM.Readers.Parse (Reader, Input);
          Doc := DOM.Readers.Get_Tree (Reader);
@@ -418,8 +530,22 @@ package body SData.File_IO is
             raise Program_Error with "No tables found in ODS file";
          end if;
 
-         -- We parse the first table found
-         Rows := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Tables, 0)), "table:table-row");
+         --  Select the target table: by name if Sheet_Name is non-empty,
+         --  otherwise use the first table found.
+         declare
+            Target_Idx : Natural := 0; -- 0-based index into Tables
+         begin
+            if Sheet_Name /= "" then
+               for T in 0 .. Length (Tables) - 1 loop
+                  if Get_Attribute (DOM.Core.Element (Item (Tables, T)), "table:name") = Sheet_Name then
+                     Target_Idx := T;
+                     exit;
+                  end if;
+               end loop;
+               --  If name not found, fall back silently to first sheet (index 0).
+            end if;
+            Rows := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Tables, Target_Idx)), "table:table-row");
+         end;
          Clear;
 
          if Length (Rows) > 0 then
@@ -552,16 +678,107 @@ package body SData.File_IO is
    -----------------
    -- Parse_OOXML --
    -----------------
-   procedure Parse_OOXML (File_Name : String) is
+   procedure Parse_OOXML (File_Name : String; Sheet_Name : String := "") is
       use DOM.Core;
       use DOM.Core.Nodes;
       use DOM.Core.Elements;
 
-      Temp_Shared : constant String := File_Name & ".sharedStrings.xml";
-      Temp_Sheet  : constant String := File_Name & ".sheet1.xml";
-      
+      Temp_Shared   : constant String := File_Name & ".sharedStrings.xml";
+      Temp_Sheet    : constant String := File_Name & ".sheet.xml";
+      Temp_Workbook : constant String := File_Name & ".workbook.xml";
+      Temp_Rels     : constant String := File_Name & ".workbook.rels.xml";
+
       package String_Vectors is new Ada.Containers.Vectors (Index_Type => Natural, Element_Type => Unbounded_String);
       Shared_Strings : String_Vectors.Vector;
+
+      --  Resolve the zip-internal path for the target sheet.
+      --  Parses xl/workbook.xml to find the r:id for the named (or first) sheet,
+      --  then resolves it through xl/_rels/workbook.xml.rels.
+      function Find_Sheet_XML_Path (Zip_Info : Zip.Zip_Info) return String is
+         WB_Reader : DOM.Readers.Tree_Reader;
+         WB_Input  : Input_Sources.File.File_Input;
+         WB_Doc    : DOM.Core.Document;
+         Sheets    : Node_List;
+         Found_RId : Unbounded_String := Null_Unbounded_String;
+         Success   : Boolean;
+      begin
+         begin
+            UnZip.Extract (from => Zip_Info, what => "xl/workbook.xml", rename => Temp_Workbook);
+         exception
+            when others => return "xl/worksheets/sheet1.xml"; -- no workbook, use default
+         end;
+
+         Input_Sources.File.Open (Temp_Workbook, WB_Input);
+         DOM.Readers.Parse (WB_Reader, WB_Input);
+         WB_Doc := DOM.Readers.Get_Tree (WB_Reader);
+         Input_Sources.File.Close (WB_Input);
+         Sheets := DOM.Core.Documents.Get_Elements_By_Tag_Name (WB_Doc, "sheet");
+
+         if Sheet_Name = "" then
+            --  Use first sheet
+            if Length (Sheets) > 0 then
+               Found_RId := To_Unbounded_String (
+                  Get_Attribute (DOM.Core.Element (Item (Sheets, 0)), "r:id"));
+            end if;
+         else
+            for I in 0 .. Length (Sheets) - 1 loop
+               if Get_Attribute (DOM.Core.Element (Item (Sheets, I)), "name") = Sheet_Name then
+                  Found_RId := To_Unbounded_String (
+                     Get_Attribute (DOM.Core.Element (Item (Sheets, I)), "r:id"));
+                  exit;
+               end if;
+            end loop;
+         end if;
+
+         Free (Sheets);
+         DOM.Readers.Free (WB_Reader);
+         GNAT.OS_Lib.Delete_File (Temp_Workbook, Success);
+
+         if Length (Found_RId) = 0 then
+            return "xl/worksheets/sheet1.xml"; -- name not found, fall back
+         end if;
+
+         --  Resolve rId → file path via xl/_rels/workbook.xml.rels
+         declare
+            RL_Reader : DOM.Readers.Tree_Reader;
+            RL_Input  : Input_Sources.File.File_Input;
+            RL_Doc    : DOM.Core.Document;
+            RL_List   : Node_List;
+            Found_Tgt : Unbounded_String := Null_Unbounded_String;
+         begin
+            begin
+               UnZip.Extract (from => Zip_Info, what => "xl/_rels/workbook.xml.rels",
+                              rename => Temp_Rels);
+            exception
+               when others => return "xl/worksheets/sheet1.xml";
+            end;
+
+            Input_Sources.File.Open (Temp_Rels, RL_Input);
+            DOM.Readers.Parse (RL_Reader, RL_Input);
+            RL_Doc := DOM.Readers.Get_Tree (RL_Reader);
+            Input_Sources.File.Close (RL_Input);
+            RL_List := DOM.Core.Documents.Get_Elements_By_Tag_Name (RL_Doc, "Relationship");
+
+            for I in 0 .. Length (RL_List) - 1 loop
+               if Get_Attribute (DOM.Core.Element (Item (RL_List, I)), "Id") = To_String (Found_RId)
+               then
+                  Found_Tgt := To_Unbounded_String (
+                     Get_Attribute (DOM.Core.Element (Item (RL_List, I)), "Target"));
+                  exit;
+               end if;
+            end loop;
+
+            Free (RL_List);
+            DOM.Readers.Free (RL_Reader);
+            GNAT.OS_Lib.Delete_File (Temp_Rels, Success);
+
+            if Length (Found_Tgt) = 0 then
+               return "xl/worksheets/sheet1.xml";
+            end if;
+            --  Target is relative to xl/: e.g. "worksheets/sheet2.xml"
+            return "xl/" & To_String (Found_Tgt);
+         end;
+      end Find_Sheet_XML_Path;
 
       procedure Load_Shared_Strings (Zip_Info : Zip.Zip_Info) is
          Reader : DOM.Readers.Tree_Reader;
@@ -603,7 +820,7 @@ package body SData.File_IO is
             end if;
       end Load_Shared_Strings;
 
-      procedure Load_Sheet (Zip_Info : Zip.Zip_Info) is
+      procedure Load_Sheet (Zip_Info : Zip.Zip_Info; Sheet_XML_Path : String) is
          Reader : DOM.Readers.Tree_Reader;
          Input  : Input_Sources.File.File_Input;
          Doc    : DOM.Core.Document;
@@ -654,7 +871,31 @@ package body SData.File_IO is
          end Get_Cell_Value;
 
       begin
-         UnZip.Extract (from => Zip_Info, what => "xl/worksheets/sheet1.xml", rename => Temp_Sheet);
+         UnZip.Extract (from => Zip_Info, what => Sheet_XML_Path, rename => Temp_Sheet);
+
+         --  Formula detection: scan for <f> elements.
+         --  If found, try LibreOffice to recalculate before parsing.
+         if Has_Formulas_XML (Temp_Sheet, Is_ODF => False) then
+            declare
+               Converted : constant String :=
+                  Convert_Via_LibreOffice (File_Name, OOXML);
+               OK : Boolean;
+            begin
+               if Converted /= "" then
+                  --  Re-enter via converted ODS (formulas recalculated).
+                  GNAT.OS_Lib.Delete_File (Temp_Sheet, OK);
+                  DOM.Readers.Free (Reader);
+                  Parse_ODF (Converted);
+                  GNAT.OS_Lib.Delete_File (Converted, OK);
+                  return;
+               end if;
+               if not SData.Config.Quiet_Mode then
+                  Put_Line_Error ("Warning: formula cells found in XLSX file but LibreOffice " &
+                     "is not available; using cached values.");
+               end if;
+            end;
+         end if;
+
          Input_Sources.File.Open (Temp_Sheet, Input);
          DOM.Readers.Parse (Reader, Input);
          Doc := DOM.Readers.Get_Tree (Reader);
@@ -745,11 +986,19 @@ package body SData.File_IO is
    begin
       Zip.Load (Zip_Info, File_Name);
       Load_Shared_Strings (Zip_Info);
-      Load_Sheet (Zip_Info);
+      declare
+         Sheet_Path : constant String := Find_Sheet_XML_Path (Zip_Info);
+      begin
+         Load_Sheet (Zip_Info, Sheet_Path);
+      end;
    exception
       when E : others =>
-         if GNAT.OS_Lib.Is_Regular_File (Temp_Shared) then declare OK : Boolean; begin GNAT.OS_Lib.Delete_File (Temp_Shared, OK); end; end if;
-         if GNAT.OS_Lib.Is_Regular_File (Temp_Sheet) then declare OK : Boolean; begin GNAT.OS_Lib.Delete_File (Temp_Sheet, OK); end; end if;
+         declare OK : Boolean; begin
+            if GNAT.OS_Lib.Is_Regular_File (Temp_Shared)   then GNAT.OS_Lib.Delete_File (Temp_Shared,   OK); end if;
+            if GNAT.OS_Lib.Is_Regular_File (Temp_Sheet)    then GNAT.OS_Lib.Delete_File (Temp_Sheet,    OK); end if;
+            if GNAT.OS_Lib.Is_Regular_File (Temp_Workbook) then GNAT.OS_Lib.Delete_File (Temp_Workbook, OK); end if;
+            if GNAT.OS_Lib.Is_Regular_File (Temp_Rels)     then GNAT.OS_Lib.Delete_File (Temp_Rels,     OK); end if;
+         end;
          raise Program_Error with "Failed to parse OOXML file """ & File_Name & """: " &
             Ada.Exceptions.Exception_Message (E);
    end Parse_OOXML;
@@ -757,11 +1006,12 @@ package body SData.File_IO is
    -----------------
    -- Write_OOXML --
    -----------------
-   procedure Write_OOXML (File_Name : String) is
+   procedure Write_OOXML (File_Name : String; Sheet_Name : String := "Sheet1") is
       use Zip.Create;
       Info : Zip_Create_Info;
       Z_File_Stream : aliased Zip_File_Stream;
       Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+      Sname     : constant String := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
    begin
       if Col_Names = null then return; end if;
       
@@ -790,7 +1040,7 @@ package body SData.File_IO is
       Add_String (Info,
          "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>" &
          "<workbook xmlns=""http://schemas.openxmlformats.org/spreadsheetml/2006/main"" xmlns:r=""http://schemas.openxmlformats.org/officeDocument/2006/relationships"">" &
-         "<sheets><sheet name=""Sheet1"" sheetId=""1"" r:id=""rId1""/></sheets>" &
+         "<sheets><sheet name=""" & Escape_XML (Sname) & """ sheetId=""1"" r:id=""rId1""/></sheets>" &
          "</workbook>",
          "xl/workbook.xml");
 
@@ -861,11 +1111,12 @@ package body SData.File_IO is
    ---------------
    -- Write_ODF --
    ---------------
-   procedure Write_ODF (File_Name : String) is
+   procedure Write_ODF (File_Name : String; Sheet_Name : String := "Sheet1") is
       use Zip.Create;
       Info : Zip_Create_Info;
       Z_File_Stream : aliased Zip_File_Stream;
       Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+      Sname     : constant String := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
    begin
       if Col_Names = null then return; end if;
 
@@ -893,7 +1144,7 @@ package body SData.File_IO is
                       "xmlns:text=""urn:oasis:names:tc:opendocument:xmlns:text:1.0"" " &
                       "office:version=""1.2"">" & ASCII.LF);
          Append (S1, "<office:body><office:spreadsheet>" & ASCII.LF);
-         Append (S1, "<table:table table:name=""Sheet1"">" & ASCII.LF);
+         Append (S1, "<table:table table:name=""" & Escape_XML (Sname) & """>" & ASCII.LF);
 
          -- Header Row
          Append (S1, "<table:table-row>");

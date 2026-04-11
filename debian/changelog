@@ -1,3 +1,9 @@
+sdata (0.4.0-1) unstable; urgency=medium
+
+  * Add multi-sheet ODF/OOXML support (/SHEET= flag); formula detection with LibreOffice subprocess fallback.
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 10 Apr 2026 20:08:47 -0700
+
 sdata (0.3.4-1) unstable; urgency=medium
 
   * Harden sdata_main.adb: unbounded REPL input, numeric arg error handling, bounds checks; add bump-version.sh script; fix Is_Immediate gaps; add AST memory management; narrow exception handlers in evaluator.

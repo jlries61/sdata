@@ -163,7 +163,7 @@ package SData.AST is
             Submit_Flag : Boolean := False; -- For FPATH
             Output_Flag : Boolean := False; -- For FPATH
             
-            -- Command-specific overrides (/FMT, /NSCAN, /DLM, /HEADER)
+            -- Command-specific overrides (/FMT, /NSCAN, /DLM, /HEADER, /SHEET)
             Format_Specified : Boolean := False;
             Fmt_Override     : SData.Config.Format_Type := SData.Config.CSV;
             NSCAN_Val        : Natural := 0;
@@ -171,6 +171,8 @@ package SData.AST is
             Header_Val       : Boolean := True;
             DLM_Path         : String (1 .. 32) := (others => ' ');
             DLM_Len          : Natural := 0;
+            Sheet_Name       : String (1 .. 64) := (others => ' ');
+            Sheet_Name_Len   : Natural := 0;
          when Stmt_REPEAT =>
             Count : Natural;
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM =>

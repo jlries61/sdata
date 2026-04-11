@@ -694,6 +694,10 @@ package body SData.Parser is
                                  elsif Flag_Name = "DLM" then
                                     Stmt.DLM_Len := Val_Tok.Length;
                                     Stmt.DLM_Path (1 .. Val_Tok.Length) := Val_Tok.Text (1 .. Val_Tok.Length);
+                                 elsif Flag_Name = "SHEET" then
+                                    Stmt.Sheet_Name_Len := Natural'Min (Val_Tok.Length, 64);
+                                    Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len) :=
+                                       Val_Tok.Text (1 .. Stmt.Sheet_Name_Len);
                                  end if;
                               end;
                            end if;

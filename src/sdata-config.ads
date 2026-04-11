@@ -30,6 +30,8 @@ package SData.Config is
    Save_File_Len   : Natural := 0;
    Save_File_Active : Boolean := False;
    Save_File_Fmt    : Format_Type := CSV;
+   Save_Sheet_Name  : String (1 .. 64) := (others => ' ');
+   Save_Sheet_Name_Len : Natural := 0;
 
    --  FPATH settings
    FPath_Use    : Unbounded_String := Null_Unbounded_String;
@@ -56,7 +58,7 @@ package SData.Config is
    --  Version information
    Version_Major : constant := 0;
    Version_Minor : constant := 3;
-   Version_Patch : constant := 4;
-   Version_Str   : constant String := "0.3.4";
+   Version_Patch : constant := 0;
+   Version_Str   : constant String := "0.4.0";
 
 end SData.Config;
