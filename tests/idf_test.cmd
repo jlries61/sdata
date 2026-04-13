@@ -39,9 +39,9 @@ PRINT "FIF(0.95,5,10):" F
 LET W = WIF(0.5, 1, 1)
 PRINT "WIF(0.5,1,1):" W
 
--- Laplace IDF
-LET L = LIF(0.75, 0, 1)
-PRINT "LIF(0.75,0,1):" L
+-- Logistic IDF (quantile = log(p/(1-p)))
+LET L = LIF(0.75)
+PRINT "LIF(0.75):" L
 
 -- Poisson IDF
 LET P = PIF(0.5, 3)

@@ -207,6 +207,30 @@ package body SData.Evaluator is
             end if;
             return Num_Result (Log (V, 10.0));
          end;
+      elsif (Name = "LN" or else Name = "LOGE") and then Has_Args (1) then
+         declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
+         begin
+            if V <= 0.0 then
+               return Handle_Domain_Error ("Argument to " & Name & " must be positive.");
+            end if;
+            return Num_Result (Log (V));
+         end;
+      elsif Name = "LOG2" and then Has_Args (1) then
+         declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
+         begin
+            if V <= 0.0 then
+               return Handle_Domain_Error ("Argument to LOG2 must be positive.");
+            end if;
+            return Num_Result (Log (V) / Log (2.0));
+         end;
+      elsif (Name = "CLG" or else Name = "LGT") and then Has_Args (1) then
+         declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
+         begin
+            if V <= 0.0 then
+               return Handle_Domain_Error ("Argument to " & Name & " must be positive.");
+            end if;
+            return Num_Result (Log (V, 10.0));
+         end;
       elsif Name = "EXP" and then Has_Args (1) then
          declare
             V : constant Float := Convert_To_Float (All_Vals.Element (1));
@@ -233,7 +257,12 @@ package body SData.Evaluator is
       elsif Name = "FLOOR" and then Has_Args (1) then
          return Num_Result (Float'Floor (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "INT" and then Has_Args (1) then
+         return Num_Result (Float'Floor (Convert_To_Float (All_Vals.Element (1))));
+      elsif (Name = "FIX" or else Name = "IP") and then Has_Args (1) then
          return Num_Result (Float'Truncation (Convert_To_Float (All_Vals.Element (1))));
+      elsif Name = "FP" and then Has_Args (1) then
+         declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
+         begin return Num_Result (V - Float'Truncation (V)); end;
       elsif Name = "MOD" and then Has_Args (2) then
          declare
             V1 : constant Float := Convert_To_Float (All_Vals.Element (1));
@@ -320,6 +349,47 @@ package body SData.Evaluator is
             end;
          end;
 
+      elsif Name = "GMEAN" then
+         declare
+            Log_Sum : Long_Float := 0.0;
+            N_Count : Natural := 0;
+         begin
+            for V of All_Vals loop
+               if V.Kind /= Val_Missing then
+                  declare FV : constant Float := Convert_To_Float (V);
+                  begin
+                     if FV <= 0.0 then return (Kind => Val_Missing); end if;
+                     Log_Sum := Log_Sum + Long_Float (Log (FV));
+                     N_Count := N_Count + 1;
+                  end;
+               end if;
+            end loop;
+            if N_Count = 0 then return (Kind => Val_Missing); end if;
+            return Num_Result (Exp (Float (Log_Sum / Long_Float (N_Count))));
+         end;
+      elsif Name = "HMEAN" then
+         declare
+            Recip_Sum : Long_Float := 0.0;
+            N_Count   : Natural := 0;
+         begin
+            for V of All_Vals loop
+               if V.Kind /= Val_Missing then
+                  declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
+                  begin
+                     if FV = 0.0 then return (Kind => Val_Missing); end if;
+                     Recip_Sum := Recip_Sum + 1.0 / FV;
+                     N_Count := N_Count + 1;
+                  end;
+               end if;
+            end loop;
+            if N_Count = 0 then return (Kind => Val_Missing); end if;
+            return Num_Result (Float (Long_Float (N_Count) / Recip_Sum));
+         end;
+      elsif Name = "FALSE" then
+         return (Kind => Val_Integer, Int_Val => 0);
+      elsif Name = "TRUE" then
+         return (Kind => Val_Integer, Int_Val => 1);
+
       -- Statistical Distributions (PDF)
       elsif Name = "ZDF" and then Has_Args (1) then
          return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (All_Vals.Element (1)), 0.0, 1.0));
@@ -363,10 +433,11 @@ package body SData.Evaluator is
          return Num_Result (SData.Statistics.Weibull_PDF (Convert_To_Float (All_Vals.Element (1)), 
                                                          Convert_To_Float (All_Vals.Element (2)), 
                                                          Convert_To_Float (All_Vals.Element (3))));
-      elsif Name = "LDF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Laplace_PDF (Convert_To_Float (All_Vals.Element (1)), 
-                                                          Convert_To_Float (All_Vals.Element (2)), 
-                                                          Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "LDF" and then Has_Args (1) then
+         declare X : constant Float := Convert_To_Float (All_Vals.Element (1));
+                 E : constant Float := Exp (-X);
+                 S : constant Float := 1.0 + E;
+         begin return Num_Result (E / (S * S)); end;
 
       -- Statistical Distributions (CDF)
       elsif Name = "ZCF" and then Has_Args (1) then
@@ -411,10 +482,8 @@ package body SData.Evaluator is
          return Num_Result (SData.Statistics.Weibull_CDF (Convert_To_Float (All_Vals.Element (1)), 
                                                          Convert_To_Float (All_Vals.Element (2)), 
                                                          Convert_To_Float (All_Vals.Element (3))));
-      elsif Name = "LCF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Laplace_CDF (Convert_To_Float (All_Vals.Element (1)), 
-                                                          Convert_To_Float (All_Vals.Element (2)), 
-                                                          Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "LCF" and then Has_Args (1) then
+         return Num_Result (1.0 / (1.0 + Exp (-Convert_To_Float (All_Vals.Element (1)))));
 
       -- Statistical Distributions (IDF)
       elsif Name = "ZIF" and then Has_Args (1) then
@@ -434,10 +503,14 @@ package body SData.Evaluator is
          return Num_Result (SData.Statistics.Beta_IDF (Convert_To_Float (All_Vals.Element (1)), 
                                                        Convert_To_Float (All_Vals.Element (2)), 
                                                        Convert_To_Float (All_Vals.Element (3))));
-      elsif Name = "LIF" and then Has_Args (3) then
-         return Num_Result (SData.Statistics.Laplace_IDF (Convert_To_Float (All_Vals.Element (1)), 
-                                                          Convert_To_Float (All_Vals.Element (2)), 
-                                                          Convert_To_Float (All_Vals.Element (3))));
+      elsif Name = "LIF" and then Has_Args (1) then
+         declare P : constant Float := Convert_To_Float (All_Vals.Element (1));
+         begin
+            if P <= 0.0 or else P >= 1.0 then
+               return Handle_Domain_Error ("LIF argument must be in (0, 1).");
+            end if;
+            return Num_Result (Log (P / (1.0 - P)));
+         end;
       elsif Name = "PIF" and then Has_Args (2) then
          return Num_Result (SData.Statistics.Poisson_IDF (Convert_To_Float (All_Vals.Element (1)), 
                                                           Convert_To_Float (All_Vals.Element (2))));
@@ -482,9 +555,9 @@ package body SData.Evaluator is
       elsif Name = "WRN" and then Has_Args (2) then
          return Num_Result (SData.Statistics.Weibull_RN (Convert_To_Float (All_Vals.Element (1)), 
                                                          Convert_To_Float (All_Vals.Element (2))));
-      elsif Name = "LRN" and then Has_Args (2) then
-         return Num_Result (SData.Statistics.Laplace_RN (Convert_To_Float (All_Vals.Element (1)), 
-                                                         Convert_To_Float (All_Vals.Element (2))));
+      elsif Name = "LRN" then
+         declare U : constant Float := SData.Statistics.Uniform_RN (0.0, 1.0);
+         begin return Num_Result (Log (U / (1.0 - U))); end;
       elsif Name = "XRN" and then Has_Args (1) then
          return Num_Result (SData.Statistics.Chi_Square_RN (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "TRN" and then Has_Args (1) then
@@ -549,6 +622,39 @@ package body SData.Evaluator is
          return Num_Result (Cosh (Convert_To_Float (All_Vals.Element (1))));
       elsif Name = "TANH" and then Has_Args (1) then
          return Num_Result (Tanh (Convert_To_Float (All_Vals.Element (1))));
+      elsif (Name = "HCS" or else Name = "HSN" or else Name = "HTN") and then Has_Args (1) then
+         declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
+         begin
+            if Name = "HCS" then return Num_Result (1.0 / Cosh (V));
+            elsif Name = "HSN" then return Num_Result (1.0 / Sinh (V));
+            else return Num_Result (Cosh (V) / Sinh (V)); end if;
+         end;
+      elsif (Name = "ARCSIN" or else Name = "ARCCOS" or else Name = "ARCTAN") and then Has_Args (1) then
+         declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
+         begin
+            if Name = "ARCSIN" then
+               if V < -1.0 or else V > 1.0 then
+                  return Handle_Domain_Error ("ARCSIN argument must be in [-1, 1].");
+               end if;
+               return Num_Result (Arcsin (V));
+            elsif Name = "ARCCOS" then
+               if V < -1.0 or else V > 1.0 then
+                  return Handle_Domain_Error ("ARCCOS argument must be in [-1, 1].");
+               end if;
+               return Num_Result (Arccos (V));
+            else
+               return Num_Result (Arctan (V));
+            end if;
+         end;
+      elsif (Name = "COT" or else Name = "CSC" or else Name = "SEC") and then Has_Args (1) then
+         declare V : constant Float := Convert_To_Float (All_Vals.Element (1));
+         begin
+            if Name = "COT" then return Num_Result (Cos (V) / Sin (V));
+            elsif Name = "CSC" then return Num_Result (1.0 / Sin (V));
+            else return Num_Result (1.0 / Cos (V)); end if;
+         end;
+      elsif (Name = "DEG" or else Name = "DEGREE") and then Has_Args (1) then
+         return Num_Result (Convert_To_Float (All_Vals.Element (1)) * 180.0 / Ada.Numerics.Pi);
 
       -- Trigonometric Functions (degrees)
       elsif Name = "SIND" and then Has_Args (1) then
@@ -622,14 +728,43 @@ package body SData.Evaluator is
             R : Value (Val_String);
          begin
             if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            declare use Ada.Strings.Fixed;
+            begin R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Both));
+            end;
+            return R;
+         end;
+      elsif Name = "LTRIM$" and then Has_Args (1) then
          declare
-            use Ada.Strings.Fixed;
+            V : constant Value := All_Vals.Element (1);
+            R : Value (Val_String);
          begin
-            R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Both));
+            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            declare use Ada.Strings.Fixed;
+            begin R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Left));
+            end;
+            return R;
          end;
-         return R;
+      elsif Name = "RTRIM$" and then Has_Args (1) then
+         declare
+            V : constant Value := All_Vals.Element (1);
+            R : Value (Val_String);
+         begin
+            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+            declare use Ada.Strings.Fixed;
+            begin R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Right));
+            end;
+            return R;
          end;
-      elsif Name = "UCASE$" and then Has_Args (1) then
+      elsif Name = "ASCII" and then Has_Args (1) then
+         declare V : constant Value := All_Vals.Element (1);
+         begin
+            if V.Kind /= Val_String or else Length (V.Str_Val) = 0 then
+               return (Kind => Val_Missing);
+            end if;
+            return (Kind => Val_Integer,
+                    Int_Val => Character'Pos (Element (V.Str_Val, 1)));
+         end;
+      elsif (Name = "UCASE$" or else Name = "UPPER$") and then Has_Args (1) then
          declare
             V : constant Value := All_Vals.Element (1);
             R : Value (Val_String);
@@ -638,7 +773,7 @@ package body SData.Evaluator is
             R.Str_Val := To_Unbounded_String (To_Upper (SData.Values.To_String (V)));
             return R;
          end;
-      elsif Name = "LCASE$" and then Has_Args (1) then
+      elsif (Name = "LCASE$" or else Name = "LOWER$") and then Has_Args (1) then
          declare
             V : constant Value := All_Vals.Element (1);
             R : Value (Val_String);
@@ -969,7 +1104,8 @@ package body SData.Evaluator is
                      VName = "BOG"   or else VName = "EOG"    or else
                      VName = "RECNO" or else VName = "DATE$"  or else
                      VName = "TIME$" or else VName = "RAN"    or else
-                     VName = "RANDOM"
+                     VName = "RANDOM" or else VName = "LRN"   or else
+                     VName = "FALSE" or else VName = "TRUE"
                   then
                      return Evaluate_Function (VName, null);
                   end if;

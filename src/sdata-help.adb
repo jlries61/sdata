@@ -22,15 +22,19 @@ package body SData.Help is
       Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
       New_Line;
       Put_Line ("Available Functions:");
-      Put_Line ("  Math:        ABS, SQRT, LOG, LOG10, EXP, ROUND, CEIL, FLOOR, INT, MOD");
-      Put_Line ("  Trig (rad):  SIN, COS, TAN, ATN, ATAN2, SINH, COSH, TANH");
+      Put_Line ("  Math:        ABS, SQRT, LOG/LN/LOGE, LOG2, LOG10/CLG/LGT, EXP,");
+      Put_Line ("               ROUND, CEIL, FLOOR, INT, FIX/IP, FP, MOD");
+      Put_Line ("  Trig (rad):  SIN, COS, TAN, ATN/ARCTAN, ATAN2, ARCSIN, ARCCOS,");
+      Put_Line ("               COT, CSC, SEC, SINH/HSN, COSH/HCS, TANH/HTN, DEG/DEGREE");
       Put_Line ("  Trig (deg):  SIND, COSD, TAND, ATND, ATAN2D");
-      Put_Line ("  String:      LEN, LEFT$, RIGHT$, MID$, TRIM$, UCASE$, LCASE$,");
-      Put_Line ("               POS, CHR$, STR$, VAL, NUM$");
+      Put_Line ("  String:      LEN, LEFT$, RIGHT$, MID$, TRIM$, LTRIM$, RTRIM$,");
+      Put_Line ("               UCASE$/UPPER$, LCASE$/LOWER$, POS, CHR$, ASCII,");
+      Put_Line ("               STR$, VAL, NUM$");
       Put_Line ("  Conversion:  NUM, HEX$, OCT$, BIN$");
       Put_Line ("  Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, NEXT, NEXTC$, OBS, OBSC$");
-      Put_Line ("  Special:     MISSING, NMISS, RAN, RANDOM, DATE$, TIME$, SHELL");
-      Put_Line ("  Aggregate:   SUM, MEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS");
+      Put_Line ("  Special:     MISSING, NMISS, RAN, RANDOM, DATE$, TIME$, SHELL,");
+      Put_Line ("               FALSE, TRUE");
+      Put_Line ("  Aggregate:   SUM, MEAN, GMEAN, HMEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS");
       Put_Line ("  Stat PDF:    ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF,");
       Put_Line ("               MDF, WDF, LDF");
       Put_Line ("  Stat CDF:    ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF,");
@@ -807,13 +811,11 @@ package body SData.Help is
 
    procedure Help_LDF is
    begin
-      Put_Line ("Laplace (double-exponential) distribution:");
-      Put_Line ("  LDF(x, loc, scale)   probability density");
-      Put_Line ("  LCF(x, loc, scale)   cumulative probability P(X <= x)");
-      Put_Line ("  LIF(p, loc, scale)   quantile  (0 < p < 1)");
-      Put_Line ("  LRN(loc, scale)      random variate");
-      Put_Line ("  loc: location parameter (mean); scale: scale parameter b (> 0)");
-      Put_Line ("  std dev = sqrt(2) * b");
+      Put_Line ("Logistic distribution (standard, location=0, scale=1):");
+      Put_Line ("  LDF(x)   probability density at x");
+      Put_Line ("  LCF(x)   cumulative probability P(X <= x)");
+      Put_Line ("  LIF(p)   quantile / inverse CDF  (0 < p < 1)");
+      Put_Line ("  LRN      random variate");
    end Help_LDF;
 
    -- ==========================================================================
