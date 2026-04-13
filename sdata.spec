@@ -51,7 +51,7 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 * Fri Apr 10 2026 John L. Ries <john@theyarnbard.com> - 0.3.4-1
 - Harden sdata_main.adb: unbounded REPL input, numeric arg error handling, bounds checks; add bump-version.sh script; fix Is_Immediate gaps; add AST memory management; narrow exception handlers in evaluator.
 
-* Thu Apr 10 2026 John L. Ries <john@theyarnbard.com> - 0.3.3-1
+* Fri Apr 10 2026 John L. Ries <john@theyarnbard.com> - 0.3.3-1
 - Add GPL-3.0 license file; update license declarations throughout.
 - Fix Makefile: remove hardcoded Alire path; centralize VERSION and tarball version variables.
 - Harden sdata_main.adb: safe Read_File, bounds checks on command-line path arguments.
