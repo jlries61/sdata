@@ -434,7 +434,12 @@ package body SData.Help is
    procedure Help_ROUND is begin Put_Line ("Function: ROUND(x [, n])  ->  x rounded to n decimal places (default 0)"); end Help_ROUND;
    procedure Help_CEIL  is begin Put_Line ("Function: CEIL(x)  ->  smallest integer >= x"); end Help_CEIL;
    procedure Help_FLOOR is begin Put_Line ("Function: FLOOR(x)  ->  largest integer <= x"); end Help_FLOOR;
-   procedure Help_INT   is begin Put_Line ("Function: INT(x)  ->  truncate toward zero"); end Help_INT;
+   procedure Help_INT   is begin Put_Line ("Function: INT(x)  ->  largest integer <= x (floor; rounds toward -infinity)"); end Help_INT;
+   procedure Help_FIX   is begin Put_Line ("Function: FIX(x) / IP(x)  ->  integer part, truncated toward zero"); end Help_FIX;
+   procedure Help_FP    is begin Put_Line ("Function: FP(x)  ->  fractional part: x - FIX(x)"); end Help_FP;
+   procedure Help_LOG2  is begin Put_Line ("Function: LOG2(x)  ->  base-2 logarithm (x > 0)"); end Help_LOG2;
+   procedure Help_LN    is begin Put_Line ("Function: LN(x) / LOGE(x)  ->  natural logarithm (aliases for LOG; x > 0)"); end Help_LN;
+   procedure Help_CLG   is begin Put_Line ("Function: CLG(x) / LGT(x)  ->  common (base-10) logarithm (aliases for LOG10; x > 0)"); end Help_CLG;
    procedure Help_MOD   is begin Put_Line ("Function: MOD(x, y)  ->  x mod y (floor division remainder)"); end Help_MOD;
 
    -- ==========================================================================
@@ -446,9 +451,16 @@ package body SData.Help is
    procedure Help_TAN   is begin Put_Line ("Function: TAN(x)  ->  tangent of x (radians)"); end Help_TAN;
    procedure Help_ATN   is begin Put_Line ("Function: ATN(x)  ->  arctangent of x (radians)"); end Help_ATN;
    procedure Help_ATAN2 is begin Put_Line ("Function: ATAN2(y, x)  ->  arctangent of y/x (radians)"); end Help_ATAN2;
-   procedure Help_SINH  is begin Put_Line ("Function: SINH(x)  ->  hyperbolic sine"); end Help_SINH;
-   procedure Help_COSH  is begin Put_Line ("Function: COSH(x)  ->  hyperbolic cosine"); end Help_COSH;
-   procedure Help_TANH  is begin Put_Line ("Function: TANH(x)  ->  hyperbolic tangent"); end Help_TANH;
+   procedure Help_SINH   is begin Put_Line ("Function: SINH(x) / HSN(x)  ->  hyperbolic sine"); end Help_SINH;
+   procedure Help_COSH   is begin Put_Line ("Function: COSH(x) / HCS(x)  ->  hyperbolic cosine"); end Help_COSH;
+   procedure Help_TANH   is begin Put_Line ("Function: TANH(x) / HTN(x)  ->  hyperbolic tangent"); end Help_TANH;
+   procedure Help_ARCSIN is begin Put_Line ("Function: ARCSIN(x)  ->  arcsine of x in radians (-1 <= x <= 1)"); end Help_ARCSIN;
+   procedure Help_ARCCOS is begin Put_Line ("Function: ARCCOS(x)  ->  arccosine of x in radians (-1 <= x <= 1)"); end Help_ARCCOS;
+   procedure Help_ARCTAN is begin Put_Line ("Function: ARCTAN(x) / ATN(x)  ->  arctangent of x in radians"); end Help_ARCTAN;
+   procedure Help_COT    is begin Put_Line ("Function: COT(x)  ->  cotangent of x (radians); cos(x)/sin(x)"); end Help_COT;
+   procedure Help_CSC    is begin Put_Line ("Function: CSC(x)  ->  cosecant of x (radians); 1/sin(x)"); end Help_CSC;
+   procedure Help_SEC    is begin Put_Line ("Function: SEC(x)  ->  secant of x (radians); 1/cos(x)"); end Help_SEC;
+   procedure Help_DEG    is begin Put_Line ("Function: DEG(x) / DEGREE(x)  ->  convert x from radians to degrees"); end Help_DEG;
 
    -- ==========================================================================
    --  Trig functions (degrees)
@@ -468,11 +480,14 @@ package body SData.Help is
    procedure Help_LEFTS  is begin Put_Line ("Function: LEFT$(s$, n)  ->  leftmost n characters"); end Help_LEFTS;
    procedure Help_RIGHTS is begin Put_Line ("Function: RIGHT$(s$, n)  ->  rightmost n characters"); end Help_RIGHTS;
    procedure Help_MIDS   is begin Put_Line ("Function: MID$(s$, start [, len])  ->  substring"); end Help_MIDS;
-   procedure Help_TRIMS  is begin Put_Line ("Function: TRIM$(s$)  ->  strip leading/trailing spaces"); end Help_TRIMS;
-   procedure Help_UCASES is begin Put_Line ("Function: UCASE$(s$)  ->  convert to upper case"); end Help_UCASES;
-   procedure Help_LCASES is begin Put_Line ("Function: LCASE$(s$)  ->  convert to lower case"); end Help_LCASES;
+   procedure Help_TRIMS  is begin Put_Line ("Function: TRIM$(s$)  ->  strip leading and trailing spaces"); end Help_TRIMS;
+   procedure Help_LTRIMS is begin Put_Line ("Function: LTRIM$(s$)  ->  strip leading spaces"); end Help_LTRIMS;
+   procedure Help_RTRIMS is begin Put_Line ("Function: RTRIM$(s$)  ->  strip trailing spaces"); end Help_RTRIMS;
+   procedure Help_UCASES is begin Put_Line ("Function: UCASE$(s$) / UPPER$(s$)  ->  convert to upper case"); end Help_UCASES;
+   procedure Help_LCASES is begin Put_Line ("Function: LCASE$(s$) / LOWER$(s$)  ->  convert to lower case"); end Help_LCASES;
    procedure Help_POS    is begin Put_Line ("Function: POS(needle$, haystack$)  ->  1-based position, 0=not found"); end Help_POS;
    procedure Help_CHRS   is begin Put_Line ("Function: CHR$(n)  ->  character with ASCII code n"); end Help_CHRS;
+   procedure Help_ASCII  is begin Put_Line ("Function: ASCII(s$)  ->  ASCII code of first character of s$"); end Help_ASCII;
    procedure Help_STRS   is begin Put_Line ("Function: STR$(x)  ->  numeric x formatted as string"); end Help_STRS;
    procedure Help_VAL    is begin Put_Line ("Function: VAL(s$)  ->  parse string s$ as a number"); end Help_VAL;
    procedure Help_NUMS   is begin Put_Line ("Function: NUM$(x)  ->  numeric x formatted as string (alias for STR$)"); end Help_NUMS;
@@ -574,6 +589,9 @@ package body SData.Help is
       Put_Line ("  Disabled by --noshell flag.");
    end Help_SHELL;
 
+   procedure Help_FALSE is begin Put_Line ("Function: FALSE  ->  0 (numeric false constant)"); end Help_FALSE;
+   procedure Help_TRUE  is begin Put_Line ("Function: TRUE   ->  1 (numeric true constant)"); end Help_TRUE;
+
    -- ==========================================================================
    --  Aggregate functions
    -- ==========================================================================
@@ -632,6 +650,22 @@ package body SData.Help is
       Put_Line ("Returns missing if all arguments are missing.");
       Put_Line ("Arguments may be individual values or array names (expanded automatically).");
    end Help_MEDIAN;
+
+   procedure Help_GMEAN is
+   begin
+      Put_Line ("Function: GMEAN(v1 [, v2, ...])");
+      Put_Line ("Returns the geometric mean of non-missing values across the arguments.");
+      Put_Line ("Returns missing if any argument is <= 0 or all arguments are missing.");
+      Put_Line ("Arguments may be individual values or array names (expanded automatically).");
+   end Help_GMEAN;
+
+   procedure Help_HMEAN is
+   begin
+      Put_Line ("Function: HMEAN(v1 [, v2, ...])");
+      Put_Line ("Returns the harmonic mean of non-missing values across the arguments.");
+      Put_Line ("Returns missing if any argument is zero or all arguments are missing.");
+      Put_Line ("Arguments may be individual values or array names (expanded automatically).");
+   end Help_HMEAN;
 
    procedure Help_N is
    begin
@@ -883,15 +917,34 @@ package body SData.Help is
    K_CEIL         : aliased constant String := "CEIL";
    K_FLOOR        : aliased constant String := "FLOOR";
    K_INT          : aliased constant String := "INT";
+   K_FIX          : aliased constant String := "FIX";
+   K_IP           : aliased constant String := "IP";
+   K_FP           : aliased constant String := "FP";
+   K_LN           : aliased constant String := "LN";
+   K_LOGE         : aliased constant String := "LOGE";
+   K_LOG2         : aliased constant String := "LOG2";
+   K_CLG          : aliased constant String := "CLG";
+   K_LGT          : aliased constant String := "LGT";
    K_MOD          : aliased constant String := "MOD";
    K_SIN          : aliased constant String := "SIN";
    K_COS          : aliased constant String := "COS";
    K_TAN          : aliased constant String := "TAN";
    K_ATN          : aliased constant String := "ATN";
    K_ATAN2        : aliased constant String := "ATAN2";
+   K_ARCSIN       : aliased constant String := "ARCSIN";
+   K_ARCCOS       : aliased constant String := "ARCCOS";
+   K_ARCTAN       : aliased constant String := "ARCTAN";
+   K_COT          : aliased constant String := "COT";
+   K_CSC          : aliased constant String := "CSC";
+   K_SEC          : aliased constant String := "SEC";
    K_SINH         : aliased constant String := "SINH";
+   K_HSN          : aliased constant String := "HSN";
    K_COSH         : aliased constant String := "COSH";
+   K_HCS          : aliased constant String := "HCS";
    K_TANH         : aliased constant String := "TANH";
+   K_HTN          : aliased constant String := "HTN";
+   K_DEG          : aliased constant String := "DEG";
+   K_DEGREE       : aliased constant String := "DEGREE";
    K_SIND         : aliased constant String := "SIND";
    K_COSD         : aliased constant String := "COSD";
    K_TAND         : aliased constant String := "TAND";
@@ -902,10 +955,15 @@ package body SData.Help is
    K_RIGHTS       : aliased constant String := "RIGHT$";
    K_MIDS         : aliased constant String := "MID$";
    K_TRIMS        : aliased constant String := "TRIM$";
+   K_LTRIMS       : aliased constant String := "LTRIM$";
+   K_RTRIMS       : aliased constant String := "RTRIM$";
    K_UCASES       : aliased constant String := "UCASE$";
+   K_UPPERS       : aliased constant String := "UPPER$";
    K_LCASES       : aliased constant String := "LCASE$";
+   K_LOWERS       : aliased constant String := "LOWER$";
    K_POS          : aliased constant String := "POS";
    K_CHRS         : aliased constant String := "CHR$";
+   K_ASCII        : aliased constant String := "ASCII";
    K_STRS         : aliased constant String := "STR$";
    K_VAL          : aliased constant String := "VAL";
    K_NUMS         : aliased constant String := "NUM$";
@@ -930,8 +988,12 @@ package body SData.Help is
    K_DATES        : aliased constant String := "DATE$";
    K_TIMES        : aliased constant String := "TIME$";
    K_SHELL        : aliased constant String := "SHELL";
+   K_FALSE        : aliased constant String := "FALSE";
+   K_TRUE         : aliased constant String := "TRUE";
    K_SUM          : aliased constant String := "SUM";
    K_MEAN         : aliased constant String := "MEAN";
+   K_GMEAN        : aliased constant String := "GMEAN";
+   K_HMEAN        : aliased constant String := "HMEAN";
    K_STD          : aliased constant String := "STD";
    K_VAR          : aliased constant String := "VAR";
    K_MIN          : aliased constant String := "MIN";
@@ -1049,6 +1111,14 @@ package body SData.Help is
       (K_CEIL'Access,     Help_CEIL'Access,     N, F),
       (K_FLOOR'Access,    Help_FLOOR'Access,    N, F),
       (K_INT'Access,      Help_INT'Access,      N, F),
+      (K_FIX'Access,      Help_FIX'Access,      N, F),
+      (K_IP'Access,       Help_FIX'Access,      N, N),   --  alias
+      (K_FP'Access,       Help_FP'Access,       N, F),
+      (K_LN'Access,       Help_LN'Access,       N, F),
+      (K_LOGE'Access,     Help_LN'Access,       N, N),   --  alias
+      (K_LOG2'Access,     Help_LOG2'Access,     N, F),
+      (K_CLG'Access,      Help_CLG'Access,      N, F),
+      (K_LGT'Access,      Help_CLG'Access,      N, N),   --  alias
       (K_MOD'Access,      Help_MOD'Access,      N, F),
       --  Trig (radians)
       (K_SIN'Access,      Help_SIN'Access,      N, F),
@@ -1056,9 +1126,20 @@ package body SData.Help is
       (K_TAN'Access,      Help_TAN'Access,      N, F),
       (K_ATN'Access,      Help_ATN'Access,      N, F),
       (K_ATAN2'Access,    Help_ATAN2'Access,    N, F),
+      (K_ARCSIN'Access,   Help_ARCSIN'Access,   N, F),
+      (K_ARCCOS'Access,   Help_ARCCOS'Access,   N, F),
+      (K_ARCTAN'Access,   Help_ARCTAN'Access,   N, F),
+      (K_COT'Access,      Help_COT'Access,      N, F),
+      (K_CSC'Access,      Help_CSC'Access,      N, F),
+      (K_SEC'Access,      Help_SEC'Access,      N, F),
       (K_SINH'Access,     Help_SINH'Access,     N, F),
+      (K_HSN'Access,      Help_SINH'Access,     N, N),   --  alias
       (K_COSH'Access,     Help_COSH'Access,     N, F),
+      (K_HCS'Access,      Help_COSH'Access,     N, N),   --  alias
       (K_TANH'Access,     Help_TANH'Access,     N, F),
+      (K_HTN'Access,      Help_TANH'Access,     N, N),   --  alias
+      (K_DEG'Access,      Help_DEG'Access,      N, F),
+      (K_DEGREE'Access,   Help_DEG'Access,      N, N),   --  alias
       --  Trig (degrees)
       (K_SIND'Access,     Help_SIND'Access,     N, F),
       (K_COSD'Access,     Help_COSD'Access,     N, F),
@@ -1071,10 +1152,15 @@ package body SData.Help is
       (K_RIGHTS'Access,   Help_RIGHTS'Access,   N, F),
       (K_MIDS'Access,     Help_MIDS'Access,     N, F),
       (K_TRIMS'Access,    Help_TRIMS'Access,    N, F),
+      (K_LTRIMS'Access,   Help_LTRIMS'Access,   N, F),
+      (K_RTRIMS'Access,   Help_RTRIMS'Access,   N, F),
       (K_UCASES'Access,   Help_UCASES'Access,   N, F),
+      (K_UPPERS'Access,   Help_UCASES'Access,   N, N),   --  alias
       (K_LCASES'Access,   Help_LCASES'Access,   N, F),
+      (K_LOWERS'Access,   Help_LCASES'Access,   N, N),   --  alias
       (K_POS'Access,      Help_POS'Access,      N, F),
       (K_CHRS'Access,     Help_CHRS'Access,     N, F),
+      (K_ASCII'Access,    Help_ASCII'Access,    N, F),
       (K_STRS'Access,     Help_STRS'Access,     N, F),
       (K_VAL'Access,      Help_VAL'Access,      N, F),
       (K_NUMS'Access,     Help_NUMS'Access,     N, F),
@@ -1102,9 +1188,13 @@ package body SData.Help is
       (K_DATES'Access,    Help_DATES'Access,    N, F),
       (K_TIMES'Access,    Help_TIMES'Access,    N, F),
       (K_SHELL'Access,    Help_SHELL'Access,    N, F),
+      (K_FALSE'Access,    Help_FALSE'Access,    N, F),
+      (K_TRUE'Access,     Help_TRUE'Access,     N, F),
       --  Aggregate functions
       (K_SUM'Access,      Help_SUM'Access,      N, F),
       (K_MEAN'Access,     Help_MEAN'Access,     N, F),
+      (K_GMEAN'Access,    Help_GMEAN'Access,    N, F),
+      (K_HMEAN'Access,    Help_HMEAN'Access,    N, F),
       (K_STD'Access,      Help_STD'Access,      N, F),
       (K_VAR'Access,      Help_VAR'Access,      N, F),
       (K_MIN'Access,      Help_MIN'Access,      N, F),
