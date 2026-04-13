@@ -632,6 +632,34 @@ package body SData.Parser is
                            Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
                         end loop;
                      end if;
+                     --  Sheet selection: "filename[sheetname]" syntax.
+                     --  If the filename ends with [...], extract the bracket
+                     --  contents as the sheet name and remove them from the path.
+                     if Stmt.File_Len > 2
+                        and then Stmt.File_Path (Stmt.File_Len) = ']'
+                     then
+                        declare
+                           Open_Pos : Natural := 0;
+                        begin
+                           for I in reverse 1 .. Stmt.File_Len - 1 loop
+                              if Stmt.File_Path (I) = '[' then
+                                 Open_Pos := I;
+                                 exit;
+                              end if;
+                           end loop;
+                           if Open_Pos > 0 then
+                              declare
+                                 SLen : constant Natural :=
+                                    Natural'Min (Stmt.File_Len - Open_Pos - 1, 64);
+                              begin
+                                 Stmt.Sheet_Name (1 .. SLen) :=
+                                    Stmt.File_Path (Open_Pos + 1 .. Open_Pos + SLen);
+                                 Stmt.Sheet_Name_Len := SLen;
+                                 Stmt.File_Len := Open_Pos - 1;
+                              end;
+                           end if;
+                        end;
+                     end if;
                   end if;
                end if;
 
@@ -694,10 +722,6 @@ package body SData.Parser is
                                  elsif Flag_Name = "DLM" then
                                     Stmt.DLM_Len := Val_Tok.Length;
                                     Stmt.DLM_Path (1 .. Val_Tok.Length) := Val_Tok.Text (1 .. Val_Tok.Length);
-                                 elsif Flag_Name = "SHEET" then
-                                    Stmt.Sheet_Name_Len := Natural'Min (Val_Tok.Length, 64);
-                                    Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len) :=
-                                       Val_Tok.Text (1 .. Stmt.Sheet_Name_Len);
                                  end if;
                               end;
                            end if;

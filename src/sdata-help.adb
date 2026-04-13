@@ -51,18 +51,18 @@ package body SData.Help is
 
    procedure Help_USE is
    begin
-      Put_Line ("Command: USE [MOCK | ""filename""] [/FMT=format] [/NSCAN=n] [/SHEET=name]");
+      Put_Line ("Command: USE [MOCK | ""filename[sheet]""] [/FMT=format] [/NSCAN=n]");
       Put_Line ("Loads a dataset from CSV, ODF, or OOXML files into the Data Table.");
       Put_Line ("USE MOCK generates synthetic test data.");
+      Put_Line ("Sheet selection (ODF/OOXML only):");
+      Put_Line ("  Append the sheet name in brackets inside the filename string.");
+      Put_Line ("  The name is case-sensitive and must match the tab label exactly.");
+      Put_Line ("  If omitted or not found, the first sheet is used.");
+      Put_Line ("  Example:  USE ""sales.xlsx[Q2]""");
       Put_Line ("Options:");
       Put_Line ("  /FMT=format  Specifies the file format (CSV, ODF, OOXML).");
       Put_Line ("               Default is auto-detected from file extension.");
       Put_Line ("  /NSCAN=n     Number of rows to scan for type detection (default: 20).");
-      Put_Line ("  /SHEET=name  For ODF (.ods) and OOXML (.xlsx) workbooks: read the named");
-      Put_Line ("               sheet instead of the first sheet.  The name is case-sensitive");
-      Put_Line ("               and must match the tab label exactly.  If the name is not");
-      Put_Line ("               found the first sheet is used.");
-      Put_Line ("               Example:  USE ""sales.xlsx"" /SHEET=Q2");
       Put_Line ("Note: If the file contains formula cells and LibreOffice (soffice) is");
       Put_Line ("      available on PATH, formulas are recalculated before import.");
       Put_Line ("      Otherwise cached values from the last save are used.");
@@ -71,15 +71,16 @@ package body SData.Help is
 
    procedure Help_SAVE is
    begin
-      Put_Line ("Command: SAVE ""filename"" [/FMT=format] [/HEADER=YES|NO] [/SHEET=name]");
+      Put_Line ("Command: SAVE ""filename[sheet]"" [/FMT=format] [/HEADER=YES|NO]");
       Put_Line ("Queues the current Data Table to be saved after the next RUN command.");
+      Put_Line ("Sheet selection (ODF/OOXML only):");
+      Put_Line ("  Append the sheet name in brackets inside the filename string.");
+      Put_Line ("  Default sheet name: ""Sheet1"".");
+      Put_Line ("  Example:  SAVE ""results.xlsx[Summary]""");
       Put_Line ("Options:");
       Put_Line ("  /FMT=format  Specifies the output format (CSV, ODF, OOXML).");
       Put_Line ("               Default is auto-detected from file extension.");
       Put_Line ("  /HEADER=val  Whether to write a header row (YES or NO). Default: YES.");
-      Put_Line ("  /SHEET=name  For ODF (.ods) and OOXML (.xlsx) output: sets the sheet");
-      Put_Line ("               (tab) name in the workbook.  Default: ""Sheet1"".");
-      Put_Line ("               Example:  SAVE ""results.xlsx"" /SHEET=Summary");
       Put_Line ("Execution: Declarative -- the file is written at the end of the next RUN.");
    end Help_SAVE;
 
