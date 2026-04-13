@@ -225,31 +225,62 @@ Functions may appear anywhere in an expression.
 Missing\-value propagation is automatic: if any required argument is missing
 the result is missing, unless noted otherwise.
 .SS Mathematical
-.BR ABS (x),\  SQRT (x),\  EXP (x),\  LOG (x),\  LOG10 (x)
+.BR ABS (x),\  SQRT (x),\  EXP (x)
 .br
-.BR INT (x),\  CEIL (x),\  FLOOR (x),\  ROUND (x[,n]),\  MOD (x,y)
+Natural log:
+.BR LOG (x)\  /\  LN (x)\  /\  LOGE (x)
+.br
+Base\-10 log:
+.BR LOG10 (x)\  /\  CLG (x)\  /\  LGT (x)
+.br
+Base\-2 log:
+.BR LOG2 (x)
+.br
+.BR FLOOR (x),\  CEIL (x),\  ROUND (x[,n]),\  MOD (x,y)
+.br
+.BR INT (x)
+\(em floor (rounds toward \-infinity).
+.br
+.BR FIX (x)\  /\  IP (x)
+\(em integer part, truncated toward zero.
+.br
+.BR FP (x)
+\(em fractional part: x \- FIX(x).
 .SS Trigonometric
 Radian variants:
-.BR SIN ,\  COS ,\  TAN ,\  ATN ,\  ATAN2 ,\  SINH ,\  COSH ,\  TANH .
+.BR SIN ,\  COS ,\  TAN ,\  ATN / ARCTAN ,\  ATAN2 ,\  ARCSIN ,\  ARCCOS ,\  COT ,\  CSC ,\  SEC .
+.br
+Hyperbolic:
+.BR SINH / HSN ,\  COSH / HCS ,\  TANH / HTN .
+.br
+Angle conversion:
+.BR DEG (x)\  /\  DEGREE (x)
+\(em radians to degrees.
 .br
 Degree variants:
 .BR SIND ,\  COSD ,\  TAND ,\  ATND ,\  ATAN2D .
 .SS String
 .BR LEN (s$),\  LEFT$ (s$,n),\  RIGHT$ (s$,n),\  MID$ (s$,start[,len])
 .br
-.BR TRIM$ (s$),\  UCASE$ (s$),\  LCASE$ (s$),\  POS (needle$,haystack$)
+.BR TRIM$ (s$),\  LTRIM$ (s$),\  RTRIM$ (s$)
 .br
-.BR CHR$ (n),\  STR$ (x),\  NUM$ (x),\  VAL (s$),\  NUM (x)
+.BR UCASE$ / UPPER$ (s$),\  LCASE$ / LOWER$ (s$),\  POS (needle$,haystack$)
+.br
+.BR CHR$ (n),\  ASCII (s$),\  STR$ (x),\  NUM$ (x),\  VAL (s$),\  NUM (x)
 .SS Base conversion
 .BR HEX$ (n),\  OCT$ (n),\  BIN$ (n)
 .SS Aggregate (row\-wise, across argument list)
-.BR SUM ,\  MEAN ,\  STD ,\  VAR ,\  MIN ,\  MAX ,\  MEDIAN ,\  N ,\  NMISS
+.BR SUM ,\  MEAN ,\  GMEAN ,\  HMEAN ,\  STD ,\  VAR ,\  MIN ,\  MAX ,\  MEDIAN ,\  N ,\  NMISS
 .PP
 .B STD
 and
 .B VAR
 use the sample formula (n\-1 denominator) and return missing when
 fewer than two non\-missing values are supplied.
+.B GMEAN
+returns missing if any argument is \(<= 0.
+.B HMEAN
+returns missing if any argument is zero.
 .SS Record navigation
 All of the following operate in
 .I logical
@@ -314,6 +345,12 @@ is non\-zero or non\-empty, else
 .BR MISSING (x)
 \(em 1 if x is missing, else 0.
 .br
+.BR FALSE
+\(em the constant 0.
+.br
+.BR TRUE
+\(em the constant 1.
+.br
 .BR RAN ()\ /\ RANDOM ()
 \(em uniform random number in [0,\ 1).
 .br
@@ -365,7 +402,7 @@ T|Student's t|\fIdf\fR
 F|F distribution|\fIdf1\fR, \fIdf2\fR
 M|Binomial|\fIn\fR, \fIprob\fR (discrete; no RN)
 W|Weibull|\fIscale\fR, \fIshape\fR
-L|Laplace|\fIloc\fR, \fIscale\fR
+L|Logistic|none (standard; location=0, scale=1)
 .TE
 .PP
 For each family the density/mass variant takes
