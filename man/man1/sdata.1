@@ -83,12 +83,21 @@ Statements fall into three categories:
 Execute immediately and configure state for the next data step.
 .RS
 .TP
-.B USE \fIfile\fR [\fB/FMT=\fIformat\fR] [\fB/NSCAN=\fIn\fR]
+.B USE \fIfile\fR[\fB[\fIsheet\fB]\fR] [\fB/FMT=\fIformat\fR] [\fB/NSCAN=\fIn\fR]
 Load a dataset from a CSV, ODF, or OOXML file.
+For ODF and OOXML workbooks, an optional sheet name may be appended in
+brackets immediately after the filename (e.g.\&
+.BR """sales.xlsx[Q1]""" ).
+If omitted, the first sheet is used.
 .TP
-.B SAVE \fIfile\fR [\fB/FMT=\fIformat\fR] [\fB/HEADER=YES|NO\fR]
+.B SAVE \fIfile\fR[\fB[\fIsheet\fB]\fR] [\fB/FMT=\fIformat\fR] [\fB/HEADER=YES|NO\fR]
 Queue the current data table to be saved after the next
-.B RUN.
+.BR RUN .
+For ODF and OOXML output, an optional sheet name in brackets sets the
+name of the sheet in the output workbook (e.g.\&
+.BR """report.ods[Summary]""" ).
+If omitted, the sheet is named
+.BR Sheet1 .
 .TP
 .B BY \fIvar\fR [\fIvar\fR ...]
 Define BY\-group variables.
