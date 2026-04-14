@@ -56,9 +56,12 @@ package SData.Config is
    Debug_Mode         : Boolean := False; -- If True, trace each statement and record to stderr.
 
    --  Version information
-   Version_Major : constant := 0;
-   Version_Minor : constant := 3;
-   Version_Patch : constant := 0;
-   Version_Str   : constant String := "0.4.0";
+   Version_Major : constant Natural := 0;
+   Version_Minor : constant Natural := 4;
+   Version_Patch : constant Natural := 0;
+   Version_Str   : constant String :=
+      Natural'Image (Version_Major)(2 .. Natural'Image (Version_Major)'Last) & "." &
+      Natural'Image (Version_Minor)(2 .. Natural'Image (Version_Minor)'Last) & "." &
+      Natural'Image (Version_Patch)(2 .. Natural'Image (Version_Patch)'Last);
 
 end SData.Config;
