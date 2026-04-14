@@ -116,6 +116,34 @@ package body SData.Evaluator is
       end Is_Identifier_Ref_Function;
 
    begin
+      --  IF(cond, true_expr, false_expr) requires lazy evaluation: only the
+      --  selected branch is evaluated so that domain errors in the non-taken
+      --  branch are never raised.  Handle it here, before the argument-
+      --  flattening loop, and return immediately.
+      if Name = "IF" then
+         declare
+            Cond_Node  : constant Expression_List := Args;
+            True_Node  : constant Expression_List :=
+               (if Cond_Node /= null then Cond_Node.Next else null);
+            False_Node : constant Expression_List :=
+               (if True_Node /= null then True_Node.Next else null);
+            Cond_Val   : Value;
+         begin
+            if Cond_Node = null or else True_Node = null or else False_Node = null then
+               return (Kind => Val_Missing);
+            end if;
+            Cond_Val := Evaluate (Cond_Node.Expr);
+            if Cond_Val.Kind = Val_Missing then
+               return (Kind => Val_Missing);
+            end if;
+            if Is_True (Cond_Val) then
+               return Evaluate (True_Node.Expr);
+            else
+               return Evaluate (False_Node.Expr);
+            end if;
+         end;
+      end if;
+
       -- Flatten arguments, expanding arrays if necessary
       while Current /= null loop
          Arg_Index := Arg_Index + 1;
@@ -179,13 +207,7 @@ package body SData.Evaluator is
       end loop;
 
       --  Math Functions
-      if Name = "IF" and then Has_Args (3) then
-         if Is_True (All_Vals.Element (1)) then
-            return All_Vals.Element (2);
-         else
-            return All_Vals.Element (3);
-         end if;
-      elsif Name = "ABS" and then Has_Args (1) then
+      if Name = "ABS" and then Has_Args (1) then
          if All_Vals.Element (1).Kind = Val_Integer then
             return (Kind => Val_Integer, Int_Val => abs All_Vals.Element (1).Int_Val);
          else
