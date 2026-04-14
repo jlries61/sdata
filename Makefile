@@ -44,40 +44,49 @@ run: build
 
 check: build
 	@echo "Running tests..."
-	@for f in tests/*.cmd; do \
+	@failures=0; failed_list=""; total=0; \
+	for f in tests/*.cmd; do \
+		total=$$((total+1)); \
 		base=$$(basename $$f .cmd); \
 		exp="tests/expected/$$base.out"; \
 		flags="tests/$$base.flags"; \
 		extra_flags=""; \
 		if [ -f "$$flags" ]; then extra_flags=$$(cat "$$flags"); fi; \
-		echo -n "Testing $$f... "; \
+		printf "Testing $$f... "; \
 		exitcode_file="tests/$$base.exitcode"; \
 		expected_exit=0; \
 		if [ -f "$$exitcode_file" ]; then expected_exit=$$(cat "$$exitcode_file"); fi; \
 		./bin/sdata $$extra_flags $$f > tests/$$base.tmp 2>&1; \
 		actual_exit=$$?; \
 		if [ $$actual_exit -ne $$expected_exit ]; then \
-			echo "FAILED (Exit code $$actual_exit, expected $$expected_exit)"; \
-			rm tests/$$base.tmp; \
-			exit 1; \
-		fi; \
-		if [ -f "$$exp" ]; then \
+			echo "FAILED (exit $$actual_exit, expected $$expected_exit)"; \
+			rm -f tests/$$base.tmp; \
+			failures=$$((failures+1)); failed_list="$$failed_list $$f"; \
+		elif [ ! -f "$$exp" ]; then \
+			echo "FAILED (no expected output file)"; \
+			rm -f tests/$$base.tmp; \
+			failures=$$((failures+1)); failed_list="$$failed_list $$f"; \
+		else \
 			diff -u "$$exp" tests/$$base.tmp > tests/$$base.diff; \
 			if [ $$? -eq 0 ]; then \
 				echo "PASSED"; \
-				rm tests/$$base.tmp tests/$$base.diff; \
+				rm -f tests/$$base.tmp tests/$$base.diff; \
 			else \
-				echo "FAILED (Output Mismatch)"; \
+				echo "FAILED (output mismatch)"; \
 				cat tests/$$base.diff; \
-				rm tests/$$base.tmp tests/$$base.diff; \
-				exit 1; \
+				rm -f tests/$$base.tmp tests/$$base.diff; \
+				failures=$$((failures+1)); failed_list="$$failed_list $$f"; \
 			fi; \
-		else \
-			echo "PASSED (No expected output file found)"; \
-			rm tests/$$base.tmp; \
 		fi; \
-	done
-	@echo "All tests passed."
+	done; \
+	echo ""; \
+	if [ $$failures -gt 0 ]; then \
+		echo "$$failures/$$total tests FAILED:"; \
+		for t in $$failed_list; do echo "  $$t"; done; \
+		exit 1; \
+	else \
+		echo "All $$total tests passed."; \
+	fi
 
 srpm: clean
 	@echo "Creating source tarball..."
