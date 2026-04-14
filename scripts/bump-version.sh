@@ -40,14 +40,22 @@ MAJOR=$(echo "$NEW_VER" | cut -d. -f1)
 MINOR=$(echo "$NEW_VER" | cut -d. -f2)
 PATCH=$(echo "$NEW_VER" | cut -d. -f3)
 
-# Detect current version from the canonical source
-OLD_VER=$(grep 'Version_Str' "$ROOT/src/sdata-config.ads" \
-          | sed 's/.*"\(.*\)".*/\1/')
+# Detect current version from the canonical source (numeric constants)
+OLD_MAJOR=$(grep 'Version_Major' "$ROOT/src/sdata-config.ads" \
+            | grep -o '[0-9]*;' | tr -d ';')
+OLD_MINOR=$(grep 'Version_Minor' "$ROOT/src/sdata-config.ads" \
+            | grep -o '[0-9]*;' | tr -d ';')
+OLD_PATCH=$(grep 'Version_Patch' "$ROOT/src/sdata-config.ads" \
+            | grep -o '[0-9]*;' | tr -d ';')
+OLD_VER="$OLD_MAJOR.$OLD_MINOR.$OLD_PATCH"
 
-if [ -z "$OLD_VER" ]; then
-    echo "Error: could not detect current version from sdata-config.ads" >&2
-    exit 1
-fi
+case "$OLD_VER" in
+    [0-9]*.[0-9]*.[0-9]*)  ;;
+    *)
+        echo "Error: could not detect current version from sdata-config.ads (got '$OLD_VER')" >&2
+        exit 1
+        ;;
+esac
 
 if [ "$OLD_VER" = "$NEW_VER" ]; then
     echo "Error: new version ($NEW_VER) is the same as the current version" >&2
@@ -71,12 +79,12 @@ sedi() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. sdata-config.ads
+# 1. sdata-config.ads  (update the three numeric constants; Version_Str is derived)
 # ---------------------------------------------------------------------------
 FILE="$ROOT/src/sdata-config.ads"
-sedi "s/Version_Patch : constant := $PATCH\b.*/Version_Patch : constant := $PATCH;/" "$FILE"
-sedi "s/Version_Patch : constant := [0-9]*/Version_Patch : constant := $PATCH/" "$FILE"
-sedi "s/Version_Str   : constant String := \"$OLD_VER\"/Version_Str   : constant String := \"$NEW_VER\"/" "$FILE"
+sedi "s/Version_Major : constant Natural := [0-9]*/Version_Major : constant Natural := $MAJOR/" "$FILE"
+sedi "s/Version_Minor : constant Natural := [0-9]*/Version_Minor : constant Natural := $MINOR/" "$FILE"
+sedi "s/Version_Patch : constant Natural := [0-9]*/Version_Patch : constant Natural := $PATCH/" "$FILE"
 echo "  updated $FILE"
 
 # ---------------------------------------------------------------------------
