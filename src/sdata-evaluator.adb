@@ -128,8 +128,7 @@ package body SData.Evaluator is
    function Is_Identifier_Ref_Function (N : String) return Boolean is
       U : constant String := To_Upper (N);
    begin
-      return U = "LAG" or else U = "LAGC$" or else U = "NEXT" or else U = "NEXTC$"
-             or else U = "OBS" or else U = "OBSC$";
+      return U in "LAG" | "LAGC$" | "NEXT" | "NEXTC$" | "OBS" | "OBSC$";
    end Is_Identifier_Ref_Function;
 
    ---------------------------------------------------------------------------
@@ -188,7 +187,7 @@ package body SData.Evaluator is
             end if;
             return Num_Result (Log (V) / Log (2.0));
          end;
-      elsif (Name = "CLG" or else Name = "LGT") and then Has_Args (Vals, 1) then
+      elsif Name in "CLG" | "LGT" and then Has_Args (Vals, 1) then
          declare V : constant Float := Convert_To_Float (Vals.Element (1));
          begin
             if V <= 0.0 then
@@ -222,7 +221,7 @@ package body SData.Evaluator is
          return Num_Result (Float'Floor (Convert_To_Float (Vals.Element (1))));
       elsif Name = "INT" and then Has_Args (Vals, 1) then
          return Num_Result (Float'Floor (Convert_To_Float (Vals.Element (1))));
-      elsif (Name = "FIX" or else Name = "IP") and then Has_Args (Vals, 1) then
+      elsif Name in "FIX" | "IP" and then Has_Args (Vals, 1) then
          return Num_Result (Float'Truncation (Convert_To_Float (Vals.Element (1))));
       elsif Name = "FP" and then Has_Args (Vals, 1) then
          declare V : constant Float := Convert_To_Float (Vals.Element (1));
@@ -269,15 +268,15 @@ package body SData.Evaluator is
       elsif Name = "COSH" and then Has_Args (Vals, 1) then
          return Num_Result (Cosh (Convert_To_Float (Vals.Element (1))));
       elsif Name = "TANH" and then Has_Args (Vals, 1) then
-         return Num_Result (Tanh (Convert_To_Float (Vals.Element (1))));
-      elsif (Name = "HCS" or else Name = "HSN" or else Name = "HTN") and then Has_Args (Vals, 1) then
+         return Num_Result (Tanh (Convert_To_Float (Vals.Element (1))));	
+      elsif Name in "HCS" | "HSN" | "HSN" and then Has_Args (Vals, 1) then
          declare V : constant Float := Convert_To_Float (Vals.Element (1));
          begin
             if Name = "HCS" then return Num_Result (1.0 / Cosh (V));
             elsif Name = "HSN" then return Num_Result (1.0 / Sinh (V));
             else return Num_Result (Cosh (V) / Sinh (V)); end if;
          end;
-      elsif (Name = "ARCSIN" or else Name = "ARCCOS" or else Name = "ARCTAN") and then Has_Args (Vals, 1) then
+      elsif Name in "ARCSIN" | "ARCCOS" | "ARCTAN" and then Has_Args (Vals, 1) then
          declare V : constant Float := Convert_To_Float (Vals.Element (1));
          begin
             if Name = "ARCSIN" then
@@ -293,15 +292,15 @@ package body SData.Evaluator is
             else
                return Num_Result (Arctan (V));
             end if;
-         end;
-      elsif (Name = "COT" or else Name = "CSC" or else Name = "SEC") and then Has_Args (Vals, 1) then
+         end;	
+      elsif Name in "COT" | "CSC" | "SEC" and then Has_Args (Vals, 1) then
          declare V : constant Float := Convert_To_Float (Vals.Element (1));
          begin
             if Name = "COT" then return Num_Result (Cos (V) / Sin (V));
             elsif Name = "CSC" then return Num_Result (1.0 / Sin (V));
             else return Num_Result (1.0 / Cos (V)); end if;
          end;
-      elsif (Name = "DEG" or else Name = "DEGREE") and then Has_Args (Vals, 1) then
+      elsif Name in "DEG" | "DEGREE" and then Has_Args (Vals, 1) then
          return Num_Result (Convert_To_Float (Vals.Element (1)) * 180.0 / Ada.Numerics.Pi);
       --  Degree variants
       elsif Name = "SIND" and then Has_Args (Vals, 1) then
@@ -325,9 +324,7 @@ package body SData.Evaluator is
    ---------------------------------------------------------------------------
    function Handle_Aggregate (Name : String; Vals : Value_Vectors.Vector) return Value is
    begin
-      if Name = "SUM" or else Name = "MEAN" or else Name = "STD" or else Name = "VAR" or else
-         Name = "MIN" or else Name = "MAX"  or else Name = "N"   or else Name = "NMISS"
-      then
+      if Name in "SUM" | "MEAN" | "STD" | "VAR" | "MIN" | "MAX" | "N" | "NMISS" then
          declare
             Sum, Sum_Sq, Min_V, Max_V : Long_Float := 0.0;
             N_Count, NMISS_Count      : Natural    := 0;
@@ -552,7 +549,7 @@ package body SData.Evaluator is
                     Int_Val => Character'Pos (Element (V.Str_Val, 1)));
          end;
 
-      elsif (Name = "UCASE$" or else Name = "UPPER$") and then Has_Args (Vals, 1) then
+      elsif Name in "UCASE$" | "UPPER$" and then Has_Args (Vals, 1) then
          declare
             V : constant Value := Vals.Element (1);
             R : Value (Val_String);
@@ -562,7 +559,7 @@ package body SData.Evaluator is
             return R;
          end;
 
-      elsif (Name = "LCASE$" or else Name = "LOWER$") and then Has_Args (Vals, 1) then
+      elsif Name in "LCASE$" | "LOWER$" and then Has_Args (Vals, 1) then
          declare
             V : constant Value := Vals.Element (1);
             R : Value (Val_String);
@@ -732,9 +729,8 @@ package body SData.Evaluator is
       elsif Name = "EOG" then
          return (Kind => Val_Integer, Int_Val => (if EOG_Flag then 1 else 0));
 
-      elsif (Name = "LAG" or else Name = "LAGC$") and then
-            (Has_Args (Vals, 1) or else Has_Args (Vals, 2))
-      then
+      elsif Name in "LAG" | "LAGC$" and then
+            (Has_Args (Vals, 1) or else Has_Args (Vals, 2)) then
          declare
             Var     : constant Value := Vals.Element (1);
             N_Val   : constant Value :=
@@ -759,9 +755,8 @@ package body SData.Evaluator is
             end;
          end;
 
-      elsif (Name = "NEXT" or else Name = "NEXTC$") and then
-            (Has_Args (Vals, 1) or else Has_Args (Vals, 2))
-      then
+      elsif Name in "NEXT" | "NEXTC$" and then
+           (Has_Args (Vals, 1) or else Has_Args (Vals, 2)) then
          declare
             Var       : constant Value := Vals.Element (1);
             N_Val     : constant Value :=
@@ -789,7 +784,7 @@ package body SData.Evaluator is
             end;
          end;
 
-      elsif (Name = "OBS" or else Name = "OBSC$") and then Has_Args (Vals, 2) then
+      elsif Name in "OBS" | "OBSC$" and then Has_Args (Vals, 2) then
          declare
             Var     : constant Value := Vals.Element (1);
             Row_Val : constant Value := Vals.Element (2);
@@ -988,7 +983,7 @@ package body SData.Evaluator is
       elsif Name = "FRN" and then Has_Args (Vals, 2) then
          return Num_Result (SData.Statistics.F_RN (Convert_To_Float (Vals.Element (1)),
                                                    Convert_To_Float (Vals.Element (2))));
-      elsif Name = "RAN" or else Name = "RANDOM" then
+      elsif Name in "RAN" | "RANDOM" then
          return Num_Result (SData.Statistics.Uniform_Random);
       end if;
       return (Kind => Val_Missing);
@@ -1257,13 +1252,9 @@ package body SData.Evaluator is
             begin
                if VVal.Kind = Val_Missing then
                   --  Fall back to zero-arg functions (optional parentheses)
-                  if VName = "BOF"   or else VName = "EOF"    or else
-                     VName = "BOG"   or else VName = "EOG"    or else
-                     VName = "RECNO" or else VName = "DATE$"  or else
-                     VName = "TIME$" or else VName = "RAN"    or else
-                     VName = "RANDOM" or else VName = "LRN"   or else
-                     VName = "FALSE" or else VName = "TRUE"
-                  then
+		  if Vname in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" |	
+		              "DATE$" | "TIME$" | "RAN" | "RANDOM" | "LRN" |	
+			      "FALSE" | "TRUE" then
                      return Evaluate_Function (VName, null);
                   end if;
                end if;
