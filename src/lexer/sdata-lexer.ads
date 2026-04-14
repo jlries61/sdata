@@ -2,6 +2,8 @@
 --  into a stream of meaningful 'Token' records. It handles keywords, literals,
 --  operators, and tracks position (line/column) for error reporting.
 
+with Ada.Strings.Unbounded;
+
 package SData.Lexer is
 
    --  Categories of tokens recognized by the lexer.
@@ -55,8 +57,8 @@ package SData.Lexer is
 private
    --  The internal state of the lexer.
    type Lexer_Context is record
-      Source      : String (1 .. 10000); -- Buffer for the input source code
-      Source_Len  : Natural := 0;         -- Total length of source
+      Source      : Ada.Strings.Unbounded.Unbounded_String; -- Input source code
+      Source_Len  : Natural := 0;                            -- Total length of source
       Pos         : Positive := 1;        -- Current read position in Source
       Line        : Positive := 1;        -- Current line counter
       Column      : Positive := 1;        -- Current column counter

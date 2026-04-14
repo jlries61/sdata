@@ -17,7 +17,8 @@ with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
 with Ada.Strings.Fixed;
-with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with Ada.Strings.Unbounded;    use Ada.Strings.Unbounded;
+with Ada.Unchecked_Deallocation;
 
 --  SData.Interpreter — statement executor and data step engine.
 --
@@ -128,6 +129,8 @@ package body SData.Interpreter is
       Next : Column_Mod_List;
    end record;
 
+   procedure Free_Mod is new Ada.Unchecked_Deallocation (Column_Mod_Node, Column_Mod_List);
+
    Pending_Mods : Column_Mod_List := null;
 
    --  State for Data Step record processing.
@@ -213,8 +216,8 @@ package body SData.Interpreter is
    procedure Clear_Pending_Mods is
    begin
       while Pending_Mods /= null loop
-         declare Tmp : constant Column_Mod_List := Pending_Mods;
-         begin Pending_Mods := Pending_Mods.Next; -- Implicit free managed by GC or let it leak for now in Ada
+         declare Tmp : Column_Mod_List := Pending_Mods;
+         begin Pending_Mods := Pending_Mods.Next; Free_Mod (Tmp);
          end;
       end loop;
    end Clear_Pending_Mods;

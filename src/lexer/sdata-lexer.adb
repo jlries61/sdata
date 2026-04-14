@@ -1,4 +1,5 @@
-with Ada.Characters.Handling; use Ada.Characters.Handling;
+with Ada.Characters.Handling;  use Ada.Characters.Handling;
+with Ada.Strings.Unbounded;    use Ada.Strings.Unbounded;
 
 package body SData.Lexer is
 
@@ -8,7 +9,7 @@ package body SData.Lexer is
    --  Prepares the lexer with the input source code.
    procedure Initialize (Ctx : in out Lexer_Context; Source : String) is
    begin
-      Ctx.Source (1 .. Source'Length) := Source;
+      Ctx.Source     := To_Unbounded_String (Source);
       Ctx.Source_Len := Source'Length;
       Ctx.Pos := 1;
       Ctx.Line := 1;
@@ -32,7 +33,7 @@ package body SData.Lexer is
       if Is_End_Of_Source (Ctx) then
          return ASCII.NUL;
       else
-         return Ctx.Source (Ctx.Pos);
+         return Element (Ctx.Source, Ctx.Pos);
       end if;
    end Current_Char;
 
@@ -43,7 +44,7 @@ package body SData.Lexer is
    procedure Advance (Ctx : in out Lexer_Context) is
    begin
       if not Is_End_Of_Source (Ctx) then
-         if Ctx.Source (Ctx.Pos) = ASCII.LF then
+         if Element (Ctx.Source, Ctx.Pos) = ASCII.LF then
             --  Newline reached, increment line and reset column.
             Ctx.Line := Ctx.Line + 1;
             Ctx.Column := 1;
