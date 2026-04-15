@@ -148,6 +148,20 @@ private
    Current_Segment_Start : Positive := 1;
    Output_Segment_Start  : Positive := 1;
 
+   -- Statement Cache for Fetch_From_Disk
+   type Fn_Statement_Access is access all Ada_Sqlite3.Statement'Class;
+   Fetch_Stmt : Fn_Statement_Access := null;
+
+   -- One-row cache for disk lookups
+   package Value_Maps is new Ada.Containers.Indefinite_Hashed_Maps
+     (Key_Type => String,
+      Element_Type => Value,
+      Hash => Ada.Strings.Hash,
+      Equivalent_Keys => "=",
+      "="             => SData.Values."=");
+   Cached_Row_Data : Value_Maps.Map;
+   Cached_Row_ID   : Natural := 0;
+
    --  SQLite Backing Store
    type Database_Access is access all Ada_Sqlite3.Database;
    type Backing_Store is record

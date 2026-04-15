@@ -30,6 +30,7 @@ package body SData.IO is
       if Interactive_Mode and then Local_Echo
          and then Lines_Printed >= Lines_On_Page
       then
+         Ada.Text_IO.New_Line;
          Ada.Text_IO.Put ("-- More -- (Press Enter)");
          begin
             Ada.Text_IO.Get_Line (Dummy, Last);

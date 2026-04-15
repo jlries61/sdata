@@ -16,6 +16,7 @@ package body SData.Table is
    use type GNAT.Strings.String_List_Access;
    use type Ada_Sqlite3.Result_Code;
 
+   procedure Clear_Fetch_Cache;
    procedure Spill_Output_To_Disk;
    procedure Spill_Table_To_Disk (T : in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive);
 
@@ -24,9 +25,13 @@ package body SData.Table is
    ---------------------------
    procedure Cleanup_Backing_Store is
       procedure Free_DB is new Ada.Unchecked_Deallocation (Ada_Sqlite3.Database, Database_Access);
+      procedure Free_Stmt is new Ada.Unchecked_Deallocation (Ada_Sqlite3.Statement'Class, Fn_Statement_Access);
       Success : Boolean;
    begin
       if Store.Is_Active then
+         if Fetch_Stmt /= null then
+            Free_Stmt (Fetch_Stmt);
+         end if;
          if Store.DB /= null then
             Free_DB (Store.DB);
          end if;
@@ -37,6 +42,8 @@ package body SData.Table is
          end;
          Store.Is_Active := False;
       end if;
+      Cached_Row_ID := 0;
+      Cached_Row_Data.Clear;
    end Cleanup_Backing_Store;
 
    -- Filtered View Mapping
@@ -80,6 +87,15 @@ package body SData.Table is
       
       Data_Table.Insert (Upper_Name, New_Col);
       Column_Order.Append (Ada.Strings.Unbounded.To_Unbounded_String (Upper_Name));
+
+      --  Clear the statement cache because the table schema has changed.
+      if Fetch_Stmt /= null then
+         declare
+            procedure Free_Stmt is new Ada.Unchecked_Deallocation (Ada_Sqlite3.Statement'Class, Fn_Statement_Access);
+         begin
+            Free_Stmt (Fetch_Stmt);
+         end;
+      end if;
    end Add_Column;
 
    ----------------------
@@ -290,14 +306,16 @@ package body SData.Table is
       N : constant Natural := Table_Row_Count;
    begin
       if N <= 1 or else Criteria'Length = 0 then return; end if;
+      
+      Clear_Fetch_Cache;
 
       if Store.Is_Active then
          Spill_To_Disk;
          declare
             Col_Names : constant GNAT.Strings.String_List_Access := Get_Column_Names;
-            Cols_CSV  : Unbounded_String;
-            Col_Def   : Unbounded_String;
-            OrderBy   : Unbounded_String := To_Unbounded_String (" ORDER BY ");
+            Cols_CSV  : Ada.Strings.Unbounded.Unbounded_String;
+            Col_Def   : Ada.Strings.Unbounded.Unbounded_String;
+            OrderBy   : Ada.Strings.Unbounded.Unbounded_String := Ada.Strings.Unbounded.To_Unbounded_String (" ORDER BY ");
          begin
             if Col_Names = null or else Col_Names'Length = 0 then return; end if;
 
@@ -309,26 +327,26 @@ package body SData.Table is
                                               elsif Typ = Col_Integer then "INTEGER"
                                               else "TEXT");
                begin
-                  Append (Cols_CSV, "[" & Upper & "]");
-                  Append (Col_Def, "[" & Upper & "] " & SQL_T);
+                  Ada.Strings.Unbounded.Append (Cols_CSV, "[" & Upper & "]");
+                  Ada.Strings.Unbounded.Append (Col_Def, "[" & Upper & "] " & SQL_T);
                   if I < Col_Names'Last then
-                     Append (Cols_CSV, ", ");
-                     Append (Col_Def, ", ");
+                     Ada.Strings.Unbounded.Append (Cols_CSV, ", ");
+                     Ada.Strings.Unbounded.Append (Col_Def, ", ");
                   end if;
                end;
             end loop;
 
             for I in Criteria'Range loop
-               Append (OrderBy, "[" & Ada.Characters.Handling.To_Upper (Criteria (I).Name (1 .. Criteria (I).Len)) & "]");
-               if Criteria (I).Dir = Descending then Append (OrderBy, " DESC"); end if;
-               if I < Criteria'Last then Append (OrderBy, ", "); end if;
+               Ada.Strings.Unbounded.Append (OrderBy, "[" & Ada.Characters.Handling.To_Upper (Criteria (I).Name (1 .. Criteria (I).Len)) & "]");
+               if Criteria (I).Dir = Descending then Ada.Strings.Unbounded.Append (OrderBy, " DESC"); end if;
+               if I < Criteria'Last then Ada.Strings.Unbounded.Append (OrderBy, ", "); end if;
             end loop;
             -- Ensure stability: use record_id as tie-breaker
-            Append (OrderBy, ", record_id ASC");
+            Ada.Strings.Unbounded.Append (OrderBy, ", record_id ASC");
 
-            Store.DB.Execute ("CREATE TABLE data_new (record_id INTEGER PRIMARY KEY AUTOINCREMENT, " & To_String (Col_Def) & ")");
-            Store.DB.Execute ("INSERT INTO data_new (" & To_String (Cols_CSV) & ") " &
-                              "SELECT " & To_String (Cols_CSV) & " FROM data " & To_String (OrderBy));
+            Store.DB.Execute ("CREATE TABLE data_new (record_id INTEGER PRIMARY KEY AUTOINCREMENT, " & Ada.Strings.Unbounded.To_String (Col_Def) & ")");
+            Store.DB.Execute ("INSERT INTO data_new (" & Ada.Strings.Unbounded.To_String (Cols_CSV) & ") " &
+                              "SELECT " & Ada.Strings.Unbounded.To_String (Cols_CSV) & " FROM data " & Ada.Strings.Unbounded.To_String (OrderBy));
             Store.DB.Execute ("DROP TABLE data");
             Store.DB.Execute ("ALTER TABLE data_new RENAME TO data");
 
@@ -419,7 +437,6 @@ package body SData.Table is
          begin
             while Column_Maps.Has_Element (Pos) loop
                declare
-                  -- Only get the key once
                   Current_Key : constant String := Column_Maps.Key (Pos);
                   Old_Data    : Value_Vectors.Vector renames Data_Table.Reference (Pos).Element.all.Data;
                   New_Data    : Value_Vectors.Vector;
@@ -542,6 +559,9 @@ package body SData.Table is
       Output_Data_Table.Clear;
       Output_Column_Order.Clear;
       Output_Table_Row_Count := 0;
+      if Store.Is_Active then
+         Store.DB.Execute ("DROP TABLE IF EXISTS output_data");
+      end if;
    end Initialize_Output_Table;
 
    procedure Add_Output_Column (Name : String; Col_Type : Column_Type) is
@@ -586,20 +606,22 @@ package body SData.Table is
             Output_Data_Table.Reference (Upper_Name);
          Col : Column renames Ref.Element.all;
       begin
-         if Col.Typ = Col_Numeric and then Val.Kind /= Val_Numeric and then Val.Kind /= Val_Missing then
-            if Val.Kind = Val_Integer then
-               Col.Data.Replace_Element (Row - Output_Segment_Start + 1, (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val)));
-               return;
+         if Val.Kind /= Val_Missing then
+            if Col.Typ = Col_Numeric and then Val.Kind /= Val_Numeric then
+               if Val.Kind = Val_Integer then
+                  Col.Data.Replace_Element (Row - Output_Segment_Start + 1, (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val)));
+                  return;
+               end if;
+               raise Type_Mismatch_Error with "Expected Numeric for column " & Upper_Name;
+            elsif Col.Typ = Col_Integer and then Val.Kind /= Val_Integer then
+               if Val.Kind = Val_Numeric then
+                  Col.Data.Replace_Element (Row - Output_Segment_Start + 1, (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val))));
+                  return;
+               end if;
+               raise Type_Mismatch_Error with "Expected Integer for column " & Upper_Name;
+            elsif Col.Typ = Col_String and then Val.Kind /= Val_String then
+               raise Type_Mismatch_Error with "Expected String for column " & Upper_Name;
             end if;
-            raise Type_Mismatch_Error with "Expected Numeric for column " & Upper_Name;
-         elsif Col.Typ = Col_Integer and then Val.Kind /= Val_Integer and then Val.Kind /= Val_Missing then
-            if Val.Kind = Val_Numeric then
-               Col.Data.Replace_Element (Row - Output_Segment_Start + 1, (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val))));
-               return;
-            end if;
-            raise Type_Mismatch_Error with "Expected Integer for column " & Upper_Name;
-         elsif Col.Typ = Col_String and then Val.Kind /= Val_String and then Val.Kind /= Val_Missing then
-            raise Type_Mismatch_Error with "Expected String for column " & Upper_Name;
          end if;
          Col.Data.Replace_Element (Row - Output_Segment_Start + 1, Val);
       end;
@@ -613,6 +635,7 @@ package body SData.Table is
    procedure Commit_Output_Table is
       Output_Spilled : constant Boolean := Output_Segment_Start > 1;
    begin
+      Clear_Fetch_Cache;
       if Output_Table_Row_Count = 0 and then Output_Data_Table.Is_Empty
         and then not Data_Table.Is_Empty
       then
@@ -637,14 +660,12 @@ package body SData.Table is
          if Store.Is_Active then
             Store.DB.Execute ("DROP TABLE IF EXISTS data");
             if Output_Spilled then
-               -- Move output segments to main data
-               Spill_Output_To_Disk; -- Flush any remaining buffer
+               Spill_Output_To_Disk;
                Store.DB.Execute ("ALTER TABLE output_data RENAME TO data");
             end if;
          end if;
       end if;
       Initialize_Output_Table;
-      -- Reset segments
       Current_Segment_Start := 1;
       Output_Segment_Start := 1;
    end Commit_Output_Table;
@@ -677,58 +698,63 @@ package body SData.Table is
       Store.Temp_Path := Ada.Strings.Unbounded.To_Unbounded_String (Temp_Name.all);
       Store.DB := new Ada_Sqlite3.Database'(Ada_Sqlite3.Open (Temp_Name.all));
       Store.Is_Active := True;
-      
-      --  Note: tables are created lazily via Spill_Table_To_Disk.
       GNAT.Strings.Free (Temp_Name);
    end Initialize_Backing_Store;
+
+   procedure Clear_Fetch_Cache is
+      procedure Free_Stmt is new Ada.Unchecked_Deallocation (Ada_Sqlite3.Statement'Class, Fn_Statement_Access);
+   begin
+      if Fetch_Stmt /= null then
+         Free_Stmt (Fetch_Stmt);
+      end if;
+      Cached_Row_ID := 0;
+      Cached_Row_Data.Clear;
+   end Clear_Fetch_Cache;
 
    ---------------------------
    -- Spill_Table_To_Disk --
    ---------------------------
    procedure Spill_Table_To_Disk (T : in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive) is
-      SQL : Unbounded_String;
+      SQL : Ada.Strings.Unbounded.Unbounded_String;
       Memory_Rows : Natural := 0;
-      package Name_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
+      package Name_Vecs is new Ada.Containers.Vectors (Positive, Ada.Strings.Unbounded.Unbounded_String);
       Col_Names : Name_Vecs.Vector;
    begin
       if T.Is_Empty then return; end if;
       
-      -- Get column names and memory row count
+      --  Clear cache because we might be modifying the table being cached.
+      Clear_Fetch_Cache;
       for Pos in T.Iterate loop
-         Col_Names.Append (To_Unbounded_String (Column_Maps.Key (Pos)));
+         Col_Names.Append (Ada.Strings.Unbounded.To_Unbounded_String (Column_Maps.Key (Pos)));
          if Memory_Rows = 0 then
             Memory_Rows := Natural (Column_Maps.Element (Pos).Data.Length);
          end if;
       end loop;
-      
       if Memory_Rows = 0 then return; end if;
-      
       Initialize_Backing_Store;
       
-      -- Create table if it doesn't exist
-      SQL := To_Unbounded_String ("CREATE TABLE IF NOT EXISTS [" & Table_Name & "] (record_id INTEGER PRIMARY KEY");
+      SQL := Ada.Strings.Unbounded.To_Unbounded_String ("CREATE TABLE IF NOT EXISTS [" & Table_Name & "] (record_id INTEGER PRIMARY KEY");
       for Name of Col_Names loop
          declare
-            Typ : constant Column_Type := T.Element (To_String (Name)).Typ;
+            Typ : constant Column_Type := T.Element (Ada.Strings.Unbounded.To_String (Name)).Typ;
             SQL_T : constant String := (if Typ = Col_Numeric then "REAL"
                                         elsif Typ = Col_Integer then "INTEGER"
                                         else "TEXT");
          begin
-            Append (SQL, ", [" & To_String (Name) & "] " & SQL_T);
+            Ada.Strings.Unbounded.Append (SQL, ", [" & Ada.Strings.Unbounded.To_String (Name) & "] " & SQL_T);
          end;
       end loop;
-      Append (SQL, ")");
-      Store.DB.Execute (To_String (SQL));
+      Ada.Strings.Unbounded.Append (SQL, ")");
+      Store.DB.Execute (Ada.Strings.Unbounded.To_String (SQL));
 
-      -- Build INSERT statement
-      SQL := To_Unbounded_String ("INSERT INTO [" & Table_Name & "] (record_id");
-      for Name of Col_Names loop Append (SQL, ", [" & To_String (Name) & "]"); end loop;
-      Append (SQL, ") VALUES (?");
-      for I in 1 .. Natural (Col_Names.Length) loop Append (SQL, ", ?"); end loop;
-      Append (SQL, ")");
+      SQL := Ada.Strings.Unbounded.To_Unbounded_String ("INSERT OR REPLACE INTO [" & Table_Name & "] (record_id");
+      for Name of Col_Names loop Ada.Strings.Unbounded.Append (SQL, ", [" & Ada.Strings.Unbounded.To_String (Name) & "]"); end loop;
+      Ada.Strings.Unbounded.Append (SQL, ") VALUES (?");
+      for I in 1 .. Natural (Col_Names.Length) loop Ada.Strings.Unbounded.Append (SQL, ", ?"); end loop;
+      Ada.Strings.Unbounded.Append (SQL, ")");
 
       declare
-         Stmt : Ada_Sqlite3.Statement := Store.DB.Prepare (To_String (SQL));
+         Stmt : Ada_Sqlite3.Statement := Store.DB.Prepare (Ada.Strings.Unbounded.To_String (SQL));
       begin
          for R in 1 .. Memory_Rows loop
             Stmt.Reset;
@@ -736,12 +762,12 @@ package body SData.Table is
             Stmt.Bind_Int (1, Start_Idx + R - 1);
             for C in 1 .. Natural (Col_Names.Length) loop
                declare
-                  Val : constant Value := T.Element (To_String (Col_Names.Element (C))).Data.Element (R);
+                  Val : constant Value := T.Element (Ada.Strings.Unbounded.To_String (Col_Names.Element (C))).Data.Element (R);
                begin
                   case Val.Kind is
                      when Val_Numeric => Stmt.Bind_Double (C + 1, Val.Num_Val);
                      when Val_Integer => Stmt.Bind_Int (C + 1, Val.Int_Val);
-                     when Val_String  => Stmt.Bind_Text (C + 1, To_String (Val.Str_Val));
+                     when Val_String  => Stmt.Bind_Text (C + 1, Ada.Strings.Unbounded.To_String (Val.Str_Val));
                      when Val_Missing => Stmt.Bind_Null (C + 1);
                   end case;
                end;
@@ -750,10 +776,7 @@ package body SData.Table is
          end loop;
       end;
 
-      -- Clear memory vectors
-      for Pos in T.Iterate loop
-         T.Reference (Pos).Element.all.Data.Clear;
-      end loop;
+      for Pos in T.Iterate loop T.Reference (Pos).Element.all.Data.Clear; end loop;
    end Spill_Table_To_Disk;
 
    procedure Spill_To_Disk is
@@ -770,24 +793,44 @@ package body SData.Table is
    -- Fetch_From_Disk --
    -----------------------
    function Fetch_From_Disk (Row : Positive; Col_Name : String) return Value is
-      SQL : constant String := "SELECT [" & Ada.Characters.Handling.To_Upper (Col_Name) & "] FROM data WHERE record_id = " & 
-                                Ada.Strings.Fixed.Trim (Row'Img, Ada.Strings.Both);
-      Stmt : Ada_Sqlite3.Statement := Store.DB.Prepare (SQL);
+      use Ada_Sqlite3;
+      U_Col : constant String := Ada.Characters.Handling.To_Upper (Col_Name);
    begin
-      if Stmt.Step = Ada_Sqlite3.ROW then
-         declare
-            Typ : constant Column_Type := Data_Table.Element (Ada.Characters.Handling.To_Upper (Col_Name)).Typ;
-         begin
-            if Stmt.Column_Is_Null (0) then
-               return (Kind => Val_Missing);
-            elsif Typ = Col_Numeric then
-               return (Kind => Val_Numeric, Num_Val => Stmt.Column_Double (0));
-            elsif Typ = Col_Integer then
-               return (Kind => Val_Integer, Int_Val => Stmt.Column_Int (0));
-            else
-               return (Kind => Val_String, Str_Val => Ada.Strings.Unbounded.To_Unbounded_String (Stmt.Column_Text (0)));
-            end if;
-         end;
+      if Row /= Cached_Row_ID then
+         if Fetch_Stmt = null then
+            Fetch_Stmt := new Ada_Sqlite3.Statement'(Store.DB.Prepare ("SELECT * FROM data WHERE record_id = ?"));
+         end if;
+         
+         Fetch_Stmt.Reset;
+         Fetch_Stmt.Clear_Bindings;
+         Fetch_Stmt.Bind_Int (1, Row);
+         
+         if Fetch_Stmt.Step = Ada_Sqlite3.ROW then
+            Cached_Row_Data.Clear;
+            for I in 1 .. Fetch_Stmt.Column_Count - 1 loop
+               declare
+                  CName : constant String := Fetch_Stmt.Column_Name (I);
+                  Typ   : constant Ada_Sqlite3.Column_Type := Fetch_Stmt.Get_Column_Type (I);
+               begin
+                  if Fetch_Stmt.Column_Is_Null (I) then
+                     Cached_Row_Data.Insert (CName, (Kind => Val_Missing));
+                  elsif Typ = Ada_Sqlite3.Float_Type then
+                     Cached_Row_Data.Insert (CName, (Kind => Val_Numeric, Num_Val => Fetch_Stmt.Column_Double (I)));
+                  elsif Typ = Ada_Sqlite3.Integer_Type then
+                     Cached_Row_Data.Insert (CName, (Kind => Val_Integer, Int_Val => Fetch_Stmt.Column_Int (I)));
+                  else
+                     Cached_Row_Data.Insert (CName, (Kind => Val_String, Str_Val => Ada.Strings.Unbounded.To_Unbounded_String (Fetch_Stmt.Column_Text (I))));
+                  end if;
+               end;
+            end loop;
+            Cached_Row_ID := Row;
+         else
+            return (Kind => Val_Missing);
+         end if;
+      end if;
+      
+      if Cached_Row_Data.Contains (U_Col) then
+         return Cached_Row_Data.Element (U_Col);
       else
          return (Kind => Val_Missing);
       end if;
