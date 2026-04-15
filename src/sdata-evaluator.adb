@@ -705,7 +705,21 @@ package body SData.Evaluator is
    ---------------------------------------------------------------------------
    function Handle_Navigation (Name : String; Vals : Value_Vectors.Vector) return Value is
    begin
-      if Name = "RECNO" then
+      if Name = "RECNO" or Name = "ORD" then
+         --  ORD with an argument is the ASCII code of the first character.
+         --  ORD with no arguments is a synonym for RECNO (logical record index).
+         if Name = "ORD" and then Has_Args (Vals, 1) then
+            declare
+               V : constant Value := Vals.Element (1);
+            begin
+               if V.Kind /= Val_String or else Length (V.Str_Val) = 0 then
+                  return (Kind => Val_Missing);
+               end if;
+               return (Kind    => Val_Integer,
+                       Int_Val => Character'Pos (Element (V.Str_Val, 1)));
+            end;
+         end if;
+
          return (Kind    => Val_Integer,
                  Int_Val => (if SData.Table.Is_Filtered
                              then Integer (SData.Table.Get_Logical_Record_Index)
@@ -1252,7 +1266,7 @@ package body SData.Evaluator is
             begin
                if VVal.Kind = Val_Missing then
                   --  Fall back to zero-arg functions (optional parentheses)
-		  if Vname in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" |	
+		  if Vname in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |	
 		              "DATE$" | "TIME$" | "RAN" | "RANDOM" | "LRN" |	
 			      "FALSE" | "TRUE" then
                      return Evaluate_Function (VName, null);
@@ -1545,6 +1559,7 @@ begin
    Dispatch_Table.Insert ("EOF",    Handle_Navigation'Access);
    Dispatch_Table.Insert ("BOG",    Handle_Navigation'Access);
    Dispatch_Table.Insert ("EOG",    Handle_Navigation'Access);
+   Dispatch_Table.Insert ("ORD",    Handle_Navigation'Access);
    Dispatch_Table.Insert ("LAG",    Handle_Navigation'Access);
    Dispatch_Table.Insert ("LAGC$",  Handle_Navigation'Access);
    Dispatch_Table.Insert ("NEXT",   Handle_Navigation'Access);

@@ -389,7 +389,13 @@ package body SData.Help is
       Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
       Put_Line ("  --clen <n>           : Set max character variable length");
       Put_Line ("  -m <n>               : Set max in-memory table rows");
+      Put_Line ("  -t <n>               : Set max temporary variables");
       Put_Line ("  -k                   : Continue execution after statement error");
+      Put_Line ("  -p <pager>           : Specify external pager for interactive output");
+      Put_Line ("  -q                   : Quiet mode (suppress console output)");
+      Put_Line ("  -o <file>            : Redirect console output to file");
+      Put_Line ("  -u <fmt>             : Default input format (CSV/ODF/OOXML)");
+      Put_Line ("  -s <fmt>             : Default output format (CSV/ODF/OOXML)");
    end Help_OPTIONS;
 
    procedure Help_EXECUTION is

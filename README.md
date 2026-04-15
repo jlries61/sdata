@@ -172,6 +172,7 @@ sdata [options] [filename]
   --noshell                 Disable SHELL/SYSTEM commands
   -k, --continue-on-error   Continue after statement errors
   --ignore-math-errors      Math errors return missing instead of halting
+  -p <pager>                External pager command for interactive output
   -o <file>                 Console output file
   -q                        Quiet mode (suppress console output)
 ```
