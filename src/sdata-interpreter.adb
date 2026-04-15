@@ -131,7 +131,8 @@ package body SData.Interpreter is
 
    procedure Free_Mod is new Ada.Unchecked_Deallocation (Column_Mod_Node, Column_Mod_List);
 
-   Pending_Mods : Column_Mod_List := null;
+   Pending_Mods      : Column_Mod_List := null;
+   Pending_Mods_Tail : Column_Mod_List := null;
 
    --  State for Data Step record processing.
    Current_Record_Deleted : Boolean := False;
@@ -162,9 +163,8 @@ package body SData.Interpreter is
 
    procedure Clear_Active_Program is
    begin
-      --  Null the borrowed filter pointer before freeing the program that owns
-      --  it, so there is no window where it points to freed memory.
-      Select_Filter_Expr := null;
+      --  Free the self-owned filter expression.
+      SData.AST.Free_Expression (Select_Filter_Expr);
       SData.AST.Free_Program (Active_Program_Head);
       Active_Program_Tail := null;
       SData.Table.Clear_Index_Map;
@@ -201,16 +201,13 @@ package body SData.Interpreter is
 
    procedure Add_Pending_Mod (Kind : Column_Mod_Kind; Name : String) is
       New_Mod : constant Column_Mod_List := new Column_Mod_Node;
-      Last : Column_Mod_List := Pending_Mods;
-      Upper : constant String := To_Upper (Name);
+      Upper   : constant String := To_Upper (Name);
    begin
       New_Mod.Kind := Kind; New_Mod.Len := Upper'Length;
       New_Mod.Name (1 .. Upper'Length) := Upper; New_Mod.Next := null;
       if Pending_Mods = null then Pending_Mods := New_Mod;
-      else
-         while Last.Next /= null loop Last := Last.Next; end loop;
-         Last.Next := New_Mod;
-      end if;
+      else Pending_Mods_Tail.Next := New_Mod; end if;
+      Pending_Mods_Tail := New_Mod;
    end Add_Pending_Mod;
 
    procedure Clear_Pending_Mods is
@@ -220,6 +217,7 @@ package body SData.Interpreter is
          begin Pending_Mods := Pending_Mods.Next; Free_Mod (Tmp);
          end;
       end loop;
+      Pending_Mods_Tail := null;
    end Clear_Pending_Mods;
 
    --  Apply_Pending_Mods — two-pass KEEP-then-DROP logic.
@@ -947,7 +945,8 @@ package body SData.Interpreter is
             SData.Config.Repeat_Count := Stmt.Count;
             Input_File_Columns.Clear;
          when Stmt_SELECT_FILTER =>
-            Select_Filter_Expr := Stmt.Expr;
+            SData.AST.Free_Expression (Select_Filter_Expr);
+            Select_Filter_Expr := SData.AST.Copy_Expression (Stmt.Expr);
             SData.Table.Clear_Index_Map;
          when Stmt_DIGITS =>
             SData.Config.Print_Digits := Stmt.Digits_Count;

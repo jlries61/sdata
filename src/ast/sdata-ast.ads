@@ -227,4 +227,10 @@ package SData.AST is
    --  Sets Prog to null on return.  Safe to call with Prog = null.
    procedure Free_Program (Prog : in out Statement_Access);
 
+   --  Deep-copies an expression tree.
+   function Copy_Expression (Expr : Expression_Access) return Expression_Access;
+
+   --  Frees a single expression tree.
+   procedure Free_Expression (Expr : in out Expression_Access);
+
 end SData.AST;

@@ -1408,12 +1408,22 @@ package body SData.Evaluator is
                            if SData.Config.Max_String_Len > 0 then
                               Limit := SData.Config.Max_String_Len;
                            end if;
-                           V.Str_Val := L.Str_Val & R.Str_Val;
-                           if Length (V.Str_Val) > Limit then
-                              Put_Line_Error ("Warning: String truncated to " &
-                                             Integer'Image (Limit) & " characters.");
-                              V.Str_Val := To_Unbounded_String (Slice (V.Str_Val, 1, Limit));
-                           end if;
+                           declare
+                              LL : constant Natural := Length (L.Str_Val);
+                              RL : constant Natural := Length (R.Str_Val);
+                           begin
+                              if LL + RL > Limit then
+                                 Put_Line_Error ("Warning: String truncated to " &
+                                                Integer'Image (Limit) & " characters.");
+                                 if LL >= Limit then
+                                    V.Str_Val := To_Unbounded_String (Slice (L.Str_Val, 1, Limit));
+                                 else
+                                    V.Str_Val := L.Str_Val & Slice (R.Str_Val, 1, Limit - LL);
+                                 end if;
+                              else
+                                 V.Str_Val := L.Str_Val & R.Str_Val;
+                              end if;
+                           end;
                            return V;
                         end;
                      when Op_Eq  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val = R.Str_Val then 1 else 0));

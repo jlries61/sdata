@@ -133,4 +133,46 @@ package body SData.AST is
       end loop;
    end Free_Program;
 
+   function Copy_Expression_List (List : Expression_List) return Expression_List is
+   begin
+      if List = null then return null; end if;
+      return new Expression_List_Node'(Expr => Copy_Expression (List.Expr),
+                                       Next => Copy_Expression_List (List.Next));
+   end Copy_Expression_List;
+
+   function Copy_Expression (Expr : Expression_Access) return Expression_Access is
+      Res : Expression_Access;
+   begin
+      if Expr = null then return null; end if;
+      Res := new Expression (Expr.Kind);
+      case Expr.Kind is
+         when Expr_Numeric_Literal => Res.Value := Expr.Value;
+         when Expr_String_Literal  => Res.Str_Value := Expr.Str_Value;
+         when Expr_Variable =>
+            Res.Var_Name := Expr.Var_Name;
+            Res.Var_Len  := Expr.Var_Len;
+         when Expr_Binary_Op =>
+            Res.Op    := Expr.Op;
+            Res.Left  := Copy_Expression (Expr.Left);
+            Res.Right := Copy_Expression (Expr.Right);
+         when Expr_Unary_Op =>
+            Res.UOp     := Expr.UOp;
+            Res.Operand := Copy_Expression (Expr.Operand);
+         when Expr_Function_Call =>
+            Res.Func_Name := Expr.Func_Name;
+            Res.Func_Len  := Expr.Func_Len;
+            Res.Arguments := Copy_Expression_List (Expr.Arguments);
+         when Expr_Array_Access =>
+            Res.Arr_Name := Expr.Arr_Name;
+            Res.Arr_Len  := Expr.Arr_Len;
+            Res.Arr_Idx  := Copy_Expression_List (Expr.Arr_Idx);
+      end case;
+      return Res;
+   end Copy_Expression;
+
+   procedure Free_Expression (Expr : in out Expression_Access) is
+   begin
+      Free (Expr);
+   end Free_Expression;
+
 end SData.AST;
