@@ -394,13 +394,13 @@ package body SData.Help is
    procedure Help_OPTIONS is
    begin
       Put_Line ("Runtime Configuration Flags:");
-      Put_Line ("  --noshell            : Disable SYSTEM/SHELL");
+      Put_Line ("  --noshell            : Disable SYSTEM/SHELL; also disables -p");
       Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
       Put_Line ("  --clen <n>           : Set max character variable length");
       Put_Line ("  -m <n>               : Set max in-memory table rows");
       Put_Line ("  -t <n>               : Set max temporary variables");
       Put_Line ("  -k                   : Continue execution after statement error");
-      Put_Line ("  -p <pager>           : Specify external pager for interactive output");
+      Put_Line ("  -p <pager>           : External pager for interactive output");
       Put_Line ("  -q                   : Quiet mode (suppress console output)");
       Put_Line ("  -o <file>            : Redirect console output to file");
       Put_Line ("  -u <fmt>             : Default input format (CSV/ODF/OOXML)");

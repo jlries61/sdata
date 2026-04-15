@@ -68,6 +68,9 @@ Error messages are still written to standard error.
 .BI \-p " pager"
 Specify an external pager program (e.g., \fBmore\fR or \fBless\fR) to use for
 interactive console output.
+This option is only relevant to interactive sessions and is ignored in
+batch mode.
+It is incompatible with and disabled by \fB\-\-noshell\fR.
 .TP
 .BI \-u ", " \-\-infmt " format"
 Override the input dataset format.

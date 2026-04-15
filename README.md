@@ -169,10 +169,10 @@ sdata [options] [filename]
   -m <size>                 Max in-memory table size
   -t <count>                Max temporary variables
   --clen <len>              Max character variable length
-  --noshell                 Disable SHELL/SYSTEM commands
+  --noshell                 Disable SHELL/SYSTEM commands; also disables -p
   -k, --continue-on-error   Continue after statement errors
   --ignore-math-errors      Math errors return missing instead of halting
-  -p <pager>                External pager command for interactive output
+  -p <pager>                External pager command for interactive output (ignored in batch mode)
   -o <file>                 Console output file
   -q                        Quiet mode (suppress console output)
 ```
