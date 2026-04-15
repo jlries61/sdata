@@ -33,6 +33,10 @@ tar xzf %{SOURCE2} -C %{_builddir}
 tar xzf %{SOURCE3} -C %{_builddir}
 tar xzf %{SOURCE4} -C %{_builddir}
 
+# Suppress strict style checks and warnings in the ada_sqlite3 dependency to reduce build log noise.
+sed -i 's/"-gnaty.*"/"-gnatws"/g' %{_builddir}/ada_sqlite3_0.1.1_2edbcebd/config/ada_sqlite3_config.gpr
+sed -i 's/"-gnatwa"/"-gnatws"/g' %{_builddir}/ada_sqlite3_0.1.1_2edbcebd/config/ada_sqlite3_config.gpr
+
 %build
 # Point gprbuild at the vendored dependency .gpr files.
 # xmlada keeps dom and input_sources in separate subdirectories.
