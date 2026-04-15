@@ -43,6 +43,7 @@ cd $PRGNAM-$VERSION
 tar xzf $CWD/zipada-61.0.0.tar.gz
 tar xzf $CWD/xmlada-26.0.0.tar.gz
 tar xzf $CWD/mathpaqs-20260205.0.0.tar.gz
+tar xzf $CWD/ada_sqlite3-0.1.1.tar.gz
 
 chown -R root:root .
 find -L . \
@@ -56,6 +57,7 @@ find -L . \
 ZIPADA_DIR="zipada_61.0.0_54fc9836"
 XMLADA_DIR="xmlada_26.0.0_b140ed4a"
 MATHPAQS_DIR="mathpaqs_20260205.0.0_abed7ef9"
+SQLITE3_DIR="ada_sqlite3-0.1.1"
 
 mkdir -p obj bin
 
@@ -73,6 +75,7 @@ gnatmake \
   -aI"../$XMLADA_DIR/input_sources" \
   -aI"../$MATHPAQS_DIR/numerics" \
   -aI"../$MATHPAQS_DIR/random" \
+  -aI"../$SQLITE3_DIR" \
   -cargs -gnat2012 -gnatwa -gnatwl -gnatwu -g $SLKCFLAGS
 cd ..
 

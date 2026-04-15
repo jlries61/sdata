@@ -2,7 +2,7 @@ Source: sdata
 Section: science
 Priority: optional
 Maintainer: John L. Ries <john@theyarnbard.com>
-Build-Depends: debhelper-compat (= 13), gnat, gprbuild, make
+Build-Depends: debhelper-compat (= 13), gnat, gprbuild, make, libsqlite3-dev
 Standards-Version: 4.5.0
 
 Package: sdata

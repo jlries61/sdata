@@ -9,6 +9,7 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        zipada-61.0.0.tar.gz
 Source2:        xmlada-26.0.0.tar.gz
 Source3:        mathpaqs-20260205.0.0.tar.gz
+Source4:        ada_sqlite3-0.1.1.tar.gz
 
 # GNAT (Ada compiler) package name differs across RPM distributions:
 #   gcc-ada   — openSUSE, SLES
@@ -17,6 +18,7 @@ Source3:        mathpaqs-20260205.0.0.tar.gz
 # RHEL 8+).  If building on an older release substitute the appropriate name.
 BuildRequires:  (gcc-ada or gcc-gnat)
 BuildRequires:  make
+BuildRequires:  sqlite-devel
 
 %description
 sdata is a statistical data interpreter designed for data step-based
@@ -29,11 +31,12 @@ aggregate functions, and advanced variable handling.
 tar xzf %{SOURCE1} -C %{_builddir}
 tar xzf %{SOURCE2} -C %{_builddir}
 tar xzf %{SOURCE3} -C %{_builddir}
+tar xzf %{SOURCE4} -C %{_builddir}
 
 %build
 # Point gprbuild at the vendored dependency .gpr files.
 # xmlada keeps dom and input_sources in separate subdirectories.
-export GPR_PROJECT_PATH="%{_builddir}/zipada_61.0.0_54fc9836:%{_builddir}/xmlada_26.0.0_b140ed4a/dom:%{_builddir}/xmlada_26.0.0_b140ed4a/input_sources:%{_builddir}/mathpaqs_20260205.0.0_abed7ef9"
+export GPR_PROJECT_PATH="%{_builddir}/zipada_61.0.0_54fc9836:%{_builddir}/xmlada_26.0.0_b140ed4a/dom:%{_builddir}/xmlada_26.0.0_b140ed4a/input_sources:%{_builddir}/mathpaqs_20260205.0.0_abed7ef9:%{_builddir}/ada_sqlite3-0.1.1"
 make %{?_smp_mflags}
 
 %install
