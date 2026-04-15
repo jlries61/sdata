@@ -51,7 +51,7 @@ procedure SData_Main is
    --  Displays available command-line options.
    procedure Print_Usage is
    begin
-      Put_Line ("Usage: sdata_main [options] [filename]");
+      Put_Line ("Usage: sdata [options] [filename]");
       Put_Line ("Options:");
       Put_Line ("  -h, --help    Show this help message");
       Put_Line ("  -v, --version Show version information");
@@ -65,7 +65,9 @@ procedure SData_Main is
       Put_Line ("  -s, --outfmt             Output dataset and format");
       Put_Line ("  -o <file>                Console output file");
       Put_Line ("  -q                       Suppress console output (Quiet Mode)");
-      Put_Line ("  -p                       Pager specification (not yet implemented)");
+      Put_Line ("  -p <pager>               External pager command for interactive output");
+      Put_Line ("                           (e.g. ""less -F"", ""more""); ignored in batch mode;");
+      Put_Line ("                           incompatible with --noshell");
       Put_Line ("  --debug                  Trace each statement and record number to stderr");
    end Print_Usage;
 
@@ -77,8 +79,11 @@ procedure SData_Main is
       Buffer : Unbounded_String;
    begin
       SData.IO.Set_Interactive (True);
-      Put_Line ("SData Statistical Interpreter version " & SData.Config.Version_Str);
-      Put_Line ("Interactive Console. Type QUIT to exit.");
+      --  Print the banner directly (bypasses pager buffer — it should
+      --  always appear immediately, not be held until the first command).
+      Ada.Text_IO.Put_Line ("SData Statistical Interpreter version "
+                            & SData.Config.Version_Str);
+      Ada.Text_IO.Put_Line ("Interactive Console. Type QUIT to exit.");
       Buffer := Null_Unbounded_String;
       REPL : loop
          if Length (Buffer) = 0 then
@@ -92,10 +97,10 @@ procedure SData_Main is
             Append (Buffer, Line & ASCII.LF);
 
             Initialize (Ctx, To_String (Buffer));
-            
+
             begin
                Prog := Parse_Program (Ctx);
-               
+
                -- If parsing succeeded, we can clear the buffer.
                Buffer := Null_Unbounded_String;
 
@@ -105,6 +110,7 @@ procedure SData_Main is
                         if Prog.Kind = Stmt_RUN then
                            Run_Active_Program;
                         elsif Prog.Kind = Stmt_QUIT or else Prog.Kind = Stmt_END then
+                           SData.IO.Flush_Pager_Buffer;
                            exit REPL;
                         else
                            Execute (Prog);
@@ -116,33 +122,38 @@ procedure SData_Main is
                   end;
                   Prog := Prog.Next;
                end loop;
+               SData.IO.Flush_Pager_Buffer;
 
             exception
                when SData.Parser.Incomplete_Statement =>
-                  -- Keep buffer as is, wait for more input on next loop
+                  --  Keep buffer as is; wait for more input — do not flush.
                   null;
             end;
-            
+
          exception
             when Ada.Text_IO.End_Error =>
+               SData.IO.Flush_Pager_Buffer;
                Ada.Text_IO.New_Line;
                exit REPL;
             when E : SData.Script_Error =>
                Put_Line_Error ("Error: " & Exception_Message (E));
                Buffer := Null_Unbounded_String;
+               SData.IO.Flush_Pager_Buffer;
             when E : others =>
                Put_Line_Error ("Internal error: " & Exception_Name (E) & ": " & Exception_Message (E));
                Buffer := Null_Unbounded_String;
+               SData.IO.Flush_Pager_Buffer;
          end;
          exit REPL when not Ada.Text_IO.Is_Open (Ada.Text_IO.Standard_Input);
       end loop REPL;
    end Run_REPL;
 
-   Ctx      : Parser_Context;
-   Prog     : Statement_Access;
-   Filename : String (1 .. 1024);
+   Ctx          : Parser_Context;
+   Prog         : Statement_Access;
+   Filename     : String (1 .. 1024);
    Filename_Len : Natural := 0;
-   Idx      : Positive := 1;
+   Idx          : Positive := 1;
+   Pager_Cmd    : Unbounded_String := Null_Unbounded_String;
 begin
    --  Initial argument check.
    if Argument_Count = 0 then
@@ -258,6 +269,15 @@ begin
                      return;
                end;
             end if;
+         elsif Arg = "-p" then
+            if Idx < Argument_Count then
+               Idx := Idx + 1;
+               Pager_Cmd := To_Unbounded_String (Argument (Idx));
+            else
+               Put_Line_Error ("Error: -p requires a pager command argument");
+               Set_Exit_Status (Failure);
+               return;
+            end if;
          elsif Arg = "--noshell" then
             Disable_Shell := True;
          elsif Arg = "--ignore-math-errors" then
@@ -302,6 +322,26 @@ begin
       end;
       Idx := Idx + 1;
    end loop;
+
+   --  Validate -p / --noshell interaction.
+   if Length (Pager_Cmd) > 0 and then Disable_Shell then
+      Put_Line_Error ("Error: --noshell disables external process execution; "
+                      & "-p cannot be used with --noshell");
+      Set_Exit_Status (Failure);
+      return;
+   end if;
+
+   --  Activate external pager (interactive mode only; ignored for batch scripts).
+   if Length (Pager_Cmd) > 0 and then Filename_Len = 0 then
+      begin
+         SData.IO.Set_Pager (To_String (Pager_Cmd));
+      exception
+         when E : SData.IO.Pager_Not_Found =>
+            Put_Line_Error ("Error: " & Exception_Message (E));
+            Set_Exit_Status (Failure);
+            return;
+      end;
+   end if;
 
    --  Handle output redirection if specified on command line.
    if Output_File_Len > 0 then
