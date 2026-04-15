@@ -122,6 +122,7 @@ package SData.AST is
       Stmt_END,    -- Terminate program
       Stmt_QUIT,   -- Terminate program
       Stmt_NAMES,  -- List column names
+      Stmt_LIST,   -- Display record data
       Stmt_SUBMIT, -- Recursive script execution
       Stmt_SYSTEM, -- External command execution
       Stmt_RSEED,  -- Set random seed
@@ -175,7 +176,7 @@ package SData.AST is
             Sheet_Name_Len   : Natural := 0;
          when Stmt_REPEAT =>
             Count : Natural;
-         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM =>
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_LIST =>
             Vars         : Variable_List;
             Arr_Name     : String (1 .. 32);
             Arr_Name_Len : Natural;

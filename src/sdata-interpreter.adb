@@ -755,6 +755,84 @@ package body SData.Interpreter is
                if T_Names /= null then declare Old : String_List_Access := T_Names; begin GNAT.Strings.Free (Old); end; end if;
                if S_Names /= null then declare Old : String_List_Access := S_Names; begin GNAT.Strings.Free (Old); end; end if;
             end;
+         when Stmt_LIST =>
+            declare
+               Col_Names : GNAT.Strings.String_List_Access;
+               Rows      : constant Natural := SData.Table.Logical_Row_Count;
+            begin
+               if Stmt.Vars = null then
+                  Col_Names := Get_Column_Names;
+               else
+                  declare
+                     V    : Name_Vectors.Vector;
+                     Curr : Variable_List := Stmt.Vars;
+                     procedure Resolve (R : Variable_Range) is
+                        All_C : constant String_List_Access := Get_Column_Names;
+                        S_Idx : Natural := 0;
+                        E_Idx : Natural := 0;
+                        U_Start : constant String := To_Upper (R.Start_Name (1 .. R.Start_Len));
+                        U_End   : constant String := (if R.Is_Range then To_Upper (R.End_Name (1 .. R.End_Len)) else "");
+                     begin
+                        if not R.Is_Range then
+                           V.Append (To_Unbounded_String (U_Start));
+                        elsif All_C /= null then
+                           for I in All_C'Range loop
+                              if To_Upper (All_C (I).all) = U_Start then S_Idx := I; end if;
+                              if To_Upper (All_C (I).all) = U_End   then E_Idx := I; end if;
+                           end loop;
+                           if S_Idx > 0 and E_Idx > 0 then
+                              if S_Idx > E_Idx then
+                                 declare T : constant Natural := S_Idx; begin S_Idx := E_Idx; E_Idx := T; end;
+                              end if;
+                              for I in S_Idx .. E_Idx loop
+                                 V.Append (To_Unbounded_String (All_C (I).all));
+                              end loop;
+                           end if;
+                           declare Old : String_List_Access := All_C; begin GNAT.Strings.Free (Old); end;
+                        end if;
+                     end Resolve;
+                  begin
+                     while Curr /= null loop
+                        Resolve (Curr.Var);
+                        Curr := Curr.Next;
+                     end loop;
+                     Col_Names := new GNAT.Strings.String_List (1 .. Integer (V.Length));
+                     for I in 1 .. Integer (V.Length) loop
+                        Col_Names (I) := new String'(To_String (V.Element (I)));
+                     end loop;
+                  end;
+               end if;
+
+               if Col_Names = null or else Col_Names'Length = 0 then
+                  Put_Line ("(No columns to list)");
+                  return;
+               end if;
+
+               -- Header
+               Put ("REC# ");
+               for I in Col_Names'Range loop
+                  Put (Col_Names (I).all & " ");
+               end loop;
+               New_Line;
+
+               -- Data
+               for R in 1 .. Rows loop
+                  declare
+                     Phys_R : constant Positive := SData.Table.Logical_To_Physical (R);
+                  begin
+                     Put (Ada.Strings.Fixed.Trim (R'Image, Ada.Strings.Both) & " ");
+                     for C in Col_Names'Range loop
+                        declare
+                           Val : constant Value := Get_Value_Upper (Phys_R, Col_Names (C).all);
+                        begin
+                           Put (To_String_Formatted (Val) & " ");
+                        end;
+                     end loop;
+                     New_Line;
+                  end;
+               end loop;
+               declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
+            end;
          when others => null;
       end case;
    end Execute_Metadata;

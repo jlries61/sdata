@@ -1043,16 +1043,19 @@ package body SData.Parser is
                end if;
             end;
 
-         when Token_END | Token_QUIT | Token_NAMES | Token_NEW | Token_HELP =>
+         when Token_END | Token_QUIT | Token_NAMES | Token_LIST | Token_NEW | Token_HELP =>
             declare
                K : constant Statement_Kind := (if Tok.Kind = Token_END then Stmt_END 
                                              elsif Tok.Kind = Token_QUIT then Stmt_QUIT 
                                              elsif Tok.Kind = Token_NEW then Stmt_NEW
                                              elsif Tok.Kind = Token_HELP then Stmt_HELP
+                                             elsif Tok.Kind = Token_LIST then Stmt_LIST
                                              else Stmt_NAMES);
             begin
                Stmt := new Statement (K);
-               if K = Stmt_HELP then
+               if K = Stmt_LIST then
+                  Stmt.Vars := Parse_Variable_List (Ctx);
+               elsif K = Stmt_HELP then
                   declare
                      Next_T : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin

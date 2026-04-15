@@ -189,6 +189,15 @@ package body SData.Help is
       Put_Line ("Execution: Immediate -- takes effect at once.");
    end Help_NEW;
 
+   procedure Help_LIST is
+   begin
+      Put_Line ("Command: LIST [variable(s)]");
+      Put_Line ("Execution: Immediate");
+      Put_Line ("Displays the values of the current Data Table records for the");
+      Put_Line ("specified variables (or all permanent variables if omitted).");
+      Put_Line ("Respects any active SELECT filter and BY grouping.");
+   end Help_LIST;
+
    procedure Help_NAMES is
    begin
       Put_Line ("Command: NAMES");
@@ -891,6 +900,7 @@ package body SData.Help is
    K_BY           : aliased constant String := "BY";
    K_SORT         : aliased constant String := "SORT";
    K_NEW          : aliased constant String := "NEW";
+   K_LIST         : aliased constant String := "LIST";
    K_NAMES        : aliased constant String := "NAMES";
    K_DELETE       : aliased constant String := "DELETE";
    K_HOLD         : aliased constant String := "HOLD";
@@ -1084,6 +1094,7 @@ package body SData.Help is
       (K_BY'Access,       Help_BY'Access,       C, N),
       (K_SORT'Access,     Help_SORT'Access,     C, N),
       (K_NEW'Access,      Help_NEW'Access,      C, N),
+      (K_LIST'Access,     Help_LIST'Access,     C, N),
       (K_NAMES'Access,    Help_NAMES'Access,    C, N),
       (K_DELETE'Access,   Help_DELETE'Access,   C, N),
       (K_HOLD'Access,     Help_HOLD'Access,     C, N),

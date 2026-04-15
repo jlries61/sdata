@@ -259,6 +259,17 @@ package body SData.Statistics is
       return Float (Long_Beta.Inverse_Regularized_Beta (Long_Float (P), Long_Float (Alpha), Long_Float (Beta)));
    end Beta_IDF;
 
+   -------------
+   -- Beta_RN --
+   -------------
+   function Beta_RN (Alpha, Beta : Float) return Float is
+      Y1 : constant Float := Gamma_RN (Alpha, 1.0);
+      Y2 : constant Float := Gamma_RN (Beta, 1.0);
+   begin
+      if Y1 + Y2 = 0.0 then return 0.0; end if;
+      return Y1 / (Y1 + Y2);
+   end Beta_RN;
+
    -----------------
    -- Poisson_PMF --
    -----------------
@@ -450,6 +461,22 @@ package body SData.Statistics is
       if KI < 0.0 then return 0.0; elsif KI >= NI then return 1.0; end if;
       return Float (Long_Beta.Regularized_Beta (1.0 - PF, NI - KI, KI + 1.0));
    end Binomial_CDF;
+
+   ------------------
+   -- Binomial_IDF --
+   ------------------
+   function Binomial_IDF (P, N, Prob : Float) return Float is
+      Sum : Float := 0.0;
+      NI  : constant Integer := Integer (Float'Floor (N));
+   begin
+      if P <= 0.0 then return 0.0; end if;
+      if P >= 1.0 then return Float (NI); end if;
+      for K in 0 .. NI loop
+         Sum := Sum + Binomial_PMF (Float (K), N, Prob);
+         if Sum >= P then return Float (K); end if;
+      end loop;
+      return Float (NI);
+   end Binomial_IDF;
 
    -----------------
    -- Binomial_RN --

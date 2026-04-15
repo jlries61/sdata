@@ -58,8 +58,10 @@ package SData.Statistics is
    function F_CDF (X, DF1, DF2 : Float) return Float;
 
    --  Binomial
+   function Beta_RN  (Alpha, Beta : Float) return Float;
    function Binomial_PMF (K, N, P : Float) return Float;
    function Binomial_CDF (K, N, P : Float) return Float;
+   function Binomial_IDF (P, N, Prob : Float) return Float;
    function Binomial_RN  (N, P : Float) return Float;
 
    --  Weibull
