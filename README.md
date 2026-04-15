@@ -76,7 +76,7 @@ Build a source RPM:
 make srpm
 ```
 
-This creates `sdata-0.4.0-1.src.rpm` which can be built with `rpmbuild
+This creates `sdata-0.4.1-1.src.rpm` which can be built with `rpmbuild
 --rebuild` or submitted to a build service. The vendored library tarballs must
 be present in `../Data/tarballs/`.
 
@@ -99,7 +99,7 @@ Create a SlackBuild tarball:
 make slackware
 ```
 
-This creates `sdata-0.4.0-slackbuild.tar.gz` containing the SlackBuild script,
+This creates `sdata-0.4.1-slackbuild.tar.gz` containing the SlackBuild script,
 source tarball, and vendored dependencies. Extract and run `./sdata.SlackBuild`
 as root to build the package.
 
@@ -111,7 +111,7 @@ Build a macOS installer package:
 make pkg
 ```
 
-This creates `sdata-0.4.0.pkg`. The `sdata` binary must already be built
+This creates `sdata-0.4.1.pkg`. The `sdata` binary must already be built
 (`make` first). Requires the `pkgbuild` tool (included with Xcode).
 
 ## Release Management
@@ -128,7 +128,7 @@ scripts/bump-version.sh <new-version> "<changelog-summary>"
 For example:
 
 ```sh
-scripts/bump-version.sh 0.4.0 "Add spreadsheet formula evaluation and multi-sheet support."
+scripts/bump-version.sh 0.4.1 "Add spreadsheet formula evaluation and multi-sheet support."
 ```
 
 The script validates the `N.N.N` version format, detects the current version
@@ -143,7 +143,7 @@ Run `sdata` with no arguments to enter the interactive console:
 
 ```
 $ sdata
-SData Statistical Interpreter version 0.4.0
+SData Statistical Interpreter version 0.4.1
 Interactive Console. Type QUIT to exit.
 sdata> use "mydata.csv"
 sdata> print recno, name$, score

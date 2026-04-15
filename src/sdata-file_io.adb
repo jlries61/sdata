@@ -558,7 +558,17 @@ package body SData.File_IO is
             for I in 0 .. Length (Cells) - 1 loop
                declare
                   Cell : constant Node := Item (Cells, I);
-                  Repeat_Attr   : constant String   := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
+                  Col_Spanned : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-spanned");
+                  Row_Spanned : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-rows-spanned");
+               begin
+                  if (Col_Spanned /= "" and then Positive'Value (Col_Spanned) > 1) or else
+                     (Row_Spanned /= "" and then Positive'Value (Row_Spanned) > 1) then
+                     Free (Cells); DOM.Readers.Free (Reader);
+                     raise SData.Script_Error with "ODS file contains merged cells, which are not supported.";
+                  end if;
+
+                  declare
+                     Repeat_Attr   : constant String   := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
                   Repeat_Count  : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
                   P_Nodes_Local : Node_List := Get_Elements_By_Tag_Name (DOM.Core.Element (Cell), "text:p");
                   Base_Name     : constant String   := (if Length (P_Nodes_Local) > 0 then Get_Text (Item (P_Nodes_Local, 0)) else "");
@@ -576,6 +586,7 @@ package body SData.File_IO is
                      end;
                   end loop;
                end;
+            end;
             end loop;
             Free (Cells);
 
@@ -900,6 +911,17 @@ package body SData.File_IO is
          DOM.Readers.Parse (Reader, Input);
          Doc := DOM.Readers.Get_Tree (Reader);
          Input_Sources.File.Close (Input);
+
+         declare
+            Merged : Node_List := DOM.Core.Documents.Get_Elements_By_Tag_Name (Doc, "mergeCells");
+         begin
+            if Length (Merged) > 0 then
+               Free (Merged);
+               DOM.Readers.Free (Reader);
+               raise SData.Script_Error with "XLSX file contains merged cells, which are not supported.";
+            end if;
+            Free (Merged);
+         end;
 
          Rows := DOM.Core.Documents.Get_Elements_By_Tag_Name (Doc, "row");
          Clear;

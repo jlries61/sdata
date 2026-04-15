@@ -1,3 +1,15 @@
+sdata (0.4.1-1) unstable; urgency=medium
+
+  * Finalize Phase 3 and Phase 4 development.
+  * Implement LIST command for data display.
+  * Finalize statistical distributions: add MIF (Binomial IDF) and BRN (Beta RN).
+  * Enhance SELECT record filter: make non-cumulative and add /ALL to cancel.
+  * Implement merged cell detection for ODF and OOXML (fails with error).
+  * Implement ORD() function as synonym for logical record number.
+  * Document -p pager/noshell incompatibility and batch-mode behavior.
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 15 Apr 2026 10:53:17 -0700
+
 sdata (0.4.0-1) unstable; urgency=medium
 
   * Add multi-sheet ODF/OOXML support (/SHEET= flag); formula detection with LibreOffice subprocess fallback.

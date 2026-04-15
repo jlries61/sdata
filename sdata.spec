@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.4.0
+Version:        0.4.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -45,6 +45,15 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Wed Apr 15 2026 John L. Ries <john@theyarnbard.com> - 0.4.1-1
+- Finalize Phase 3 and Phase 4 development.
+- Implement LIST command for data display.
+- Finalize statistical distributions: add MIF (Binomial IDF) and BRN (Beta RN).
+- Enhance SELECT record filter: make non-cumulative and add /ALL to cancel.
+- Implement merged cell detection for ODF and OOXML (fails with error).
+- Implement ORD() function as synonym for logical record number.
+- Document -p pager/noshell incompatibility and batch-mode behavior.
+
 * Fri Apr 10 2026 John L. Ries <john@theyarnbard.com> - 0.4.0-1
 - Add multi-sheet ODF/OOXML support (/SHEET= flag); formula detection with LibreOffice subprocess fallback.
 
