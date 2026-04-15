@@ -25,23 +25,31 @@ package SData.Config is
    Output_File   : String (1 .. 1024) := (others => ' ');
    Output_File_Len : Natural := 0;
 
-   --  Pending SAVE operation for the next RUN.
-   Save_File_Path  : String (1 .. 1024) := (others => ' ');
-   Save_File_Len   : Natural := 0;
-   Save_File_Active : Boolean := False;
-   Save_File_Fmt    : Format_Type := CSV;
-   Save_Sheet_Name  : String (1 .. 64) := (others => ' ');
-   Save_Sheet_Name_Len : Natural := 0;
-
-   --  FPATH settings
-   FPath_Use    : Unbounded_String := Null_Unbounded_String;
-   FPath_Save   : Unbounded_String := Null_Unbounded_String;
-   FPath_Submit : Unbounded_String := Null_Unbounded_String;
-   FPath_Output : Unbounded_String := Null_Unbounded_String;
-
    --  REPEAT state.
    Repeat_Count  : Natural := 0;
    Repeat_Active : Boolean := False;
+
+   --  Runtime state (reset by NEW)
+   type Runtime_State_Record is record
+      Save_File_Path      : String (1 .. 1024) := (others => ' ');
+      Save_File_Len       : Natural            := 0;
+      Save_File_Active    : Boolean            := False;
+      Save_File_Fmt       : Format_Type        := CSV;
+      Save_Sheet_Name     : String (1 .. 64)   := (others => ' ');
+      Save_Sheet_Name_Len : Natural            := 0;
+      FPath_Use           : Unbounded_String   := Null_Unbounded_String;
+      FPath_Save          : Unbounded_String   := Null_Unbounded_String;
+      FPath_Submit        : Unbounded_String   := Null_Unbounded_String;
+      FPath_Output        : Unbounded_String   := Null_Unbounded_String;
+      Repeat_Count        : Natural            := 0;
+      Repeat_Active       : Boolean            := False;
+   end record;
+
+   Runtime : Runtime_State_Record;
+
+   procedure Reset_Runtime_State;
+
+   --  DIGITS state (controlling float precision in output).
 
    --  DIGITS state (controlling float precision in output).
    Print_Digits  : Natural := 5;

@@ -40,7 +40,12 @@ build:
 	$(GPRBUILD) -P $(GPR_FILE)
 
 run: build
-	./bin/sdata tests/test1.cmd
+	@if [ -z "$(FILE)" ]; then \
+		echo "Error: please specify a script to run with FILE=<path>"; \
+		echo "Usage: make run FILE=tests/test1.cmd"; \
+		exit 1; \
+	fi
+	./bin/sdata $(FILE)
 
 check: build
 	@echo "Running tests..."
@@ -56,9 +61,13 @@ check: build
 		exitcode_file="tests/$$base.exitcode"; \
 		expected_exit=0; \
 		if [ -f "$$exitcode_file" ]; then expected_exit=$$(cat "$$exitcode_file"); fi; \
-		./bin/sdata $$extra_flags $$f > tests/$$base.tmp 2>&1; \
+		timeout 10 ./bin/sdata $$extra_flags $$f > tests/$$base.tmp 2>&1; \
 		actual_exit=$$?; \
-		if [ $$actual_exit -ne $$expected_exit ]; then \
+		if [ $$actual_exit -eq 124 ]; then \
+			echo "FAILED (Timed out after 10s)"; \
+			rm -f tests/$$base.tmp; \
+			failures=$$((failures+1)); failed_list="$$failed_list $$f"; \
+		elif [ $$actual_exit -ne $$expected_exit ]; then \
 			echo "FAILED (exit $$actual_exit, expected $$expected_exit)"; \
 			rm -f tests/$$base.tmp; \
 			failures=$$((failures+1)); failed_list="$$failed_list $$f"; \

@@ -361,13 +361,13 @@ package body SData.Interpreter is
       else
          -- 2. Handle FPATH prepending
          if Cat = "USE" then
-            Base := SData.Config.FPath_Use;
+            Base := SData.Config.Runtime.FPath_Use;
          elsif Cat = "SAVE" then
-            Base := SData.Config.FPath_Save;
+            Base := SData.Config.Runtime.FPath_Save;
          elsif Cat = "SUBMIT" then
-            Base := SData.Config.FPath_Submit;
+            Base := SData.Config.Runtime.FPath_Submit;
          elsif Cat = "OUTPUT" then
-            Base := SData.Config.FPath_Output;
+            Base := SData.Config.Runtime.FPath_Output;
          end if;
 
          if Base /= Null_Unbounded_String and then To_String (Base) /= "" then
@@ -840,8 +840,8 @@ package body SData.Interpreter is
    begin
       case Stmt.Kind is
          when Stmt_USE =>
-            SData.Config.Repeat_Active := False;
-            SData.Config.Repeat_Count := 0;
+            SData.Config.Runtime.Repeat_Active := False;
+            SData.Config.Runtime.Repeat_Count := 0;
             declare
                File_Name : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
                Expanded  : String (1 .. 1024);
@@ -871,12 +871,12 @@ package body SData.Interpreter is
                Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
                SLen  : constant Natural := Stmt.Sheet_Name_Len;
             begin
-               SData.Config.Save_File_Path (1 .. Full'Length) := Full;
-               SData.Config.Save_File_Len := Full'Length;
-               SData.Config.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
-               SData.Config.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
-               SData.Config.Save_Sheet_Name_Len := SLen;
-               SData.Config.Save_File_Active := True;
+               SData.Config.Runtime.Save_File_Path (1 .. Full'Length) := Full;
+               SData.Config.Runtime.Save_File_Len := Full'Length;
+               SData.Config.Runtime.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
+               SData.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
+               SData.Config.Runtime.Save_Sheet_Name_Len := SLen;
+               SData.Config.Runtime.Save_File_Active := True;
             end;
          when Stmt_SORT =>
             declare
@@ -908,10 +908,10 @@ package body SData.Interpreter is
                             RC (RC'First + 1 .. RC'Last) & " records and " &
                             VC (VC'First + 1 .. VC'Last) & " variables processed.");
                end;
-               if SData.Config.Save_File_Active then
-                  SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt, SData.Config.Save_Sheet_Name (1 .. SData.Config.Save_Sheet_Name_Len));
-                  if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
-                  SData.Config.Save_File_Active := False;
+               if SData.Config.Runtime.Save_File_Active then
+                  SData.File_IO.Open_Output (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"), SData.Config.Runtime.Save_File_Fmt, SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len));
+                  if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+                  SData.Config.Runtime.Save_File_Active := False;
                end if;
             end;
          when Stmt_BY =>
@@ -941,8 +941,8 @@ package body SData.Interpreter is
             end;
          when Stmt_REPEAT =>
             SData.Table.Clear;
-            SData.Config.Repeat_Active := True;
-            SData.Config.Repeat_Count := Stmt.Count;
+            SData.Config.Runtime.Repeat_Active := True;
+            SData.Config.Runtime.Repeat_Count := Stmt.Count;
             Input_File_Columns.Clear;
          when Stmt_SELECT_FILTER =>
             SData.AST.Free_Expression (Select_Filter_Expr);
@@ -964,9 +964,7 @@ package body SData.Interpreter is
             SData.Variables.Clear_Temporary;
             SData.Variables.Initialize_PDV;
             Clear_Active_Program;
-            SData.Config.Repeat_Active := False;
-            SData.Config.Repeat_Count := 0;
-            SData.Config.Save_File_Active := False;
+            SData.Config.Reset_Runtime_State;
          when others => null;
       end case;
    end Execute_Declarative;
@@ -1038,10 +1036,10 @@ package body SData.Interpreter is
                Path      : constant String  := (if Stmt.File_Len > 0 then Stmt.File_Path (1 .. Stmt.File_Len) else "");
                Reset_All : constant Boolean := not (Stmt.Use_Flag or Stmt.Save_Flag or Stmt.Submit_Flag or Stmt.Output_Flag);
             begin
-               if Reset_All or Stmt.Use_Flag    then SData.Config.FPath_Use    := To_Unbounded_String (Path); end if;
-               if Reset_All or Stmt.Save_Flag   then SData.Config.FPath_Save   := To_Unbounded_String (Path); end if;
-               if Reset_All or Stmt.Submit_Flag then SData.Config.FPath_Submit := To_Unbounded_String (Path); end if;
-               if Reset_All or Stmt.Output_Flag then SData.Config.FPath_Output := To_Unbounded_String (Path); end if;
+               if Reset_All or Stmt.Use_Flag    then SData.Config.Runtime.FPath_Use    := To_Unbounded_String (Path); end if;
+               if Reset_All or Stmt.Save_Flag   then SData.Config.Runtime.FPath_Save   := To_Unbounded_String (Path); end if;
+               if Reset_All or Stmt.Submit_Flag then SData.Config.Runtime.FPath_Submit := To_Unbounded_String (Path); end if;
+               if Reset_All or Stmt.Output_Flag then SData.Config.Runtime.FPath_Output := To_Unbounded_String (Path); end if;
             end;
          when others => null;
       end case;
@@ -1153,7 +1151,7 @@ package body SData.Interpreter is
       Initialize_PDV;
       SData.Table.Initialize_Output_Table;
 
-      Num_Records := (if SData.Config.Repeat_Active then SData.Config.Repeat_Count
+      Num_Records := (if SData.Config.Runtime.Repeat_Active then SData.Config.Runtime.Repeat_Count
                       else (if Row_Count > 0 then Row_Count else 1));
 
       --  Rebuild the SELECT filter map against the current table at the
@@ -1274,13 +1272,13 @@ package body SData.Interpreter is
       SData.Table.Clear_Index_Map;
       --  REPEAT generates records for exactly one RUN.  Subsequent RUNs
       --  must iterate the committed table, not re-use Repeat_Count.
-      SData.Config.Repeat_Active := False;
+      SData.Config.Runtime.Repeat_Active := False;
       Set_Current_Record_Index (0);
       Apply_Pending_Mods;
-      if SData.Config.Save_File_Active then
-         SData.File_IO.Open_Output (Full_Path (SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len), "SAVE"), SData.Config.Save_File_Fmt, SData.Config.Save_Sheet_Name (1 .. SData.Config.Save_Sheet_Name_Len));
-         if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Save_File_Path (1 .. SData.Config.Save_File_Len)); end if;
-         SData.Config.Save_File_Active := False;
+      if SData.Config.Runtime.Save_File_Active then
+         SData.File_IO.Open_Output (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"), SData.Config.Runtime.Save_File_Fmt, SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len));
+         if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+         SData.Config.Runtime.Save_File_Active := False;
       end if;
    end Run_One_Step;
 

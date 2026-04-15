@@ -779,8 +779,8 @@ package body SData.Help is
       Put_Line ("  BDF(x, a, b)   probability density");
       Put_Line ("  BCF(x, a, b)   cumulative probability P(X <= x)");
       Put_Line ("  BIF(p, a, b)   quantile  (0 < p < 1)");
+      Put_Line ("  BRN(a, b)      random variate");
       Put_Line ("  a, b: shape parameters (both > 0)");
-      Put_Line ("  Note: no random variate generator (BRN) is available.");
    end Help_BDF;
 
    procedure Help_PDF is
@@ -842,9 +842,9 @@ package body SData.Help is
       Put_Line ("  MDF(k, n, prob)   probability mass P(X = k)  (k = 0, 1, ..., n)");
       Put_Line ("  MCF(k, n, prob)   cumulative probability P(X <= k)");
       Put_Line ("  MIF(p, n, prob)   quantile  (0 < p < 1)");
+      Put_Line ("  MRN(n, prob)      random variate");
       Put_Line ("  n: number of trials (positive integer)");
       Put_Line ("  prob: success probability per trial (0 <= prob <= 1)");
-      Put_Line ("  Note: no random variate generator (MRN) is available.");
    end Help_MDF;
 
    procedure Help_WDF is

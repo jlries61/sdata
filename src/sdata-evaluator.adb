@@ -1481,163 +1481,169 @@ package body SData.Evaluator is
    --  Each function name is registered exactly once; every name maps to the
    --  handler subprogram for its family.
    ---------------------------------------------------------------------------
+   procedure Register_All_Functions is
+   begin
+      --  Math
+      Dispatch_Table.Insert ("ABS",    Handle_Math'Access);
+      Dispatch_Table.Insert ("LOG",    Handle_Math'Access);
+      Dispatch_Table.Insert ("LN",     Handle_Math'Access);
+      Dispatch_Table.Insert ("LOGE",   Handle_Math'Access);
+      Dispatch_Table.Insert ("LOG10",  Handle_Math'Access);
+      Dispatch_Table.Insert ("CLG",    Handle_Math'Access);
+      Dispatch_Table.Insert ("LGT",    Handle_Math'Access);
+      Dispatch_Table.Insert ("LOG2",   Handle_Math'Access);
+      Dispatch_Table.Insert ("EXP",    Handle_Math'Access);
+      Dispatch_Table.Insert ("ROUND",  Handle_Math'Access);
+      Dispatch_Table.Insert ("CEIL",   Handle_Math'Access);
+      Dispatch_Table.Insert ("FLOOR",  Handle_Math'Access);
+      Dispatch_Table.Insert ("INT",    Handle_Math'Access);
+      Dispatch_Table.Insert ("FIX",    Handle_Math'Access);
+      Dispatch_Table.Insert ("IP",     Handle_Math'Access);
+      Dispatch_Table.Insert ("FP",     Handle_Math'Access);
+      Dispatch_Table.Insert ("MOD",    Handle_Math'Access);
+      Dispatch_Table.Insert ("SQRT",   Handle_Math'Access);
+
+      --  Trigonometry
+      Dispatch_Table.Insert ("SIN",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("COS",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("TAN",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("ATN",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("ATAN2",  Handle_Trig'Access);
+      Dispatch_Table.Insert ("SINH",   Handle_Trig'Access);
+      Dispatch_Table.Insert ("COSH",   Handle_Trig'Access);
+      Dispatch_Table.Insert ("TANH",   Handle_Trig'Access);
+      Dispatch_Table.Insert ("HCS",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("HSN",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("HTN",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("ARCSIN", Handle_Trig'Access);
+      Dispatch_Table.Insert ("ARCCOS", Handle_Trig'Access);
+      Dispatch_Table.Insert ("ARCTAN", Handle_Trig'Access);
+      Dispatch_Table.Insert ("COT",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("CSC",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("SEC",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("DEG",    Handle_Trig'Access);
+      Dispatch_Table.Insert ("DEGREE", Handle_Trig'Access);
+      Dispatch_Table.Insert ("SIND",   Handle_Trig'Access);
+      Dispatch_Table.Insert ("COSD",   Handle_Trig'Access);
+      Dispatch_Table.Insert ("TAND",   Handle_Trig'Access);
+      Dispatch_Table.Insert ("ATND",   Handle_Trig'Access);
+      Dispatch_Table.Insert ("ATAN2D", Handle_Trig'Access);
+
+      --  Aggregate
+      Dispatch_Table.Insert ("SUM",    Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("MEAN",   Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("STD",    Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("VAR",    Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("MIN",    Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("MAX",    Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("N",      Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("NMISS",  Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("GMEAN",  Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("HMEAN",  Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("MEDIAN", Handle_Aggregate'Access);
+
+      --  String operations
+      Dispatch_Table.Insert ("LEN",    Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("LEFT$",  Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("RIGHT$", Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("MID$",   Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("TRIM$",  Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("LTRIM$", Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("RTRIM$", Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("ASCII",  Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("UCASE$", Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("UPPER$", Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("LCASE$", Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("LOWER$", Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("POS",    Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("CHR$",   Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("STR$",   Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("VAL",    Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("HEX$",   Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("OCT$",   Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("BIN$",   Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("NUM$",   Handle_String_Ops'Access);
+
+      --  Record navigation
+      Dispatch_Table.Insert ("RECNO",  Handle_Navigation'Access);
+      Dispatch_Table.Insert ("BOF",    Handle_Navigation'Access);
+      Dispatch_Table.Insert ("EOF",    Handle_Navigation'Access);
+      Dispatch_Table.Insert ("BOG",    Handle_Navigation'Access);
+      Dispatch_Table.Insert ("EOG",    Handle_Navigation'Access);
+      Dispatch_Table.Insert ("ORD",    Handle_Navigation'Access);
+      Dispatch_Table.Insert ("LAG",    Handle_Navigation'Access);
+      Dispatch_Table.Insert ("LAGC$",  Handle_Navigation'Access);
+      Dispatch_Table.Insert ("NEXT",   Handle_Navigation'Access);
+      Dispatch_Table.Insert ("NEXTC$", Handle_Navigation'Access);
+      Dispatch_Table.Insert ("OBS",    Handle_Navigation'Access);
+      Dispatch_Table.Insert ("OBSC$",  Handle_Navigation'Access);
+
+      --  Statistical distributions
+      Dispatch_Table.Insert ("ZDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("NDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("UDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("EDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("BDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("PDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("GDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("XDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("TDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("FDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("MDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("WDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("LDF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("ZCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("NCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("UCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("ECF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("BCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("PCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("GCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("XCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("TCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("FCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("MCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("WCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("LCF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("ZIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("NIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("UIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("EIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("BIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("LIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("PIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("MIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("GIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("XIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("TIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("FIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("WIF",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("ZRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("NRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("URN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("ERN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("PRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("GRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("MRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("WRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("BRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("LRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("XRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("TRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("FRN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("RAN",    Handle_Statistics'Access);
+      Dispatch_Table.Insert ("RANDOM", Handle_Statistics'Access);
+
+      --  Miscellaneous
+      Dispatch_Table.Insert ("MISSING", Handle_Misc'Access);
+      Dispatch_Table.Insert ("FALSE",   Handle_Misc'Access);
+      Dispatch_Table.Insert ("TRUE",    Handle_Misc'Access);
+      Dispatch_Table.Insert ("DATE$",   Handle_Misc'Access);
+      Dispatch_Table.Insert ("TIME$",   Handle_Misc'Access);
+      Dispatch_Table.Insert ("SHELL",   Handle_Misc'Access);
+      Dispatch_Table.Insert ("NUM",     Handle_Misc'Access);
+   end Register_All_Functions;
+
 begin
-   --  Math
-   Dispatch_Table.Insert ("ABS",    Handle_Math'Access);
-   Dispatch_Table.Insert ("LOG",    Handle_Math'Access);
-   Dispatch_Table.Insert ("LOG10",  Handle_Math'Access);
-   Dispatch_Table.Insert ("LN",     Handle_Math'Access);
-   Dispatch_Table.Insert ("LOGE",   Handle_Math'Access);
-   Dispatch_Table.Insert ("LOG2",   Handle_Math'Access);
-   Dispatch_Table.Insert ("CLG",    Handle_Math'Access);
-   Dispatch_Table.Insert ("LGT",    Handle_Math'Access);
-   Dispatch_Table.Insert ("EXP",    Handle_Math'Access);
-   Dispatch_Table.Insert ("ROUND",  Handle_Math'Access);
-   Dispatch_Table.Insert ("CEIL",   Handle_Math'Access);
-   Dispatch_Table.Insert ("FLOOR",  Handle_Math'Access);
-   Dispatch_Table.Insert ("INT",    Handle_Math'Access);
-   Dispatch_Table.Insert ("FIX",    Handle_Math'Access);
-   Dispatch_Table.Insert ("IP",     Handle_Math'Access);
-   Dispatch_Table.Insert ("FP",     Handle_Math'Access);
-   Dispatch_Table.Insert ("MOD",    Handle_Math'Access);
-   Dispatch_Table.Insert ("SQRT",   Handle_Math'Access);
-
-   --  Trigonometry
-   Dispatch_Table.Insert ("SIN",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("COS",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("TAN",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("ATN",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("ATAN2",  Handle_Trig'Access);
-   Dispatch_Table.Insert ("SINH",   Handle_Trig'Access);
-   Dispatch_Table.Insert ("COSH",   Handle_Trig'Access);
-   Dispatch_Table.Insert ("TANH",   Handle_Trig'Access);
-   Dispatch_Table.Insert ("HCS",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("HSN",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("HTN",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("ARCSIN", Handle_Trig'Access);
-   Dispatch_Table.Insert ("ARCCOS", Handle_Trig'Access);
-   Dispatch_Table.Insert ("ARCTAN", Handle_Trig'Access);
-   Dispatch_Table.Insert ("COT",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("CSC",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("SEC",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("DEG",    Handle_Trig'Access);
-   Dispatch_Table.Insert ("DEGREE", Handle_Trig'Access);
-   Dispatch_Table.Insert ("SIND",   Handle_Trig'Access);
-   Dispatch_Table.Insert ("COSD",   Handle_Trig'Access);
-   Dispatch_Table.Insert ("TAND",   Handle_Trig'Access);
-   Dispatch_Table.Insert ("ATND",   Handle_Trig'Access);
-   Dispatch_Table.Insert ("ATAN2D", Handle_Trig'Access);
-
-   --  Aggregate
-   Dispatch_Table.Insert ("SUM",    Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("MEAN",   Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("STD",    Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("VAR",    Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("MIN",    Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("MAX",    Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("N",      Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("NMISS",  Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("GMEAN",  Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("HMEAN",  Handle_Aggregate'Access);
-   Dispatch_Table.Insert ("MEDIAN", Handle_Aggregate'Access);
-
-   --  String operations
-   Dispatch_Table.Insert ("LEN",    Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("LEFT$",  Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("RIGHT$", Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("MID$",   Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("TRIM$",  Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("LTRIM$", Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("RTRIM$", Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("ASCII",  Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("UCASE$", Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("UPPER$", Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("LCASE$", Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("LOWER$", Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("POS",    Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("CHR$",   Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("STR$",   Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("VAL",    Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("HEX$",   Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("OCT$",   Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("BIN$",   Handle_String_Ops'Access);
-   Dispatch_Table.Insert ("NUM$",   Handle_String_Ops'Access);
-
-   --  Record navigation
-   Dispatch_Table.Insert ("RECNO",  Handle_Navigation'Access);
-   Dispatch_Table.Insert ("BOF",    Handle_Navigation'Access);
-   Dispatch_Table.Insert ("EOF",    Handle_Navigation'Access);
-   Dispatch_Table.Insert ("BOG",    Handle_Navigation'Access);
-   Dispatch_Table.Insert ("EOG",    Handle_Navigation'Access);
-   Dispatch_Table.Insert ("ORD",    Handle_Navigation'Access);
-   Dispatch_Table.Insert ("LAG",    Handle_Navigation'Access);
-   Dispatch_Table.Insert ("LAGC$",  Handle_Navigation'Access);
-   Dispatch_Table.Insert ("NEXT",   Handle_Navigation'Access);
-   Dispatch_Table.Insert ("NEXTC$", Handle_Navigation'Access);
-   Dispatch_Table.Insert ("OBS",    Handle_Navigation'Access);
-   Dispatch_Table.Insert ("OBSC$",  Handle_Navigation'Access);
-
-   --  Statistical distributions (PDF, CDF, IDF, RN)
-   Dispatch_Table.Insert ("ZDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("NDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("UDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("EDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("BDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("PDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("GDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("XDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("TDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("FDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("MDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("WDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("LDF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("ZCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("NCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("UCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("ECF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("BCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("PCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("GCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("XCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("TCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("FCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("MCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("WCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("LCF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("ZIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("NIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("UIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("EIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("BIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("LIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("PIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("GIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("XIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("TIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("FIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("WIF",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("ZRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("NRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("URN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("ERN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("PRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("GRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("MRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("WRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("LRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("XRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("TRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("FRN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("RAN",    Handle_Statistics'Access);
-   Dispatch_Table.Insert ("RANDOM", Handle_Statistics'Access);
-
-   --  Miscellaneous
-   Dispatch_Table.Insert ("MISSING", Handle_Misc'Access);
-   Dispatch_Table.Insert ("FALSE",   Handle_Misc'Access);
-   Dispatch_Table.Insert ("TRUE",    Handle_Misc'Access);
-   Dispatch_Table.Insert ("DATE$",   Handle_Misc'Access);
-   Dispatch_Table.Insert ("TIME$",   Handle_Misc'Access);
-   Dispatch_Table.Insert ("SHELL",   Handle_Misc'Access);
-   Dispatch_Table.Insert ("NUM",     Handle_Misc'Access);
-
+   Register_All_Functions;
 end SData.Evaluator;
