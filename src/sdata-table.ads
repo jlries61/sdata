@@ -11,6 +11,10 @@ with Ada.Containers.Vectors;
 with SData.Values; use SData.Values;
 
 
+with Ada.Finalization;
+with Ada_Sqlite3;
+with Ada.Unchecked_Deallocation;
+
 package SData.Table is
 
    --  Resets the table state (removes all columns and rows).
@@ -139,5 +143,24 @@ private
    
    -- Logical record number (respecting filters)
    Logical_Record : Natural := 0;
+
+   -- Segment tracking for disk spillover
+   Current_Segment_Start : Positive := 1;
+
+   --  SQLite Backing Store
+   type Database_Access is access all Ada_Sqlite3.Database;
+   type Backing_Store is record
+      DB          : Database_Access := null;
+      Is_Active   : Boolean := False;
+      Temp_Path   : Unbounded_String;
+      Row_Limit   : Natural := 0; -- -m value
+   end record;
+
+   Store : Backing_Store;
+
+   --  Storage Management Procedures
+   procedure Initialize_Backing_Store;
+   procedure Spill_To_Disk;
+   function Fetch_From_Disk (Row : Positive; Col_Name : String) return Value;
 
 end SData.Table;

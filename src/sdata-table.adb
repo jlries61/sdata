@@ -1,11 +1,40 @@
-with Ada.Characters.Handling; use Ada.Characters.Handling;
-with Ada.Containers;         use Ada.Containers;
+with Ada.Characters.Handling;
+with Ada.Containers;
 with SData.Config;
 with SData.IO;
 
+with GNAT.OS_Lib;
 with Ada.Unchecked_Deallocation;
+with GNAT.Strings;
+with Ada_Sqlite3;
+with Ada.Strings.Fixed;
+with Ada.Strings.Unbounded;
 
 package body SData.Table is
+
+   use type Ada.Containers.Count_Type;
+   use type GNAT.Strings.String_List_Access;
+   use type Ada_Sqlite3.Result_Code;
+
+   ---------------------------
+   -- Backing Store Cleanup --
+   ---------------------------
+   procedure Cleanup_Backing_Store is
+      procedure Free_DB is new Ada.Unchecked_Deallocation (Ada_Sqlite3.Database, Database_Access);
+      Success : Boolean;
+   begin
+      if Store.Is_Active then
+         if Store.DB /= null then
+            Free_DB (Store.DB);
+         end if;
+         declare
+            Path : constant String := Ada.Strings.Unbounded.To_String (Store.Temp_Path);
+         begin
+            GNAT.OS_Lib.Delete_File (Path, Success);
+         end;
+         Store.Is_Active := False;
+      end if;
+   end Cleanup_Backing_Store;
 
    -- Filtered View Mapping
    type Index_Array_Access is access Index_Array;
@@ -16,18 +45,21 @@ package body SData.Table is
    -----------
    procedure Clear is
    begin
+      Cleanup_Backing_Store;
       Data_Table.Clear;
       Column_Order.Clear;
       Table_Row_Count := 0;
       Current_Record := 0;
+      Logical_Record := 0;
       Clear_Index_Map;
+      Current_Segment_Start := 1;
    end Clear;
 
    ----------------
    -- Add_Column --
    ----------------
    procedure Add_Column (Name : String; Col_Type : Column_Type) is
-      Upper_Name : constant String := To_Upper (Name);
+      Upper_Name : constant String := Ada.Characters.Handling.To_Upper (Name);
       New_Col : Column;
    begin
       if Data_Table.Contains (Upper_Name) then
@@ -44,7 +76,7 @@ package body SData.Table is
       end loop;
       
       Data_Table.Insert (Upper_Name, New_Col);
-      Column_Order.Append (To_Unbounded_String (Upper_Name));
+      Column_Order.Append (Ada.Strings.Unbounded.To_Unbounded_String (Upper_Name));
    end Add_Column;
 
    ----------------------
@@ -55,7 +87,7 @@ package body SData.Table is
       List : constant GNAT.Strings.String_List_Access := new GNAT.Strings.String_List (1 .. Count);
    begin
       for I in 1 .. Count loop
-         List (I) := new String'(To_String (Column_Order.Element (I)));
+         List (I) := new String'(Ada.Strings.Unbounded.To_String (Column_Order.Element (I)));
       end loop;
       return List;
    end Get_Column_Names;
@@ -65,7 +97,7 @@ package body SData.Table is
    ----------------
    function Has_Column (Name : String) return Boolean is
    begin
-      return Data_Table.Contains (To_Upper (Name));
+      return Data_Table.Contains (Ada.Characters.Handling.To_Upper (Name));
    end Has_Column;
 
    ------------------
@@ -89,9 +121,13 @@ package body SData.Table is
    -------------
    procedure Add_Row is
    begin
-      if SData.Config.Max_Table_Rows > 0 and then Table_Row_Count >= SData.Config.Max_Table_Rows then
-         raise SData.Script_Error with "Table row limit (" & Integer'Image(SData.Config.Max_Table_Rows) & ") exceeded.";
+      if SData.Config.Max_Table_Rows > 0 and then
+         Table_Row_Count >= (Current_Segment_Start + SData.Config.Max_Table_Rows - 1)
+      then
+         Spill_To_Disk;
+         Current_Segment_Start := Table_Row_Count + 1;
       end if;
+
       Table_Row_Count := Table_Row_Count + 1;
       for Pos in Data_Table.Iterate loop
          Data_Table.Reference (Pos).Element.all.Data.Append ((Kind => Val_Missing));
@@ -103,7 +139,7 @@ package body SData.Table is
    ---------------
    function Get_Value (Row : Positive; Column_Name : String) return Value is
    begin
-      return Get_Value_Upper (Row, To_Upper (Column_Name));
+      return Get_Value_Upper (Row, Ada.Characters.Handling.To_Upper (Column_Name));
    end Get_Value;
 
    function Get_Value_Upper (Row : Positive; Upper_Name : String) return Value is
@@ -114,17 +150,21 @@ package body SData.Table is
       declare
          Ref : constant Column_Maps.Constant_Reference_Type :=
             Data_Table.Constant_Reference (Upper_Name);
+         Len : constant Natural := Natural (Ref.Element.all.Data.Length);
       begin
-         if Count_Type (Row) > Ref.Element.all.Data.Length then
+         if Row >= Current_Segment_Start and then Row < Current_Segment_Start + Len then
+            return Ref.Element.all.Data.Element (Row - Current_Segment_Start + 1);
+         elsif Store.Is_Active then
+            return Fetch_From_Disk (Row, Upper_Name);
+         else
             return (Kind => Val_Missing);
          end if;
-         return Ref.Element.all.Data.Element (Row);
       end;
    end Get_Value_Upper;
 
    procedure Set_Value (Row : Positive; Column_Name : String; Val : Value) is
    begin
-      Set_Value_Upper (Row, To_Upper (Column_Name), Val);
+      Set_Value_Upper (Row, Ada.Characters.Handling.To_Upper (Column_Name), Val);
    end Set_Value;
 
    procedure Set_Value_Upper (Row : Positive; Upper_Name : String; Val : Value) is
@@ -136,7 +176,7 @@ package body SData.Table is
          Ref : constant Column_Maps.Reference_Type := Data_Table.Reference (Upper_Name);
          Col : Column renames Ref.Element.all;
       begin
-         if Count_Type (Row) > Col.Data.Length then
+         if Row > Table_Row_Count then
             for I in Positive (Col.Data.Length) + 1 .. Row loop
                Col.Data.Append ((Kind => Val_Missing));
             end loop;
@@ -144,13 +184,13 @@ package body SData.Table is
          if Val.Kind /= Val_Missing then
             if Col.Typ = Col_Numeric and Val.Kind /= Val_Numeric then
                if Val.Kind = Val_Integer then
-                  Col.Data.Replace_Element (Row, (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val)));
+                  Col.Data.Replace_Element (Row - Current_Segment_Start + 1, (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val)));
                   return;
                end if;
                raise Type_Mismatch_Error with "Expected Numeric, got " & Val.Kind'Image;
             elsif Col.Typ = Col_Integer and Val.Kind /= Val_Integer then
                if Val.Kind = Val_Numeric then
-                  Col.Data.Replace_Element (Row, (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val))));
+                  Col.Data.Replace_Element (Row - Current_Segment_Start + 1, (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val))));
                   return;
                end if;
                raise Type_Mismatch_Error with "Expected Integer, got " & Val.Kind'Image;
@@ -158,7 +198,7 @@ package body SData.Table is
                raise Type_Mismatch_Error with "Expected String, got " & Val.Kind'Image;
             end if;
          end if;
-         Col.Data.Replace_Element (Row, Val);
+         Col.Data.Replace_Element (Row - Current_Segment_Start + 1, Val);
       end;
    end Set_Value_Upper;
 
@@ -166,8 +206,8 @@ package body SData.Table is
    -- Rename_Column --
    -------------------
    procedure Rename_Column (Old_Name, New_Name : String) is
-      Upper_Old : constant String := To_Upper (Old_Name);
-      Upper_New : constant String := To_Upper (New_Name);
+      Upper_Old : constant String := Ada.Characters.Handling.To_Upper (Old_Name);
+      Upper_New : constant String := Ada.Characters.Handling.To_Upper (New_Name);
    begin
       if Data_Table.Contains (Upper_Old) and then not Data_Table.Contains (Upper_New) then
          declare
@@ -184,8 +224,8 @@ package body SData.Table is
             
             -- Update Order Vector
             for I in 1 .. Natural (Column_Order.Length) loop
-               if To_String (Column_Order.Element (I)) = Upper_Old then
-                  Column_Order.Replace_Element (I, To_Unbounded_String (Upper_New));
+               if Ada.Strings.Unbounded.To_String (Column_Order.Element (I)) = Upper_Old then
+                  Column_Order.Replace_Element (I, Ada.Strings.Unbounded.To_Unbounded_String (Upper_New));
                   exit;
                end if;
             end loop;
@@ -197,13 +237,13 @@ package body SData.Table is
    -- Drop_Column --
    -----------------
    procedure Drop_Column (Name : String) is
-      Upper_Name : constant String := To_Upper (Name);
+      Upper_Name : constant String := Ada.Characters.Handling.To_Upper (Name);
    begin
       if Data_Table.Contains (Upper_Name) then
          Data_Table.Delete (Upper_Name);
          -- Update Order Vector
          for I in 1 .. Natural (Column_Order.Length) loop
-            if To_String (Column_Order.Element (I)) = Upper_Name then
+            if Ada.Strings.Unbounded.To_String (Column_Order.Element (I)) = Upper_Name then
                Column_Order.Delete (I);
                exit;
             end if;
@@ -244,23 +284,14 @@ package body SData.Table is
    -- Sort --
    ----------
    procedure Sort (Criteria : Sort_Criteria_Array) is
-      --  Sort an array of row indices (1..Table_Row_Count) using a stable
-      --  merge sort, then reconstruct every column's data vector in sorted
-      --  order.  Merge sort guarantees that records with equal sort keys
-      --  retain their original relative order.
-      --
-      --  Performance note: sort-key values are pre-extracted into plain
-      --  arrays so that each comparison is just two array accesses.
-
       N : constant Natural := Table_Row_Count;
 
-      --  One pre-extracted value array per sort criterion.
       type Value_Row     is array (Natural range <>) of Value;
       type Value_Row_Acc is access Value_Row;
       Key_Data : array (Criteria'Range) of Value_Row_Acc;
 
-      type Index_Array is array (Positive range <>) of Natural;
-      type Index_Array_Acc is access Index_Array;
+      type Index_Array_Sort is array (Positive range <>) of Natural;
+      type Index_Array_Acc  is access Index_Array_Sort;
       Indices : Index_Array_Acc;
       Temp    : Index_Array_Acc;
 
@@ -282,7 +313,6 @@ package body SData.Table is
          end loop;
          return L < R;
       end Lt;
-      pragma Inline (Lt);
 
       procedure Merge_Sort (Lo, Hi : Positive) is
          Mid : Positive;
@@ -292,7 +322,6 @@ package body SData.Table is
          Mid := Lo + (Hi - Lo) / 2;
          Merge_Sort (Lo, Mid);
          Merge_Sort (Mid + 1, Hi);
-         --  Merge
          for X in Lo .. Hi loop Temp (X) := Indices (X); end loop;
          I := Lo; J := Mid + 1; K := Lo;
          while I <= Mid and then J <= Hi loop
@@ -304,30 +333,22 @@ package body SData.Table is
             K := K + 1;
          end loop;
          while I <= Mid loop Indices (K) := Temp (I); I := I + 1; K := K + 1; end loop;
-         --  No need to copy remaining J..Hi, they're already in place.
       end Merge_Sort;
 
    begin
       if N <= 1 or else Criteria'Length = 0 then return; end if;
 
-      --  Pre-extract sort-key values.
       for C in Criteria'Range loop
          declare
             Col_Name : constant String :=
-               To_Upper (Criteria (C).Name (1 .. Criteria (C).Len));
+               Ada.Characters.Handling.To_Upper (Criteria (C).Name (1 .. Criteria (C).Len));
             Row_Vals : constant Value_Row_Acc := new Value_Row (0 .. N);
          begin
-            Row_Vals (0) := (Kind => Val_Missing);  --  scratch-slot sentinel
+            Row_Vals (0) := (Kind => Val_Missing);
             if Data_Table.Contains (Col_Name) then
-               declare
-                  --  Constant_Reference avoids copying the whole Column record.
-                  Ref : constant Column_Maps.Constant_Reference_Type :=
-                     Data_Table.Constant_Reference (Col_Name);
-               begin
-                  for R in 1 .. N loop
-                     Row_Vals (R) := Ref.Element.all.Data.Element (R);
-                  end loop;
-               end;
+               for R in 1 .. N loop
+                  Row_Vals (R) := Get_Value_Upper (R, Col_Name);
+               end loop;
             else
                for R in 1 .. N loop
                   Row_Vals (R) := (Kind => Val_Missing);
@@ -337,14 +358,12 @@ package body SData.Table is
          end;
       end loop;
 
-      --  Initialise index permutation.
-      Indices := new Index_Array (1 .. N);
-      Temp    := new Index_Array (1 .. N);
+      Indices := new Index_Array_Sort (1 .. N);
+      Temp    := new Index_Array_Sort (1 .. N);
       for I in 1 .. N loop Indices (I) := I; end loop;
 
       Merge_Sort (1, N);
 
-      --  Rebuild every column in sorted order.
       declare
          Pos : Column_Maps.Cursor := Data_Table.First;
       begin
@@ -357,7 +376,7 @@ package body SData.Table is
             begin
                New_Data.Reserve_Capacity (Ada.Containers.Count_Type (N));
                for I in 1 .. N loop
-                  New_Data.Append (Old_Data.Element (Indices (I)));
+                  New_Data.Append (Get_Value_Upper (Indices (I), Column_Maps.Key (Pos)));
                end loop;
                Value_Vectors.Move (Source => New_Data, Target => Old_Data);
             end;
@@ -440,6 +459,28 @@ package body SData.Table is
       return Filter_Map /= null;
    end Is_Filtered;
 
+   ------------------------
+   -- Set_Filtered_Stats --
+   ------------------------
+   procedure Set_Filtered_Stats (Recno : Natural; Is_BOF, Is_EOF : Boolean) is
+   begin
+      null;
+   end Set_Filtered_Stats;
+
+   function Get_Filtered_Recno return Natural is
+   begin
+      return Logical_Record;
+   end Get_Filtered_Recno;
+
+   function Is_Filtered_BOF return Boolean is
+   begin
+      return Logical_Record = 1;
+   end Is_Filtered_BOF;
+
+   function Is_Filtered_EOF return Boolean is
+   begin
+      return Logical_Record > 0 and then Logical_Record = Logical_Row_Count;
+   end Is_Filtered_EOF;
 
    -----------------------------
    -- Output Table Management --
@@ -453,7 +494,7 @@ package body SData.Table is
    end Initialize_Output_Table;
 
    procedure Add_Output_Column (Name : String; Col_Type : Column_Type) is
-      Upper_Name : constant String := To_Upper (Name);
+      Upper_Name : constant String := Ada.Characters.Handling.To_Upper (Name);
       New_Col : Column;
    begin
       if Output_Data_Table.Contains (Upper_Name) then return; end if;
@@ -461,20 +502,17 @@ package body SData.Table is
       New_Col.Name (1 .. Upper_Name'Length) := Upper_Name;
       New_Col.Typ := Col_Type;
       
-      -- If the output table already has rows, pad with missing values
       for I in 1 .. Output_Table_Row_Count loop
          New_Col.Data.Append ((Kind => Val_Missing));
       end loop;
       
       Output_Data_Table.Insert (Upper_Name, New_Col);
-      Output_Column_Order.Append (To_Unbounded_String (Upper_Name));
+      Output_Column_Order.Append (Ada.Strings.Unbounded.To_Unbounded_String (Upper_Name));
    end Add_Output_Column;
 
    procedure Add_Output_Row is
    begin
-      if SData.Config.Max_Table_Rows > 0 and then Output_Table_Row_Count >= SData.Config.Max_Table_Rows then
-         SData.IO.Put_Line_Error ("Warning: Table row limit (" & Integer'Image(SData.Config.Max_Table_Rows) & ") exceeded. Memory cache full.");
-      end if;
+      -- Spillover not yet implemented for output table
       Output_Table_Row_Count := Output_Table_Row_Count + 1;
       for Pos in Output_Data_Table.Iterate loop
          Output_Data_Table.Reference (Pos).Element.all.Data.Append ((Kind => Val_Missing));
@@ -512,7 +550,7 @@ package body SData.Table is
 
    procedure Set_Output_Value (Row : Positive; Column_Name : String; Val : Value) is
    begin
-      Set_Output_Value_Upper (Row, To_Upper (Column_Name), Val);
+      Set_Output_Value_Upper (Row, Ada.Characters.Handling.To_Upper (Column_Name), Val);
    end Set_Output_Value;
 
    procedure Commit_Output_Table is
@@ -520,7 +558,6 @@ package body SData.Table is
       if Output_Table_Row_Count = 0 and then Output_Data_Table.Is_Empty
         and then not Data_Table.Is_Empty
       then
-         --  All records were deleted: keep column structure with 0 rows.
          for Pos in Data_Table.Iterate loop
             declare
                Col : Column := Column_Maps.Element (Pos);
@@ -536,6 +573,8 @@ package body SData.Table is
          Table_Row_Count := Output_Table_Row_Count;
       end if;
       Initialize_Output_Table;
+      -- Reset segment for committed table
+      Current_Segment_Start := 1;
    end Commit_Output_Table;
 
    function Output_Row_Count return Natural is
@@ -552,5 +591,143 @@ package body SData.Table is
    begin
       return Record_Explicitly_Written;
    end Get_Record_Explicitly_Written;
+
+   ------------------------------
+   -- Initialize_Backing_Store --
+   ------------------------------
+   procedure Initialize_Backing_Store is
+      FD : GNAT.OS_Lib.File_Descriptor;
+      Temp_Name : GNAT.Strings.String_Access;
+   begin
+      if Store.Is_Active then return; end if;
+      GNAT.OS_Lib.Create_Temp_File (FD, Temp_Name);
+      GNAT.OS_Lib.Close (FD);
+      Store.Temp_Path := Ada.Strings.Unbounded.To_Unbounded_String (Temp_Name.all);
+      Store.DB := new Ada_Sqlite3.Database'(Ada_Sqlite3.Open (Temp_Name.all));
+      Store.Is_Active := True;
+      
+      Store.DB.Execute ("CREATE TABLE data (record_id INTEGER PRIMARY KEY)");
+      
+      declare
+         Col_Names : constant GNAT.Strings.String_List_Access := Get_Column_Names;
+      begin
+         if Col_Names /= null then
+            for I in Col_Names'Range loop
+               declare
+                  Upper : constant String := Ada.Characters.Handling.To_Upper (Col_Names (I).all);
+                  Typ   : constant Column_Type := Data_Table.Element (Upper).Typ;
+                  SQL_T : constant String := (if Typ = Col_Numeric then "REAL"
+                                              elsif Typ = Col_Integer then "INTEGER"
+                                              else "TEXT");
+               begin
+                  Store.DB.Execute ("ALTER TABLE data ADD COLUMN [" & Upper & "] " & SQL_T);
+               end;
+            end loop;
+            declare
+               Old : GNAT.Strings.String_List_Access := Col_Names;
+            begin
+               GNAT.Strings.Free (Old);
+            end;
+         end if;
+      end;
+      GNAT.Strings.Free (Temp_Name);
+   end Initialize_Backing_Store;
+
+   -------------------
+   -- Spill_To_Disk --
+   -------------------
+   procedure Spill_To_Disk is
+      Col_Names : constant GNAT.Strings.String_List_Access := Get_Column_Names;
+      SQL : Ada.Strings.Unbounded.Unbounded_String;
+      Memory_Rows : Natural := 0;
+   begin
+      if Data_Table.Is_Empty then return; end if;
+
+      declare
+         Pos : constant Column_Maps.Cursor := Data_Table.First;
+      begin
+         Memory_Rows := Natural (Column_Maps.Element (Pos).Data.Length);
+      end;
+
+      if Memory_Rows = 0 then return; end if;
+
+      Initialize_Backing_Store;
+
+      SQL := Ada.Strings.Unbounded.To_Unbounded_String ("INSERT INTO data (record_id");
+      if Col_Names /= null then
+         for I in Col_Names'Range loop
+            Ada.Strings.Unbounded.Append (SQL, ", [" & Ada.Characters.Handling.To_Upper (Col_Names (I).all) & "]");
+         end loop;
+      end if;
+      Ada.Strings.Unbounded.Append (SQL, ") VALUES (?");
+      if Col_Names /= null then
+         for I in Col_Names'Range loop
+            Ada.Strings.Unbounded.Append (SQL, ", ?");
+         end loop;
+      end if;
+      Ada.Strings.Unbounded.Append (SQL, ")");
+
+      declare
+         Stmt : Ada_Sqlite3.Statement := Store.DB.Prepare (Ada.Strings.Unbounded.To_String (SQL));
+      begin
+         for R in 1 .. Memory_Rows loop
+            Stmt.Reset;
+            Stmt.Clear_Bindings;
+            Stmt.Bind_Int (1, Current_Segment_Start + R - 1);
+            if Col_Names /= null then
+               for C in Col_Names'Range loop
+                  declare
+                     Upper : constant String := Ada.Characters.Handling.To_Upper (Col_Names (C).all);
+                     Col   : constant Column := Data_Table.Element (Upper);
+                     Val   : constant Value  := Col.Data.Element (R);
+                  begin
+                     case Val.Kind is
+                        when Val_Numeric => Stmt.Bind_Double (C + 2, Val.Num_Val);
+                        when Val_Integer => Stmt.Bind_Int (C + 2, Val.Int_Val);
+                        when Val_String  => Stmt.Bind_Text (C + 2, Ada.Strings.Unbounded.To_String (Val.Str_Val));
+                        when Val_Missing => Stmt.Bind_Null (C + 2);
+                     end case;
+                  end;
+               end loop;
+            end if;
+            Stmt.Step;
+         end loop;
+      end;
+
+      for Pos in Data_Table.Iterate loop
+         Data_Table.Reference (Pos).Element.all.Data.Clear;
+      end loop;
+
+      if Col_Names /= null then
+         declare Old : GNAT.Strings.String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
+      end if;
+   end Spill_To_Disk;
+
+   -----------------------
+   -- Fetch_From_Disk --
+   -----------------------
+   function Fetch_From_Disk (Row : Positive; Col_Name : String) return Value is
+      SQL : constant String := "SELECT [" & Ada.Characters.Handling.To_Upper (Col_Name) & "] FROM data WHERE record_id = " & 
+                                Ada.Strings.Fixed.Trim (Row'Img, Ada.Strings.Both);
+      Stmt : Ada_Sqlite3.Statement := Store.DB.Prepare (SQL);
+   begin
+      if Stmt.Step = Ada_Sqlite3.ROW then
+         declare
+            Typ : constant Column_Type := Data_Table.Element (Ada.Characters.Handling.To_Upper (Col_Name)).Typ;
+         begin
+            if Stmt.Column_Is_Null (0) then
+               return (Kind => Val_Missing);
+            elsif Typ = Col_Numeric then
+               return (Kind => Val_Numeric, Num_Val => Stmt.Column_Double (0));
+            elsif Typ = Col_Integer then
+               return (Kind => Val_Integer, Int_Val => Stmt.Column_Int (0));
+            else
+               return (Kind => Val_String, Str_Val => Ada.Strings.Unbounded.To_Unbounded_String (Stmt.Column_Text (0)));
+            end if;
+         end;
+      else
+         return (Kind => Val_Missing);
+      end if;
+   end Fetch_From_Disk;
 
 end SData.Table;
