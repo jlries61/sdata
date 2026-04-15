@@ -4,7 +4,7 @@ VERSION          := 0.5.0
 ZIPADA_VERSION   := 61.0.0
 XMLADA_VERSION   := 26.0.0
 MATHPAQS_VERSION := 20260205.0.0
-SQLITE3_VERSION  := 0.1.1
+SQLITE3_TARBALL  := ada_sqlite3_0.1.1_2edbcebd
 
 GPR_FILE = sdata.gpr
 # Use GPRBUILD from the environment or command line if set; otherwise detect
@@ -115,7 +115,7 @@ srpm: clean
 	@cp sdata.spec rpmbuild/SPECS/
 	@# Copy vendored Ada library tarballs from their canonical location.
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
-	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz ada_sqlite3-$(SQLITE3_VERSION).tar.gz ada_sqlite3-$(SQLITE3_VERSION).tar.gz; do \
+	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz $(SQLITE3_TARBALL).tar.gz; do \
 	   if [ ! -f "$$TARBALL_DIR/$$tb" ]; then \
 	     echo "ERROR: dependency tarball not found: $$TARBALL_DIR/$$tb"; exit 1; \
 	   fi; \
@@ -134,8 +134,8 @@ dsc: clean
 	 BASE_DIR="sdata-$(VERSION)"; \
 	 SRC_DIR="$$TEMP_DIR/$$BASE_DIR"; \
 	 mkdir -p "$$SRC_DIR"; \
-	 cp -r * "$$SRC_DIR/"; \
-	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz ada_sqlite3-$(SQLITE3_VERSION).tar.gz; do \
+	 git archive --format=tar HEAD | tar -x -C "$$SRC_DIR/"; \
+	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz; do \
 	   tar xzf "$$TARBALL_DIR/$$tb" -C "$$SRC_DIR/"; \
 	 done; \
 	 cd "$$TEMP_DIR" && tar czf "sdata_$(VERSION).orig.tar.gz" "$$BASE_DIR"; \
@@ -159,7 +159,7 @@ slackware: clean
 	 TEMP_DIR=$$(mktemp -d); \
 	 cp sdata-$(VERSION).tar.gz "$$TEMP_DIR/"; \
 	 cp slackware/* "$$TEMP_DIR/"; \
-	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz ada_sqlite3-$(SQLITE3_VERSION).tar.gz; do \
+	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz; do \
 	   cp "$$TARBALL_DIR/$$tb" "$$TEMP_DIR/"; \
 	 done; \
 	 cd "$$TEMP_DIR" && tar czf sdata-$(VERSION)-slackbuild.tar.gz *; \

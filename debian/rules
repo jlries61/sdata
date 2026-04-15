@@ -2,7 +2,7 @@
 export DH_VERBOSE = 1
 
 # Point gprbuild at the vendored dependency subdirectories for all phases (build, test, clean)
-export GPR_PROJECT_PATH=$(CURDIR)/zipada_61.0.0_54fc9836:$(CURDIR)/xmlada_26.0.0_b140ed4a/dom:$(CURDIR)/xmlada_26.0.0_b140ed4a/input_sources:$(CURDIR)/mathpaqs_20260205.0.0_abed7ef9
+export GPR_PROJECT_PATH=$(CURDIR)/zipada_61.0.0_54fc9836:$(CURDIR)/xmlada_26.0.0_b140ed4a/dom:$(CURDIR)/xmlada_26.0.0_b140ed4a/input_sources:$(CURDIR)/mathpaqs_20260205.0.0_abed7ef9:$(CURDIR)/ada_sqlite3_0.1.1_2edbcebd
 
 %:
 	dh $@

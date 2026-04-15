@@ -43,7 +43,7 @@ cd $PRGNAM-$VERSION
 tar xzf $CWD/zipada-61.0.0.tar.gz
 tar xzf $CWD/xmlada-26.0.0.tar.gz
 tar xzf $CWD/mathpaqs-20260205.0.0.tar.gz
-tar xzf $CWD/ada_sqlite3-0.1.1.tar.gz
+tar xzf $CWD/ada_sqlite3_0.1.1_2edbcebd.tar.gz
 
 chown -R root:root .
 find -L . \
@@ -57,7 +57,7 @@ find -L . \
 ZIPADA_DIR="zipada_61.0.0_54fc9836"
 XMLADA_DIR="xmlada_26.0.0_b140ed4a"
 MATHPAQS_DIR="mathpaqs_20260205.0.0_abed7ef9"
-SQLITE3_DIR="ada_sqlite3-0.1.1"
+SQLITE3_DIR="ada_sqlite3_0.1.1_2edbcebd"
 
 mkdir -p obj bin
 
