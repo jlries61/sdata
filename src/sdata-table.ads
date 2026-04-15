@@ -146,6 +146,7 @@ private
 
    -- Segment tracking for disk spillover
    Current_Segment_Start : Positive := 1;
+   Output_Segment_Start  : Positive := 1;
 
    --  SQLite Backing Store
    type Database_Access is access all Ada_Sqlite3.Database;
