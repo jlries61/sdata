@@ -60,10 +60,10 @@ package body SData.Interpreter is
    begin
       return Kind in
          Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP |
-         Stmt_RENAME | Stmt_NAMES | Stmt_RUN | Stmt_QUIT | Stmt_END |
+         Stmt_RENAME | Stmt_NAMES | Stmt_LIST | Stmt_RUN | Stmt_QUIT | Stmt_END |
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
-         Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER;
+         Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT;
    end Is_Immediate;
 
    --  In_Same_Group: both Idx1 and Idx2 are *physical* row indices.
@@ -1078,7 +1078,7 @@ package body SData.Interpreter is
          when Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT =>
             Execute_Control_Flow (Stmt);
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET
-            | Stmt_RENAME | Stmt_ARRAY | Stmt_DIM | Stmt_NAMES =>
+            | Stmt_RENAME | Stmt_ARRAY | Stmt_DIM | Stmt_NAMES | Stmt_LIST =>
             Execute_Metadata (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW =>

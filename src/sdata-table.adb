@@ -285,103 +285,151 @@ package body SData.Table is
    ----------
    procedure Sort (Criteria : Sort_Criteria_Array) is
       N : constant Natural := Table_Row_Count;
-
-      type Value_Row     is array (Natural range <>) of Value;
-      type Value_Row_Acc is access Value_Row;
-      Key_Data : array (Criteria'Range) of Value_Row_Acc;
-
-      type Index_Array_Sort is array (Positive range <>) of Natural;
-      type Index_Array_Acc  is access Index_Array_Sort;
-      Indices : Index_Array_Acc;
-      Temp    : Index_Array_Acc;
-
-      function Lt (L, R : Natural) return Boolean is
-      begin
-         for C in Criteria'Range loop
-            declare
-               VL : Value renames Key_Data (C)(L);
-               VR : Value renames Key_Data (C)(R);
-            begin
-               if VL /= VR then
-                  if Criteria (C).Dir = Ascending then
-                     return VL < VR;
-                  else
-                     return VR < VL;
-                  end if;
-               end if;
-            end;
-         end loop;
-         return L < R;
-      end Lt;
-
-      procedure Merge_Sort (Lo, Hi : Positive) is
-         Mid : Positive;
-         I, J, K : Positive;
-      begin
-         if Lo >= Hi then return; end if;
-         Mid := Lo + (Hi - Lo) / 2;
-         Merge_Sort (Lo, Mid);
-         Merge_Sort (Mid + 1, Hi);
-         for X in Lo .. Hi loop Temp (X) := Indices (X); end loop;
-         I := Lo; J := Mid + 1; K := Lo;
-         while I <= Mid and then J <= Hi loop
-            if not Lt (Temp (J), Temp (I)) then
-               Indices (K) := Temp (I); I := I + 1;
-            else
-               Indices (K) := Temp (J); J := J + 1;
-            end if;
-            K := K + 1;
-         end loop;
-         while I <= Mid loop Indices (K) := Temp (I); I := I + 1; K := K + 1; end loop;
-      end Merge_Sort;
-
    begin
       if N <= 1 or else Criteria'Length = 0 then return; end if;
 
-      for C in Criteria'Range loop
+      if Store.Is_Active then
+         Spill_To_Disk;
          declare
-            Col_Name : constant String :=
-               Ada.Characters.Handling.To_Upper (Criteria (C).Name (1 .. Criteria (C).Len));
-            Row_Vals : constant Value_Row_Acc := new Value_Row (0 .. N);
+            Col_Names : constant GNAT.Strings.String_List_Access := Get_Column_Names;
+            Cols_CSV  : Unbounded_String;
+            Col_Def   : Unbounded_String;
+            OrderBy   : Unbounded_String := To_Unbounded_String (" ORDER BY ");
          begin
-            Row_Vals (0) := (Kind => Val_Missing);
-            if Data_Table.Contains (Col_Name) then
-               for R in 1 .. N loop
-                  Row_Vals (R) := Get_Value_Upper (R, Col_Name);
-               end loop;
-            else
-               for R in 1 .. N loop
-                  Row_Vals (R) := (Kind => Val_Missing);
-               end loop;
-            end if;
-            Key_Data (C) := Row_Vals;
+            if Col_Names = null or else Col_Names'Length = 0 then return; end if;
+
+            for I in Col_Names'Range loop
+               declare
+                  Upper : constant String := Ada.Characters.Handling.To_Upper (Col_Names (I).all);
+                  Typ   : constant Column_Type := Data_Table.Element (Upper).Typ;
+                  SQL_T : constant String := (if Typ = Col_Numeric then "REAL"
+                                              elsif Typ = Col_Integer then "INTEGER"
+                                              else "TEXT");
+               begin
+                  Append (Cols_CSV, "[" & Upper & "]");
+                  Append (Col_Def, "[" & Upper & "] " & SQL_T);
+                  if I < Col_Names'Last then
+                     Append (Cols_CSV, ", ");
+                     Append (Col_Def, ", ");
+                  end if;
+               end;
+            end loop;
+
+            for I in Criteria'Range loop
+               Append (OrderBy, "[" & Ada.Characters.Handling.To_Upper (Criteria (I).Name (1 .. Criteria (I).Len)) & "]");
+               if Criteria (I).Dir = Descending then Append (OrderBy, " DESC"); end if;
+               if I < Criteria'Last then Append (OrderBy, ", "); end if;
+            end loop;
+            -- Ensure stability: use record_id as tie-breaker
+            Append (OrderBy, ", record_id ASC");
+
+            Store.DB.Execute ("CREATE TABLE data_new (record_id INTEGER PRIMARY KEY AUTOINCREMENT, " & To_String (Col_Def) & ")");
+            Store.DB.Execute ("INSERT INTO data_new (" & To_String (Cols_CSV) & ") " &
+                              "SELECT " & To_String (Cols_CSV) & " FROM data " & To_String (OrderBy));
+            Store.DB.Execute ("DROP TABLE data");
+            Store.DB.Execute ("ALTER TABLE data_new RENAME TO data");
+
+            declare Old : GNAT.Strings.String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
          end;
-      end loop;
-
-      Indices := new Index_Array_Sort (1 .. N);
-      Temp    := new Index_Array_Sort (1 .. N);
-      for I in 1 .. N loop Indices (I) := I; end loop;
-
-      Merge_Sort (1, N);
+         return;
+      end if;
 
       declare
-         Pos : Column_Maps.Cursor := Data_Table.First;
+         type Value_Row     is array (Natural range <>) of Value;
+         type Value_Row_Acc is access Value_Row;
+         Key_Data : array (Criteria'Range) of Value_Row_Acc;
+
+         type Index_Array_Sort is array (Positive range <>) of Natural;
+         type Index_Array_Acc  is access Index_Array_Sort;
+         Indices : Index_Array_Acc;
+         Temp    : Index_Array_Acc;
+
+         function Lt (L, R : Natural) return Boolean is
+         begin
+            for C in Criteria'Range loop
+               declare
+                  VL : Value renames Key_Data (C)(L);
+                  VR : Value renames Key_Data (C)(R);
+               begin
+                  if VL /= VR then
+                     if Criteria (C).Dir = Ascending then
+                        return VL < VR;
+                     else
+                        return VR < VL;
+                     end if;
+                  end if;
+               end;
+            end loop;
+            return L < R;
+         end Lt;
+
+         procedure Merge_Sort (Lo, Hi : Positive) is
+            Mid : Positive;
+            I, J, K : Positive;
+         begin
+            if Lo >= Hi then return; end if;
+            Mid := Lo + (Hi - Lo) / 2;
+            Merge_Sort (Lo, Mid);
+            Merge_Sort (Mid + 1, Hi);
+            for X in Lo .. Hi loop Temp (X) := Indices (X); end loop;
+            I := Lo; J := Mid + 1; K := Lo;
+            while I <= Mid and then J <= Hi loop
+               if not Lt (Temp (J), Temp (I)) then
+                  Indices (K) := Temp (I); I := I + 1;
+               else
+                  Indices (K) := Temp (J); J := J + 1;
+               end if;
+               K := K + 1;
+            end loop;
+            while I <= Mid loop Indices (K) := Temp (I); I := I + 1; K := K + 1; end loop;
+         end Merge_Sort;
+
       begin
-         while Column_Maps.Has_Element (Pos) loop
+         for C in Criteria'Range loop
             declare
-               Ref : constant Column_Maps.Reference_Type :=
-                  Data_Table.Reference (Pos);
-               Old_Data : Value_Vectors.Vector renames Ref.Element.all.Data;
-               New_Data : Value_Vectors.Vector;
+               Col_Name : constant String :=
+                  Ada.Characters.Handling.To_Upper (Criteria (C).Name (1 .. Criteria (C).Len));
+               Row_Vals : constant Value_Row_Acc := new Value_Row (0 .. N);
             begin
-               New_Data.Reserve_Capacity (Ada.Containers.Count_Type (N));
-               for I in 1 .. N loop
-                  New_Data.Append (Get_Value_Upper (Indices (I), Column_Maps.Key (Pos)));
-               end loop;
-               Value_Vectors.Move (Source => New_Data, Target => Old_Data);
+               Row_Vals (0) := (Kind => Val_Missing);
+               if Data_Table.Contains (Col_Name) then
+                  for R in 1 .. N loop
+                     Row_Vals (R) := Get_Value_Upper (R, Col_Name);
+                  end loop;
+               else
+                  for R in 1 .. N loop
+                     Row_Vals (R) := (Kind => Val_Missing);
+                  end loop;
+               end if;
+               Key_Data (C) := Row_Vals;
             end;
-            Column_Maps.Next (Pos);
          end loop;
+
+         Indices := new Index_Array_Sort (1 .. N);
+         Temp    := new Index_Array_Sort (1 .. N);
+         for I in 1 .. N loop Indices (I) := I; end loop;
+
+         Merge_Sort (1, N);
+
+         declare
+            Pos : Column_Maps.Cursor := Data_Table.First;
+         begin
+            while Column_Maps.Has_Element (Pos) loop
+               declare
+                  -- Only get the key once
+                  Current_Key : constant String := Column_Maps.Key (Pos);
+                  Old_Data    : Value_Vectors.Vector renames Data_Table.Reference (Pos).Element.all.Data;
+                  New_Data    : Value_Vectors.Vector;
+               begin
+                  New_Data.Reserve_Capacity (Ada.Containers.Count_Type (N));
+                  for I in 1 .. N loop
+                     New_Data.Append (Get_Value_Upper (Indices (I), Current_Key));
+                  end loop;
+                  Value_Vectors.Move (Source => New_Data, Target => Old_Data);
+               end;
+               Column_Maps.Next (Pos);
+            end loop;
+         end;
       end;
    end Sort;
 
