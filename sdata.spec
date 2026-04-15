@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.4.1
+Version:        0.4.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -45,6 +45,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Wed Apr 15 2026 John L. Ries <john@theyarnbard.com> - 0.4.2-1
+- Address SKEPTIC review findings; refactor Config and Evaluator; complete distribution RNs.
+
 * Wed Apr 15 2026 John L. Ries <john@theyarnbard.com> - 0.4.1-1
 - Finalize Phase 3 and Phase 4 development.
 - Implement LIST command for data display.

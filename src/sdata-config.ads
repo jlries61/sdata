@@ -66,7 +66,7 @@ package SData.Config is
    --  Version information
    Version_Major : constant Natural := 0;
    Version_Minor : constant Natural := 4;
-   Version_Patch : constant Natural := 1;
+   Version_Patch : constant Natural := 2;
    Version_Str   : constant String :=
       Natural'Image (Version_Major)(2 .. Natural'Image (Version_Major)'Last) & "." &
       Natural'Image (Version_Minor)(2 .. Natural'Image (Version_Minor)'Last) & "." &

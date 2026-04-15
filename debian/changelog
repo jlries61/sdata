@@ -1,3 +1,9 @@
+sdata (0.4.2-1) unstable; urgency=medium
+
+  * Address SKEPTIC review findings; refactor Config and Evaluator; complete distribution RNs.
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 15 Apr 2026 11:27:30 -0700
+
 sdata (0.4.1-1) unstable; urgency=medium
 
   * Finalize Phase 3 and Phase 4 development.
