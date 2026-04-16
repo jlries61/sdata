@@ -193,6 +193,15 @@ package body SData.IO is
          else
             Ada.Text_IO.Put (Ada.Text_IO.Standard_Output, Item);
             Ada.Text_IO.Flush (Ada.Text_IO.Standard_Output);
+            --  Count newlines in the item to maintain pager state.
+            for C of Item loop
+               if C = ASCII.LF then
+                  Lines_Printed := Lines_Printed + 1;
+               end if;
+            end loop;
+            if Lines_Printed >= Lines_On_Page then
+               Check_Internal_Pager;
+            end if;
          end if;
       end if;
    end Put;
