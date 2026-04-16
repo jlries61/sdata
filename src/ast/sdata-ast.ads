@@ -39,7 +39,9 @@ package SData.AST is
    type Expression (Kind : Expression_Kind) is record
       case Kind is
          when Expr_Numeric_Literal =>
-            Value : Float;
+            Value      : Float;
+            Is_Integer : Boolean := False;
+            Int_Value  : Integer := 0;
          when Expr_String_Literal =>
             Str_Value : Ada.Strings.Unbounded.Unbounded_String;
          when Expr_Variable =>

@@ -1255,9 +1255,8 @@ package body SData.Evaluator is
 
       case Expr.Kind is
          when Expr_Numeric_Literal =>
-            --  Check if it looks like an integer.
-            if Float'Floor (Expr.Value) = Expr.Value then
-               return (Kind => Val_Integer, Int_Val => Integer (Expr.Value));
+            if Expr.Is_Integer then
+               return (Kind => Val_Integer, Int_Val => Expr.Int_Value);
             else
                return (Kind => Val_Numeric, Num_Val => Expr.Value);
             end if;
@@ -1276,7 +1275,7 @@ package body SData.Evaluator is
             begin
                if VVal.Kind = Val_Missing then
                   --  Fall back to zero-arg functions (optional parentheses)
-                  if Vname in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |	
+                  if Vname in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |
                               "DATE$" | "TIME$" | "RAN" | "RANDOM" | "LRN" |
                               "FALSE" | "TRUE" then
                      return Evaluate_Function (VName, null);

@@ -255,7 +255,23 @@ package body SData.Parser is
                case Actual_Tok.Kind is
                   when Token_Numeric_Literal =>
                      Node := new Expression (Expr_Numeric_Literal);
-                     Node.Value := Float'Value (Actual_Tok.Text (1 .. Actual_Tok.Length));
+                     declare
+                        S       : constant String := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                        Has_Dot : Boolean := False;
+                     begin
+                        for Ch of S loop
+                           if Ch = '.' then Has_Dot := True; exit; end if;
+                        end loop;
+                        Node.Value := Float'Value (S);
+                        if not Has_Dot then
+                           begin
+                              Node.Int_Value  := Integer'Value (S);
+                              Node.Is_Integer := True;
+                           exception
+                              when Constraint_Error => null;  --  Exceeds Integer'Last; stay Float.
+                           end;
+                        end if;
+                     end;
                      return Node;
 
                   when Token_String_Literal =>
@@ -788,7 +804,9 @@ package body SData.Parser is
                               -- Simple dimension: DIM X(n) means 1 to n
                               Stmt.Arr_End_Expr := Stmt.Arr_Start_Expr;
                               Stmt.Arr_Start_Expr := new Expression (Expr_Numeric_Literal);
-                              Stmt.Arr_Start_Expr.Value := 1.0;
+                              Stmt.Arr_Start_Expr.Value      := 1.0;
+                              Stmt.Arr_Start_Expr.Is_Integer := True;
+                              Stmt.Arr_Start_Expr.Int_Value  := 1;
                            else
                               Put_Line_Error ("Error: Expected TO or ')' in DIM bounds");
                               return null;

@@ -146,7 +146,10 @@ package body SData.AST is
       if Expr = null then return null; end if;
       Res := new Expression (Expr.Kind);
       case Expr.Kind is
-         when Expr_Numeric_Literal => Res.Value := Expr.Value;
+         when Expr_Numeric_Literal =>
+            Res.Value      := Expr.Value;
+            Res.Is_Integer := Expr.Is_Integer;
+            Res.Int_Value  := Expr.Int_Value;
          when Expr_String_Literal  => Res.Str_Value := Expr.Str_Value;
          when Expr_Variable =>
             Res.Var_Name := Expr.Var_Name;
