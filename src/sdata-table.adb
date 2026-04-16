@@ -6,7 +6,7 @@ with SData.IO;
 with GNAT.OS_Lib;
 with Ada.Unchecked_Deallocation;
 with GNAT.Strings;
-with Ada_Sqlite3;
+with Ada_Sqlite3; use Ada_Sqlite3;
 with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 
@@ -29,12 +29,16 @@ package body SData.Table is
       Success : Boolean;
    begin
       if Store.Is_Active then
-         if Fetch_Stmt /= null then
-            Free_Stmt (Fetch_Stmt);
-         end if;
-         if Store.DB /= null then
-            Free_DB (Store.DB);
-         end if;
+         begin
+            if Fetch_Stmt /= null then
+               Free_Stmt (Fetch_Stmt);
+            end if;
+            if Store.DB /= null then
+               Free_DB (Store.DB);
+            end if;
+         exception
+            when others => null; -- Avoid PROGRAM_ERROR during finalization
+         end;
          declare
             Path : constant String := Ada.Strings.Unbounded.To_String (Store.Temp_Path);
          begin
@@ -62,7 +66,7 @@ package body SData.Table is
       Current_Record := 0;
       Logical_Record := 0;
       Clear_Index_Map;
-      Current_Segment_Start := 1;
+      Current_Segment_Start := Output_Segment_Start;
    end Clear;
 
    ----------------
@@ -666,7 +670,7 @@ package body SData.Table is
          end if;
       end if;
       Initialize_Output_Table;
-      Current_Segment_Start := 1;
+      Current_Segment_Start := Output_Segment_Start;
       Output_Segment_Start := 1;
    end Commit_Output_Table;
 
@@ -797,36 +801,33 @@ package body SData.Table is
       U_Col : constant String := Ada.Characters.Handling.To_Upper (Col_Name);
    begin
       if Row /= Cached_Row_ID then
-         if Fetch_Stmt = null then
-            Fetch_Stmt := new Ada_Sqlite3.Statement'(Store.DB.Prepare ("SELECT * FROM data WHERE record_id = ?"));
-         end if;
-         
-         Fetch_Stmt.Reset;
-         Fetch_Stmt.Clear_Bindings;
-         Fetch_Stmt.Bind_Int (1, Row);
-         
-         if Fetch_Stmt.Step = Ada_Sqlite3.ROW then
-            Cached_Row_Data.Clear;
-            for I in 1 .. Fetch_Stmt.Column_Count - 1 loop
-               declare
-                  CName : constant String := Fetch_Stmt.Column_Name (I);
-                  Typ   : constant Ada_Sqlite3.Column_Type := Fetch_Stmt.Get_Column_Type (I);
-               begin
-                  if Fetch_Stmt.Column_Is_Null (I) then
-                     Cached_Row_Data.Insert (CName, (Kind => Val_Missing));
-                  elsif Typ = Ada_Sqlite3.Float_Type then
-                     Cached_Row_Data.Insert (CName, (Kind => Val_Numeric, Num_Val => Fetch_Stmt.Column_Double (I)));
-                  elsif Typ = Ada_Sqlite3.Integer_Type then
-                     Cached_Row_Data.Insert (CName, (Kind => Val_Integer, Int_Val => Fetch_Stmt.Column_Int (I)));
-                  else
-                     Cached_Row_Data.Insert (CName, (Kind => Val_String, Str_Val => Ada.Strings.Unbounded.To_Unbounded_String (Fetch_Stmt.Column_Text (I))));
-                  end if;
-               end;
-            end loop;
-            Cached_Row_ID := Row;
-         else
-            return (Kind => Val_Missing);
-         end if;
+         declare
+            Stmt : Ada_Sqlite3.Statement := Store.DB.Prepare ("SELECT * FROM data WHERE record_id = ?");
+         begin
+            Stmt.Bind_Int (1, Row);
+            if Stmt.Step = Ada_Sqlite3.ROW then
+               Cached_Row_Data.Clear;
+               for I in 1 .. Stmt.Column_Count - 1 loop
+                  declare
+                     CName : constant String := Stmt.Column_Name (I);
+                     Typ   : constant Ada_Sqlite3.Column_Type := Stmt.Get_Column_Type (I);
+                  begin
+                     if Stmt.Column_Is_Null (I) then
+                        Cached_Row_Data.Insert (CName, (Kind => Val_Missing));
+                     elsif Typ = Ada_Sqlite3.Float_Type then
+                        Cached_Row_Data.Insert (CName, (Kind => Val_Numeric, Num_Val => Stmt.Column_Double (I)));
+                     elsif Typ = Ada_Sqlite3.Integer_Type then
+                        Cached_Row_Data.Insert (CName, (Kind => Val_Integer, Int_Val => Stmt.Column_Int (I)));
+                     else
+                        Cached_Row_Data.Insert (CName, (Kind => Val_String, Str_Val => Ada.Strings.Unbounded.To_Unbounded_String (Stmt.Column_Text (I))));
+                     end if;
+                  end;
+               end loop;
+               Cached_Row_ID := Row;
+            else
+               return (Kind => Val_Missing);
+            end if;
+         end;
       end if;
       
       if Cached_Row_Data.Contains (U_Col) then

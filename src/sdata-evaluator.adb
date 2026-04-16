@@ -47,6 +47,16 @@ package body SData.Evaluator is
    --  BOG_Flag / EOG_Flag: per-record beginning-of-group / end-of-group
    --  indicators.  Set by the interpreter's data step loop before each
    --  record's program body executes; read by BOG() and EOG() functions.
+   function Is_True (V : Value) return Boolean is
+   begin
+      case V.Kind is
+         when Val_Integer => return V.Int_Val /= 0;
+         when Val_Numeric => return V.Num_Val /= 0.0;
+         when Val_String  => return Length (V.Str_Val) > 0;
+         when Val_Missing => return False;
+      end case;
+   end Is_True;
+
    BOG_Flag : Boolean := False;
    EOG_Flag : Boolean := False;
 
@@ -1463,18 +1473,6 @@ package body SData.Evaluator is
       end case;
    end Evaluate;
 
-   -------------
-   -- Is_True --
-   -------------
-   function Is_True (V : Value) return Boolean is
-   begin
-      case V.Kind is
-         when Val_Integer => return V.Int_Val /= 0;
-         when Val_Numeric => return V.Num_Val /= 0.0;
-         when Val_String  => return Length (V.Str_Val) > 0;
-         when Val_Missing => return False;
-      end case;
-   end Is_True;
 
    ---------------------------------------------------------------------------
    --  Package initialization — populate the dispatch table.

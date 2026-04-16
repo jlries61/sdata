@@ -5,5 +5,4 @@ RUN
 
 -- After commit, table should be on disk.
 LIST X
-RUN
 QUIT

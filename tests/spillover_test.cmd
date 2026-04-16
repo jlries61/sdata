@@ -11,6 +11,4 @@ PRINT "RECNO 20:" OBS("X", 20)
 
 PRINT "Full List:"
 LIST X
-RUN
-
 QUIT
