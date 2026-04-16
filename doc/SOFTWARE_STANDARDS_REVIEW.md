@@ -161,7 +161,7 @@ Type coercion logic is duplicated between `Set_Value_Upper` and `Set_Output_Valu
 
 | Item | Location | Remediation Estimate | Interest Rate |
 |---|---|---|---|
-| Dead `Repeat_Count`/`Repeat_Active` at top-level of `SData.Config` | `sdata-config.ads:29-30` | 30 min | Stable |
+| ~~Dead `Repeat_Count`/`Repeat_Active` at top-level of `SData.Config`~~ | `sdata-config.ads:29-30` | 30 min | **Fixed** |
 | Duplicate type coercion logic | `sdata-table.adb:191-223, 578-607` | 2 hours | Stable |
 | `BOG_Flag`/`EOG_Flag` owned by evaluator but logically belong to interpreter | `sdata-evaluator.adb:60-61` | 3 hours | Stable |
 | No unit tests for evaluator functions | Entire evaluator | 20+ hours | Growing |
@@ -341,7 +341,7 @@ Trust this at 3 AM? Yes — with the `HTN` bugfix applied first.
 |---|---|---|---|
 | ~~HTN bug: duplicate HSN in pattern match~~ | `sdata-evaluator.adb` | 282 | **Fixed** — pattern now `"HCS" \| "HSN" \| "HTN"` |
 | ~~Integer precision via Float~~ | `sdata-evaluator.adb` | 1259-1263 | **Fixed** — `Is_Integer`/`Int_Value` fields added to AST; parser detects and stores exact integer at parse time |
-| Dead top-level Repeat state | `sdata-config.ads` | 29-30, 44-45 | Two copies of same fields; interpreter uses only Runtime version |
+| ~~Dead top-level Repeat state~~ | `sdata-config.ads` | 29-30 | **Fixed** — dead fields removed; `Runtime_State_Record` is the correct home per spec |
 | Duplicate coercion logic | `sdata-table.adb` | 191-223 and 578-607 | `Set_Value_Upper` and `Set_Output_Value_Upper` are near-identical |
 | BOG/EOG state in wrong package | `sdata-evaluator.adb` | 60-61 | Package-level booleans set by interpreter, owned by evaluator |
 | Acknowledged DB pointer leak | `sdata-table.adb` | 36-44 | Comment documents deliberate non-free to avoid finalization crash |

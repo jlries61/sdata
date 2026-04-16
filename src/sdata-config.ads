@@ -25,10 +25,6 @@ package SData.Config is
    Output_File   : String (1 .. 1024) := (others => ' ');
    Output_File_Len : Natural := 0;
 
-   --  REPEAT state.
-   Repeat_Count  : Natural := 0;
-   Repeat_Active : Boolean := False;
-
    --  Runtime state (reset by NEW)
    type Runtime_State_Record is record
       Save_File_Path      : String (1 .. 1024) := (others => ' ');
