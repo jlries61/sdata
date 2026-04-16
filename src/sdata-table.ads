@@ -11,9 +11,7 @@ with Ada.Containers.Vectors;
 with SData.Values; use SData.Values;
 
 
-with Ada.Finalization;
 with Ada_Sqlite3;
-with Ada.Unchecked_Deallocation;
 
 package SData.Table is
 

@@ -77,7 +77,8 @@ gnatmake \
   -aI"../$MATHPAQS_DIR/random" \
   -aI"../$SQLITE3_DIR/src" \
   -aI"../$SQLITE3_DIR/config" \
-  -cargs -gnat2012 -gnatwa -gnatwl -gnatwu -g $SLKCFLAGS
+  -cargs -gnat2012 -gnatwa -gnatwl -gnatwu -g $SLKCFLAGS \
+  -largs -lsqlite3
 cd ..
 
 # Install to the staging directory

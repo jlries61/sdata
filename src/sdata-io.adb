@@ -123,9 +123,10 @@ package body SData.IO is
       --  Write accumulated output to a temp file.
       GNAT.OS_Lib.Create_Temp_File (FD, TN_Acc);
       declare
-         Close_OK  : Boolean;
+         Close_OK : Boolean;
       begin
          GNAT.OS_Lib.Close (FD, Close_OK);
+         pragma Unreferenced (Close_OK);
       end;
 
       declare

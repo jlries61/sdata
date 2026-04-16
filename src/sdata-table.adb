@@ -1,13 +1,11 @@
 with Ada.Characters.Handling;
 with Ada.Containers;
 with SData.Config;
-with SData.IO;
 
 with GNAT.OS_Lib;
 with Ada.Unchecked_Deallocation;
 with GNAT.Strings;
 with Ada_Sqlite3; use Ada_Sqlite3;
-with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 
 package body SData.Table is
@@ -16,7 +14,12 @@ package body SData.Table is
    use type GNAT.Strings.String_List_Access;
    use type Ada_Sqlite3.Result_Code;
 
-   procedure Clear_Fetch_Cache;
+   procedure Clear_Fetch_Cache is
+   begin
+      Cached_Row_ID := 0;
+      Cached_Row_Data.Clear;
+   end Clear_Fetch_Cache;
+
    procedure Spill_Output_To_Disk;
    procedure Spill_Table_To_Disk (T : in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive);
 
@@ -38,6 +41,7 @@ package body SData.Table is
             --  if SQLite still has a lock, but it's better than crashing.
             GNAT.OS_Lib.Delete_File (Path, Success);
          end;
+         pragma Unreferenced (Success);
          Store.Is_Active := False;
       end if;
       Cached_Row_ID := 0;
@@ -60,7 +64,7 @@ package body SData.Table is
       Current_Record := 0;
       Logical_Record := 0;
       Clear_Index_Map;
-      Current_Segment_Start := Output_Segment_Start;
+      Current_Segment_Start := 1;
    end Clear;
 
    ----------------
@@ -304,7 +308,7 @@ package body SData.Table is
       N : constant Natural := Table_Row_Count;
    begin
       if N <= 1 or else Criteria'Length = 0 then return; end if;
-      
+
       Clear_Fetch_Cache;
 
       if Store.Is_Active then
@@ -525,29 +529,6 @@ package body SData.Table is
       return Filter_Map /= null;
    end Is_Filtered;
 
-   ------------------------
-   -- Set_Filtered_Stats --
-   ------------------------
-   procedure Set_Filtered_Stats (Recno : Natural; Is_BOF, Is_EOF : Boolean) is
-   begin
-      null;
-   end Set_Filtered_Stats;
-
-   function Get_Filtered_Recno return Natural is
-   begin
-      return Logical_Record;
-   end Get_Filtered_Recno;
-
-   function Is_Filtered_BOF return Boolean is
-   begin
-      return Logical_Record = 1;
-   end Is_Filtered_BOF;
-
-   function Is_Filtered_EOF return Boolean is
-   begin
-      return Logical_Record > 0 and then Logical_Record = Logical_Row_Count;
-   end Is_Filtered_EOF;
-
    -----------------------------
    -- Output Table Management --
    -----------------------------
@@ -698,16 +679,6 @@ package body SData.Table is
       Store.Is_Active := True;
       GNAT.Strings.Free (Temp_Name);
    end Initialize_Backing_Store;
-
-   procedure Clear_Fetch_Cache is
-      procedure Free_Stmt is new Ada.Unchecked_Deallocation (Ada_Sqlite3.Statement'Class, Fn_Statement_Access);
-   begin
-      if Fetch_Stmt /= null then
-         Free_Stmt (Fetch_Stmt);
-      end if;
-      Cached_Row_ID := 0;
-      Cached_Row_Data.Clear;
-   end Clear_Fetch_Cache;
 
    ---------------------------
    -- Spill_Table_To_Disk --
