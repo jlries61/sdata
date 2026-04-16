@@ -50,8 +50,6 @@ package SData.Config is
    procedure Reset_Runtime_State;
 
    --  DIGITS state (controlling float precision in output).
-
-   --  DIGITS state (controlling float precision in output).
    Print_Digits  : Natural := 5;
 
    --  Constraint limits
