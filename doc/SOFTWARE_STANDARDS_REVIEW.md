@@ -82,7 +82,7 @@ Package-level design notes in both `sdata-evaluator.adb:18-43` and `sdata-interp
 |---|---|---|
 | ~~Duplicate comment `DIGITS state` on consecutive lines~~ | ~~`sdata-config.ads:53-54`~~ | ~~Low~~ — **Fixed** |
 | ~~Inconsistent indentation (tabs vs spaces) mixed~~ | ~~`sdata-evaluator.adb:1279-1282`~~ | ~~Low~~ — **Fixed** |
-| `-- Update Order Vector` describes *what*, not *why* | `sdata-table.adb:246` | Low |
+| ~~`-- Update Order Vector` describes *what*, not *why*~~ | ~~`sdata-table.adb:246`~~ | ~~Low~~ — **Fixed** |
 
 No commented-out code. No anonymous TODOs.
 

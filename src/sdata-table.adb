@@ -240,7 +240,9 @@ package body SData.Table is
             Data_Table.Delete (Upper_Old);
             Data_Table.Insert (Upper_New, Col);
             
-            -- Update Order Vector
+            --  Data_Table is an unordered hash map, so Column_Order is the
+            --  sole record of user-visible column sequence.  Patch the name
+            --  in place rather than delete/re-append to preserve position.
             for I in 1 .. Natural (Column_Order.Length) loop
                if Ada.Strings.Unbounded.To_String (Column_Order.Element (I)) = Upper_Old then
                   Column_Order.Replace_Element (I, Ada.Strings.Unbounded.To_Unbounded_String (Upper_New));
