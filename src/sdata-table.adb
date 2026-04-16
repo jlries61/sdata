@@ -4,15 +4,12 @@ with SData.Config;
 
 with GNAT.OS_Lib;
 with Ada.Unchecked_Deallocation;
-with GNAT.Strings;
 with Ada_Sqlite3; use Ada_Sqlite3;
-with Ada.Strings.Unbounded;
 
 package body SData.Table is
 
    use type Ada.Containers.Count_Type;
    use type GNAT.Strings.String_List_Access;
-   use type Ada_Sqlite3.Result_Code;
 
    procedure Clear_Fetch_Cache is
    begin
@@ -762,7 +759,6 @@ package body SData.Table is
    -- Fetch_From_Disk --
    -----------------------
    function Fetch_From_Disk (Row : Positive; Col_Name : String) return Value is
-      use Ada_Sqlite3;
       U_Col : constant String := Ada.Characters.Handling.To_Upper (Col_Name);
    begin
       if Row /= Cached_Row_ID then
