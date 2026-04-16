@@ -181,7 +181,7 @@ package body SData.Evaluator is
             end if;
             return Num_Result (Log (V, 10.0));
          end;
-      elsif (Name = "LN" or else Name = "LOGE") and then Has_Args (Vals, 1) then
+      elsif Name in "LN" | "LOGE" and then Has_Args (Vals, 1) then
          declare V : constant Float := Convert_To_Float (Vals.Element (1));
          begin
             if V <= 0.0 then
@@ -278,7 +278,7 @@ package body SData.Evaluator is
       elsif Name = "COSH" and then Has_Args (Vals, 1) then
          return Num_Result (Cosh (Convert_To_Float (Vals.Element (1))));
       elsif Name = "TANH" and then Has_Args (Vals, 1) then
-         return Num_Result (Tanh (Convert_To_Float (Vals.Element (1))));	
+         return Num_Result (Tanh (Convert_To_Float (Vals.Element (1))));
       elsif Name in "HCS" | "HSN" | "HSN" and then Has_Args (Vals, 1) then
          declare V : constant Float := Convert_To_Float (Vals.Element (1));
          begin
@@ -302,7 +302,7 @@ package body SData.Evaluator is
             else
                return Num_Result (Arctan (V));
             end if;
-         end;	
+         end;
       elsif Name in "COT" | "CSC" | "SEC" and then Has_Args (Vals, 1) then
          declare V : constant Float := Convert_To_Float (Vals.Element (1));
          begin
@@ -369,7 +369,7 @@ package body SData.Evaluator is
                elsif Name = "MEAN" then return (Kind => Val_Numeric, Num_Val => Float (Sum / NF));
                elsif Name = "MIN"  then return (Kind => Val_Numeric, Num_Val => Float (Min_V));
                elsif Name = "MAX"  then return (Kind => Val_Numeric, Num_Val => Float (Max_V));
-               elsif Name = "VAR" or else Name = "STD" then
+               elsif Name in "VAR" | "STD" then
                   if N_Count > 1 then
                      declare Variance : constant Long_Float := (Sum_Sq - (Sum ** 2 / NF)) / (NF - 1.0);
                      begin
@@ -715,7 +715,7 @@ package body SData.Evaluator is
    ---------------------------------------------------------------------------
    function Handle_Navigation (Name : String; Vals : Value_Vectors.Vector) return Value is
    begin
-      if Name = "RECNO" or Name = "ORD" then
+      if Name in "RECNO" | "ORD" then
          --  ORD with an argument is the ASCII code of the first character.
          --  ORD with no arguments is a synonym for RECNO (logical record index).
          if Name = "ORD" and then Has_Args (Vals, 1) then
@@ -1276,9 +1276,9 @@ package body SData.Evaluator is
             begin
                if VVal.Kind = Val_Missing then
                   --  Fall back to zero-arg functions (optional parentheses)
-		  if Vname in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |	
-		              "DATE$" | "TIME$" | "RAN" | "RANDOM" | "LRN" |	
-			      "FALSE" | "TRUE" then
+                  if Vname in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |	
+                              "DATE$" | "TIME$" | "RAN" | "RANDOM" | "LRN" |
+                              "FALSE" | "TRUE" then
                      return Evaluate_Function (VName, null);
                   end if;
                end if;
