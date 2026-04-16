@@ -105,6 +105,44 @@ as root to build the package.
 
 ### macOS
 
+#### Building with Alire
+
+If you use Alire on macOS, the Alire-managed GNAT toolchain is a pre-built
+binary targeting a specific macOS SDK version. If your macOS version is older
+than the one the toolchain was compiled for, the C compiler will not find
+Apple's private SDK headers (such as `_stdio.h`) when compiling the bundled
+`sqlite3.c` in the `ada_sqlite3` dependency, producing an error like:
+
+```
+fatal error: _stdio.h: No such file or directory
+```
+
+The fix is to set `C_INCLUDE_PATH` so that GCC can locate the SDK headers:
+
+```sh
+export SDKROOT=$(xcrun --show-sdk-path)
+export C_INCLUDE_PATH=$SDKROOT/usr/include
+alr build
+```
+
+Add both lines to your `~/.zshrc` or `~/.zprofile` to make the setting
+permanent. Note that `SDKROOT` alone is not sufficient — unlike Clang, the
+GCC-based GNAT toolchain does not automatically apply it as `-isysroot`.
+
+This issue is not specific to Alire: the same fix is needed whenever the
+pre-built GNAT binary is used with `gprbuild` directly. A GNAT compiled
+natively for your macOS version will have the correct SDK paths embedded and
+should not require this workaround.
+
+#### Running the Test Suite
+
+The test harness uses the GNU coreutils `timeout` command, which is not
+included with macOS. Install it via MacPorts (`sudo port install coreutils`),
+after which it is available as `gtimeout`. The Makefile detects `gtimeout`
+automatically, so no further configuration is needed.
+
+#### Installer Package
+
 Build a macOS installer package:
 
 ```sh
