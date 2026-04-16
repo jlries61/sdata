@@ -24,24 +24,18 @@ package body SData.Table is
    -- Backing Store Cleanup --
    ---------------------------
    procedure Cleanup_Backing_Store is
-      procedure Free_DB is new Ada.Unchecked_Deallocation (Ada_Sqlite3.Database, Database_Access);
-      procedure Free_Stmt is new Ada.Unchecked_Deallocation (Ada_Sqlite3.Statement'Class, Fn_Statement_Access);
       Success : Boolean;
    begin
       if Store.Is_Active then
-         begin
-            if Fetch_Stmt /= null then
-               Free_Stmt (Fetch_Stmt);
-            end if;
-            if Store.DB /= null then
-               Free_DB (Store.DB);
-            end if;
-         exception
-            when others => null; -- Avoid PROGRAM_ERROR during finalization
-         end;
+         --  We avoid manual Free of the Database pointer here because it 
+         --  triggers a double-finalization crash with the library's internal 
+         --  state management during program exit. The library will clean 
+         --  up the handle, and the OS will reclaim the memory.
          declare
             Path : constant String := Ada.Strings.Unbounded.To_String (Store.Temp_Path);
          begin
+            --  Attempt to delete the file. On some systems this may fail 
+            --  if SQLite still has a lock, but it's better than crashing.
             GNAT.OS_Lib.Delete_File (Path, Success);
          end;
          Store.Is_Active := False;
