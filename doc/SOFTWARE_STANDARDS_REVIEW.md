@@ -55,7 +55,7 @@ Naming is Ada-idiomatic and precise. Procedure names are verb phrases; function 
 | Self-Documentation | 8/10 |
 | Cognitive Load | Medium |
 
-**Deduction:** Package-level booleans `BOG_Flag`/`EOG_Flag` in `sdata-evaluator.adb:60-61` look like they belong in the interpreter's data-step state, not in the evaluator. Their presence in the evaluator package body is an ownership smell.
+**Note:** Package-level booleans `BOG_Flag`/`EOG_Flag` in `sdata-evaluator.adb:60-61` are private implementation state for the `BOG()` and `EOG()` language functions, which are dispatched by the evaluator. The `Set_BOG`/`Set_EOG` interface in `sdata-evaluator.ads` is the correct boundary: the interpreter signals group boundaries; the evaluator answers function calls about them. Placement is correct.
 
 ### 2.2 Function Design
 
@@ -163,7 +163,7 @@ Type coercion logic is duplicated between `Set_Value_Upper` and `Set_Output_Valu
 |---|---|---|---|
 | ~~Dead `Repeat_Count`/`Repeat_Active` at top-level of `SData.Config`~~ | `sdata-config.ads:29-30` | 30 min | **Fixed** |
 | Duplicate type coercion logic | `sdata-table.adb:191-223, 578-607` | 2 hours | Stable |
-| `BOG_Flag`/`EOG_Flag` owned by evaluator but logically belong to interpreter | `sdata-evaluator.adb:60-61` | 3 hours | Stable |
+| ~~`BOG_Flag`/`EOG_Flag` owned by evaluator but logically belong to interpreter~~ | `sdata-evaluator.adb:60-61` | — | **Retracted** — placement is correct per design |
 | No unit tests for evaluator functions | Entire evaluator | 20+ hours | Growing |
 | Integer literal classification via `Float'Floor` may misclassify large integers | `sdata-evaluator.adb:1259-1263` | 2 hours | Stable |
 | Database pointer not freed on cleanup | `sdata-table.adb:36-44` | Blocked on upstream library fix | Stable |
@@ -343,7 +343,7 @@ Trust this at 3 AM? Yes — with the `HTN` bugfix applied first.
 | ~~Integer precision via Float~~ | `sdata-evaluator.adb` | 1259-1263 | **Fixed** — `Is_Integer`/`Int_Value` fields added to AST; parser detects and stores exact integer at parse time |
 | ~~Dead top-level Repeat state~~ | `sdata-config.ads` | 29-30 | **Fixed** — dead fields removed; `Runtime_State_Record` is the correct home per spec |
 | Duplicate coercion logic | `sdata-table.adb` | 191-223 and 578-607 | `Set_Value_Upper` and `Set_Output_Value_Upper` are near-identical |
-| BOG/EOG state in wrong package | `sdata-evaluator.adb` | 60-61 | Package-level booleans set by interpreter, owned by evaluator |
+| ~~BOG/EOG state in wrong package~~ | `sdata-evaluator.adb` | 60-61 | **Retracted** — flags are private implementation state for `BOG()`/`EOG()` functions; evaluator ownership is correct |
 | Acknowledged DB pointer leak | `sdata-table.adb` | 36-44 | Comment documents deliberate non-free to avoid finalization crash |
 | Stack allocation for file content | `sdata-interpreter.adb` | 991 | `String (1 .. Integer(Ada.Streams.Stream_IO.Size(File)))` on stack |
 | ~~Duplicate DIGITS comment~~ | `sdata-config.ads` | 53-54 | **Fixed** — duplicate line removed |
