@@ -75,7 +75,8 @@ gnatmake \
   -aI"../$XMLADA_DIR/input_sources" \
   -aI"../$MATHPAQS_DIR/numerics" \
   -aI"../$MATHPAQS_DIR/random" \
-  -aI"../$SQLITE3_DIR" \
+  -aI"../$SQLITE3_DIR/src" \
+  -aI"../$SQLITE3_DIR/config" \
   -cargs -gnat2012 -gnatwa -gnatwl -gnatwu -g $SLKCFLAGS
 cd ..
 
