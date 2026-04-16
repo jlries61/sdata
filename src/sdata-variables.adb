@@ -168,25 +168,41 @@ package body SData.Variables is
    -------------------------
    -- Load_PDV_From_Table --
    -------------------------
+   --  Iterates column names via Column_Count/Column_Name so no heap
+   --  allocation is needed just to obtain the list of column names.
    procedure Load_PDV_From_Table (Row : Positive) is
-      Col_Names : constant GNAT.Strings.String_List_Access := SData.Table.Get_Column_Names;
+      C : constant Natural := SData.Table.Column_Count;
    begin
-      if Col_Names /= null then
-         for I in Col_Names'Range loop
-            declare
-               Name : constant String := To_Upper (Col_Names (I).all);
-               Val  : constant Value := SData.Table.Get_Value (Row, Name);
-            begin
-               if Permanent_Symbols.Contains (Name) then
-                  Permanent_Symbols.Replace (Name, Val);
-               else
-                  Permanent_Symbols.Insert (Name, Val);
-               end if;
-            end;
-         end loop;
-         declare Old : GNAT.Strings.String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
-      end if;
+      for I in 1 .. C loop
+         declare
+            Name : constant String := SData.Table.Column_Name (I);
+            Val  : constant Value  := SData.Table.Get_Value_Upper (Row, Name);
+         begin
+            if Permanent_Symbols.Contains (Name) then
+               Permanent_Symbols.Replace (Name, Val);
+            else
+               Permanent_Symbols.Insert (Name, Val);
+            end if;
+         end;
+      end loop;
    end Load_PDV_From_Table;
+
+   -------------------------
+   -- Load_PDV_One_Column --
+   -------------------------
+   --  Loads a single column Col_Name (must be upper-cased) for Row into
+   --  the PDV.  Called by the SELECT filter scan, which first collects the
+   --  set of variable names the filter expression references so that only
+   --  those columns are loaded rather than all of them.
+   procedure Load_PDV_One_Column (Row : Positive; Col_Name : String) is
+      Val : constant Value := SData.Table.Get_Value_Upper (Row, Col_Name);
+   begin
+      if Permanent_Symbols.Contains (Col_Name) then
+         Permanent_Symbols.Replace (Col_Name, Val);
+      else
+         Permanent_Symbols.Insert (Col_Name, Val);
+      end if;
+   end Load_PDV_One_Column;
 
    -----------------------
    -- Refresh_PDV_Names --

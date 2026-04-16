@@ -115,6 +115,12 @@ package body SData.Interpreter is
       Equivalent_Elements => "=");
    Input_File_Columns : Name_Sets.Set;
 
+   --  Walks an expression AST and adds to Names every variable name that the
+   --  expression reads at evaluation time.  Used by the SELECT filter scan to
+   --  determine the minimal set of columns that need to be loaded per row.
+   procedure Collect_Filter_Vars (Expr  : Expression_Access;
+                                   Names : in out Name_Sets.Set);
+
    --  Set of script files currently in the SUBMIT execution chain (for cycle detection).
    Submit_Chain : Name_Sets.Set;
 
@@ -1102,6 +1108,56 @@ package body SData.Interpreter is
       end loop;
    end Execute_List;
 
+   ---------------------------
+   -- Collect_Filter_Vars  --
+   ---------------------------
+   --  Walks the filter expression AST recursively, inserting into Names the
+   --  upper-cased name of every variable that the expression reads directly.
+   --  For identifier-ref functions (LAG/NEXT/OBS and variants) the first
+   --  argument is a variable name, not a read of that variable's current PDV
+   --  value — those are skipped so we don't load an irrelevant column.
+   procedure Collect_Filter_Vars (Expr  : Expression_Access;
+                                   Names : in out Name_Sets.Set) is
+   begin
+      if Expr = null then return; end if;
+      case Expr.Kind is
+         when Expr_Variable =>
+            Names.Include (To_Upper (Expr.Var_Name (1 .. Expr.Var_Len)));
+         when Expr_Binary_Op =>
+            Collect_Filter_Vars (Expr.Left,    Names);
+            Collect_Filter_Vars (Expr.Right,   Names);
+         when Expr_Unary_Op =>
+            Collect_Filter_Vars (Expr.Operand, Names);
+         when Expr_Function_Call =>
+            declare
+               FName : constant String :=
+                  To_Upper (Expr.Func_Name (1 .. Expr.Func_Len));
+               Args  : Expression_List := Expr.Arguments;
+            begin
+               if Is_Identifier_Ref_Function (FName) and then Args /= null then
+                  Args := Args.Next;  -- skip the variable-name argument
+               end if;
+               while Args /= null loop
+                  Collect_Filter_Vars (Args.Expr, Names);
+                  Args := Args.Next;
+               end loop;
+            end;
+         when Expr_Array_Access =>
+            --  The array name is itself a variable reference.
+            Names.Include (To_Upper (Expr.Arr_Name (1 .. Expr.Arr_Len)));
+            declare
+               Idx : Expression_List := Expr.Arr_Idx;
+            begin
+               while Idx /= null loop
+                  Collect_Filter_Vars (Idx.Expr, Names);
+                  Idx := Idx.Next;
+               end loop;
+            end;
+         when others =>
+            null;  -- Expr_Numeric_Literal and Expr_String_Literal: no variables.
+      end case;
+   end Collect_Filter_Vars;
+
    --  Run_One_Step — executes the deferred statement list once per record.
    --  Start..Boundary is the slice of the statement list belonging to this RUN.
    procedure Run_One_Step (Start, Boundary : Statement_Access) is
@@ -1158,6 +1214,12 @@ package body SData.Interpreter is
       --  start of every RUN.  The previous map (from an earlier RUN) has
       --  been cleared by Commit_Output_Table, so we always work against
       --  the up-to-date physical row set.
+      --
+      --  Targeted loading: collect the variable names the filter expression
+      --  actually reads, then load only those columns per row.  For a filter
+      --  like SELECT age > 18 on a 100-column table, only one column is
+      --  loaded instead of all 100.  Temporary variables (not table columns)
+      --  are excluded from loading — they are already in the symbol table.
       if Select_Filter_Expr /= null then
          declare
             Total          : constant Natural := Row_Count;
@@ -1167,19 +1229,28 @@ package body SData.Interpreter is
                SData.Table.Clear_Index_Map;
             else
                declare
-                  Passing : SData.Table.Index_Array (1 .. Total);
-                  Count   : Natural := 0;
+                  Filter_Cols : Name_Sets.Set;
                begin
-                  for R in 1 .. Total loop
-                     SData.Table.Set_Current_Record_Index (R);
-                     SData.Variables.Load_PDV_From_Table (R);
-                     if Is_True (Evaluate (Select_Filter_Expr)) then
-                        Count := Count + 1;
-                        Passing (Count) := R;
-                     end if;
-                  end loop;
-                  SData.Table.Set_Current_Record_Index (Saved_Physical);
-                  SData.Table.Set_Index_Map (Passing (1 .. Count));
+                  Collect_Filter_Vars (Select_Filter_Expr, Filter_Cols);
+                  declare
+                     Passing : SData.Table.Index_Array (1 .. Total);
+                     Count   : Natural := 0;
+                  begin
+                     for R in 1 .. Total loop
+                        SData.Table.Set_Current_Record_Index (R);
+                        for Col_Name of Filter_Cols loop
+                           if SData.Table.Has_Column (Col_Name) then
+                              SData.Variables.Load_PDV_One_Column (R, Col_Name);
+                           end if;
+                        end loop;
+                        if Is_True (Evaluate (Select_Filter_Expr)) then
+                           Count := Count + 1;
+                           Passing (Count) := R;
+                        end if;
+                     end loop;
+                     SData.Table.Set_Current_Record_Index (Saved_Physical);
+                     SData.Table.Set_Index_Map (Passing (1 .. Count));
+                  end;
                end;
             end if;
          end;

@@ -126,6 +126,14 @@ package body SData.Table is
       return Natural (Data_Table.Length);
    end Column_Count;
 
+   -----------------
+   -- Column_Name --
+   -----------------
+   function Column_Name (I : Positive) return String is
+   begin
+      return Ada.Strings.Unbounded.To_String (Column_Order.Element (I));
+   end Column_Name;
+
    ---------------
    -- Row_Count --
    ---------------

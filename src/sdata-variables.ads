@@ -27,7 +27,11 @@ package SData.Variables is
 
    -- PDV Management (PDV stands for Program Data Vector)
    procedure Initialize_PDV;
+   --  Load all table columns for Row into the PDV.
    procedure Load_PDV_From_Table (Row : Positive);
+   --  Load a single already-upper-cased column Col_Name for Row into the PDV.
+   --  Used by the SELECT filter scan to load only the columns the filter references.
+   procedure Load_PDV_One_Column (Row : Positive; Col_Name : String);
    procedure Reset_PDV_Non_Held;
    procedure Refresh_PDV_Names;
    

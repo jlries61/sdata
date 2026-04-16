@@ -16,6 +16,12 @@ package SData.Evaluator is
    -- Returns the expected kind of value based on name suffix
    function Get_Expected_Kind (Name : String) return Value_Kind;
 
+   --  Returns True for functions whose first argument is passed as a variable
+   --  *name* rather than the variable's evaluated value (LAG, NEXT, OBS and
+   --  their character variants).  Used by the parser, evaluator, and any code
+   --  that walks the expression AST.
+   function Is_Identifier_Ref_Function (N : String) return Boolean;
+
    -- Indicators for BY group boundaries
    function Is_BOG return Boolean;
    function Is_EOG return Boolean;

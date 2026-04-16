@@ -34,6 +34,10 @@ package SData.Table is
    --  Returns the number of columns in the table.
    function Column_Count return Natural;
 
+   --  Returns the Ith column name in user-visible (insertion) order, 1-based.
+   --  Used to iterate column names without heap-allocating a String_List.
+   function Column_Name (I : Positive) return String;
+
    --  Returns the number of rows (records) in the table.
    function Row_Count return Natural;
 
