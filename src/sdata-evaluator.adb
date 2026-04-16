@@ -279,7 +279,7 @@ package body SData.Evaluator is
          return Num_Result (Cosh (Convert_To_Float (Vals.Element (1))));
       elsif Name = "TANH" and then Has_Args (Vals, 1) then
          return Num_Result (Tanh (Convert_To_Float (Vals.Element (1))));
-      elsif Name in "HCS" | "HSN" | "HSN" and then Has_Args (Vals, 1) then
+      elsif Name in "HCS" | "HSN" | "HTN" and then Has_Args (Vals, 1) then
          declare V : constant Float := Convert_To_Float (Vals.Element (1));
          begin
             if Name = "HCS" then return Num_Result (1.0 / Cosh (V));
