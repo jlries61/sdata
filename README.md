@@ -134,6 +134,13 @@ pre-built GNAT binary is used with `gprbuild` directly. A GNAT compiled
 natively for your macOS version will have the correct SDK paths embedded and
 should not require this workaround.
 
+#### Running the Test Suite
+
+The test harness uses the GNU coreutils `timeout` command, which is not
+included with macOS. Install it via MacPorts (`sudo port install coreutils`),
+after which it is available as `gtimeout`. The Makefile detects `gtimeout`
+automatically, so no further configuration is needed.
+
 #### Installer Package
 
 Build a macOS installer package:

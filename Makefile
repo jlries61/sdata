@@ -11,6 +11,9 @@ GPR_FILE = sdata.gpr
 # from PATH.  When working with an Alire-managed toolchain, run 'alr build'
 # directly, or ensure the toolchain is on PATH via 'eval $(alr printenv)'.
 GPRBUILD ?= $(firstword $(shell which gprbuild 2>/dev/null) gprbuild)
+# GNU coreutils 'timeout' is 'gtimeout' on macOS/MacPorts; fall back to plain
+# 'timeout' (Linux) if 'gtimeout' is not found.
+TIMEOUT  := $(firstword $(shell which gtimeout 2>/dev/null) timeout)
 
 # GPR_PROJECT_PATH: tells gprbuild where to find dependency .gpr files.
 # If already set in the environment (e.g. by the RPM spec), use that.
@@ -63,7 +66,7 @@ check: build
 		exitcode_file="tests/$$base.exitcode"; \
 		expected_exit=0; \
 		if [ -f "$$exitcode_file" ]; then expected_exit=$$(cat "$$exitcode_file"); fi; \
-		timeout 10 ./bin/sdata $$extra_flags $$f > tests/$$base.tmp 2>&1; \
+		$(TIMEOUT) 10 ./bin/sdata $$extra_flags $$f > tests/$$base.tmp 2>&1; \
 		actual_exit=$$?; \
 		if [ $$actual_exit -eq 124 ]; then \
 			echo "FAILED (Timed out after 10s)"; \
