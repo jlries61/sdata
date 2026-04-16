@@ -37,10 +37,10 @@ with Ada.Strings.Hash;
 --    * IF(cond, true_expr, false_expr) is intercepted before argument
 --      flattening so that only the selected branch is evaluated (lazy eval).
 --    * All other built-in functions are dispatched through Dispatch_Table,
---      a hashed map from function name to handler subprogram.  Functions are
---      grouped into families (Math, Trig, Aggregate, String_Ops, Navigation,
---      Statistics, Misc); every family shares one handler subprogram, which
---      uses the Name parameter to discriminate among its members.
+--      a hashed map from function name to handler subprogram.  String, navigation,
+--      and statistics functions each have their own dedicated Ada subprogram so
+--      the dispatch table is the sole dispatch layer.  Math, trig, aggregate, and
+--      misc families share a handler and use Name to discriminate among members.
 
 package body SData.Evaluator is
 
@@ -141,17 +141,6 @@ package body SData.Evaluator is
       return U in "LAG" | "LAGC$" | "NEXT" | "NEXTC$" | "OBS" | "OBSC$";
    end Is_Identifier_Ref_Function;
 
-   ---------------------------------------------------------------------------
-   --  Forward declarations for family handlers
-   ---------------------------------------------------------------------------
-
-   function Handle_Math       (Name : String; Vals : Value_Vectors.Vector) return Value;
-   function Handle_Trig       (Name : String; Vals : Value_Vectors.Vector) return Value;
-   function Handle_Aggregate  (Name : String; Vals : Value_Vectors.Vector) return Value;
-   function Handle_String_Ops (Name : String; Vals : Value_Vectors.Vector) return Value;
-   function Handle_Navigation (Name : String; Vals : Value_Vectors.Vector) return Value;
-   function Handle_Statistics (Name : String; Vals : Value_Vectors.Vector) return Value;
-   function Handle_Misc       (Name : String; Vals : Value_Vectors.Vector) return Value;
 
    ---------------------------------------------------------------------------
    --  Handle_Math — ABS, LOG*, EXP, ROUND, CEIL, FLOOR, INT, FIX, IP, FP,
@@ -450,568 +439,886 @@ package body SData.Evaluator is
    end Handle_Aggregate;
 
    ---------------------------------------------------------------------------
-   --  Handle_String_Ops — LEN, LEFT$, RIGHT$, MID$, TRIM$, LTRIM$, RTRIM$,
-   --                       ASCII, UCASE$/UPPER$, LCASE$/LOWER$, POS, CHR$,
-   --                       STR$, VAL, HEX$, OCT$, BIN$, NUM$
+   --  To_Base_String — private helper for HEX$, OCT$, BIN$
    ---------------------------------------------------------------------------
-   function Handle_String_Ops (Name : String; Vals : Value_Vectors.Vector) return Value is
+   function To_Base_String (N : Integer; Radix : Positive) return String is
+      Digits_Map : constant String := "0123456789ABCDEF";
+      Buf        : String (1 .. 32);
+      Len        : Natural := 0;
+      Val        : Integer := abs N;
    begin
-      if Name = "LEN" and then Has_Args (Vals, 1) then
-         declare V : constant Value := Vals.Element (1);
-         begin
-            if V.Kind = Val_String then return (Kind => Val_Integer, Int_Val => Length (V.Str_Val));
-            else return (Kind => Val_Missing); end if;
-         end;
+      if Val = 0 then return "0"; end if;
+      while Val > 0 loop
+         Len := Len + 1;
+         Buf (Len) := Digits_Map (Val mod Radix + 1);
+         Val := Val / Radix;
+      end loop;
+      for I in 1 .. Len / 2 loop
+         declare Tmp : constant Character := Buf (I);
+         begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
+      end loop;
+      return Buf (1 .. Len);
+   end To_Base_String;
 
-      elsif Name = "LEFT$" and then Has_Args (Vals, 2) then
-         declare
-            V : constant Value   := Vals.Element (1);
-            N : constant Integer := Integer (Convert_To_Float (Vals.Element (2)));
-            R : Value (Val_String);
-         begin
-            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            if N <= 0 then R.Str_Val := Null_Unbounded_String;
-            elsif N >= Length (V.Str_Val) then R.Str_Val := V.Str_Val;
-            else R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, 1, N));
-            end if;
-            return R;
-         end;
+   ---------------------------------------------------------------------------
+   --  String-operation handlers — one subprogram per language function
+   ---------------------------------------------------------------------------
 
-      elsif Name = "RIGHT$" and then Has_Args (Vals, 2) then
-         declare
-            V     : constant Value   := Vals.Element (1);
-            N     : constant Integer := Integer (Convert_To_Float (Vals.Element (2)));
-            R     : Value (Val_String);
-            Start : Integer;
-         begin
-            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            if N <= 0 then R.Str_Val := Null_Unbounded_String;
-            elsif N >= Length (V.Str_Val) then R.Str_Val := V.Str_Val;
-            else
-               Start := Length (V.Str_Val) - N + 1;
-               R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, Start, Length (V.Str_Val)));
-            end if;
-            return R;
-         end;
+   function Handle_Len (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Value := Vals.Element (1);
+      begin
+         if V.Kind = Val_String then
+            return (Kind => Val_Integer, Int_Val => Length (V.Str_Val));
+         else
+            return (Kind => Val_Missing);
+         end if;
+      end;
+   end Handle_Len;
 
-      elsif Name = "MID$" and then (Has_Args (Vals, 2) or else Has_Args (Vals, 3)) then
-         declare
-            V     : constant Value   := Vals.Element (1);
-            Start : constant Integer := Integer (Convert_To_Float (Vals.Element (2)));
-            Len   : constant Integer :=
-               (if Has_Args (Vals, 3) then Integer (Convert_To_Float (Vals.Element (3)))
-                else Length (V.Str_Val));
-            R     : Value (Val_String);
-            S, E  : Integer;
-         begin
-            if V.Kind /= Val_String or else Start < 1 then return (Kind => Val_Missing); end if;
-            S := Start;
-            E := Integer'Min (S + Len - 1, Length (V.Str_Val));
-            if S > Length (V.Str_Val) then R.Str_Val := Null_Unbounded_String;
-            else R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, S, E));
-            end if;
-            return R;
-         end;
+   function Handle_Left (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         V : constant Value   := Vals.Element (1);
+         N : constant Integer := Integer (Convert_To_Float (Vals.Element (2)));
+         R : Value (Val_String);
+      begin
+         if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+         if N <= 0 then R.Str_Val := Null_Unbounded_String;
+         elsif N >= Length (V.Str_Val) then R.Str_Val := V.Str_Val;
+         else R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, 1, N));
+         end if;
+         return R;
+      end;
+   end Handle_Left;
 
-      elsif Name = "TRIM$" and then Has_Args (Vals, 1) then
-         declare
-            V : constant Value := Vals.Element (1);
-            R : Value (Val_String);
-         begin
-            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            declare use Ada.Strings.Fixed;
-            begin R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Both));
-            end;
-            return R;
-         end;
+   function Handle_Right (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         V     : constant Value   := Vals.Element (1);
+         N     : constant Integer := Integer (Convert_To_Float (Vals.Element (2)));
+         R     : Value (Val_String);
+         Start : Integer;
+      begin
+         if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+         if N <= 0 then R.Str_Val := Null_Unbounded_String;
+         elsif N >= Length (V.Str_Val) then R.Str_Val := V.Str_Val;
+         else
+            Start := Length (V.Str_Val) - N + 1;
+            R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, Start, Length (V.Str_Val)));
+         end if;
+         return R;
+      end;
+   end Handle_Right;
 
-      elsif Name = "LTRIM$" and then Has_Args (Vals, 1) then
-         declare
-            V : constant Value := Vals.Element (1);
-            R : Value (Val_String);
-         begin
-            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            declare use Ada.Strings.Fixed;
-            begin R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Left));
-            end;
-            return R;
-         end;
+   function Handle_Mid (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         V     : constant Value   := Vals.Element (1);
+         Start : constant Integer := Integer (Convert_To_Float (Vals.Element (2)));
+         Len   : constant Integer :=
+            (if Has_Args (Vals, 3) then Integer (Convert_To_Float (Vals.Element (3)))
+             else Length (V.Str_Val));
+         R     : Value (Val_String);
+         S, E  : Integer;
+      begin
+         if V.Kind /= Val_String or else Start < 1 then return (Kind => Val_Missing); end if;
+         S := Start;
+         E := Integer'Min (S + Len - 1, Length (V.Str_Val));
+         if S > Length (V.Str_Val) then R.Str_Val := Null_Unbounded_String;
+         else R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, S, E));
+         end if;
+         return R;
+      end;
+   end Handle_Mid;
 
-      elsif Name = "RTRIM$" and then Has_Args (Vals, 1) then
-         declare
-            V : constant Value := Vals.Element (1);
-            R : Value (Val_String);
-         begin
-            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            declare use Ada.Strings.Fixed;
-            begin R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Right));
-            end;
-            return R;
-         end;
+   function Handle_Trim (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      V : Value;
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      V := Vals.Element (1);
+      if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+      declare use Ada.Strings.Fixed;
+      begin R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Both)); end;
+      return R;
+   end Handle_Trim;
 
-      elsif Name = "ASCII" and then Has_Args (Vals, 1) then
+   function Handle_Ltrim (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      V : Value;
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      V := Vals.Element (1);
+      if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+      declare use Ada.Strings.Fixed;
+      begin R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Left)); end;
+      return R;
+   end Handle_Ltrim;
+
+   function Handle_Rtrim (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      V : Value;
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      V := Vals.Element (1);
+      if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+      declare use Ada.Strings.Fixed;
+      begin R.Str_Val := To_Unbounded_String (Trim (To_String (V.Str_Val), Ada.Strings.Right)); end;
+      return R;
+   end Handle_Rtrim;
+
+   function Handle_ASCII (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Value := Vals.Element (1);
+      begin
+         if V.Kind /= Val_String or else Length (V.Str_Val) = 0 then
+            return (Kind => Val_Missing);
+         end if;
+         return (Kind => Val_Integer, Int_Val => Character'Pos (Element (V.Str_Val, 1)));
+      end;
+   end Handle_ASCII;
+
+   --  UCASE$/UPPER$ share this handler; both uppercase-convert their argument.
+   function Handle_Upper (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      V : Value;
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      V := Vals.Element (1);
+      if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+      R.Str_Val := To_Unbounded_String (To_Upper (SData.Values.To_String (V)));
+      return R;
+   end Handle_Upper;
+
+   --  LCASE$/LOWER$ share this handler; both lowercase-convert their argument.
+   function Handle_Lower (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      V : Value;
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      V := Vals.Element (1);
+      if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+      R.Str_Val := To_Unbounded_String (To_Lower (SData.Values.To_String (V)));
+      return R;
+   end Handle_Lower;
+
+   function Handle_Pos (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         Needle   : constant Value := Vals.Element (1);
+         Haystack : constant Value := Vals.Element (2);
+      begin
+         if Needle.Kind /= Val_String or else Haystack.Kind /= Val_String then
+            return (Kind => Val_Missing);
+         end if;
+         if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
+         return (Kind    => Val_Integer,
+                 Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
+      end;
+   end Handle_Pos;
+
+   function Handle_Chr (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare Code : constant Integer := Integer (Convert_To_Float (Vals.Element (1)));
+      begin
+         R.Str_Val := To_Unbounded_String ("" & Character'Val (Code));
+         return R;
+      end;
+   end Handle_Chr;
+
+   function Handle_Str (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      R.Str_Val := To_Unbounded_String (SData.Values.To_String_Formatted (Vals.Element (1)));
+      return R;
+   end Handle_Str;
+
+   function Handle_Val (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Value := Vals.Element (1);
+      begin
+         if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
+         begin
+            return (Kind    => Val_Numeric,
+                    Num_Val => Float'Value (SData.Values.To_String (V)));
+         exception
+            when Constraint_Error => return (Kind => Val_Missing);
+         end;
+      end;
+   end Handle_Val;
+
+   function Handle_Num_Str (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      Result : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      Result.Str_Val :=
+         To_Unbounded_String (SData.Values.To_String_Formatted (Vals.Element (1)));
+      return Result;
+   end Handle_Num_Str;
+
+   function Handle_Hex (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      R.Str_Val := To_Unbounded_String
+         (To_Base_String (Integer (Convert_To_Float (Vals.Element (1))), 16));
+      return R;
+   end Handle_Hex;
+
+   function Handle_Oct (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      R.Str_Val := To_Unbounded_String
+         (To_Base_String (Integer (Convert_To_Float (Vals.Element (1))), 8));
+      return R;
+   end Handle_Oct;
+
+   function Handle_Bin (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : Value (Val_String);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      R.Str_Val := To_Unbounded_String
+         (To_Base_String (Integer (Convert_To_Float (Vals.Element (1))), 2));
+      return R;
+   end Handle_Bin;
+
+   ---------------------------------------------------------------------------
+   --  Record-navigation handlers — one subprogram per language function
+   ---------------------------------------------------------------------------
+
+   function Handle_Recno (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind    => Val_Integer,
+              Int_Val => (if SData.Table.Is_Filtered
+                          then Integer (SData.Table.Get_Logical_Record_Index)
+                          else Integer (SData.Table.Get_Current_Record_Index)));
+   end Handle_Recno;
+
+   --  ORD(s) returns the ASCII code of the first character of s.
+   --  ORD with no argument is a synonym for RECNO (logical record position).
+   function Handle_Ord (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if Has_Args (Vals, 1) then
          declare V : constant Value := Vals.Element (1);
          begin
             if V.Kind /= Val_String or else Length (V.Str_Val) = 0 then
                return (Kind => Val_Missing);
             end if;
-            return (Kind => Val_Integer,
+            return (Kind    => Val_Integer,
                     Int_Val => Character'Pos (Element (V.Str_Val, 1)));
          end;
+      end if;
+      return (Kind    => Val_Integer,
+              Int_Val => (if SData.Table.Is_Filtered
+                          then Integer (SData.Table.Get_Logical_Record_Index)
+                          else Integer (SData.Table.Get_Current_Record_Index)));
+   end Handle_Ord;
 
-      elsif Name in "UCASE$" | "UPPER$" and then Has_Args (Vals, 1) then
-         declare
-            V : constant Value := Vals.Element (1);
-            R : Value (Val_String);
-         begin
-            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            R.Str_Val := To_Unbounded_String (To_Upper (SData.Values.To_String (V)));
-            return R;
-         end;
+   function Handle_BOF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind    => Val_Integer,
+              Int_Val => (if SData.Table.Is_Filtered
+                          then (if SData.Table.Get_Logical_Record_Index <= 1 then 1 else 0)
+                          else (if SData.Table.Get_Current_Record_Index <= 1 then 1 else 0)));
+   end Handle_BOF;
 
-      elsif Name in "LCASE$" | "LOWER$" and then Has_Args (Vals, 1) then
-         declare
-            V : constant Value := Vals.Element (1);
-            R : Value (Val_String);
-         begin
-            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            R.Str_Val := To_Unbounded_String (To_Lower (SData.Values.To_String (V)));
-            return R;
-         end;
+   function Handle_EOF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind    => Val_Integer,
+              Int_Val => (if SData.Table.Is_Filtered
+                          then (if SData.Table.Get_Logical_Record_Index >= SData.Table.Logical_Row_Count then 1 else 0)
+                          else (if SData.Table.Get_Current_Record_Index >= SData.Table.Row_Count then 1 else 0)));
+   end Handle_EOF;
 
-      elsif Name = "POS" and then Has_Args (Vals, 2) then
+   function Handle_BOG (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => (if BOG_Flag then 1 else 0));
+   end Handle_BOG;
+
+   function Handle_EOG (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => (if EOG_Flag then 1 else 0));
+   end Handle_EOG;
+
+   --  LAG/LAGC$ share this handler; both look up the nth prior record value.
+   function Handle_Lag (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare
+         Var     : constant Value := Vals.Element (1);
+         N_Val   : constant Value :=
+            (if Has_Args (Vals, 2) then Vals.Element (2)
+             else (Kind => Val_Integer, Int_Val => 1));
+         N       : Integer;
+         Log_Idx : constant Natural :=
+            (if SData.Table.Is_Filtered then SData.Table.Get_Logical_Record_Index
+             else SData.Table.Get_Current_Record_Index);
+      begin
+         if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
+         N := Integer (Convert_To_Float (N_Val));
+         if N <= 0 or else Log_Idx <= N then return (Kind => Val_Missing); end if;
          declare
-            Needle   : constant Value := Vals.Element (1);
-            Haystack : constant Value := Vals.Element (2);
+            Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Log_Idx);
+            Phys_Prev : constant Positive := SData.Table.Logical_To_Physical (Log_Idx - N);
          begin
-            if Needle.Kind /= Val_String or else Haystack.Kind /= Val_String then
+            if not SData.Interpreter.In_Same_Group (Phys_Curr, Phys_Prev) then
                return (Kind => Val_Missing);
             end if;
-            if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
-            return (Kind => Val_Integer,
-                    Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
+            return SData.Table.Get_Value_Upper (Phys_Prev, To_Upper (SData.Values.To_String (Var)));
          end;
+      end;
+   end Handle_Lag;
 
-      elsif Name = "CHR$" and then Has_Args (Vals, 1) then
-         declare
-            Code : constant Integer := Integer (Convert_To_Float (Vals.Element (1)));
-            R    : Value (Val_String);
-         begin
-            R.Str_Val := To_Unbounded_String ("" & Character'Val (Code));
-            return R;
-         end;
-
-      elsif Name = "STR$" and then Has_Args (Vals, 1) then
-         declare
-            Img : constant String := SData.Values.To_String_Formatted (Vals.Element (1));
-            R   : Value (Val_String);
-         begin
-            R.Str_Val := To_Unbounded_String (Img);
-            return R;
-         end;
-
-      elsif Name = "VAL" and then Has_Args (Vals, 1) then
-         declare V : constant Value := Vals.Element (1);
-         begin
-            if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            begin
-               return (Kind    => Val_Numeric,
-                       Num_Val => Float'Value (SData.Values.To_String (V)));
-            exception
-               when Constraint_Error => return (Kind => Val_Missing);
-            end;
-         end;
-
-      elsif Name = "NUM$" and then Has_Args (Vals, 1) then
-         declare
-            V      : constant Value  := Vals.Element (1);
-            Result : Value (Val_String);
-            Img    : constant String := SData.Values.To_String_Formatted (V);
-         begin
-            Result.Str_Val := To_Unbounded_String (Img);
-            return Result;
-         end;
-
-      --  Base conversion
-      elsif Name = "HEX$" and then Has_Args (Vals, 1) then
-         declare
-            N         : constant Integer := Integer (Convert_To_Float (Vals.Element (1)));
-            Buf       : String (1 .. 16);
-            Len       : Natural := 0;
-            Val       : Integer := abs N;
-            Hex_Chars : constant String := "0123456789ABCDEF";
-            R         : Value (Val_String);
-         begin
-            if Val = 0 then Buf (1) := '0'; Len := 1;
-            else
-               while Val > 0 loop
-                  Len := Len + 1;
-                  Buf (Len) := Hex_Chars (Val mod 16 + 1);
-                  Val := Val / 16;
-               end loop;
-               for I in 1 .. Len / 2 loop
-                  declare Tmp : constant Character := Buf (I);
-                  begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
-               end loop;
-            end if;
-            R.Str_Val := To_Unbounded_String (Buf (1 .. Len));
-            return R;
-         end;
-
-      elsif Name = "OCT$" and then Has_Args (Vals, 1) then
-         declare
-            N   : constant Integer := Integer (Convert_To_Float (Vals.Element (1)));
-            Buf : String (1 .. 16);
-            Len : Natural := 0;
-            Val : Integer := abs N;
-            R   : Value (Val_String);
-         begin
-            if Val = 0 then Buf (1) := '0'; Len := 1;
-            else
-               while Val > 0 loop
-                  Len := Len + 1;
-                  Buf (Len) := Character'Val (Val mod 8 + Character'Pos ('0'));
-                  Val := Val / 8;
-               end loop;
-               for I in 1 .. Len / 2 loop
-                  declare Tmp : constant Character := Buf (I);
-                  begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
-               end loop;
-            end if;
-            R.Str_Val := To_Unbounded_String (Buf (1 .. Len));
-            return R;
-         end;
-
-      elsif Name = "BIN$" and then Has_Args (Vals, 1) then
-         declare
-            N   : constant Integer := Integer (Convert_To_Float (Vals.Element (1)));
-            Buf : String (1 .. 32);
-            Len : Natural := 0;
-            Val : Integer := abs N;
-            R   : Value (Val_String);
-         begin
-            if Val = 0 then Buf (1) := '0'; Len := 1;
-            else
-               while Val > 0 loop
-                  Len := Len + 1;
-                  Buf (Len) := Character'Val (Val mod 2 + Character'Pos ('0'));
-                  Val := Val / 2;
-               end loop;
-               for I in 1 .. Len / 2 loop
-                  declare Tmp : constant Character := Buf (I);
-                  begin Buf (I) := Buf (Len - I + 1); Buf (Len - I + 1) := Tmp; end;
-               end loop;
-            end if;
-            R.Str_Val := To_Unbounded_String (Buf (1 .. Len));
-            return R;
-         end;
-      end if;
-      return (Kind => Val_Missing);
-   end Handle_String_Ops;
-
-   ---------------------------------------------------------------------------
-   --  Handle_Navigation — RECNO, BOF, EOF, BOG, EOG,
-   --                       LAG/LAGC$, NEXT/NEXTC$, OBS/OBSC$
-   ---------------------------------------------------------------------------
-   function Handle_Navigation (Name : String; Vals : Value_Vectors.Vector) return Value is
+   --  NEXT/NEXTC$ share this handler; both look up the nth succeeding record value.
+   function Handle_Next_Val (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
    begin
-      if Name in "RECNO" | "ORD" then
-         --  ORD with an argument is the ASCII code of the first character.
-         --  ORD with no arguments is a synonym for RECNO (logical record index).
-         if Name = "ORD" and then Has_Args (Vals, 1) then
-            declare
-               V : constant Value := Vals.Element (1);
-            begin
-               if V.Kind /= Val_String or else Length (V.Str_Val) = 0 then
-                  return (Kind => Val_Missing);
-               end if;
-               return (Kind    => Val_Integer,
-                       Int_Val => Character'Pos (Element (V.Str_Val, 1)));
-            end;
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare
+         Var       : constant Value := Vals.Element (1);
+         N_Val     : constant Value :=
+            (if Has_Args (Vals, 2) then Vals.Element (2)
+             else (Kind => Val_Integer, Int_Val => 1));
+         N         : Integer;
+         Log_Idx   : constant Natural :=
+            (if SData.Table.Is_Filtered then SData.Table.Get_Logical_Record_Index
+             else SData.Table.Get_Current_Record_Index);
+         Log_Count : constant Natural :=
+            (if SData.Table.Is_Filtered then SData.Table.Logical_Row_Count
+             else SData.Table.Row_Count);
+      begin
+         if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
+         N := Integer (Convert_To_Float (N_Val));
+         if N <= 0 or else (Log_Idx + N) > Log_Count then return (Kind => Val_Missing); end if;
+         declare
+            Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Log_Idx);
+            Phys_Next : constant Positive := SData.Table.Logical_To_Physical (Log_Idx + N);
+         begin
+            if not SData.Interpreter.In_Same_Group (Phys_Curr, Phys_Next) then
+               return (Kind => Val_Missing);
+            end if;
+            return SData.Table.Get_Value_Upper (Phys_Next, To_Upper (SData.Values.To_String (Var)));
+         end;
+      end;
+   end Handle_Next_Val;
+
+   --  OBS/OBSC$ share this handler; both look up a variable value at an absolute row.
+   function Handle_Obs (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         Var     : constant Value := Vals.Element (1);
+         Row_Val : constant Value := Vals.Element (2);
+         Row     : Integer;
+      begin
+         if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
+         Row := Integer (Convert_To_Float (Row_Val));
+         if Row < 1 or else Row > SData.Table.Row_Count then
+            return (Kind => Val_Missing);
          end if;
-
-         return (Kind    => Val_Integer,
-                 Int_Val => (if SData.Table.Is_Filtered
-                             then Integer (SData.Table.Get_Logical_Record_Index)
-                             else Integer (SData.Table.Get_Current_Record_Index)));
-
-      elsif Name = "BOF" then
-         return (Kind    => Val_Integer,
-                 Int_Val => (if SData.Table.Is_Filtered
-                             then (if SData.Table.Get_Logical_Record_Index <= 1 then 1 else 0)
-                             else (if SData.Table.Get_Current_Record_Index <= 1 then 1 else 0)));
-
-      elsif Name = "EOF" then
-         return (Kind    => Val_Integer,
-                 Int_Val => (if SData.Table.Is_Filtered
-                             then (if SData.Table.Get_Logical_Record_Index >= SData.Table.Logical_Row_Count then 1 else 0)
-                             else (if SData.Table.Get_Current_Record_Index >= SData.Table.Row_Count then 1 else 0)));
-
-      elsif Name = "BOG" then
-         return (Kind => Val_Integer, Int_Val => (if BOG_Flag then 1 else 0));
-
-      elsif Name = "EOG" then
-         return (Kind => Val_Integer, Int_Val => (if EOG_Flag then 1 else 0));
-
-      elsif Name in "LAG" | "LAGC$" and then
-            (Has_Args (Vals, 1) or else Has_Args (Vals, 2)) then
-         declare
-            Var     : constant Value := Vals.Element (1);
-            N_Val   : constant Value :=
-               (if Has_Args (Vals, 2) then Vals.Element (2)
-                else (Kind => Val_Integer, Int_Val => 1));
-            N       : Integer;
-            Log_Idx : constant Natural :=
-               (if SData.Table.Is_Filtered then SData.Table.Get_Logical_Record_Index
-                else SData.Table.Get_Current_Record_Index);
-         begin
-            if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            N := Integer (Convert_To_Float (N_Val));
-            if N <= 0 or else Log_Idx <= N then return (Kind => Val_Missing); end if;
-            declare
-               Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Log_Idx);
-               Phys_Prev : constant Positive := SData.Table.Logical_To_Physical (Log_Idx - N);
-            begin
-               if not SData.Interpreter.In_Same_Group (Phys_Curr, Phys_Prev) then
-                  return (Kind => Val_Missing);
-               end if;
-               return SData.Table.Get_Value_Upper (Phys_Prev, To_Upper (SData.Values.To_String (Var)));
-            end;
-         end;
-
-      elsif Name in "NEXT" | "NEXTC$" and then
-           (Has_Args (Vals, 1) or else Has_Args (Vals, 2)) then
-         declare
-            Var       : constant Value := Vals.Element (1);
-            N_Val     : constant Value :=
-               (if Has_Args (Vals, 2) then Vals.Element (2)
-                else (Kind => Val_Integer, Int_Val => 1));
-            N         : Integer;
-            Log_Idx   : constant Natural :=
-               (if SData.Table.Is_Filtered then SData.Table.Get_Logical_Record_Index
-                else SData.Table.Get_Current_Record_Index);
-            Log_Count : constant Natural :=
-               (if SData.Table.Is_Filtered then SData.Table.Logical_Row_Count
-                else SData.Table.Row_Count);
-         begin
-            if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            N := Integer (Convert_To_Float (N_Val));
-            if N <= 0 or else (Log_Idx + N) > Log_Count then return (Kind => Val_Missing); end if;
-            declare
-               Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Log_Idx);
-               Phys_Next : constant Positive := SData.Table.Logical_To_Physical (Log_Idx + N);
-            begin
-               if not SData.Interpreter.In_Same_Group (Phys_Curr, Phys_Next) then
-                  return (Kind => Val_Missing);
-               end if;
-               return SData.Table.Get_Value_Upper (Phys_Next, To_Upper (SData.Values.To_String (Var)));
-            end;
-         end;
-
-      elsif Name in "OBS" | "OBSC$" and then Has_Args (Vals, 2) then
-         declare
-            Var     : constant Value := Vals.Element (1);
-            Row_Val : constant Value := Vals.Element (2);
-            Row     : Integer;
-         begin
-            if Var.Kind /= Val_String then return (Kind => Val_Missing); end if;
-            Row := Integer (Convert_To_Float (Row_Val));
-            if Row < 1 or else Row > SData.Table.Row_Count then
-               return (Kind => Val_Missing);
-            end if;
-            return SData.Table.Get_Value_Upper (Row, To_Upper (SData.Values.To_String (Var)));
-         end;
-      end if;
-      return (Kind => Val_Missing);
-   end Handle_Navigation;
+         return SData.Table.Get_Value_Upper (Row, To_Upper (SData.Values.To_String (Var)));
+      end;
+   end Handle_Obs;
 
    ---------------------------------------------------------------------------
-   --  Handle_Statistics — probability distributions (PDF, CDF, IDF, RN)
-   --                       and uniform random RAN/RANDOM
+   --  Statistics handlers — one subprogram per language function.
+   --  L-prefix functions implement the Logistic distribution inline.
+   --  MIF and BRN were previously registered but unimplemented; they are now
+   --  wired to their respective SData.Statistics functions.
    ---------------------------------------------------------------------------
-   function Handle_Statistics (Name : String; Vals : Value_Vectors.Vector) return Value is
+
+   --  --- PDF family ---
+
+   function Handle_ZDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
    begin
-      --  PDF family
-      if Name = "ZDF" and then Has_Args (Vals, 1) then
-         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
-      elsif Name = "NDF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)),
-                                                         Convert_To_Float (Vals.Element (2)),
-                                                         Convert_To_Float (Vals.Element (3))));
-      elsif Name = "UDF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Uniform_PDF (Convert_To_Float (Vals.Element (1)),
-                                                          Convert_To_Float (Vals.Element (2)),
-                                                          Convert_To_Float (Vals.Element (3))));
-      elsif Name = "EDF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Exponential_PDF (Convert_To_Float (Vals.Element (1)),
-                                                              Convert_To_Float (Vals.Element (2))));
-      elsif Name = "BDF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Beta_PDF (Convert_To_Float (Vals.Element (1)),
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+   end Handle_ZDF;
+
+   function Handle_NDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)),
+                                                      Convert_To_Float (Vals.Element (2)),
+                                                      Convert_To_Float (Vals.Element (3))));
+   end Handle_NDF;
+
+   function Handle_UDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Uniform_PDF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2)),
                                                        Convert_To_Float (Vals.Element (3))));
-      elsif Name = "PDF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Poisson_PMF (Convert_To_Float (Vals.Element (1)),
-                                                          Convert_To_Float (Vals.Element (2))));
-      elsif Name = "GDF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Gamma_PDF (Convert_To_Float (Vals.Element (1)),
-                                                        Convert_To_Float (Vals.Element (2)),
-                                                        Convert_To_Float (Vals.Element (3))));
-      elsif Name = "XDF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Chi_Square_PDF (Convert_To_Float (Vals.Element (1)),
-                                                             Convert_To_Float (Vals.Element (2))));
-      elsif Name = "TDF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Student_T_PDF (Convert_To_Float (Vals.Element (1)),
-                                                            Convert_To_Float (Vals.Element (2))));
-      elsif Name = "FDF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.F_PDF (Convert_To_Float (Vals.Element (1)),
+   end Handle_UDF;
+
+   function Handle_EDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Exponential_PDF (Convert_To_Float (Vals.Element (1)),
+                                                           Convert_To_Float (Vals.Element (2))));
+   end Handle_EDF;
+
+   function Handle_BDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Beta_PDF (Convert_To_Float (Vals.Element (1)),
                                                     Convert_To_Float (Vals.Element (2)),
                                                     Convert_To_Float (Vals.Element (3))));
-      elsif Name = "MDF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Binomial_PMF (Convert_To_Float (Vals.Element (1)),
-                                                           Convert_To_Float (Vals.Element (2)),
-                                                           Convert_To_Float (Vals.Element (3))));
-      elsif Name = "WDF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Weibull_PDF (Convert_To_Float (Vals.Element (1)),
-                                                          Convert_To_Float (Vals.Element (2)),
-                                                          Convert_To_Float (Vals.Element (3))));
-      elsif Name = "LDF" and then Has_Args (Vals, 1) then
-         declare
-            X : constant Float := Convert_To_Float (Vals.Element (1));
-            E : constant Float := Exp (-X);
-            S : constant Float := 1.0 + E;
-         begin return Num_Result (E / (S * S)); end;
+   end Handle_BDF;
 
-      --  CDF family
-      elsif Name = "ZCF" and then Has_Args (Vals, 1) then
-         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
-      elsif Name = "NCF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)),
-                                                         Convert_To_Float (Vals.Element (2)),
-                                                         Convert_To_Float (Vals.Element (3))));
-      elsif Name = "UCF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Uniform_CDF (Convert_To_Float (Vals.Element (1)),
-                                                          Convert_To_Float (Vals.Element (2)),
-                                                          Convert_To_Float (Vals.Element (3))));
-      elsif Name = "ECF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Exponential_CDF (Convert_To_Float (Vals.Element (1)),
-                                                              Convert_To_Float (Vals.Element (2))));
-      elsif Name = "BCF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Beta_CDF (Convert_To_Float (Vals.Element (1)),
-                                                       Convert_To_Float (Vals.Element (2)),
-                                                       Convert_To_Float (Vals.Element (3))));
-      elsif Name = "PCF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Poisson_CDF (Convert_To_Float (Vals.Element (1)),
-                                                          Convert_To_Float (Vals.Element (2))));
-      elsif Name = "GCF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Gamma_CDF (Convert_To_Float (Vals.Element (1)),
-                                                        Convert_To_Float (Vals.Element (2)),
-                                                        Convert_To_Float (Vals.Element (3))));
-      elsif Name = "XCF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Chi_Square_CDF (Convert_To_Float (Vals.Element (1)),
-                                                             Convert_To_Float (Vals.Element (2))));
-      elsif Name = "TCF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Student_T_CDF (Convert_To_Float (Vals.Element (1)),
-                                                            Convert_To_Float (Vals.Element (2))));
-      elsif Name = "FCF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.F_CDF (Convert_To_Float (Vals.Element (1)),
-                                                    Convert_To_Float (Vals.Element (2)),
-                                                    Convert_To_Float (Vals.Element (3))));
-      elsif Name = "MCF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Binomial_CDF (Convert_To_Float (Vals.Element (1)),
-                                                           Convert_To_Float (Vals.Element (2)),
-                                                           Convert_To_Float (Vals.Element (3))));
-      elsif Name = "WCF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Weibull_CDF (Convert_To_Float (Vals.Element (1)),
-                                                          Convert_To_Float (Vals.Element (2)),
-                                                          Convert_To_Float (Vals.Element (3))));
-      elsif Name = "LCF" and then Has_Args (Vals, 1) then
-         return Num_Result (1.0 / (1.0 + Exp (-Convert_To_Float (Vals.Element (1)))));
-
-      --  IDF family
-      elsif Name = "ZIF" and then Has_Args (Vals, 1) then
-         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
-      elsif Name = "NIF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)),
-                                                         Convert_To_Float (Vals.Element (2)),
-                                                         Convert_To_Float (Vals.Element (3))));
-      elsif Name = "UIF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Uniform_IDF (Convert_To_Float (Vals.Element (1)),
-                                                          Convert_To_Float (Vals.Element (2)),
-                                                          Convert_To_Float (Vals.Element (3))));
-      elsif Name = "EIF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Exponential_IDF (Convert_To_Float (Vals.Element (1)),
-                                                              Convert_To_Float (Vals.Element (2))));
-      elsif Name = "BIF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Beta_IDF (Convert_To_Float (Vals.Element (1)),
-                                                       Convert_To_Float (Vals.Element (2)),
-                                                       Convert_To_Float (Vals.Element (3))));
-      elsif Name = "LIF" and then Has_Args (Vals, 1) then
-         declare P : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if P <= 0.0 or else P >= 1.0 then
-               return Handle_Domain_Error ("LIF argument must be in (0, 1).");
-            end if;
-            return Num_Result (Log (P / (1.0 - P)));
-         end;
-      elsif Name = "PIF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Poisson_IDF (Convert_To_Float (Vals.Element (1)),
-                                                          Convert_To_Float (Vals.Element (2))));
-      elsif Name = "GIF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Gamma_IDF (Convert_To_Float (Vals.Element (1)),
-                                                        Convert_To_Float (Vals.Element (2)),
-                                                        Convert_To_Float (Vals.Element (3))));
-      elsif Name = "XIF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Chi_Square_IDF (Convert_To_Float (Vals.Element (1)),
-                                                             Convert_To_Float (Vals.Element (2))));
-      elsif Name = "TIF" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Student_T_IDF (Convert_To_Float (Vals.Element (1)),
-                                                            Convert_To_Float (Vals.Element (2))));
-      elsif Name = "FIF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.F_IDF (Convert_To_Float (Vals.Element (1)),
-                                                    Convert_To_Float (Vals.Element (2)),
-                                                    Convert_To_Float (Vals.Element (3))));
-      elsif Name = "WIF" and then Has_Args (Vals, 3) then
-         return Num_Result (SData.Statistics.Weibull_IDF (Convert_To_Float (Vals.Element (1)),
-                                                          Convert_To_Float (Vals.Element (2)),
-                                                          Convert_To_Float (Vals.Element (3))));
-
-      --  RN family
-      elsif Name = "ZRN" then
-         return Num_Result (SData.Statistics.Normal_RN (0.0, 1.0));
-      elsif Name = "NRN" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
-                                                        Convert_To_Float (Vals.Element (2))));
-      elsif Name = "URN" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Uniform_RN (Convert_To_Float (Vals.Element (1)),
-                                                         Convert_To_Float (Vals.Element (2))));
-      elsif Name = "ERN" and then Has_Args (Vals, 1) then
-         return Num_Result (SData.Statistics.Exponential_RN (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "PRN" and then Has_Args (Vals, 1) then
-         return Num_Result (SData.Statistics.Poisson_RN (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "GRN" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Gamma_RN (Convert_To_Float (Vals.Element (1)),
+   function Handle_PDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Poisson_PMF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2))));
-      elsif Name = "MRN" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Binomial_RN (Convert_To_Float (Vals.Element (1)),
+   end Handle_PDF;
+
+   function Handle_GDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Gamma_PDF (Convert_To_Float (Vals.Element (1)),
+                                                     Convert_To_Float (Vals.Element (2)),
+                                                     Convert_To_Float (Vals.Element (3))));
+   end Handle_GDF;
+
+   function Handle_XDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Chi_Square_PDF (Convert_To_Float (Vals.Element (1)),
                                                           Convert_To_Float (Vals.Element (2))));
-      elsif Name = "WRN" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.Weibull_RN (Convert_To_Float (Vals.Element (1)),
+   end Handle_XDF;
+
+   function Handle_TDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Student_T_PDF (Convert_To_Float (Vals.Element (1)),
                                                          Convert_To_Float (Vals.Element (2))));
-      elsif Name = "LRN" then
-         declare U : constant Float := SData.Statistics.Uniform_RN (0.0, 1.0);
-         begin return Num_Result (Log (U / (1.0 - U))); end;
-      elsif Name = "XRN" and then Has_Args (Vals, 1) then
-         return Num_Result (SData.Statistics.Chi_Square_RN (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "TRN" and then Has_Args (Vals, 1) then
-         return Num_Result (SData.Statistics.Student_T_RN (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "FRN" and then Has_Args (Vals, 2) then
-         return Num_Result (SData.Statistics.F_RN (Convert_To_Float (Vals.Element (1)),
+   end Handle_TDF;
+
+   function Handle_FDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.F_PDF (Convert_To_Float (Vals.Element (1)),
+                                                 Convert_To_Float (Vals.Element (2)),
+                                                 Convert_To_Float (Vals.Element (3))));
+   end Handle_FDF;
+
+   function Handle_MDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Binomial_PMF (Convert_To_Float (Vals.Element (1)),
+                                                        Convert_To_Float (Vals.Element (2)),
+                                                        Convert_To_Float (Vals.Element (3))));
+   end Handle_MDF;
+
+   function Handle_WDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Weibull_PDF (Convert_To_Float (Vals.Element (1)),
+                                                       Convert_To_Float (Vals.Element (2)),
+                                                       Convert_To_Float (Vals.Element (3))));
+   end Handle_WDF;
+
+   --  Logistic PDF: f(x) = e^-x / (1 + e^-x)^2
+   function Handle_LDF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare
+         X : constant Float := Convert_To_Float (Vals.Element (1));
+         E : constant Float := Exp (-X);
+         S : constant Float := 1.0 + E;
+      begin
+         return Num_Result (E / (S * S));
+      end;
+   end Handle_LDF;
+
+   --  --- CDF family ---
+
+   function Handle_ZCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+   end Handle_ZCF;
+
+   function Handle_NCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)),
+                                                      Convert_To_Float (Vals.Element (2)),
+                                                      Convert_To_Float (Vals.Element (3))));
+   end Handle_NCF;
+
+   function Handle_UCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Uniform_CDF (Convert_To_Float (Vals.Element (1)),
+                                                       Convert_To_Float (Vals.Element (2)),
+                                                       Convert_To_Float (Vals.Element (3))));
+   end Handle_UCF;
+
+   function Handle_ECF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Exponential_CDF (Convert_To_Float (Vals.Element (1)),
+                                                           Convert_To_Float (Vals.Element (2))));
+   end Handle_ECF;
+
+   function Handle_BCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Beta_CDF (Convert_To_Float (Vals.Element (1)),
+                                                    Convert_To_Float (Vals.Element (2)),
+                                                    Convert_To_Float (Vals.Element (3))));
+   end Handle_BCF;
+
+   function Handle_PCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Poisson_CDF (Convert_To_Float (Vals.Element (1)),
+                                                       Convert_To_Float (Vals.Element (2))));
+   end Handle_PCF;
+
+   function Handle_GCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Gamma_CDF (Convert_To_Float (Vals.Element (1)),
+                                                     Convert_To_Float (Vals.Element (2)),
+                                                     Convert_To_Float (Vals.Element (3))));
+   end Handle_GCF;
+
+   function Handle_XCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Chi_Square_CDF (Convert_To_Float (Vals.Element (1)),
+                                                          Convert_To_Float (Vals.Element (2))));
+   end Handle_XCF;
+
+   function Handle_TCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Student_T_CDF (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2))));
+   end Handle_TCF;
+
+   function Handle_FCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.F_CDF (Convert_To_Float (Vals.Element (1)),
+                                                 Convert_To_Float (Vals.Element (2)),
+                                                 Convert_To_Float (Vals.Element (3))));
+   end Handle_FCF;
+
+   function Handle_MCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Binomial_CDF (Convert_To_Float (Vals.Element (1)),
+                                                        Convert_To_Float (Vals.Element (2)),
+                                                        Convert_To_Float (Vals.Element (3))));
+   end Handle_MCF;
+
+   function Handle_WCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Weibull_CDF (Convert_To_Float (Vals.Element (1)),
+                                                       Convert_To_Float (Vals.Element (2)),
+                                                       Convert_To_Float (Vals.Element (3))));
+   end Handle_WCF;
+
+   --  Logistic CDF: F(x) = 1 / (1 + e^-x)  (sigmoid)
+   function Handle_LCF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (1.0 / (1.0 + Exp (-Convert_To_Float (Vals.Element (1)))));
+   end Handle_LCF;
+
+   --  --- IDF family ---
+
+   function Handle_ZIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+   end Handle_ZIF;
+
+   function Handle_NIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)),
+                                                      Convert_To_Float (Vals.Element (2)),
+                                                      Convert_To_Float (Vals.Element (3))));
+   end Handle_NIF;
+
+   function Handle_UIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Uniform_IDF (Convert_To_Float (Vals.Element (1)),
+                                                       Convert_To_Float (Vals.Element (2)),
+                                                       Convert_To_Float (Vals.Element (3))));
+   end Handle_UIF;
+
+   function Handle_EIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Exponential_IDF (Convert_To_Float (Vals.Element (1)),
+                                                           Convert_To_Float (Vals.Element (2))));
+   end Handle_EIF;
+
+   function Handle_BIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Beta_IDF (Convert_To_Float (Vals.Element (1)),
+                                                    Convert_To_Float (Vals.Element (2)),
+                                                    Convert_To_Float (Vals.Element (3))));
+   end Handle_BIF;
+
+   --  Logistic IDF: Q(p) = ln(p / (1-p))  (logit function); p must be in (0, 1).
+   function Handle_LIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare P : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if P <= 0.0 or else P >= 1.0 then
+            return Handle_Domain_Error ("LIF argument must be in (0, 1).");
+         end if;
+         return Num_Result (Log (P / (1.0 - P)));
+      end;
+   end Handle_LIF;
+
+   function Handle_PIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Poisson_IDF (Convert_To_Float (Vals.Element (1)),
+                                                       Convert_To_Float (Vals.Element (2))));
+   end Handle_PIF;
+
+   function Handle_GIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Gamma_IDF (Convert_To_Float (Vals.Element (1)),
+                                                     Convert_To_Float (Vals.Element (2)),
+                                                     Convert_To_Float (Vals.Element (3))));
+   end Handle_GIF;
+
+   function Handle_XIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Chi_Square_IDF (Convert_To_Float (Vals.Element (1)),
+                                                          Convert_To_Float (Vals.Element (2))));
+   end Handle_XIF;
+
+   function Handle_TIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Student_T_IDF (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2))));
+   end Handle_TIF;
+
+   function Handle_FIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.F_IDF (Convert_To_Float (Vals.Element (1)),
+                                                 Convert_To_Float (Vals.Element (2)),
+                                                 Convert_To_Float (Vals.Element (3))));
+   end Handle_FIF;
+
+   function Handle_WIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Weibull_IDF (Convert_To_Float (Vals.Element (1)),
+                                                       Convert_To_Float (Vals.Element (2)),
+                                                       Convert_To_Float (Vals.Element (3))));
+   end Handle_WIF;
+
+   function Handle_MIF (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Binomial_IDF (Convert_To_Float (Vals.Element (1)),
+                                                        Convert_To_Float (Vals.Element (2)),
+                                                        Convert_To_Float (Vals.Element (3))));
+   end Handle_MIF;
+
+   --  --- RN (random number) family ---
+
+   function Handle_ZRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return Num_Result (SData.Statistics.Normal_RN (0.0, 1.0));
+   end Handle_ZRN;
+
+   function Handle_NRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
+                                                     Convert_To_Float (Vals.Element (2))));
+   end Handle_NRN;
+
+   function Handle_URN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Uniform_RN (Convert_To_Float (Vals.Element (1)),
+                                                      Convert_To_Float (Vals.Element (2))));
+   end Handle_URN;
+
+   function Handle_ERN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Exponential_RN (Convert_To_Float (Vals.Element (1))));
+   end Handle_ERN;
+
+   function Handle_PRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Poisson_RN (Convert_To_Float (Vals.Element (1))));
+   end Handle_PRN;
+
+   function Handle_GRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Gamma_RN (Convert_To_Float (Vals.Element (1)),
+                                                    Convert_To_Float (Vals.Element (2))));
+   end Handle_GRN;
+
+   function Handle_MRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Binomial_RN (Convert_To_Float (Vals.Element (1)),
+                                                       Convert_To_Float (Vals.Element (2))));
+   end Handle_MRN;
+
+   function Handle_WRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Weibull_RN (Convert_To_Float (Vals.Element (1)),
+                                                      Convert_To_Float (Vals.Element (2))));
+   end Handle_WRN;
+
+   function Handle_BRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Beta_RN (Convert_To_Float (Vals.Element (1)),
                                                    Convert_To_Float (Vals.Element (2))));
-      elsif Name in "RAN" | "RANDOM" then
-         return Num_Result (SData.Statistics.Uniform_Random);
-      end if;
-      return (Kind => Val_Missing);
-   end Handle_Statistics;
+   end Handle_BRN;
+
+   --  Logistic RN: sample via inversion — U(0,1) → logit(U)
+   function Handle_LRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+      U : constant Float := SData.Statistics.Uniform_RN (0.0, 1.0);
+   begin
+      return Num_Result (Log (U / (1.0 - U)));
+   end Handle_LRN;
+
+   function Handle_XRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Chi_Square_RN (Convert_To_Float (Vals.Element (1))));
+   end Handle_XRN;
+
+   function Handle_TRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.Student_T_RN (Convert_To_Float (Vals.Element (1))));
+   end Handle_TRN;
+
+   function Handle_FRN (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (SData.Statistics.F_RN (Convert_To_Float (Vals.Element (1)),
+                                                Convert_To_Float (Vals.Element (2))));
+   end Handle_FRN;
+
+   --  RAN/RANDOM share this handler; both return a Uniform(0,1) deviate.
+   function Handle_Ran (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return Num_Result (SData.Statistics.Uniform_Random);
+   end Handle_Ran;
 
    ---------------------------------------------------------------------------
    --  Handle_Misc — MISSING, FALSE, TRUE, DATE$, TIME$, SHELL, NUM
@@ -1540,96 +1847,99 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("MEDIAN", Handle_Aggregate'Access);
 
       --  String operations
-      Dispatch_Table.Insert ("LEN",    Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("LEFT$",  Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("RIGHT$", Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("MID$",   Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("TRIM$",  Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("LTRIM$", Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("RTRIM$", Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("ASCII",  Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("UCASE$", Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("UPPER$", Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("LCASE$", Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("LOWER$", Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("POS",    Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("CHR$",   Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("STR$",   Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("VAL",    Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("HEX$",   Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("OCT$",   Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("BIN$",   Handle_String_Ops'Access);
-      Dispatch_Table.Insert ("NUM$",   Handle_String_Ops'Access);
+      Dispatch_Table.Insert ("LEN",    Handle_Len'Access);
+      Dispatch_Table.Insert ("LEFT$",  Handle_Left'Access);
+      Dispatch_Table.Insert ("RIGHT$", Handle_Right'Access);
+      Dispatch_Table.Insert ("MID$",   Handle_Mid'Access);
+      Dispatch_Table.Insert ("TRIM$",  Handle_Trim'Access);
+      Dispatch_Table.Insert ("LTRIM$", Handle_Ltrim'Access);
+      Dispatch_Table.Insert ("RTRIM$", Handle_Rtrim'Access);
+      Dispatch_Table.Insert ("ASCII",  Handle_ASCII'Access);
+      Dispatch_Table.Insert ("UCASE$", Handle_Upper'Access);
+      Dispatch_Table.Insert ("UPPER$", Handle_Upper'Access);
+      Dispatch_Table.Insert ("LCASE$", Handle_Lower'Access);
+      Dispatch_Table.Insert ("LOWER$", Handle_Lower'Access);
+      Dispatch_Table.Insert ("POS",    Handle_Pos'Access);
+      Dispatch_Table.Insert ("CHR$",   Handle_Chr'Access);
+      Dispatch_Table.Insert ("STR$",   Handle_Str'Access);
+      Dispatch_Table.Insert ("VAL",    Handle_Val'Access);
+      Dispatch_Table.Insert ("HEX$",   Handle_Hex'Access);
+      Dispatch_Table.Insert ("OCT$",   Handle_Oct'Access);
+      Dispatch_Table.Insert ("BIN$",   Handle_Bin'Access);
+      Dispatch_Table.Insert ("NUM$",   Handle_Num_Str'Access);
 
       --  Record navigation
-      Dispatch_Table.Insert ("RECNO",  Handle_Navigation'Access);
-      Dispatch_Table.Insert ("BOF",    Handle_Navigation'Access);
-      Dispatch_Table.Insert ("EOF",    Handle_Navigation'Access);
-      Dispatch_Table.Insert ("BOG",    Handle_Navigation'Access);
-      Dispatch_Table.Insert ("EOG",    Handle_Navigation'Access);
-      Dispatch_Table.Insert ("ORD",    Handle_Navigation'Access);
-      Dispatch_Table.Insert ("LAG",    Handle_Navigation'Access);
-      Dispatch_Table.Insert ("LAGC$",  Handle_Navigation'Access);
-      Dispatch_Table.Insert ("NEXT",   Handle_Navigation'Access);
-      Dispatch_Table.Insert ("NEXTC$", Handle_Navigation'Access);
-      Dispatch_Table.Insert ("OBS",    Handle_Navigation'Access);
-      Dispatch_Table.Insert ("OBSC$",  Handle_Navigation'Access);
+      Dispatch_Table.Insert ("RECNO",  Handle_Recno'Access);
+      Dispatch_Table.Insert ("BOF",    Handle_BOF'Access);
+      Dispatch_Table.Insert ("EOF",    Handle_EOF'Access);
+      Dispatch_Table.Insert ("BOG",    Handle_BOG'Access);
+      Dispatch_Table.Insert ("EOG",    Handle_EOG'Access);
+      Dispatch_Table.Insert ("ORD",    Handle_Ord'Access);
+      Dispatch_Table.Insert ("LAG",    Handle_Lag'Access);
+      Dispatch_Table.Insert ("LAGC$",  Handle_Lag'Access);
+      Dispatch_Table.Insert ("NEXT",   Handle_Next_Val'Access);
+      Dispatch_Table.Insert ("NEXTC$", Handle_Next_Val'Access);
+      Dispatch_Table.Insert ("OBS",    Handle_Obs'Access);
+      Dispatch_Table.Insert ("OBSC$",  Handle_Obs'Access);
 
-      --  Statistical distributions
-      Dispatch_Table.Insert ("ZDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("NDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("UDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("EDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("BDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("PDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("GDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("XDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("TDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("FDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("MDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("WDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("LDF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("ZCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("NCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("UCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("ECF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("BCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("PCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("GCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("XCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("TCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("FCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("MCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("WCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("LCF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("ZIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("NIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("UIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("EIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("BIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("LIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("PIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("MIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("GIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("XIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("TIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("FIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("WIF",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("ZRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("NRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("URN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("ERN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("PRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("GRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("MRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("WRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("BRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("LRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("XRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("TRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("FRN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("RAN",    Handle_Statistics'Access);
-      Dispatch_Table.Insert ("RANDOM", Handle_Statistics'Access);
+      --  Statistical distributions — PDF family
+      Dispatch_Table.Insert ("ZDF",    Handle_ZDF'Access);
+      Dispatch_Table.Insert ("NDF",    Handle_NDF'Access);
+      Dispatch_Table.Insert ("UDF",    Handle_UDF'Access);
+      Dispatch_Table.Insert ("EDF",    Handle_EDF'Access);
+      Dispatch_Table.Insert ("BDF",    Handle_BDF'Access);
+      Dispatch_Table.Insert ("PDF",    Handle_PDF'Access);
+      Dispatch_Table.Insert ("GDF",    Handle_GDF'Access);
+      Dispatch_Table.Insert ("XDF",    Handle_XDF'Access);
+      Dispatch_Table.Insert ("TDF",    Handle_TDF'Access);
+      Dispatch_Table.Insert ("FDF",    Handle_FDF'Access);
+      Dispatch_Table.Insert ("MDF",    Handle_MDF'Access);
+      Dispatch_Table.Insert ("WDF",    Handle_WDF'Access);
+      Dispatch_Table.Insert ("LDF",    Handle_LDF'Access);
+      --  CDF family
+      Dispatch_Table.Insert ("ZCF",    Handle_ZCF'Access);
+      Dispatch_Table.Insert ("NCF",    Handle_NCF'Access);
+      Dispatch_Table.Insert ("UCF",    Handle_UCF'Access);
+      Dispatch_Table.Insert ("ECF",    Handle_ECF'Access);
+      Dispatch_Table.Insert ("BCF",    Handle_BCF'Access);
+      Dispatch_Table.Insert ("PCF",    Handle_PCF'Access);
+      Dispatch_Table.Insert ("GCF",    Handle_GCF'Access);
+      Dispatch_Table.Insert ("XCF",    Handle_XCF'Access);
+      Dispatch_Table.Insert ("TCF",    Handle_TCF'Access);
+      Dispatch_Table.Insert ("FCF",    Handle_FCF'Access);
+      Dispatch_Table.Insert ("MCF",    Handle_MCF'Access);
+      Dispatch_Table.Insert ("WCF",    Handle_WCF'Access);
+      Dispatch_Table.Insert ("LCF",    Handle_LCF'Access);
+      --  IDF family
+      Dispatch_Table.Insert ("ZIF",    Handle_ZIF'Access);
+      Dispatch_Table.Insert ("NIF",    Handle_NIF'Access);
+      Dispatch_Table.Insert ("UIF",    Handle_UIF'Access);
+      Dispatch_Table.Insert ("EIF",    Handle_EIF'Access);
+      Dispatch_Table.Insert ("BIF",    Handle_BIF'Access);
+      Dispatch_Table.Insert ("LIF",    Handle_LIF'Access);
+      Dispatch_Table.Insert ("PIF",    Handle_PIF'Access);
+      Dispatch_Table.Insert ("MIF",    Handle_MIF'Access);
+      Dispatch_Table.Insert ("GIF",    Handle_GIF'Access);
+      Dispatch_Table.Insert ("XIF",    Handle_XIF'Access);
+      Dispatch_Table.Insert ("TIF",    Handle_TIF'Access);
+      Dispatch_Table.Insert ("FIF",    Handle_FIF'Access);
+      Dispatch_Table.Insert ("WIF",    Handle_WIF'Access);
+      --  RN family
+      Dispatch_Table.Insert ("ZRN",    Handle_ZRN'Access);
+      Dispatch_Table.Insert ("NRN",    Handle_NRN'Access);
+      Dispatch_Table.Insert ("URN",    Handle_URN'Access);
+      Dispatch_Table.Insert ("ERN",    Handle_ERN'Access);
+      Dispatch_Table.Insert ("PRN",    Handle_PRN'Access);
+      Dispatch_Table.Insert ("GRN",    Handle_GRN'Access);
+      Dispatch_Table.Insert ("MRN",    Handle_MRN'Access);
+      Dispatch_Table.Insert ("WRN",    Handle_WRN'Access);
+      Dispatch_Table.Insert ("BRN",    Handle_BRN'Access);
+      Dispatch_Table.Insert ("LRN",    Handle_LRN'Access);
+      Dispatch_Table.Insert ("XRN",    Handle_XRN'Access);
+      Dispatch_Table.Insert ("TRN",    Handle_TRN'Access);
+      Dispatch_Table.Insert ("FRN",    Handle_FRN'Access);
+      Dispatch_Table.Insert ("RAN",    Handle_Ran'Access);
+      Dispatch_Table.Insert ("RANDOM", Handle_Ran'Access);
 
       --  Miscellaneous
       Dispatch_Table.Insert ("MISSING", Handle_Misc'Access);

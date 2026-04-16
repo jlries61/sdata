@@ -61,14 +61,16 @@ Naming is Ada-idiomatic and precise. Procedure names are verb phrases; function 
 
 | Metric | Value |
 |---|---|
-| Avg procedure/function length | ~35 lines |
-| Max function length | `Handle_String_Ops`: ~253 lines |
-| Single Responsibility | 7/10 |
+| Avg procedure/function length | ~20 lines |
+| Max function length | `Evaluate` (~220 lines) and `Run_One_Step` (~175 lines) |
+| Single Responsibility | 8/10 |
 
-The large functions are family dispatch handlers (`Handle_Math`, `Handle_Trig`, `Handle_String_Ops`, `Handle_Statistics`, `Handle_Navigation`, `Handle_Aggregate`). Each is a `case` or `if-elsif` chain that re-dispatches after the Dispatch_Table already selected the family. This is a documented two-level dispatch design, but:
+~~`Handle_String_Ops` at ~253 lines, `Handle_Statistics` at ~187 lines, and `Handle_Navigation` at ~116 lines each violated the "one function does one thing" principle.~~ — **Fixed**: all three family handlers have been dissolved into individual per-function handlers. Each language function now has its own dedicated Ada subprogram (19 string handlers, 8 navigation handlers, 54 statistics handlers). The dispatch table is the sole dispatch layer — there is no second if-elsif re-dispatch inside a family handler. As a side effect, two previously registered but unimplemented functions (`BRN` and `MIF`) have been wired to their `SData.Statistics` implementations. The HEX$/OCT$/BIN$ code duplication was also eliminated via a shared `To_Base_String` helper.
 
-1. `Handle_String_Ops` at ~253 lines, `Handle_Statistics` at ~187 lines, and `Handle_Navigation` at ~116 lines each violate the "one function does one thing" principle. They are better described as *modules with a shared signature* than single-responsibility functions.
-2. `Run_One_Step` (`sdata-interpreter.adb:1107`) is ~175 lines doing filter rebuilding, logical/physical mapping, BOG/EOG computation, PDV management, and output flushing — multiple distinct concerns in one procedure.
+The remaining large functions have defensible reasons:
+- `Evaluate` (~220 lines) is a structural `case` on expression kind — it is linear in AST node types, not a dispatch chain.
+- `Run_One_Step` (`sdata-interpreter.adb:1107`) is ~175 lines doing filter rebuilding, logical/physical mapping, BOG/EOG computation, PDV management, and output flushing — multiple distinct concerns in one procedure. Still an open item.
+- `Handle_Math`, `Handle_Trig`, `Handle_Aggregate`, `Handle_Misc` retain their family-handler structure (70–120 lines each); these families have fewer members and the chains are shorter.
 
 ### 2.3 Comment Quality
 
@@ -148,12 +150,12 @@ Test breadth is commendable: control flow, BY-groups, aggregates, spill/sort, st
 ### 4.2 Change Resilience
 
 Adding a new built-in function requires:
-1. Implement handler logic in the appropriate `Handle_*` function in `sdata-evaluator.adb`
-2. Add one line to `Register_All_Functions`
+1. Add a new `Handle_FuncName` subprogram in `sdata-evaluator.adb`
+2. Add one `Dispatch_Table.Insert` line in `Register_All_Functions`
 3. Add help text in `sdata-help.adb`
 4. Add a test `.cmd` file and expected output
 
-That is a clean, well-defined change surface. Adding a new statement type is more invasive (lexer token, parser case, AST node type, interpreter case, help text) but the pattern is consistent throughout.
+That is a clean, well-defined change surface with no risk of disturbing unrelated functions. Adding a new statement type is more invasive (lexer token, parser case, AST node type, interpreter case, help text) but the pattern is consistent throughout.
 
 Type coercion logic is duplicated between `Set_Value_Upper` and `Set_Output_Value_Upper` in `sdata-table.adb`. A change to coercion rules requires edits in two places.
 
@@ -165,8 +167,10 @@ Type coercion logic is duplicated between `Set_Value_Upper` and `Set_Output_Valu
 | Duplicate type coercion logic | `sdata-table.adb:191-223, 578-607` | 2 hours | Stable |
 | ~~`BOG_Flag`/`EOG_Flag` owned by evaluator but logically belong to interpreter~~ | `sdata-evaluator.adb:60-61` | — | **Retracted** — placement is correct per design |
 | No unit tests for evaluator functions | Entire evaluator | 20+ hours | Growing |
-| Integer literal classification via `Float'Floor` may misclassify large integers | `sdata-evaluator.adb:1259-1263` | 2 hours | Stable |
+| ~~Integer literal classification via `Float'Floor` may misclassify large integers~~ | ~~`sdata-evaluator.adb:1259-1263`~~ | — | **Fixed** — `Is_Integer`/`Int_Value` stored at parse time |
 | Database pointer not freed on cleanup | `sdata-table.adb:36-44` | Blocked on upstream library fix | Stable |
+| ~~`Handle_String_Ops`, `Handle_Statistics`, `Handle_Navigation` SRP violations~~ | ~~`sdata-evaluator.adb`~~ | — | **Fixed** — dissolved into 81 individual handlers; dispatch table is now the sole dispatch layer |
+| `Run_One_Step` does filter rebuild, BOG/EOG, PDV management, output flush | `sdata-interpreter.adb:1107` | 4 hours | Stable |
 
 ---
 
@@ -284,14 +288,14 @@ The macOS section is notably thorough: the Alire/GNAT SDK path issue (`C_INCLUDE
 | Category | Score |
 |---|---|
 | Architectural Integrity | 78/100 |
-| Code Quality | 72/100 |
+| Code Quality | 78/100 |
 | Efficiency | 80/100 |
-| Maintainability | 65/100 |
+| Maintainability | 68/100 |
 | Error Handling | 85/100 |
 | Security | 82/100 |
 | Operational Readiness | 75/100 |
 | Documentation | 80/100 |
-| **TOTAL** | **617/800** |
+| **TOTAL** | **626/800** |
 
 ---
 
@@ -304,20 +308,22 @@ The macOS section is notably thorough: the Alire/GNAT SDK path issue (`C_INCLUDE
 - Excellent README and inline design documentation
 - Comprehensive integration test suite with good domain coverage
 - Sophisticated features (BY-groups, SELECT filter, disk spillover, lazy IF eval) are well-implemented and well-documented
-- The dispatch table + family handler design is a defensible choice that balances extensibility and simplicity
+- Each built-in language function now has its own Ada subprogram — the dispatch table is the sole dispatch layer with no hidden second-level re-dispatch
 
 **Fatal Flaws:**
 - None — there are no security holes, data corruption paths, or correctness violations found in the overall design
 
 **Genuine Defects Found:**
 
-1. ~~**Bug in `Handle_Trig`** (`sdata-evaluator.adb:282`): The pattern `Name in "HCS" | "HSN" | "HSN"` had `"HSN"` twice; `HTN` (hyperbolic cotangent) returned `Val_Missing` silently.~~ — **Fixed**: pattern is now `"HCS" | "HSN" | "HTN"`.
+1. ~~**Bug in `Handle_Trig`** (`sdata-evaluator.adb:282`): The pattern `Name in "HCS" | "HSN" | "HSN"` had `"HSN"` twice; `HTN` (hyperbolic cotangent) returned `Val_Missing` silently.~~ — **Fixed**.
 
-2. ~~**Integer literal precision** (`sdata-evaluator.adb:1259-1263`): Classifying a literal as integer by testing `Float'Floor(Expr.Value) = Expr.Value` fails for large integers (e.g., `16777217`) that cannot be exactly represented in 32-bit `Float`. The value is stored as `Float` in the AST, so precision is already lost before this check.~~ — **Fixed**: `Expr_Numeric_Literal` in the AST now carries `Is_Integer : Boolean` and `Int_Value : Integer`. The parser detects integer tokens (no `.` in source text) and stores the exact value via `Integer'Value`; literals exceeding `Integer'Last` fall back to `Float`. The evaluator uses `Is_Integer` directly, eliminating the float-floor heuristic.
+2. ~~**Integer literal precision** (`sdata-evaluator.adb:1259-1263`): Classifying a literal as integer by testing `Float'Floor(Expr.Value) = Expr.Value` fails for large integers (e.g., `16777217`) that cannot be exactly represented in 32-bit `Float`.~~ — **Fixed**: `Expr_Numeric_Literal` in the AST now carries `Is_Integer : Boolean` and `Int_Value : Integer`; the parser stores the exact value at parse time.
 
-3. **Dead state** in `SData.Config` top-level (`Repeat_Count`, `Repeat_Active` at lines 29-30) — the interpreter uses only the `Runtime_State_Record` copies.
+3. ~~**Dead state** in `SData.Config` top-level (`Repeat_Count`, `Repeat_Active`).~~ — **Fixed**.
 
-**Recommendation:** Fix the `HTN` bug immediately — it is a silent wrong-answer defect. Address the integer precision issue before claiming full numeric correctness. The dead config fields are low-risk cleanup. The architectural patterns (global state, no unit tests, large handler functions) are consistent choices that suit the project's current scale; revisit if the codebase grows significantly or if library embedding becomes a goal.
+4. ~~**SRP violations**: `Handle_String_Ops`, `Handle_Statistics`, `Handle_Navigation` were multi-hundred-line if-elsif re-dispatch chains.~~ — **Fixed**: dissolved into 81 individual handlers; `BRN` (Beta RN) and `MIF` (Binomial IDF) were also wired to their `SData.Statistics` implementations (they were registered but silently returned missing).
+
+**Recommendation:** The architectural patterns (global state, no unit tests) suit the project's current scale; revisit if the codebase grows significantly or if library embedding becomes a goal. The remaining open item of note is `Run_One_Step`'s multiple concerns.
 
 ---
 
@@ -325,13 +331,13 @@ The macOS section is notably thorough: the Alire/GNAT SDK path issue (`C_INCLUDE
 
 This is competent, honest Ada code. It is not trying to impress anyone — it is trying to work correctly, and it largely succeeds. The architecture matches the problem domain. The error handling is better than most interpreted languages' own implementations. The README is better than most commercial tools write.
 
-But if I had to hand this to a senior Ada engineer at 3 AM when a data pipeline is producing wrong statistical results, I would be worried about exactly two things: the `HTN` bug (silent wrong output — the worst kind), and the fact that there are zero unit tests for 1,600 lines of expression evaluation code. The integration tests tell you *that* something broke; they do not tell you *what*. When `Handle_Statistics` produces a wrong chi-square quantile, you will not know if it is the numerical algorithm, the argument parsing, the missing-value propagation, or the dispatch routing — you will diff test output and read 187 lines of if-elsif.
+The three significant quality issues identified at first review — the HTN silent-wrong-answer bug, the integer literal precision defect, and the family-handler SRP violations — have all been resolved. The dispatch table is now the sole dispatch layer: each language function has exactly one Ada subprogram. Adding a new function is a 2-file change with zero risk of accidentally breaking a neighbouring function. Two silently-broken functions (`BRN`, `MIF`) were discovered and fixed as a side effect.
 
-The code worth scrutinizing: the `Handle_*` family handlers. They are not bad code. They are honest, direct code. But they are also 250-line if-elsif chains where adding the 51st function requires reading all 50 existing branches to find the right insertion point. The dispatch table was built precisely to avoid this — and then the family handlers recreated it manually. That tension is unresolved.
+What remains: zero unit tests for the expression evaluator. The integration tests tell you *that* something broke; they do not tell you *what*. When `Handle_GIF` produces a wrong gamma quantile, you will not know if it is the numerical algorithm, the argument parsing, the missing-value propagation, or something in the dispatch path — you will diff test output and grep for gamma. This is the primary remaining quality gap for a project of this complexity.
 
-The design specification living outside the repository in a `.odt` file is an operational risk. If the author is unavailable and the repo is the only artifact, future maintainers will have to reverse-engineer the language semantics from `sdata-help.adb`.
+The design specification living outside the repository in a `.odt` file is an operational risk. `doc/design.odt` is now present in the repo but is not currently open for easy in-repo reading without LibreOffice or pandoc.
 
-Trust this at 3 AM? Yes — with the `HTN` bugfix applied first.
+Trust this at 3 AM? Yes — with higher confidence than at first review.
 
 ---
 
@@ -348,4 +354,7 @@ Trust this at 3 AM? Yes — with the `HTN` bugfix applied first.
 | Stack allocation for file content | `sdata-interpreter.adb` | 991 | `String (1 .. Integer(Ada.Streams.Stream_IO.Size(File)))` on stack |
 | ~~Duplicate DIGITS comment~~ | `sdata-config.ads` | 53-54 | **Fixed** — duplicate line removed |
 | ~~Inconsistent indentation (tabs vs spaces)~~ | `sdata-evaluator.adb` | 1279-1282 | **Fixed** — no tabs remain |
-| Design doc not in repo | External | N/A | `design.odt` lives at `~/Develop/Data/Docs/`, not version-controlled with code |
+| ~~Design doc not in repo~~ | External | N/A | **Resolved** — `doc/design.odt` and `doc/feasibility_assessment.md` copied into repo |
+| ~~`Handle_String_Ops`/`Handle_Statistics`/`Handle_Navigation` SRP violations~~ | `sdata-evaluator.adb` | 452-1014 | **Fixed** — dissolved into 81 individual handlers; `To_Base_String` helper eliminates HEX$/OCT$/BIN$ duplication |
+| ~~`BRN` registered, not implemented~~ | `sdata-evaluator.adb` | 1626 | **Fixed** — `Handle_BRN` calls `SData.Statistics.Beta_RN` |
+| ~~`MIF` registered, not implemented~~ | `sdata-evaluator.adb` | 1612 | **Fixed** — `Handle_MIF` calls `SData.Statistics.Binomial_IDF` |
