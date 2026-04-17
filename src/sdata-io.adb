@@ -267,7 +267,14 @@ package body SData.IO is
       if Redirected then
          Close_Output;
       end if;
-      Ada.Text_IO.Create (Redirect_File, Ada.Text_IO.Out_File, Filename);
+      begin
+         Ada.Text_IO.Create (Redirect_File, Ada.Text_IO.Out_File, Filename);
+      exception
+         when Ada.Text_IO.Name_Error =>
+            raise SData.Script_Error with "OUTPUT: invalid file name """ & Filename & """";
+         when Ada.Text_IO.Use_Error =>
+            raise SData.Script_Error with "OUTPUT: cannot create """ & Filename & """: permission denied";
+      end;
       Redirected := True;
    end Open_Output;
 

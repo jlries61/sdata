@@ -1013,12 +1013,7 @@ package body SData.Interpreter is
          when Stmt_OUTPUT =>
             if SData.IO.Is_Redirected then SData.IO.Close_Output; end if;
             if Stmt.File_Len > 0 then
-               declare Final_Path : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT");
-               begin
-                  SData.IO.Open_Output (Final_Path);
-               exception
-                  when others => SData.IO.Put_Line_Error ("Error: Could not create output file " & Final_Path);
-               end;
+               SData.IO.Open_Output (Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT"));
             end if;
          when Stmt_FPATH =>
             declare

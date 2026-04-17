@@ -173,7 +173,7 @@ That is a clean, well-defined change surface with no risk of disturbing unrelate
 | ~~Dead `Repeat_Count`/`Repeat_Active` at top-level of `SData.Config`~~ | `sdata-config.ads:29-30` | 30 min | **Fixed** |
 | ~~Duplicate type coercion logic~~ | ~~`sdata-table.adb:191-223, 578-607`~~ | — | **Fixed** — `Coerce_Value` helper |
 | ~~`BOG_Flag`/`EOG_Flag` owned by evaluator but logically belong to interpreter~~ | `sdata-evaluator.adb:60-61` | — | **Retracted** — placement is correct per design |
-| No unit tests for evaluator functions | Entire evaluator | 20+ hours | Growing |
+| No unit tests for evaluator functions | Entire evaluator | 20+ hours | **Deferred to Phase 6** (Testing & Validation per `doc/feasibility_assessment.md`) |
 | ~~Integer literal classification via `Float'Floor` may misclassify large integers~~ | ~~`sdata-evaluator.adb:1259-1263`~~ | — | **Fixed** — `Is_Integer`/`Int_Value` stored at parse time |
 | Database pointer not freed on cleanup | `sdata-table.adb:36-44` | Blocked on upstream library fix | Stable |
 | ~~`Handle_String_Ops`, `Handle_Statistics`, `Handle_Navigation` SRP violations~~ | ~~`sdata-evaluator.adb`~~ | — | **Fixed** — dissolved into 81 individual handlers; dispatch table is now the sole dispatch layer |
@@ -187,15 +187,15 @@ That is a clean, well-defined change surface with no risk of disturbing unrelate
 
 | Metric | Score |
 |---|---|
-| Error Consistency | 9/10 |
-| Error Informativeness | 8/10 |
+| Error Consistency | 10/10 |
+| Error Informativeness | 9/10 |
 | Recovery Patterns | 8/10 |
 
 `Script_Error` is the unified exception for user-visible errors. Ada's exception model ensures errors propagate upward cleanly. `Handle_Domain_Error` centralizes the decision between halt and warn-and-continue for math errors. `Continue_On_Error` allows batch scripts to proceed past statement errors. Error messages include the variable name or context.
 
 The distinction between recoverable (`Script_Error`, caught and reported) and unrecoverable (`Constraint_Error`, `Program_Error`, propagated to main) is clear and appropriate.
 
-**Minor issue:** `Execute_IO` (`sdata-interpreter.adb:1031`) catches all exceptions on `Open_Output` and emits a single-line error, swallowing the original exception type. A script that specifies an output file on a read-only filesystem gets a terse message but execution continues silently with output going to stdout.
+~~**Minor issue:** `Execute_IO` (`sdata-interpreter.adb:1031`) catches all exceptions on `Open_Output` and emits a single-line error, swallowing the original exception type. A script that specifies an output file on a read-only filesystem gets a terse message but execution continues silently with output going to stdout.~~ **Fixed** — `Open_Output` now raises `Script_Error` with a specific message for `Name_Error` (invalid filename) and `Use_Error` (permission denied); the suppressing handler in `Execute_IO` is removed so the error propagates like any other script error.
 
 ### 5.2 Failure Modes
 
@@ -298,11 +298,11 @@ The macOS section is notably thorough: the Alire/GNAT SDK path issue (`C_INCLUDE
 | Code Quality | 78/100 |
 | Efficiency | 92/100 |
 | Maintainability | 71/100 |
-| Error Handling | 85/100 |
+| Error Handling | 88/100 |
 | Security | 82/100 |
 | Operational Readiness | 75/100 |
 | Documentation | 80/100 |
-| **TOTAL** | **641/800** |
+| **TOTAL** | **644/800** |
 
 ---
 
@@ -369,3 +369,4 @@ Trust this at 3 AM? Yes — with higher confidence than at first review.
 | ~~Spill INSERT loop unboxed — O(N) implicit transactions~~ | `sdata-table.adb: Spill_Table_To_Disk` | row loop | **Fixed** — wrapped in explicit `BEGIN`/`COMMIT` |
 | ~~Backing store opened with default SQLite durability settings~~ | `sdata-table.adb: Initialize_Backing_Store` | DB open | **Fixed** — `journal_mode=OFF`, `synchronous=OFF`, `cache_size=-65536`, `temp_store=MEMORY` |
 | ~~`Get_Column_Names` heap-allocates a `String_List`; callers must free — 3 confirmed leaks in range-expansion functions~~ | `sdata-table.adb`, `sdata-interpreter.adb`, `sdata-file_io.adb`, `sdata-variables.adb` | 17 call sites | **Fixed** — function removed from public API; all callers migrated to `Column_Count`/`Column_Name(I)`; leaks in `Expand_Range`, `Set_Hold_For_Range`, `Resolve_Range` eliminated |
+| ~~`Execute_IO` swallows `Open_Output` failures silently~~ | `sdata-interpreter.adb`, `sdata-io.adb` | Stmt_OUTPUT handler | **Fixed** — `Open_Output` raises `Script_Error` for `Name_Error`/`Use_Error`; suppressing `when others` handler removed from interpreter |
