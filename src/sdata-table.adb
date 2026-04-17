@@ -683,6 +683,14 @@ package body SData.Table is
       GNAT.OS_Lib.Close (FD);
       Store.Temp_Path := Ada.Strings.Unbounded.To_Unbounded_String (Temp_Name.all);
       Store.DB := new Ada_Sqlite3.Database'(Ada_Sqlite3.Open (Temp_Name.all));
+      --  This is a process-private temp file; we need no durability at all.
+      --  Disable the journal and fsync entirely, and give SQLite a large page
+      --  cache so that external-merge sort runs stay hot across passes.
+      --  temp_store=MEMORY keeps SQLite's own sort intermediates in RAM.
+      Store.DB.Execute ("PRAGMA journal_mode = OFF");
+      Store.DB.Execute ("PRAGMA synchronous = OFF");
+      Store.DB.Execute ("PRAGMA cache_size = -65536");  --  64 MB (negative = KiB)
+      Store.DB.Execute ("PRAGMA temp_store = MEMORY");
       Store.Is_Active := True;
       GNAT.Strings.Free (Temp_Name);
    end Initialize_Backing_Store;
@@ -732,6 +740,9 @@ package body SData.Table is
       declare
          Stmt : Ada_Sqlite3.Statement := Store.DB.Prepare (Ada.Strings.Unbounded.To_String (SQL));
       begin
+         --  Batch all inserts in one transaction; without this, SQLite
+         --  auto-commits each row individually, causing O(N) lock cycles.
+         Store.DB.Execute ("BEGIN");
          for R in 1 .. Memory_Rows loop
             Stmt.Reset;
             Stmt.Clear_Bindings;
@@ -750,6 +761,7 @@ package body SData.Table is
             end loop;
             Stmt.Step;
          end loop;
+         Store.DB.Execute ("COMMIT");
       end;
 
       for Pos in T.Iterate loop T.Reference (Pos).Element.all.Data.Clear; end loop;

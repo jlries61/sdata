@@ -96,12 +96,16 @@ No commented-out code. No anonymous TODOs.
 |---|---|---|
 | ~~SELECT filter scanned all columns per row even when filter only referenced a subset~~ | ~~`sdata-interpreter.adb`~~ | — | **Fixed** — `Collect_Filter_Vars` AST walker + `Load_PDV_One_Column` loads only referenced columns |
 | ~~`Load_PDV_From_Table` heap-allocated a new `String_List` on every call~~ | ~~`sdata-variables.adb`~~ | — | **Fixed** — rewrote to use `Column_Count`/`Column_Name(I)` with no heap allocation |
+| ~~Spill INSERT loop had no transaction wrapper — O(N) auto-commits per spill~~ | ~~`sdata-table.adb: Spill_Table_To_Disk`~~ | — | **Fixed** — loop wrapped in explicit `BEGIN`/`COMMIT` |
+| ~~Backing store opened with default journal/sync/cache settings~~ | ~~`sdata-table.adb: Initialize_Backing_Store`~~ | — | **Fixed** — `journal_mode=OFF`, `synchronous=OFF`, `cache_size=-65536`, `temp_store=MEMORY` |
 | Sort copies full column arrays | `sdata-table.adb` Sort procedure | Acceptable for memory-resident data |
 | `Get_Column_Names` allocates a new heap-allocated string list every call | `sdata-table.adb:106-114` | Used in hot paths (print, KEEP/DROP) — callers must remember to free |
 
 No O(n²) algorithmic failures. Hash maps used throughout for O(1) column lookup. The SQLite spill-to-disk design for large tables is appropriate.
 
 **SELECT filter optimization detail:** The filter scan now calls `Collect_Filter_Vars` once before the row loop to walk the filter expression AST and collect only the column names it references. Inside the loop, only those columns are loaded via `Load_PDV_One_Column`. Temporary variables present in the filter are skipped (guarded by `Has_Column`) so they remain visible from `Temp_Symbols`. For a 10-column table where the filter references 2 columns, this reduces PDV work per row by 80%. `Is_Identifier_Ref_Function` (LAG/NEXT/OBS family) is respected during AST traversal — their first argument is a variable name, not a value, and is excluded from the load set.
+
+**Spill performance optimization detail:** `Spill_Table_To_Disk` previously executed each prepared-statement `Step` in its own implicit SQLite transaction, causing O(N) lock-acquire/release cycles (and O(N) fsyncs under the default `synchronous=FULL` setting). The loop is now wrapped in an explicit `BEGIN`/`COMMIT`, collapsing the cost to a single commit regardless of table size. `Initialize_Backing_Store` now sets four pragmas immediately after opening: `journal_mode=OFF` eliminates the rollback journal file entirely; `synchronous=OFF` removes all fsync calls (safe because this is a process-private temp file); `cache_size=-65536` gives SQLite a 64 MB page cache so sort runs stay hot between external-merge passes; `temp_store=MEMORY` keeps SQLite's own internal sort intermediates in RAM rather than writing a second temp file. Together these changes mean that for a spilled table, `SORT` delegates to SQLite's external merge sort running at full I/O-bound throughput rather than being throttled by per-row durability overhead.
 
 ### 3.2 Resource Management
 
@@ -292,13 +296,13 @@ The macOS section is notably thorough: the Alire/GNAT SDK path issue (`C_INCLUDE
 |---|---|
 | Architectural Integrity | 78/100 |
 | Code Quality | 78/100 |
-| Efficiency | 85/100 |
+| Efficiency | 90/100 |
 | Maintainability | 68/100 |
 | Error Handling | 85/100 |
 | Security | 82/100 |
 | Operational Readiness | 75/100 |
 | Documentation | 80/100 |
-| **TOTAL** | **631/800** |
+| **TOTAL** | **636/800** |
 
 ---
 
@@ -362,3 +366,5 @@ Trust this at 3 AM? Yes — with higher confidence than at first review.
 | ~~`BRN` registered, not implemented~~ | `sdata-evaluator.adb` | 1626 | **Fixed** — `Handle_BRN` calls `SData.Statistics.Beta_RN` |
 | ~~`MIF` registered, not implemented~~ | `sdata-evaluator.adb` | 1612 | **Fixed** — `Handle_MIF` calls `SData.Statistics.Binomial_IDF` |
 | ~~SELECT filter loaded all columns per row~~ | `sdata-interpreter.adb` / `sdata-variables.adb` | filter scan | **Fixed** — `Collect_Filter_Vars` + `Load_PDV_One_Column`: only referenced columns loaded per row; heap allocation in `Load_PDV_From_Table` also eliminated |
+| ~~Spill INSERT loop unboxed — O(N) implicit transactions~~ | `sdata-table.adb: Spill_Table_To_Disk` | row loop | **Fixed** — wrapped in explicit `BEGIN`/`COMMIT` |
+| ~~Backing store opened with default SQLite durability settings~~ | `sdata-table.adb: Initialize_Backing_Store` | DB open | **Fixed** — `journal_mode=OFF`, `synchronous=OFF`, `cache_size=-65536`, `temp_store=MEMORY` |
