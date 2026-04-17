@@ -152,6 +152,8 @@ No AUnit or other unit test framework. For a project with ~1,600 lines of expres
 
 Test breadth is commendable: control flow, BY-groups, aggregates, spill/sort, string functions, type checking, file I/O formats (CSV, ODF, OOXML), edge cases (overflow, empty save, boundary conditions).
 
+**Status:** This gap is a known item deferred to **Phase 6: Testing & Validation** of the development plan (`doc/feasibility_assessment.md`). Phase 6 covers: comprehensive test suite, validation against BW BASIC, performance benchmarking, edge case testing, and security review.
+
 ### 4.2 Change Resilience
 
 Adding a new built-in function requires:
@@ -162,14 +164,14 @@ Adding a new built-in function requires:
 
 That is a clean, well-defined change surface with no risk of disturbing unrelated functions. Adding a new statement type is more invasive (lexer token, parser case, AST node type, interpreter case, help text) but the pattern is consistent throughout.
 
-Type coercion logic is duplicated between `Set_Value_Upper` and `Set_Output_Value_Upper` in `sdata-table.adb`. A change to coercion rules requires edits in two places.
+~~Type coercion logic is duplicated between `Set_Value_Upper` and `Set_Output_Value_Upper` in `sdata-table.adb`. A change to coercion rules requires edits in two places.~~ **Fixed** — extracted to private `Coerce_Value (Val, Col_Typ, Col_Name)` function; both procedures now delegate to it. Error messages standardized to "Expected X for column Y" format.
 
 ### 4.3 Technical Debt Inventory
 
 | Item | Location | Remediation Estimate | Interest Rate |
 |---|---|---|---|
 | ~~Dead `Repeat_Count`/`Repeat_Active` at top-level of `SData.Config`~~ | `sdata-config.ads:29-30` | 30 min | **Fixed** |
-| Duplicate type coercion logic | `sdata-table.adb:191-223, 578-607` | 2 hours | Stable |
+| ~~Duplicate type coercion logic~~ | ~~`sdata-table.adb:191-223, 578-607`~~ | — | **Fixed** — `Coerce_Value` helper |
 | ~~`BOG_Flag`/`EOG_Flag` owned by evaluator but logically belong to interpreter~~ | `sdata-evaluator.adb:60-61` | — | **Retracted** — placement is correct per design |
 | No unit tests for evaluator functions | Entire evaluator | 20+ hours | Growing |
 | ~~Integer literal classification via `Float'Floor` may misclassify large integers~~ | ~~`sdata-evaluator.adb:1259-1263`~~ | — | **Fixed** — `Is_Integer`/`Int_Value` stored at parse time |
@@ -295,12 +297,12 @@ The macOS section is notably thorough: the Alire/GNAT SDK path issue (`C_INCLUDE
 | Architectural Integrity | 78/100 |
 | Code Quality | 78/100 |
 | Efficiency | 92/100 |
-| Maintainability | 68/100 |
+| Maintainability | 71/100 |
 | Error Handling | 85/100 |
 | Security | 82/100 |
 | Operational Readiness | 75/100 |
 | Documentation | 80/100 |
-| **TOTAL** | **638/800** |
+| **TOTAL** | **641/800** |
 
 ---
 
@@ -353,7 +355,7 @@ Trust this at 3 AM? Yes — with higher confidence than at first review.
 | ~~HTN bug: duplicate HSN in pattern match~~ | `sdata-evaluator.adb` | 282 | **Fixed** — pattern now `"HCS" \| "HSN" \| "HTN"` |
 | ~~Integer precision via Float~~ | `sdata-evaluator.adb` | 1259-1263 | **Fixed** — `Is_Integer`/`Int_Value` fields added to AST; parser detects and stores exact integer at parse time |
 | ~~Dead top-level Repeat state~~ | `sdata-config.ads` | 29-30 | **Fixed** — dead fields removed; `Runtime_State_Record` is the correct home per spec |
-| Duplicate coercion logic | `sdata-table.adb` | 191-223 and 578-607 | `Set_Value_Upper` and `Set_Output_Value_Upper` are near-identical |
+| ~~Duplicate coercion logic~~ | `sdata-table.adb` | 191-223 and 578-607 | **Fixed** — extracted to `Coerce_Value (Val, Col_Typ, Col_Name)` private function; error messages standardized to "Expected X for column Y" |
 | ~~BOG/EOG state in wrong package~~ | `sdata-evaluator.adb` | 60-61 | **Retracted** — flags are private implementation state for `BOG()`/`EOG()` functions; evaluator ownership is correct |
 | Acknowledged DB pointer leak | `sdata-table.adb` | 36-44 | Comment documents deliberate non-free to avoid finalization crash |
 | ~~Stack allocation for file content in SUBMIT and Read_File~~ | `sdata-interpreter.adb`, `sdata_main.adb` | SUBMIT block, Read_File | **Fixed** — heap-allocated with `new String (1 .. Size)`; freed after parse/execute |

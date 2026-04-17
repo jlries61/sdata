@@ -176,6 +176,30 @@ package body SData.Table is
       Set_Value_Upper (Row, Ada.Characters.Handling.To_Upper (Column_Name), Val);
    end Set_Value;
 
+   --  Coerce Val to the type required by Col_Typ, or return Val unchanged if
+   --  Val is already the right type or is missing.  Raises Type_Mismatch_Error
+   --  if the value kind is incompatible with the column type.
+   function Coerce_Value (Val : Value; Col_Typ : Column_Type; Col_Name : String) return Value is
+   begin
+      if Val.Kind = Val_Missing then
+         return Val;
+      end if;
+      if Col_Typ = Col_Numeric and then Val.Kind /= Val_Numeric then
+         if Val.Kind = Val_Integer then
+            return (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val));
+         end if;
+         raise Type_Mismatch_Error with "Expected Numeric for column " & Col_Name;
+      elsif Col_Typ = Col_Integer and then Val.Kind /= Val_Integer then
+         if Val.Kind = Val_Numeric then
+            return (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val)));
+         end if;
+         raise Type_Mismatch_Error with "Expected Integer for column " & Col_Name;
+      elsif Col_Typ = Col_String and then Val.Kind /= Val_String then
+         raise Type_Mismatch_Error with "Expected String for column " & Col_Name;
+      end if;
+      return Val;
+   end Coerce_Value;
+
    procedure Set_Value_Upper (Row : Positive; Upper_Name : String; Val : Value) is
    begin
       if not Data_Table.Contains (Upper_Name) then
@@ -190,24 +214,7 @@ package body SData.Table is
                Col.Data.Append ((Kind => Val_Missing));
             end loop;
          end if;
-         if Val.Kind /= Val_Missing then
-            if Col.Typ = Col_Numeric and Val.Kind /= Val_Numeric then
-               if Val.Kind = Val_Integer then
-                  Col.Data.Replace_Element (Row - Current_Segment_Start + 1, (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val)));
-                  return;
-               end if;
-               raise Type_Mismatch_Error with "Expected Numeric, got " & Val.Kind'Image;
-            elsif Col.Typ = Col_Integer and Val.Kind /= Val_Integer then
-               if Val.Kind = Val_Numeric then
-                  Col.Data.Replace_Element (Row - Current_Segment_Start + 1, (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val))));
-                  return;
-               end if;
-               raise Type_Mismatch_Error with "Expected Integer, got " & Val.Kind'Image;
-            elsif Col.Typ = Col_String and Val.Kind /= Val_String then
-               raise Type_Mismatch_Error with "Expected String, got " & Val.Kind'Image;
-            end if;
-         end if;
-         Col.Data.Replace_Element (Row - Current_Segment_Start + 1, Val);
+         Col.Data.Replace_Element (Row - Current_Segment_Start + 1, Coerce_Value (Val, Col.Typ, Upper_Name));
       end;
    end Set_Value_Upper;
 
@@ -574,24 +581,7 @@ package body SData.Table is
             Output_Data_Table.Reference (Upper_Name);
          Col : Column renames Ref.Element.all;
       begin
-         if Val.Kind /= Val_Missing then
-            if Col.Typ = Col_Numeric and then Val.Kind /= Val_Numeric then
-               if Val.Kind = Val_Integer then
-                  Col.Data.Replace_Element (Row - Output_Segment_Start + 1, (Kind => Val_Numeric, Num_Val => Float (Val.Int_Val)));
-                  return;
-               end if;
-               raise Type_Mismatch_Error with "Expected Numeric for column " & Upper_Name;
-            elsif Col.Typ = Col_Integer and then Val.Kind /= Val_Integer then
-               if Val.Kind = Val_Numeric then
-                  Col.Data.Replace_Element (Row - Output_Segment_Start + 1, (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Val.Num_Val))));
-                  return;
-               end if;
-               raise Type_Mismatch_Error with "Expected Integer for column " & Upper_Name;
-            elsif Col.Typ = Col_String and then Val.Kind /= Val_String then
-               raise Type_Mismatch_Error with "Expected String for column " & Upper_Name;
-            end if;
-         end if;
-         Col.Data.Replace_Element (Row - Output_Segment_Start + 1, Val);
+         Col.Data.Replace_Element (Row - Output_Segment_Start + 1, Coerce_Value (Val, Col.Typ, Upper_Name));
       end;
    end Set_Output_Value_Upper;
 
