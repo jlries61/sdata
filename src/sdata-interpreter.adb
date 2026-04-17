@@ -245,23 +245,25 @@ package body SData.Interpreter is
          Curr := Curr.Next;
       end loop;
 
-      -- If there was a KEEP statement, drop everything not in the list
+      -- If there was a KEEP statement, drop everything not in the list.
+      -- Snapshot names first: Drop_Column modifies Column_Order, so iterating
+      -- Column_Name(I) live while dropping would corrupt the index sequence.
       if Keep_Mods_Exist then
          declare
-            All_Cols : String_List_Access := Get_Column_Names;
+            Snapshot : Name_Vectors.Vector;
          begin
-            if All_Cols /= null then
-               for I in All_Cols'Range loop
-                  declare
-                     Col_Name : constant String := To_Upper(All_Cols(I).all);
-                  begin
-                     if not Keep_List.Contains(Col_Name) then
-                        Drop_Column(Col_Name);
-                     end if;
-                  end;
-               end loop;
-               GNAT.Strings.Free(All_Cols);
-            end if;
+            for I in 1 .. Column_Count loop
+               Snapshot.Append (To_Unbounded_String (Column_Name (I)));
+            end loop;
+            for Name of Snapshot loop
+               declare
+                  Col_Name : constant String := To_String (Name);
+               begin
+                  if not Keep_List.Contains (Col_Name) then
+                     Drop_Column (Col_Name);
+                  end if;
+               end;
+            end loop;
          end;
       end if;
 
@@ -278,27 +280,27 @@ package body SData.Interpreter is
    end Apply_Pending_Mods;
 
    procedure Expand_Range (Kind : Column_Mod_Kind; Range_Spec : Variable_Range) is
-      Col_Names : constant String_List_Access := Get_Column_Names;
       Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
       End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
       Start_Idx, End_Idx : Natural := 0;
    begin
       if not Range_Spec.Is_Range then
          Add_Pending_Mod (Kind, Start_Name);
-      elsif Col_Names /= null then
-         for I in Col_Names'Range loop
-            if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
-            if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+      else
+         for I in 1 .. Column_Count loop
+            declare Name : constant String := Column_Name (I); begin
+               if Name = Start_Name then Start_Idx := I; end if;
+               if Name = End_Name   then End_Idx   := I; end if;
+            end;
          end loop;
          if Start_Idx > 0 and End_Idx > 0 then
             if Start_Idx > End_Idx then
                declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
             end if;
             for I in Start_Idx .. End_Idx loop
-               Add_Pending_Mod (Kind, Col_Names (I).all);
+               Add_Pending_Mod (Kind, Column_Name (I));
             end loop;
          end if;
-         declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
       end if;
    end Expand_Range;
 
@@ -484,20 +486,18 @@ package body SData.Interpreter is
    begin
       if Stmt.Print_Args = null then
          declare
-            Col_Names : constant String_List_Access := Get_Column_Names;
+            N : constant Natural := Column_Count;
          begin
-            if Col_Names /= null then
-               for I in Col_Names'Range loop
+            if N > 0 then
+               for I in 1 .. N loop
                   declare
-                     Name : constant String := To_Upper (Col_Names (I).all);
+                     Name : constant String := Column_Name (I);
                      Val  : constant Value  := Get (Name);
                   begin
                      Put (Name & ": " & To_String_Formatted (Val) & "  ");
                   end;
                end loop;
                New_Line;
-               declare Old_List : String_List_Access := Col_Names;
-               begin GNAT.Strings.Free (Old_List); end;
             end if;
          end;
       else
@@ -629,36 +629,32 @@ package body SData.Interpreter is
                   declare
                      State : constant Boolean := (Stmt.Kind = Stmt_HOLD);
                      procedure Set_Hold_For_Range (Range_Spec : Variable_Range) is
-                        Col_Names  : constant GNAT.Strings.String_List_Access := Get_Column_Names;
                         Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
                         End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
                         Start_Idx, End_Idx : Natural := 0;
                      begin
                         if not Range_Spec.Is_Range then
                            Set_Hold (Start_Name, State);
-                        elsif Col_Names /= null then
-                           for I in Col_Names'Range loop
-                              if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
-                              if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+                        else
+                           for I in 1 .. Column_Count loop
+                              declare Name : constant String := Column_Name (I); begin
+                                 if Name = Start_Name then Start_Idx := I; end if;
+                                 if Name = End_Name   then End_Idx   := I; end if;
+                              end;
                            end loop;
                            if Start_Idx > 0 and End_Idx > 0 then
                               if Start_Idx > End_Idx then
                                  declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
                               end if;
-                              for I in Start_Idx .. End_Idx loop Set_Hold (Col_Names (I).all, State); end loop;
+                              for I in Start_Idx .. End_Idx loop Set_Hold (Column_Name (I), State); end loop;
                            end if;
-                           declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
                         end if;
                      end Set_Hold_For_Range;
                   begin
                      if Curr_Var = null then
-                        declare Col_Names : constant String_List_Access := Get_Column_Names;
-                        begin
-                           if Col_Names /= null then
-                              for I in Col_Names'Range loop Set_Hold (Col_Names (I).all, State); end loop;
-                              declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
-                           end if;
-                        end;
+                        for I in 1 .. Column_Count loop
+                           Set_Hold (Column_Name (I), State);
+                        end loop;
                      else
                         while Curr_Var /= null loop
                            Set_Hold_For_Range (Curr_Var.Var);
@@ -681,7 +677,6 @@ package body SData.Interpreter is
                V        : Name_Vectors.Vector;
                Curr_Var : Variable_List := Stmt.Arr_Vars;
                procedure Resolve_Range (Range_Spec : Variable_Range) is
-                  Col_Names  : constant GNAT.Strings.String_List_Access := Get_Column_Names;
                   Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
                   End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
                   Start_Idx, End_Idx : Natural := 0;
@@ -698,18 +693,19 @@ package body SData.Interpreter is
                      else
                         V.Append (To_Unbounded_String (Start_Name));
                      end if;
-                  elsif Col_Names /= null then
-                     for I in Col_Names'Range loop
-                        if To_Upper (Col_Names (I).all) = Start_Name then Start_Idx := I; end if;
-                        if To_Upper (Col_Names (I).all) = End_Name then End_Idx := I; end if;
+                  else
+                     for I in 1 .. Column_Count loop
+                        declare Name : constant String := Column_Name (I); begin
+                           if Name = Start_Name then Start_Idx := I; end if;
+                           if Name = End_Name   then End_Idx   := I; end if;
+                        end;
                      end loop;
                      if Start_Idx > 0 and End_Idx > 0 then
                         if Start_Idx > End_Idx then
                            declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
                         end if;
-                        for I in Start_Idx .. End_Idx loop V.Append (To_Unbounded_String (Col_Names (I).all)); end loop;
+                        for I in Start_Idx .. End_Idx loop V.Append (To_Unbounded_String (Column_Name (I))); end loop;
                      end if;
-                     declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
                   end if;
                end Resolve_Range;
             begin
@@ -743,12 +739,12 @@ package body SData.Interpreter is
             end;
          when Stmt_NAMES =>
             declare
-               T_Names : constant String_List_Access := Get_Column_Names;
                S_Names : constant String_List_Access := Get_Session_Names;
+               N_Cols  : constant Natural := Column_Count;
             begin
                Put_Line ("Permanent Variables (Table Columns):");
-               if T_Names /= null and then T_Names'Length > 0 then
-                  for I in T_Names'Range loop Put (T_Names (I).all & " "); end loop;
+               if N_Cols > 0 then
+                  for I in 1 .. N_Cols loop Put (Column_Name (I) & " "); end loop;
                   New_Line;
                else Put_Line ("(none)"); end if;
                Put_Line ("Session Variables (SET):");
@@ -756,43 +752,42 @@ package body SData.Interpreter is
                   for I in S_Names'Range loop Put (S_Names (I).all & " "); end loop;
                   New_Line;
                else Put_Line ("(none)"); end if;
-               if T_Names /= null then declare Old : String_List_Access := T_Names; begin GNAT.Strings.Free (Old); end; end if;
                if S_Names /= null then declare Old : String_List_Access := S_Names; begin GNAT.Strings.Free (Old); end; end if;
             end;
          when Stmt_LIST =>
             declare
-               Col_Names : GNAT.Strings.String_List_Access;
-               Rows      : constant Natural := SData.Table.Logical_Row_Count;
+               V    : Name_Vectors.Vector;
+               Rows : constant Natural := SData.Table.Logical_Row_Count;
             begin
                if Stmt.Vars = null then
-                  Col_Names := Get_Column_Names;
+                  for I in 1 .. Column_Count loop
+                     V.Append (To_Unbounded_String (Column_Name (I)));
+                  end loop;
                else
                   declare
-                     V    : Name_Vectors.Vector;
                      Curr : Variable_List := Stmt.Vars;
                      procedure Resolve (R : Variable_Range) is
-                        All_C : constant String_List_Access := Get_Column_Names;
-                        S_Idx : Natural := 0;
-                        E_Idx : Natural := 0;
                         U_Start : constant String := To_Upper (R.Start_Name (1 .. R.Start_Len));
                         U_End   : constant String := (if R.Is_Range then To_Upper (R.End_Name (1 .. R.End_Len)) else "");
+                        S_Idx, E_Idx : Natural := 0;
                      begin
                         if not R.Is_Range then
                            V.Append (To_Unbounded_String (U_Start));
-                        elsif All_C /= null then
-                           for I in All_C'Range loop
-                              if To_Upper (All_C (I).all) = U_Start then S_Idx := I; end if;
-                              if To_Upper (All_C (I).all) = U_End   then E_Idx := I; end if;
+                        else
+                           for I in 1 .. Column_Count loop
+                              declare Name : constant String := Column_Name (I); begin
+                                 if Name = U_Start then S_Idx := I; end if;
+                                 if Name = U_End   then E_Idx := I; end if;
+                              end;
                            end loop;
                            if S_Idx > 0 and E_Idx > 0 then
                               if S_Idx > E_Idx then
                                  declare T : constant Natural := S_Idx; begin S_Idx := E_Idx; E_Idx := T; end;
                               end if;
                               for I in S_Idx .. E_Idx loop
-                                 V.Append (To_Unbounded_String (All_C (I).all));
+                                 V.Append (To_Unbounded_String (Column_Name (I)));
                               end loop;
                            end if;
-                           declare Old : String_List_Access := All_C; begin GNAT.Strings.Free (Old); end;
                         end if;
                      end Resolve;
                   begin
@@ -800,23 +795,17 @@ package body SData.Interpreter is
                         Resolve (Curr.Var);
                         Curr := Curr.Next;
                      end loop;
-                     Col_Names := new GNAT.Strings.String_List (1 .. Integer (V.Length));
-                     for I in 1 .. Integer (V.Length) loop
-                        Col_Names (I) := new String'(To_String (V.Element (I)));
-                     end loop;
                   end;
                end if;
 
-               if Col_Names = null or else Col_Names'Length = 0 then
+               if V.Is_Empty then
                   Put_Line ("(No columns to list)");
                   return;
                end if;
 
                -- Header
                Put ("REC# ");
-               for I in Col_Names'Range loop
-                  Put (Col_Names (I).all & " ");
-               end loop;
+               for Name of V loop Put (To_String (Name) & " "); end loop;
                New_Line;
 
                -- Data
@@ -825,17 +814,12 @@ package body SData.Interpreter is
                      Phys_R : constant Positive := SData.Table.Logical_To_Physical (R);
                   begin
                      Put (Ada.Strings.Fixed.Trim (R'Image, Ada.Strings.Both) & " ");
-                     for C in Col_Names'Range loop
-                        declare
-                           Val : constant Value := Get_Value_Upper (Phys_R, Col_Names (C).all);
-                        begin
-                           Put (To_String_Formatted (Val) & " ");
-                        end;
+                     for Name of V loop
+                        Put (To_String_Formatted (Get_Value_Upper (Phys_R, To_String (Name))) & " ");
                      end loop;
                      New_Line;
                   end;
                end loop;
-               declare Old : String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
             end;
          when others => null;
       end case;
@@ -865,13 +849,9 @@ package body SData.Interpreter is
             end;
             Input_File_Columns.Clear;
             Refresh_PDV_Names;
-            declare Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-            begin
-               if Col_Names /= null then
-                  for I in Col_Names'Range loop Input_File_Columns.Include (To_Upper (Col_Names (I).all)); end loop;
-                  GNAT.Strings.Free (Col_Names);
-               end if;
-            end;
+            for I in 1 .. Column_Count loop
+               Input_File_Columns.Include (Column_Name (I));
+            end loop;
          when Stmt_SAVE =>
             declare
                Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");

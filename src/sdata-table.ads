@@ -5,7 +5,6 @@
 
 with Ada.Finalization;
 with Ada.Strings.Hash;
-with GNAT.Strings;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Containers.Vectors;
@@ -23,10 +22,6 @@ package SData.Table is
 
    --  Defines a new column. If the table already has rows, they are padded with missing values.
    procedure Add_Column (Name : String; Col_Type : Column_Type);
-
-   --  Returns a list of all current column names. 
-   --  Note: The caller is responsible for freeing the GNAT.Strings.String_List_Access.
-   function Get_Column_Names return GNAT.Strings.String_List_Access;
 
    --  Checks if a column with the given name (case-insensitive) exists.
    function Has_Column (Name : String) return Boolean;

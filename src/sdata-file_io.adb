@@ -409,19 +409,19 @@ package body SData.File_IO is
    ---------------
    procedure Write_CSV (File_Name : String) is
       File : Ada.Text_IO.File_Type;
-      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
+      N    : constant Natural := Column_Count;
    begin
       Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, File_Name);
-      if Col_Names /= null then
-         for I in Col_Names'Range loop
-            Ada.Text_IO.Put (File, Col_Names (I).all);
-            if I /= Col_Names'Last then Ada.Text_IO.Put (File, ","); end if;
+      if N > 0 then
+         for I in 1 .. N loop
+            Ada.Text_IO.Put (File, Column_Name (I));
+            if I /= N then Ada.Text_IO.Put (File, ","); end if;
          end loop;
          Ada.Text_IO.New_Line (File);
          for R in 1 .. Row_Count loop
-            for C in Col_Names'Range loop
+            for C in 1 .. N loop
                declare
-                  Val : constant Value := Get_Value_Upper (R, Col_Names (C).all);
+                  Val : constant Value := Get_Value_Upper (R, Column_Name (C));
                begin
                   if Val.Kind = Val_Numeric then
                      Ada.Text_IO.Put (File, Trim (Val.Num_Val'Img, Ada.Strings.Both));
@@ -433,17 +433,15 @@ package body SData.File_IO is
                      Ada.Text_IO.Put (File, ".");
                   end if;
                end;
-               if C /= Col_Names'Last then Ada.Text_IO.Put (File, ","); end if;
+               if C /= N then Ada.Text_IO.Put (File, ","); end if;
             end loop;
             Ada.Text_IO.New_Line (File);
          end loop;
       end if;
       Ada.Text_IO.Close (File);
-      if Col_Names /= null then GNAT.Strings.Free (Col_Names); end if;
    exception
       when others =>
          if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
-         if Col_Names /= null then GNAT.Strings.Free (Col_Names); end if;
          raise;
    end Write_CSV;
 
@@ -464,7 +462,7 @@ package body SData.File_IO is
          Doc    : DOM.Core.Document;
          Tables, Rows, Cells : Node_List;
          Success : Boolean;
-         Header_Names : GNAT.Strings.String_List_Access;
+         Col_Count : Natural := 0;
 
          function Get_Cell_Value (Cell_Node : Node) return Value is
             Val_Type : constant String := Get_Attribute (DOM.Core.Element (Cell_Node), "office:value-type");
@@ -614,7 +612,7 @@ package body SData.File_IO is
                   Add_Column (To_String (Col_Name_Vec (I)), Col_Types (I));
                end loop;
             end;
-            Header_Names := Get_Column_Names;
+            Col_Count := Column_Count;
 
             -- Data Rows
             for I in 1 .. Length (Rows) - 1 loop
@@ -624,7 +622,7 @@ package body SData.File_IO is
                   Row_Repeat_Count : constant Positive := (if Row_Repeat_Attr = "" then 1 else Positive'Value (Row_Repeat_Attr));
                begin
                   -- Heuristic: If we see a huge number of repeated rows, it's usually just empty padding at the end of the sheet
-                  exit when Row_Repeat_Count > 1000; 
+                  exit when Row_Repeat_Count > 1000;
 
                   for R_Count in 1 .. Row_Repeat_Count loop
                      Add_Row;
@@ -640,16 +638,16 @@ package body SData.File_IO is
                               Val : constant Value := Get_Cell_Value (Cell);
                            begin
                               for K in 1 .. Repeat_Count loop
-                                 if Col_Idx <= Header_Names'Length then
+                                 if Col_Idx <= Col_Count then
                                     if Val.Kind /= Val_Missing then
                                        begin
-                                          Set_Value (Row_Count, Header_Names (Col_Idx).all, Val);
+                                          Set_Value (Row_Count, Column_Name (Col_Idx), Val);
                                        exception
                                           when E : others =>
                                              if not SData.Config.Quiet_Mode then
                                                 Put_Line_Error ("Warning: ODF import skipped cell at row" &
                                                    Row_Count'Image & ", column """ &
-                                                   Header_Names (Col_Idx).all & """: " &
+                                                   Column_Name (Col_Idx) & """: " &
                                                    Ada.Exceptions.Exception_Message (E));
                                              end if;
                                        end;
@@ -658,14 +656,13 @@ package body SData.File_IO is
                                  end if;
                               end loop;
                            end;
-                           exit when Col_Idx > Header_Names'Length;
+                           exit when Col_Idx > Col_Count;
                         end loop;
                      end;
                      Free (Cells);
                   end loop;
                end;
             end loop;
-            GNAT.Strings.Free (Header_Names);
          end;
          end if;
 
@@ -837,7 +834,7 @@ package body SData.File_IO is
          Doc    : DOM.Core.Document;
          Rows, Cells : Node_List;
          Success : Boolean;
-         Header_Names : GNAT.Strings.String_List_Access;
+         Col_Count : Natural := 0;
          package Name_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
 
          function Get_Cell_Value (Cell_Node : Node) return Value is
@@ -969,26 +966,26 @@ package body SData.File_IO is
                   end loop;
                end;
             end;
-            Header_Names := Get_Column_Names;
+            Col_Count := Column_Count;
 
             -- Data Rows
             for I in 1 .. Length (Rows) - 1 loop
                Add_Row;
                Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, I)), "c");
                for J in 0 .. Length (Cells) - 1 loop
-                  if J < Header_Names'Length then
+                  if J < Col_Count then
                      declare
                         V : constant Value := Get_Cell_Value (Item (Cells, J));
                      begin
                         if V.Kind /= Val_Missing then
-                           Set_Value (Row_Count, Header_Names (J + 1).all, V);
+                           Set_Value (Row_Count, Column_Name (J + 1), V);
                         end if;
                      exception
                         when E : others =>
                            if not SData.Config.Quiet_Mode then
                               Put_Line_Error ("Warning: OOXML import skipped cell at row" &
                                  Row_Count'Image & ", column """ &
-                                 Header_Names (J + 1).all & """: " &
+                                 Column_Name (J + 1) & """: " &
                                  Ada.Exceptions.Exception_Message (E));
                            end if;
                      end;
@@ -996,7 +993,6 @@ package body SData.File_IO is
                end loop;
                Free (Cells);
             end loop;
-            GNAT.Strings.Free (Header_Names);
          end if;
 
          Free (Rows);
@@ -1032,10 +1028,10 @@ package body SData.File_IO is
       use Zip.Create;
       Info : Zip_Create_Info;
       Z_File_Stream : aliased Zip_File_Stream;
-      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-      Sname     : constant String := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
+      N     : constant Natural := Column_Count;
+      Sname : constant String  := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
    begin
-      if Col_Names = null then return; end if;
+      if N = 0 then return; end if;
       
       Create_Archive (Info, Z_File_Stream'Unchecked_Access, File_Name);
 
@@ -1084,10 +1080,10 @@ package body SData.File_IO is
          
          -- Header Row
          Append (S1, "<row r=""1"">");
-         for C in Col_Names'Range loop
+         for C in 1 .. N loop
             declare
                Ref : constant String := Col_To_Letters (C) & "1";
-               Val : constant String := Escape_XML (Col_Names (C).all);
+               Val : constant String := Escape_XML (Column_Name (C));
             begin
                Append (S1, "<c r=""" & Ref & """ t=""inlineStr""><is><t>" & Val & "</t></is></c>");
             end;
@@ -1097,10 +1093,10 @@ package body SData.File_IO is
          -- Data Rows
          for R in 1 .. Row_Count loop
             Append (S1, "<row r=""" & Trim (Integer (R + 1)'Img, Ada.Strings.Both) & """>");
-            for C in Col_Names'Range loop
+            for C in 1 .. N loop
                declare
                   Ref : constant String := Col_To_Letters (C) & Trim (Integer (R + 1)'Img, Ada.Strings.Both);
-                  V   : constant Value := Get_Value (R, Col_Names (C).all);
+                  V   : constant Value := Get_Value (R, Column_Name (C));
                begin
                   case V.Kind is
                      when Val_Numeric =>
@@ -1123,11 +1119,6 @@ package body SData.File_IO is
       end;
 
       Finish (Info);
-      GNAT.Strings.Free (Col_Names);
-   exception
-      when others =>
-         if Col_Names /= null then GNAT.Strings.Free (Col_Names); end if;
-         raise;
    end Write_OOXML;
 
    ---------------
@@ -1137,10 +1128,10 @@ package body SData.File_IO is
       use Zip.Create;
       Info : Zip_Create_Info;
       Z_File_Stream : aliased Zip_File_Stream;
-      Col_Names : GNAT.Strings.String_List_Access := Get_Column_Names;
-      Sname     : constant String := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
+      N     : constant Natural := Column_Count;
+      Sname : constant String  := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
    begin
-      if Col_Names = null then return; end if;
+      if N = 0 then return; end if;
 
       Create_Archive (Info, Z_File_Stream'Unchecked_Access, File_Name);
 
@@ -1170,17 +1161,17 @@ package body SData.File_IO is
 
          -- Header Row
          Append (S1, "<table:table-row>");
-         for C in Col_Names'Range loop
-            Append (S1, "<table:table-cell office:value-type=""string""><text:p>" & Escape_XML (Col_Names (C).all) & "</text:p></table:table-cell>");
+         for C in 1 .. N loop
+            Append (S1, "<table:table-cell office:value-type=""string""><text:p>" & Escape_XML (Column_Name (C)) & "</text:p></table:table-cell>");
          end loop;
          Append (S1, "</table:table-row>" & ASCII.LF);
 
          -- Data Rows
          for R in 1 .. Row_Count loop
             Append (S1, "<table:table-row>");
-            for C in Col_Names'Range loop
+            for C in 1 .. N loop
                declare
-                  V : constant Value := Get_Value (R, Col_Names (C).all);
+                  V : constant Value := Get_Value (R, Column_Name (C));
                begin
                   case V.Kind is
                      when Val_Numeric =>
@@ -1204,11 +1195,6 @@ package body SData.File_IO is
       end;
 
       Finish (Info);
-      GNAT.Strings.Free (Col_Names);
-   exception
-      when others =>
-         if Col_Names /= null then GNAT.Strings.Free (Col_Names); end if;
-         raise;
    end Write_ODF;
 
 end SData.File_IO;

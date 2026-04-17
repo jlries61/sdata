@@ -99,7 +99,7 @@ No commented-out code. No anonymous TODOs.
 | ~~Spill INSERT loop had no transaction wrapper — O(N) auto-commits per spill~~ | ~~`sdata-table.adb: Spill_Table_To_Disk`~~ | — | **Fixed** — loop wrapped in explicit `BEGIN`/`COMMIT` |
 | ~~Backing store opened with default journal/sync/cache settings~~ | ~~`sdata-table.adb: Initialize_Backing_Store`~~ | — | **Fixed** — `journal_mode=OFF`, `synchronous=OFF`, `cache_size=-65536`, `temp_store=MEMORY` |
 | Sort copies full column arrays | `sdata-table.adb` Sort procedure | Acceptable for memory-resident data |
-| `Get_Column_Names` allocates a new heap-allocated string list every call | `sdata-table.adb:106-114` | Used in hot paths (print, KEEP/DROP) — callers must remember to free |
+| ~~`Get_Column_Names` allocates a heap-allocated `String_List` — callers must remember to free~~ | ~~`sdata-table.adb`, `sdata-interpreter.adb`, `sdata-file_io.adb`, `sdata-variables.adb`~~ | — | **Fixed** — `Get_Column_Names` removed from the public API; all 17 call sites migrated to `Column_Count`/`Column_Name(I)`; 3 confirmed leaks in range-expansion functions eliminated as a side effect |
 
 No O(n²) algorithmic failures. Hash maps used throughout for O(1) column lookup. The SQLite spill-to-disk design for large tables is appropriate.
 
@@ -119,12 +119,10 @@ No O(n²) algorithmic failures. Hash maps used throughout for O(1) column lookup
 
 This is a pragmatic workaround for a library defect, clearly documented. For a CLI tool that exits immediately after use it is acceptable. For any future library embedding it would be a memory leak.
 
-`Get_Column_Names` returns a heap-allocated list that callers must explicitly free. This pattern is used ~6 times in `sdata-interpreter.adb`. All call sites examined do free correctly, but the API is a memory-trap for future contributors unfamiliar with GNAT.Strings conventions.
-
 | Metric | Score |
 |---|---|
-| Resource Handling | 7/10 |
-| Memory Safety | 7/10 |
+| Resource Handling | 8/10 |
+| Memory Safety | 8/10 |
 
 ### 3.3 Startup & Runtime Costs
 
@@ -296,13 +294,13 @@ The macOS section is notably thorough: the Alire/GNAT SDK path issue (`C_INCLUDE
 |---|---|
 | Architectural Integrity | 78/100 |
 | Code Quality | 78/100 |
-| Efficiency | 90/100 |
+| Efficiency | 92/100 |
 | Maintainability | 68/100 |
 | Error Handling | 85/100 |
 | Security | 82/100 |
 | Operational Readiness | 75/100 |
 | Documentation | 80/100 |
-| **TOTAL** | **636/800** |
+| **TOTAL** | **638/800** |
 
 ---
 
@@ -368,3 +366,4 @@ Trust this at 3 AM? Yes — with higher confidence than at first review.
 | ~~SELECT filter loaded all columns per row~~ | `sdata-interpreter.adb` / `sdata-variables.adb` | filter scan | **Fixed** — `Collect_Filter_Vars` + `Load_PDV_One_Column`: only referenced columns loaded per row; heap allocation in `Load_PDV_From_Table` also eliminated |
 | ~~Spill INSERT loop unboxed — O(N) implicit transactions~~ | `sdata-table.adb: Spill_Table_To_Disk` | row loop | **Fixed** — wrapped in explicit `BEGIN`/`COMMIT` |
 | ~~Backing store opened with default SQLite durability settings~~ | `sdata-table.adb: Initialize_Backing_Store` | DB open | **Fixed** — `journal_mode=OFF`, `synchronous=OFF`, `cache_size=-65536`, `temp_store=MEMORY` |
+| ~~`Get_Column_Names` heap-allocates a `String_List`; callers must free — 3 confirmed leaks in range-expansion functions~~ | `sdata-table.adb`, `sdata-interpreter.adb`, `sdata-file_io.adb`, `sdata-variables.adb` | 17 call sites | **Fixed** — function removed from public API; all callers migrated to `Column_Count`/`Column_Name(I)`; leaks in `Expand_Range`, `Set_Hold_For_Range`, `Resolve_Range` eliminated |

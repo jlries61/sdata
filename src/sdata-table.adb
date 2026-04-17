@@ -3,13 +3,13 @@ with Ada.Containers;
 with SData.Config;
 
 with GNAT.OS_Lib;
+with GNAT.Strings;
 with Ada.Unchecked_Deallocation;
 with Ada_Sqlite3; use Ada_Sqlite3;
 
 package body SData.Table is
 
    use type Ada.Containers.Count_Type;
-   use type GNAT.Strings.String_List_Access;
 
    procedure Clear_Fetch_Cache is
    begin
@@ -92,19 +92,6 @@ package body SData.Table is
          end;
       end if;
    end Add_Column;
-
-   ----------------------
-   -- Get_Column_Names --
-   ----------------------
-   function Get_Column_Names return GNAT.Strings.String_List_Access is
-      Count : constant Natural := Natural (Column_Order.Length);
-      List : constant GNAT.Strings.String_List_Access := new GNAT.Strings.String_List (1 .. Count);
-   begin
-      for I in 1 .. Count loop
-         List (I) := new String'(Ada.Strings.Unbounded.To_String (Column_Order.Element (I)));
-      end loop;
-      return List;
-   end Get_Column_Names;
 
    ----------------
    -- Has_Column --
@@ -317,26 +304,27 @@ package body SData.Table is
       if Store.Is_Active then
          Spill_To_Disk;
          declare
-            Col_Names : constant GNAT.Strings.String_List_Access := Get_Column_Names;
-            Cols_CSV  : Ada.Strings.Unbounded.Unbounded_String;
-            Col_Def   : Ada.Strings.Unbounded.Unbounded_String;
-            OrderBy   : Ada.Strings.Unbounded.Unbounded_String := Ada.Strings.Unbounded.To_Unbounded_String (" ORDER BY ");
+            N       : constant Natural := Column_Count;
+            Cols_CSV : Ada.Strings.Unbounded.Unbounded_String;
+            Col_Def  : Ada.Strings.Unbounded.Unbounded_String;
+            OrderBy  : Ada.Strings.Unbounded.Unbounded_String :=
+                          Ada.Strings.Unbounded.To_Unbounded_String (" ORDER BY ");
          begin
-            if Col_Names = null or else Col_Names'Length = 0 then return; end if;
+            if N = 0 then return; end if;
 
-            for I in Col_Names'Range loop
+            for I in 1 .. N loop
                declare
-                  Upper : constant String := Ada.Characters.Handling.To_Upper (Col_Names (I).all);
-                  Typ   : constant Column_Type := Data_Table.Element (Upper).Typ;
+                  Name  : constant String := Column_Name (I);  --  already upper-cased
+                  Typ   : constant Column_Type := Data_Table.Element (Name).Typ;
                   SQL_T : constant String := (if Typ = Col_Numeric then "REAL"
                                               elsif Typ = Col_Integer then "INTEGER"
                                               else "TEXT");
                begin
-                  Ada.Strings.Unbounded.Append (Cols_CSV, "[" & Upper & "]");
-                  Ada.Strings.Unbounded.Append (Col_Def, "[" & Upper & "] " & SQL_T);
-                  if I < Col_Names'Last then
+                  Ada.Strings.Unbounded.Append (Cols_CSV, "[" & Name & "]");
+                  Ada.Strings.Unbounded.Append (Col_Def,  "[" & Name & "] " & SQL_T);
+                  if I < N then
                      Ada.Strings.Unbounded.Append (Cols_CSV, ", ");
-                     Ada.Strings.Unbounded.Append (Col_Def, ", ");
+                     Ada.Strings.Unbounded.Append (Col_Def,  ", ");
                   end if;
                end;
             end loop;
@@ -354,8 +342,6 @@ package body SData.Table is
                               "SELECT " & Ada.Strings.Unbounded.To_String (Cols_CSV) & " FROM data " & Ada.Strings.Unbounded.To_String (OrderBy));
             Store.DB.Execute ("DROP TABLE data");
             Store.DB.Execute ("ALTER TABLE data_new RENAME TO data");
-
-            declare Old : GNAT.Strings.String_List_Access := Col_Names; begin GNAT.Strings.Free (Old); end;
          end;
          return;
       end if;
