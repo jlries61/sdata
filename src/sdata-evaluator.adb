@@ -36,10 +36,10 @@ with Ada.Strings.Hash;
 --    * IF(cond, true_expr, false_expr) is intercepted before argument
 --      flattening so that only the selected branch is evaluated (lazy eval).
 --    * All other built-in functions are dispatched through Dispatch_Table,
---      a hashed map from function name to handler subprogram.  String, navigation,
---      and statistics functions each have their own dedicated Ada subprogram so
---      the dispatch table is the sole dispatch layer.  Math, trig, aggregate, and
---      misc families share a handler and use Name to discriminate among members.
+--      a hashed map from function name to handler subprogram.  Every function
+--      has its own dedicated Ada subprogram; the dispatch table is the sole
+--      dispatch layer.  Synonym pairs (LOG/LN/LOGE, FLOOR/INT, FIX/IP,
+--      DEG/DEGREE, etc.) share one subprogram registered under multiple keys.
 
 package body SData.Evaluator is
 
@@ -142,300 +142,491 @@ package body SData.Evaluator is
 
 
    ---------------------------------------------------------------------------
-   --  Handle_Math — ABS, LOG*, EXP, ROUND, CEIL, FLOOR, INT, FIX, IP, FP,
-   --                MOD, SQRT
+   --  Math handlers — one subprogram per language function
    ---------------------------------------------------------------------------
-   function Handle_Math (Name : String; Vals : Value_Vectors.Vector) return Value is
+
+   function Handle_Abs (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
    begin
-      if Name = "ABS" and then Has_Args (Vals, 1) then
-         if Vals.Element (1).Kind = Val_Integer then
-            return (Kind => Val_Integer, Int_Val => abs Vals.Element (1).Int_Val);
-         else
-            return Num_Result (abs Convert_To_Float (Vals.Element (1)));
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      if Vals.Element (1).Kind = Val_Integer then
+         return (Kind => Val_Integer, Int_Val => abs Vals.Element (1).Int_Val);
+      else
+         return Num_Result (abs Convert_To_Float (Vals.Element (1)));
+      end if;
+   end Handle_Abs;
+
+   --  LOG / LN / LOGE — natural logarithm
+   function Handle_Log_Nat (Name : String; Vals : Value_Vectors.Vector) return Value is
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if V <= 0.0 then
+            return Handle_Domain_Error ("Argument to " & Name & " must be positive.");
          end if;
-      elsif Name = "LOG" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if V <= 0.0 then
-               return Handle_Domain_Error ("Argument to LOG must be positive.");
-            end if;
-            return Num_Result (Log (V));
-         end;
-      elsif Name = "LOG10" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if V <= 0.0 then
-               return Handle_Domain_Error ("Argument to LOG10 must be positive.");
-            end if;
-            return Num_Result (Log (V, 10.0));
-         end;
-      elsif Name in "LN" | "LOGE" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if V <= 0.0 then
-               return Handle_Domain_Error ("Argument to " & Name & " must be positive.");
-            end if;
-            return Num_Result (Log (V));
-         end;
-      elsif Name = "LOG2" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if V <= 0.0 then
-               return Handle_Domain_Error ("Argument to LOG2 must be positive.");
-            end if;
-            return Num_Result (Log (V) / Log (2.0));
-         end;
-      elsif Name in "CLG" | "LGT" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if V <= 0.0 then
-               return Handle_Domain_Error ("Argument to " & Name & " must be positive.");
-            end if;
-            return Num_Result (Log (V, 10.0));
-         end;
-      elsif Name = "EXP" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if V > 88.0 then
-               return Handle_Domain_Error ("Argument to EXP is too large (overflow).");
-            end if;
-            return Num_Result (Exp (V));
-         end;
-      elsif Name = "ROUND" and then Has_Args (Vals, 1) then
-         declare
-            V        : constant Float := Convert_To_Float (Vals.Element (1));
-            Decimals : Float := 0.0;
-            Factor   : Float;
-         begin
-            if Integer (Vals.Length) >= 2 and then Vals.Element (2).Kind /= Val_Missing then
-               Decimals := Convert_To_Float (Vals.Element (2));
-            end if;
-            Factor := 10.0 ** Decimals;
-            return Num_Result (Float'Rounding (V * Factor) / Factor);
-         end;
-      elsif Name = "CEIL" and then Has_Args (Vals, 1) then
-         return Num_Result (Float'Ceiling (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "FLOOR" and then Has_Args (Vals, 1) then
-         return Num_Result (Float'Floor (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "INT" and then Has_Args (Vals, 1) then
-         return Num_Result (Float'Floor (Convert_To_Float (Vals.Element (1))));
-      elsif Name in "FIX" | "IP" and then Has_Args (Vals, 1) then
-         return Num_Result (Float'Truncation (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "FP" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin return Num_Result (V - Float'Truncation (V)); end;
-      elsif Name = "MOD" and then Has_Args (Vals, 2) then
-         declare
-            V1 : constant Float := Convert_To_Float (Vals.Element (1));
-            V2 : constant Float := Convert_To_Float (Vals.Element (2));
-         begin
-            if V2 /= 0.0 then return Num_Result (V1 - Float'Floor (V1 / V2) * V2);
-            else return Handle_Domain_Error ("Division by zero in MOD."); end if;
-         end;
-      elsif Name = "SQRT" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if V >= 0.0 then return Num_Result (Sqrt (V));
-            else return Handle_Domain_Error ("Argument to SQRT must be non-negative."); end if;
-         end;
-      end if;
-      return (Kind => Val_Missing);
-   end Handle_Math;
+         return Num_Result (Log (V));
+      end;
+   end Handle_Log_Nat;
 
-   ---------------------------------------------------------------------------
-   --  Handle_Trig — radians: SIN, COS, TAN, ATN, ATAN2, SINH, COSH, TANH,
-   --                HCS, HSN, HTN, ARCSIN, ARCCOS, ARCTAN, COT, CSC, SEC,
-   --                DEG, DEGREE
-   --                degrees: SIND, COSD, TAND, ATND, ATAN2D
-   ---------------------------------------------------------------------------
-   function Handle_Trig (Name : String; Vals : Value_Vectors.Vector) return Value is
+   --  LOG10 / CLG / LGT — base-10 logarithm
+   function Handle_Log10_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
    begin
-      if Name = "SIN" and then Has_Args (Vals, 1) then
-         return Num_Result (Sin (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "COS" and then Has_Args (Vals, 1) then
-         return Num_Result (Cos (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "TAN" and then Has_Args (Vals, 1) then
-         return Num_Result (Tan (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "ATN" and then Has_Args (Vals, 1) then
-         return Num_Result (Arctan (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "ATAN2" and then Has_Args (Vals, 2) then
-         return Num_Result (Arctan (Convert_To_Float (Vals.Element (1)),
-                                    Convert_To_Float (Vals.Element (2))));
-      elsif Name = "SINH" and then Has_Args (Vals, 1) then
-         return Num_Result (Sinh (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "COSH" and then Has_Args (Vals, 1) then
-         return Num_Result (Cosh (Convert_To_Float (Vals.Element (1))));
-      elsif Name = "TANH" and then Has_Args (Vals, 1) then
-         return Num_Result (Tanh (Convert_To_Float (Vals.Element (1))));
-      elsif Name in "HCS" | "HSN" | "HTN" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if Name = "HCS" then return Num_Result (1.0 / Cosh (V));
-            elsif Name = "HSN" then return Num_Result (1.0 / Sinh (V));
-            else return Num_Result (Cosh (V) / Sinh (V)); end if;
-         end;
-      elsif Name in "ARCSIN" | "ARCCOS" | "ARCTAN" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if Name = "ARCSIN" then
-               if V < -1.0 or else V > 1.0 then
-                  return Handle_Domain_Error ("ARCSIN argument must be in [-1, 1].");
-               end if;
-               return Num_Result (Arcsin (V));
-            elsif Name = "ARCCOS" then
-               if V < -1.0 or else V > 1.0 then
-                  return Handle_Domain_Error ("ARCCOS argument must be in [-1, 1].");
-               end if;
-               return Num_Result (Arccos (V));
-            else
-               return Num_Result (Arctan (V));
-            end if;
-         end;
-      elsif Name in "COT" | "CSC" | "SEC" and then Has_Args (Vals, 1) then
-         declare V : constant Float := Convert_To_Float (Vals.Element (1));
-         begin
-            if Name = "COT" then return Num_Result (Cos (V) / Sin (V));
-            elsif Name = "CSC" then return Num_Result (1.0 / Sin (V));
-            else return Num_Result (1.0 / Cos (V)); end if;
-         end;
-      elsif Name in "DEG" | "DEGREE" and then Has_Args (Vals, 1) then
-         return Num_Result (Convert_To_Float (Vals.Element (1)) * 180.0 / Ada.Numerics.Pi);
-      --  Degree variants
-      elsif Name = "SIND" and then Has_Args (Vals, 1) then
-         return Num_Result (Sin (Convert_To_Float (Vals.Element (1)) * Ada.Numerics.Pi / 180.0));
-      elsif Name = "COSD" and then Has_Args (Vals, 1) then
-         return Num_Result (Cos (Convert_To_Float (Vals.Element (1)) * Ada.Numerics.Pi / 180.0));
-      elsif Name = "TAND" and then Has_Args (Vals, 1) then
-         return Num_Result (Tan (Convert_To_Float (Vals.Element (1)) * Ada.Numerics.Pi / 180.0));
-      elsif Name = "ATND" and then Has_Args (Vals, 1) then
-         return Num_Result (Arctan (Convert_To_Float (Vals.Element (1))) * 180.0 / Ada.Numerics.Pi);
-      elsif Name = "ATAN2D" and then Has_Args (Vals, 2) then
-         return Num_Result (Arctan (Convert_To_Float (Vals.Element (1)),
-                                    Convert_To_Float (Vals.Element (2))) * 180.0 / Ada.Numerics.Pi);
-      end if;
-      return (Kind => Val_Missing);
-   end Handle_Trig;
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if V <= 0.0 then
+            return Handle_Domain_Error ("Argument to " & Name & " must be positive.");
+         end if;
+         return Num_Result (Log (V, 10.0));
+      end;
+   end Handle_Log10_Fn;
 
-   ---------------------------------------------------------------------------
-   --  Handle_Aggregate — SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS,
-   --                      GMEAN, HMEAN, MEDIAN
-   ---------------------------------------------------------------------------
-   function Handle_Aggregate (Name : String; Vals : Value_Vectors.Vector) return Value is
+   function Handle_Log2_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
    begin
-      if Name in "SUM" | "MEAN" | "STD" | "VAR" | "MIN" | "MAX" | "N" | "NMISS" then
-         declare
-            Sum, Sum_Sq, Min_V, Max_V : Long_Float := 0.0;
-            N_Count, NMISS_Count      : Natural    := 0;
-            First_Val                 : Boolean    := True;
-         begin
-            for V of Vals loop
-               if V.Kind = Val_Missing then
-                  NMISS_Count := NMISS_Count + 1;
-               else
-                  declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
-                  begin
-                     N_Count := N_Count + 1;
-                     Sum     := Sum + FV;
-                     Sum_Sq  := Sum_Sq + FV ** 2;
-                     if First_Val then
-                        Min_V := FV; Max_V := FV; First_Val := False;
-                     else
-                        if FV < Min_V then Min_V := FV; end if;
-                        if FV > Max_V then Max_V := FV; end if;
-                     end if;
-                  end;
-               end if;
-            end loop;
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if V <= 0.0 then
+            return Handle_Domain_Error ("Argument to " & Name & " must be positive.");
+         end if;
+         return Num_Result (Log (V) / Log (2.0));
+      end;
+   end Handle_Log2_Fn;
 
-            if Name = "N"     then return (Kind => Val_Integer, Int_Val => N_Count); end if;
-            if Name = "NMISS" then return (Kind => Val_Integer, Int_Val => NMISS_Count); end if;
-            if N_Count = 0    then return (Kind => Val_Missing); end if;
+   function Handle_Exp_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if V > 88.0 then
+            return Handle_Domain_Error ("Argument to " & Name & " is too large (overflow).");
+         end if;
+         return Num_Result (Exp (V));
+      end;
+   end Handle_Exp_Fn;
 
-            declare NF : constant Long_Float := Long_Float (N_Count);
+   function Handle_Round_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare
+         V        : constant Float := Convert_To_Float (Vals.Element (1));
+         Decimals : Float := 0.0;
+         Factor   : Float;
+      begin
+         if Integer (Vals.Length) >= 2 and then Vals.Element (2).Kind /= Val_Missing then
+            Decimals := Convert_To_Float (Vals.Element (2));
+         end if;
+         Factor := 10.0 ** Decimals;
+         return Num_Result (Float'Rounding (V * Factor) / Factor);
+      end;
+   end Handle_Round_Fn;
+
+   function Handle_Ceil_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Float'Ceiling (Convert_To_Float (Vals.Element (1))));
+   end Handle_Ceil_Fn;
+
+   --  FLOOR / INT — round toward -infinity
+   function Handle_Floor_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Float'Floor (Convert_To_Float (Vals.Element (1))));
+   end Handle_Floor_Fn;
+
+   --  FIX / IP — truncate toward zero
+   function Handle_Fix_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Float'Truncation (Convert_To_Float (Vals.Element (1))));
+   end Handle_Fix_Fn;
+
+   function Handle_Fp_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin return Num_Result (V - Float'Truncation (V)); end;
+   end Handle_Fp_Fn;
+
+   function Handle_Mod_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         V1 : constant Float := Convert_To_Float (Vals.Element (1));
+         V2 : constant Float := Convert_To_Float (Vals.Element (2));
+      begin
+         if V2 /= 0.0 then return Num_Result (V1 - Float'Floor (V1 / V2) * V2);
+         else return Handle_Domain_Error ("Division by zero in MOD."); end if;
+      end;
+   end Handle_Mod_Fn;
+
+   function Handle_Sqrt_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if V >= 0.0 then return Num_Result (Sqrt (V));
+         else return Handle_Domain_Error ("Argument to SQRT must be non-negative."); end if;
+      end;
+   end Handle_Sqrt_Fn;
+
+   ---------------------------------------------------------------------------
+   --  Trig handlers — one subprogram per language function
+   ---------------------------------------------------------------------------
+
+   function Handle_Sin_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Sin (Convert_To_Float (Vals.Element (1))));
+   end Handle_Sin_Fn;
+
+   function Handle_Cos_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Cos (Convert_To_Float (Vals.Element (1))));
+   end Handle_Cos_Fn;
+
+   function Handle_Tan_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Tan (Convert_To_Float (Vals.Element (1))));
+   end Handle_Tan_Fn;
+
+   function Handle_Atn_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Arctan (Convert_To_Float (Vals.Element (1))));
+   end Handle_Atn_Fn;
+
+   function Handle_Atan2_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (Arctan (Convert_To_Float (Vals.Element (1)),
+                                 Convert_To_Float (Vals.Element (2))));
+   end Handle_Atan2_Fn;
+
+   function Handle_Sinh_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Sinh (Convert_To_Float (Vals.Element (1))));
+   end Handle_Sinh_Fn;
+
+   function Handle_Cosh_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Cosh (Convert_To_Float (Vals.Element (1))));
+   end Handle_Cosh_Fn;
+
+   function Handle_Tanh_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Tanh (Convert_To_Float (Vals.Element (1))));
+   end Handle_Tanh_Fn;
+
+   function Handle_Hcs_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (1.0 / Cosh (Convert_To_Float (Vals.Element (1))));
+   end Handle_Hcs_Fn;
+
+   function Handle_Hsn_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (1.0 / Sinh (Convert_To_Float (Vals.Element (1))));
+   end Handle_Hsn_Fn;
+
+   function Handle_Htn_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin return Num_Result (Cosh (V) / Sinh (V)); end;
+   end Handle_Htn_Fn;
+
+   function Handle_Arcsin_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if V < -1.0 or else V > 1.0 then
+            return Handle_Domain_Error ("ARCSIN argument must be in [-1, 1].");
+         end if;
+         return Num_Result (Arcsin (V));
+      end;
+   end Handle_Arcsin_Fn;
+
+   function Handle_Arccos_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if V < -1.0 or else V > 1.0 then
+            return Handle_Domain_Error ("ARCCOS argument must be in [-1, 1].");
+         end if;
+         return Num_Result (Arccos (V));
+      end;
+   end Handle_Arccos_Fn;
+
+   function Handle_Arctan_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Arctan (Convert_To_Float (Vals.Element (1))));
+   end Handle_Arctan_Fn;
+
+   function Handle_Cot_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin return Num_Result (Cos (V) / Sin (V)); end;
+   end Handle_Cot_Fn;
+
+   function Handle_Csc_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (1.0 / Sin (Convert_To_Float (Vals.Element (1))));
+   end Handle_Csc_Fn;
+
+   function Handle_Sec_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (1.0 / Cos (Convert_To_Float (Vals.Element (1))));
+   end Handle_Sec_Fn;
+
+   --  DEG / DEGREE — convert radians to degrees
+   function Handle_Deg_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Convert_To_Float (Vals.Element (1)) * 180.0 / Ada.Numerics.Pi);
+   end Handle_Deg_Fn;
+
+   function Handle_Sind_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Sin (Convert_To_Float (Vals.Element (1)) * Ada.Numerics.Pi / 180.0));
+   end Handle_Sind_Fn;
+
+   function Handle_Cosd_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Cos (Convert_To_Float (Vals.Element (1)) * Ada.Numerics.Pi / 180.0));
+   end Handle_Cosd_Fn;
+
+   function Handle_Tand_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Tan (Convert_To_Float (Vals.Element (1)) * Ada.Numerics.Pi / 180.0));
+   end Handle_Tand_Fn;
+
+   function Handle_Atnd_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Arctan (Convert_To_Float (Vals.Element (1))) * 180.0 / Ada.Numerics.Pi);
+   end Handle_Atnd_Fn;
+
+   function Handle_Atan2d_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      return Num_Result (Arctan (Convert_To_Float (Vals.Element (1)),
+                                 Convert_To_Float (Vals.Element (2))) * 180.0 / Ada.Numerics.Pi);
+   end Handle_Atan2d_Fn;
+
+   ---------------------------------------------------------------------------
+   --  Aggregate helpers and handlers
+   ---------------------------------------------------------------------------
+
+   type Stats_Pass_Result is record
+      N_Count     : Natural    := 0;
+      NMISS_Count : Natural    := 0;
+      Sum         : Long_Float := 0.0;
+      Sum_Sq      : Long_Float := 0.0;
+      Min_V       : Long_Float := 0.0;
+      Max_V       : Long_Float := 0.0;
+      Has_Values  : Boolean    := False;
+   end record;
+
+   function Compute_Stats_Pass (Vals : Value_Vectors.Vector) return Stats_Pass_Result is
+      R : Stats_Pass_Result;
+   begin
+      for V of Vals loop
+         if V.Kind = Val_Missing then
+            R.NMISS_Count := R.NMISS_Count + 1;
+         else
+            declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
             begin
-               if Name = "SUM"  then return (Kind => Val_Numeric, Num_Val => Float (Sum));
-               elsif Name = "MEAN" then return (Kind => Val_Numeric, Num_Val => Float (Sum / NF));
-               elsif Name = "MIN"  then return (Kind => Val_Numeric, Num_Val => Float (Min_V));
-               elsif Name = "MAX"  then return (Kind => Val_Numeric, Num_Val => Float (Max_V));
-               elsif Name in "VAR" | "STD" then
-                  if N_Count > 1 then
-                     declare Variance : constant Long_Float := (Sum_Sq - (Sum ** 2 / NF)) / (NF - 1.0);
-                     begin
-                        if Name = "VAR" then return (Kind => Val_Numeric, Num_Val => Float (Variance));
-                        else return (Kind => Val_Numeric, Num_Val => Sqrt (Float (Variance))); end if;
-                     end;
-                  else
-                     return (Kind => Val_Missing);
-                  end if;
+               R.N_Count := R.N_Count + 1;
+               R.Sum     := R.Sum + FV;
+               R.Sum_Sq  := R.Sum_Sq + FV ** 2;
+               if not R.Has_Values then
+                  R.Min_V := FV; R.Max_V := FV; R.Has_Values := True;
+               else
+                  if FV < R.Min_V then R.Min_V := FV; end if;
+                  if FV > R.Max_V then R.Max_V := FV; end if;
                end if;
             end;
-         end;
+         end if;
+      end loop;
+      return R;
+   end Compute_Stats_Pass;
 
-      elsif Name = "GMEAN" then
-         declare
-            Log_Sum : Long_Float := 0.0;
-            N_Count : Natural   := 0;
-         begin
-            for V of Vals loop
-               if V.Kind /= Val_Missing then
-                  declare FV : constant Float := Convert_To_Float (V);
-                  begin
-                     if FV <= 0.0 then return (Kind => Val_Missing); end if;
-                     Log_Sum := Log_Sum + Long_Float (Log (FV));
-                     N_Count := N_Count + 1;
-                  end;
-               end if;
-            end loop;
-            if N_Count = 0 then return (Kind => Val_Missing); end if;
-            return Num_Result (Exp (Float (Log_Sum / Long_Float (N_Count))));
-         end;
+   function Handle_Sum (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+   begin
+      if R.N_Count = 0 then return (Kind => Val_Missing); end if;
+      return (Kind => Val_Numeric, Num_Val => Float (R.Sum));
+   end Handle_Sum;
 
-      elsif Name = "HMEAN" then
-         declare
-            Recip_Sum : Long_Float := 0.0;
-            N_Count   : Natural   := 0;
-         begin
-            for V of Vals loop
-               if V.Kind /= Val_Missing then
-                  declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
-                  begin
-                     if FV = 0.0 then return (Kind => Val_Missing); end if;
-                     Recip_Sum := Recip_Sum + 1.0 / FV;
-                     N_Count   := N_Count + 1;
-                  end;
-               end if;
-            end loop;
-            if N_Count = 0 then return (Kind => Val_Missing); end if;
-            return Num_Result (Float (Long_Float (N_Count) / Recip_Sum));
-         end;
+   function Handle_Mean (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+   begin
+      if R.N_Count = 0 then return (Kind => Val_Missing); end if;
+      return (Kind => Val_Numeric, Num_Val => Float (R.Sum / Long_Float (R.N_Count)));
+   end Handle_Mean;
 
-      elsif Name = "MEDIAN" then
-         declare
-            package Float_Vecs is new Ada.Containers.Vectors (Positive, Float);
-            package Float_Sort  is new Float_Vecs.Generic_Sorting;
-            FVals   : Float_Vecs.Vector;
-            N_Count : Natural := 0;
+   function Handle_Var_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R  : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+      NF : Long_Float;
+   begin
+      if R.N_Count < 2 then return (Kind => Val_Missing); end if;
+      NF := Long_Float (R.N_Count);
+      return (Kind => Val_Numeric, Num_Val => Float ((R.Sum_Sq - (R.Sum ** 2 / NF)) / (NF - 1.0)));
+   end Handle_Var_Fn;
+
+   function Handle_Std_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R  : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+      NF : Long_Float;
+   begin
+      if R.N_Count < 2 then return (Kind => Val_Missing); end if;
+      NF := Long_Float (R.N_Count);
+      return (Kind => Val_Numeric,
+              Num_Val => Sqrt (Float ((R.Sum_Sq - (R.Sum ** 2 / NF)) / (NF - 1.0))));
+   end Handle_Std_Fn;
+
+   function Handle_Min_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+   begin
+      if R.N_Count = 0 then return (Kind => Val_Missing); end if;
+      return (Kind => Val_Numeric, Num_Val => Float (R.Min_V));
+   end Handle_Min_Fn;
+
+   function Handle_Max_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+   begin
+      if R.N_Count = 0 then return (Kind => Val_Missing); end if;
+      return (Kind => Val_Numeric, Num_Val => Float (R.Max_V));
+   end Handle_Max_Fn;
+
+   function Handle_N_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => R.N_Count);
+   end Handle_N_Fn;
+
+   function Handle_Nmiss_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => R.NMISS_Count);
+   end Handle_Nmiss_Fn;
+
+   function Handle_Gmean (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      Log_Sum : Long_Float := 0.0;
+      N_Count : Natural   := 0;
+   begin
+      for V of Vals loop
+         if V.Kind /= Val_Missing then
+            declare FV : constant Float := Convert_To_Float (V);
+            begin
+               if FV <= 0.0 then return (Kind => Val_Missing); end if;
+               Log_Sum := Log_Sum + Long_Float (Log (FV));
+               N_Count := N_Count + 1;
+            end;
+         end if;
+      end loop;
+      if N_Count = 0 then return (Kind => Val_Missing); end if;
+      return Num_Result (Exp (Float (Log_Sum / Long_Float (N_Count))));
+   end Handle_Gmean;
+
+   function Handle_Hmean (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      Recip_Sum : Long_Float := 0.0;
+      N_Count   : Natural   := 0;
+   begin
+      for V of Vals loop
+         if V.Kind /= Val_Missing then
+            declare FV : constant Long_Float := Long_Float (Convert_To_Float (V));
+            begin
+               if FV = 0.0 then return (Kind => Val_Missing); end if;
+               Recip_Sum := Recip_Sum + 1.0 / FV;
+               N_Count   := N_Count + 1;
+            end;
+         end if;
+      end loop;
+      if N_Count = 0 then return (Kind => Val_Missing); end if;
+      return Num_Result (Float (Long_Float (N_Count) / Recip_Sum));
+   end Handle_Hmean;
+
+   function Handle_Median (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      package Float_Vecs is new Ada.Containers.Vectors (Positive, Float);
+      package Float_Sort  is new Float_Vecs.Generic_Sorting;
+      FVals   : Float_Vecs.Vector;
+      N_Count : Natural := 0;
+   begin
+      for I in 1 .. Integer (Vals.Length) loop
+         declare V : constant Value := Vals.Element (I);
          begin
-            for I in 1 .. Integer (Vals.Length) loop
-               declare V : constant Value := Vals.Element (I);
-               begin
-                  if V.Kind /= Val_Missing then
-                     FVals.Append (Convert_To_Float (V));
-                     N_Count := N_Count + 1;
-                  end if;
-               end;
-            end loop;
-            if N_Count = 0 then return (Kind => Val_Missing); end if;
-            Float_Sort.Sort (FVals);
-            if N_Count mod 2 = 1 then
-               return Num_Result (FVals.Element ((N_Count + 1) / 2));
-            else
-               return Num_Result ((FVals.Element (N_Count / 2) + FVals.Element (N_Count / 2 + 1)) / 2.0);
+            if V.Kind /= Val_Missing then
+               FVals.Append (Convert_To_Float (V));
+               N_Count := N_Count + 1;
             end if;
          end;
+      end loop;
+      if N_Count = 0 then return (Kind => Val_Missing); end if;
+      Float_Sort.Sort (FVals);
+      if N_Count mod 2 = 1 then
+         return Num_Result (FVals.Element ((N_Count + 1) / 2));
+      else
+         return Num_Result ((FVals.Element (N_Count / 2) + FVals.Element (N_Count / 2 + 1)) / 2.0);
       end if;
-      return (Kind => Val_Missing);
-   end Handle_Aggregate;
+   end Handle_Median;
 
    ---------------------------------------------------------------------------
    --  To_Base_String — private helper for HEX$, OCT$, BIN$
@@ -1320,105 +1511,119 @@ package body SData.Evaluator is
    end Handle_Ran;
 
    ---------------------------------------------------------------------------
-   --  Handle_Misc — MISSING, FALSE, TRUE, DATE$, TIME$, SHELL, NUM
    ---------------------------------------------------------------------------
-   function Handle_Misc (Name : String; Vals : Value_Vectors.Vector) return Value is
+   --  Misc handlers — one subprogram per language function
+   ---------------------------------------------------------------------------
+
+   function Handle_Missing (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
    begin
-      if Name = "MISSING" and then Integer (Vals.Length) >= 1 then
-         return (Kind    => Val_Integer,
-                 Int_Val => (if Vals.Element (1).Kind = Val_Missing then 1 else 0));
+      if Integer (Vals.Length) < 1 then return (Kind => Val_Missing); end if;
+      return (Kind => Val_Integer,
+              Int_Val => (if Vals.Element (1).Kind = Val_Missing then 1 else 0));
+   end Handle_Missing;
 
-      elsif Name = "FALSE" then
-         return (Kind => Val_Integer, Int_Val => 0);
+   function Handle_False (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => 0);
+   end Handle_False;
 
-      elsif Name = "TRUE" then
-         return (Kind => Val_Integer, Int_Val => 1);
+   function Handle_True (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => 1);
+   end Handle_True;
 
-      elsif Name = "DATE$" then
-         declare
-            R   : Value (Val_String);
-            Now : constant Ada.Calendar.Time := Ada.Calendar.Clock;
-            Y   : Ada.Calendar.Year_Number;
-            Mo  : Ada.Calendar.Month_Number;
-            D   : Ada.Calendar.Day_Number;
-            Sec : Ada.Calendar.Day_Duration;
-            Buf : String (1 .. 10);
-         begin
-            Ada.Calendar.Split (Now, Y, Mo, D, Sec);
-            declare
-               use Ada.Strings.Fixed;
-               YS : constant String := Y'Image;
-               MS : constant String := (if Mo < 10 then "0" else "") & Trim (Mo'Image, Ada.Strings.Both);
-               DS : constant String := (if D  < 10 then "0" else "") & Trim (D'Image,  Ada.Strings.Both);
-            begin
-               Buf := YS (YS'Last - 3 .. YS'Last) & "-" & MS & "-" & DS;
-            end;
-            R.Str_Val := To_Unbounded_String (Buf);
-            return R;
-         end;
+   function Handle_Date (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+      R   : Value (Val_String);
+      Now : constant Ada.Calendar.Time := Ada.Calendar.Clock;
+      Y   : Ada.Calendar.Year_Number;
+      Mo  : Ada.Calendar.Month_Number;
+      D   : Ada.Calendar.Day_Number;
+      Sec : Ada.Calendar.Day_Duration;
+      Buf : String (1 .. 10);
+   begin
+      Ada.Calendar.Split (Now, Y, Mo, D, Sec);
+      declare
+         use Ada.Strings.Fixed;
+         YS : constant String := Y'Image;
+         MS : constant String := (if Mo < 10 then "0" else "") & Trim (Mo'Image, Ada.Strings.Both);
+         DS : constant String := (if D  < 10 then "0" else "") & Trim (D'Image,  Ada.Strings.Both);
+      begin
+         Buf := YS (YS'Last - 3 .. YS'Last) & "-" & MS & "-" & DS;
+      end;
+      R.Str_Val := To_Unbounded_String (Buf);
+      return R;
+   end Handle_Date;
 
-      elsif Name = "TIME$" then
-         declare
-            R         : Value (Val_String);
-            Now       : constant Ada.Calendar.Time := Ada.Calendar.Clock;
-            Y         : Ada.Calendar.Year_Number;
-            Mo        : Ada.Calendar.Month_Number;
-            D         : Ada.Calendar.Day_Number;
-            Sec       : Ada.Calendar.Day_Duration;
-            Total_Sec : Natural;
-            H, Mi, S  : Natural;
-            Buf       : String (1 .. 8);
-         begin
-            Ada.Calendar.Split (Now, Y, Mo, D, Sec);
-            Total_Sec := Natural (Float'Floor (Float (Sec)));
-            H  := Total_Sec / 3600;
-            Mi := (Total_Sec mod 3600) / 60;
-            S  := Total_Sec mod 60;
-            declare
-               use Ada.Strings.Fixed;
-               HS  : constant String := (if H  < 10 then "0" else "") & Trim (H'Image,  Ada.Strings.Both);
-               MiS : constant String := (if Mi < 10 then "0" else "") & Trim (Mi'Image, Ada.Strings.Both);
-               SS  : constant String := (if S  < 10 then "0" else "") & Trim (S'Image,  Ada.Strings.Both);
-            begin
-               Buf := HS & ":" & MiS & ":" & SS;
-            end;
-            R.Str_Val := To_Unbounded_String (Buf);
-            return R;
-         end;
+   function Handle_Time (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+      R         : Value (Val_String);
+      Now       : constant Ada.Calendar.Time := Ada.Calendar.Clock;
+      Y         : Ada.Calendar.Year_Number;
+      Mo        : Ada.Calendar.Month_Number;
+      D         : Ada.Calendar.Day_Number;
+      Sec       : Ada.Calendar.Day_Duration;
+      Total_Sec : Natural;
+      H, Mi, S  : Natural;
+      Buf       : String (1 .. 8);
+   begin
+      Ada.Calendar.Split (Now, Y, Mo, D, Sec);
+      Total_Sec := Natural (Float'Floor (Float (Sec)));
+      H  := Total_Sec / 3600;
+      Mi := (Total_Sec mod 3600) / 60;
+      S  := Total_Sec mod 60;
+      declare
+         use Ada.Strings.Fixed;
+         HS  : constant String := (if H  < 10 then "0" else "") & Trim (H'Image,  Ada.Strings.Both);
+         MiS : constant String := (if Mi < 10 then "0" else "") & Trim (Mi'Image, Ada.Strings.Both);
+         SS  : constant String := (if S  < 10 then "0" else "") & Trim (S'Image,  Ada.Strings.Both);
+      begin
+         Buf := HS & ":" & MiS & ":" & SS;
+      end;
+      R.Str_Val := To_Unbounded_String (Buf);
+      return R;
+   end Handle_Time;
 
-      elsif Name = "SHELL" and then Has_Args (Vals, 1) then
-         if SData.Config.Disable_Shell then
-            Put_Line_Error ("Error: SHELL function is disabled.");
-            return (Kind => Val_Missing);
-         else
-            declare
-               Command : constant String  := SData.Values.To_String (Vals.Element (1));
-               Success : Boolean;
-            begin
-               SData.System.Shell_Execute (Command, Success);
-               return (Kind => Val_Integer, Int_Val => (if Success then 0 else 1));
-            end;
-         end if;
-
-      elsif Name = "NUM" and then Has_Args (Vals, 1) then
-         declare V : constant Value := Vals.Element (1);
-         begin
-            if V.Kind = Val_Numeric or else V.Kind = Val_Integer then
-               return V;
-            elsif V.Kind = Val_String then
-               begin
-                  return (Kind    => Val_Numeric,
-                          Num_Val => Float'Value (SData.Values.To_String (V)));
-               exception
-                  when Constraint_Error => return (Kind => Val_Missing);
-               end;
-            else
-               return (Kind => Val_Missing);
-            end if;
-         end;
+   function Handle_Shell (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      if SData.Config.Disable_Shell then
+         Put_Line_Error ("Error: SHELL function is disabled.");
+         return (Kind => Val_Missing);
       end if;
-      return (Kind => Val_Missing);
-   end Handle_Misc;
+      declare
+         Command : constant String := SData.Values.To_String (Vals.Element (1));
+         Success : Boolean;
+      begin
+         SData.System.Shell_Execute (Command, Success);
+         return (Kind => Val_Integer, Int_Val => (if Success then 0 else 1));
+      end;
+   end Handle_Shell;
+
+   function Handle_Num (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Value := Vals.Element (1);
+      begin
+         if V.Kind = Val_Numeric or else V.Kind = Val_Integer then
+            return V;
+         elsif V.Kind = Val_String then
+            begin
+               return (Kind    => Val_Numeric,
+                       Num_Val => Float'Value (SData.Values.To_String (V)));
+            exception
+               when Constraint_Error => return (Kind => Val_Missing);
+            end;
+         else
+            return (Kind => Val_Missing);
+         end if;
+      end;
+   end Handle_Num;
 
    ---------------------------------------------------------------------------
    --  Evaluate_Function — public entry point
@@ -1787,63 +1992,63 @@ package body SData.Evaluator is
    procedure Register_All_Functions is
    begin
       --  Math
-      Dispatch_Table.Insert ("ABS",    Handle_Math'Access);
-      Dispatch_Table.Insert ("LOG",    Handle_Math'Access);
-      Dispatch_Table.Insert ("LN",     Handle_Math'Access);
-      Dispatch_Table.Insert ("LOGE",   Handle_Math'Access);
-      Dispatch_Table.Insert ("LOG10",  Handle_Math'Access);
-      Dispatch_Table.Insert ("CLG",    Handle_Math'Access);
-      Dispatch_Table.Insert ("LGT",    Handle_Math'Access);
-      Dispatch_Table.Insert ("LOG2",   Handle_Math'Access);
-      Dispatch_Table.Insert ("EXP",    Handle_Math'Access);
-      Dispatch_Table.Insert ("ROUND",  Handle_Math'Access);
-      Dispatch_Table.Insert ("CEIL",   Handle_Math'Access);
-      Dispatch_Table.Insert ("FLOOR",  Handle_Math'Access);
-      Dispatch_Table.Insert ("INT",    Handle_Math'Access);
-      Dispatch_Table.Insert ("FIX",    Handle_Math'Access);
-      Dispatch_Table.Insert ("IP",     Handle_Math'Access);
-      Dispatch_Table.Insert ("FP",     Handle_Math'Access);
-      Dispatch_Table.Insert ("MOD",    Handle_Math'Access);
-      Dispatch_Table.Insert ("SQRT",   Handle_Math'Access);
+      Dispatch_Table.Insert ("ABS",    Handle_Abs'Access);
+      Dispatch_Table.Insert ("LOG",    Handle_Log_Nat'Access);
+      Dispatch_Table.Insert ("LN",     Handle_Log_Nat'Access);
+      Dispatch_Table.Insert ("LOGE",   Handle_Log_Nat'Access);
+      Dispatch_Table.Insert ("LOG10",  Handle_Log10_Fn'Access);
+      Dispatch_Table.Insert ("CLG",    Handle_Log10_Fn'Access);
+      Dispatch_Table.Insert ("LGT",    Handle_Log10_Fn'Access);
+      Dispatch_Table.Insert ("LOG2",   Handle_Log2_Fn'Access);
+      Dispatch_Table.Insert ("EXP",    Handle_Exp_Fn'Access);
+      Dispatch_Table.Insert ("ROUND",  Handle_Round_Fn'Access);
+      Dispatch_Table.Insert ("CEIL",   Handle_Ceil_Fn'Access);
+      Dispatch_Table.Insert ("FLOOR",  Handle_Floor_Fn'Access);
+      Dispatch_Table.Insert ("INT",    Handle_Floor_Fn'Access);
+      Dispatch_Table.Insert ("FIX",    Handle_Fix_Fn'Access);
+      Dispatch_Table.Insert ("IP",     Handle_Fix_Fn'Access);
+      Dispatch_Table.Insert ("FP",     Handle_Fp_Fn'Access);
+      Dispatch_Table.Insert ("MOD",    Handle_Mod_Fn'Access);
+      Dispatch_Table.Insert ("SQRT",   Handle_Sqrt_Fn'Access);
 
       --  Trigonometry
-      Dispatch_Table.Insert ("SIN",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("COS",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("TAN",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("ATN",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("ATAN2",  Handle_Trig'Access);
-      Dispatch_Table.Insert ("SINH",   Handle_Trig'Access);
-      Dispatch_Table.Insert ("COSH",   Handle_Trig'Access);
-      Dispatch_Table.Insert ("TANH",   Handle_Trig'Access);
-      Dispatch_Table.Insert ("HCS",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("HSN",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("HTN",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("ARCSIN", Handle_Trig'Access);
-      Dispatch_Table.Insert ("ARCCOS", Handle_Trig'Access);
-      Dispatch_Table.Insert ("ARCTAN", Handle_Trig'Access);
-      Dispatch_Table.Insert ("COT",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("CSC",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("SEC",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("DEG",    Handle_Trig'Access);
-      Dispatch_Table.Insert ("DEGREE", Handle_Trig'Access);
-      Dispatch_Table.Insert ("SIND",   Handle_Trig'Access);
-      Dispatch_Table.Insert ("COSD",   Handle_Trig'Access);
-      Dispatch_Table.Insert ("TAND",   Handle_Trig'Access);
-      Dispatch_Table.Insert ("ATND",   Handle_Trig'Access);
-      Dispatch_Table.Insert ("ATAN2D", Handle_Trig'Access);
+      Dispatch_Table.Insert ("SIN",    Handle_Sin_Fn'Access);
+      Dispatch_Table.Insert ("COS",    Handle_Cos_Fn'Access);
+      Dispatch_Table.Insert ("TAN",    Handle_Tan_Fn'Access);
+      Dispatch_Table.Insert ("ATN",    Handle_Atn_Fn'Access);
+      Dispatch_Table.Insert ("ATAN2",  Handle_Atan2_Fn'Access);
+      Dispatch_Table.Insert ("SINH",   Handle_Sinh_Fn'Access);
+      Dispatch_Table.Insert ("COSH",   Handle_Cosh_Fn'Access);
+      Dispatch_Table.Insert ("TANH",   Handle_Tanh_Fn'Access);
+      Dispatch_Table.Insert ("HCS",    Handle_Hcs_Fn'Access);
+      Dispatch_Table.Insert ("HSN",    Handle_Hsn_Fn'Access);
+      Dispatch_Table.Insert ("HTN",    Handle_Htn_Fn'Access);
+      Dispatch_Table.Insert ("ARCSIN", Handle_Arcsin_Fn'Access);
+      Dispatch_Table.Insert ("ARCCOS", Handle_Arccos_Fn'Access);
+      Dispatch_Table.Insert ("ARCTAN", Handle_Arctan_Fn'Access);
+      Dispatch_Table.Insert ("COT",    Handle_Cot_Fn'Access);
+      Dispatch_Table.Insert ("CSC",    Handle_Csc_Fn'Access);
+      Dispatch_Table.Insert ("SEC",    Handle_Sec_Fn'Access);
+      Dispatch_Table.Insert ("DEG",    Handle_Deg_Fn'Access);
+      Dispatch_Table.Insert ("DEGREE", Handle_Deg_Fn'Access);
+      Dispatch_Table.Insert ("SIND",   Handle_Sind_Fn'Access);
+      Dispatch_Table.Insert ("COSD",   Handle_Cosd_Fn'Access);
+      Dispatch_Table.Insert ("TAND",   Handle_Tand_Fn'Access);
+      Dispatch_Table.Insert ("ATND",   Handle_Atnd_Fn'Access);
+      Dispatch_Table.Insert ("ATAN2D", Handle_Atan2d_Fn'Access);
 
       --  Aggregate
-      Dispatch_Table.Insert ("SUM",    Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("MEAN",   Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("STD",    Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("VAR",    Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("MIN",    Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("MAX",    Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("N",      Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("NMISS",  Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("GMEAN",  Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("HMEAN",  Handle_Aggregate'Access);
-      Dispatch_Table.Insert ("MEDIAN", Handle_Aggregate'Access);
+      Dispatch_Table.Insert ("SUM",    Handle_Sum'Access);
+      Dispatch_Table.Insert ("MEAN",   Handle_Mean'Access);
+      Dispatch_Table.Insert ("STD",    Handle_Std_Fn'Access);
+      Dispatch_Table.Insert ("VAR",    Handle_Var_Fn'Access);
+      Dispatch_Table.Insert ("MIN",    Handle_Min_Fn'Access);
+      Dispatch_Table.Insert ("MAX",    Handle_Max_Fn'Access);
+      Dispatch_Table.Insert ("N",      Handle_N_Fn'Access);
+      Dispatch_Table.Insert ("NMISS",  Handle_Nmiss_Fn'Access);
+      Dispatch_Table.Insert ("GMEAN",  Handle_Gmean'Access);
+      Dispatch_Table.Insert ("HMEAN",  Handle_Hmean'Access);
+      Dispatch_Table.Insert ("MEDIAN", Handle_Median'Access);
 
       --  String operations
       Dispatch_Table.Insert ("LEN",    Handle_Len'Access);
@@ -1941,13 +2146,13 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("RANDOM", Handle_Ran'Access);
 
       --  Miscellaneous
-      Dispatch_Table.Insert ("MISSING", Handle_Misc'Access);
-      Dispatch_Table.Insert ("FALSE",   Handle_Misc'Access);
-      Dispatch_Table.Insert ("TRUE",    Handle_Misc'Access);
-      Dispatch_Table.Insert ("DATE$",   Handle_Misc'Access);
-      Dispatch_Table.Insert ("TIME$",   Handle_Misc'Access);
-      Dispatch_Table.Insert ("SHELL",   Handle_Misc'Access);
-      Dispatch_Table.Insert ("NUM",     Handle_Misc'Access);
+      Dispatch_Table.Insert ("MISSING", Handle_Missing'Access);
+      Dispatch_Table.Insert ("FALSE",   Handle_False'Access);
+      Dispatch_Table.Insert ("TRUE",    Handle_True'Access);
+      Dispatch_Table.Insert ("DATE$",   Handle_Date'Access);
+      Dispatch_Table.Insert ("TIME$",   Handle_Time'Access);
+      Dispatch_Table.Insert ("SHELL",   Handle_Shell'Access);
+      Dispatch_Table.Insert ("NUM",     Handle_Num'Access);
    end Register_All_Functions;
 
 begin
