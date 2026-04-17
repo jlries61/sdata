@@ -62,14 +62,14 @@ Naming is Ada-idiomatic and precise. Procedure names are verb phrases; function 
 | Metric | Value |
 |---|---|
 | Avg procedure/function length | ~20 lines |
-| Max function length | `Evaluate` (~220 lines) and `Run_One_Step` (~175 lines) |
-| Single Responsibility | 8/10 |
+| Max function length | `Evaluate` (~220 lines) and `Process_One_Record` (~65 lines) |
+| Single Responsibility | 9/10 |
 
 ~~`Handle_String_Ops` at ~253 lines, `Handle_Statistics` at ~187 lines, and `Handle_Navigation` at ~116 lines each violated the "one function does one thing" principle.~~ — **Fixed**: all three family handlers have been dissolved into individual per-function handlers. Each language function now has its own dedicated Ada subprogram (19 string handlers, 8 navigation handlers, 54 statistics handlers). The dispatch table is the sole dispatch layer — there is no second if-elsif re-dispatch inside a family handler. As a side effect, two previously registered but unimplemented functions (`BRN` and `MIF`) have been wired to their `SData.Statistics` implementations. The HEX$/OCT$/BIN$ code duplication was also eliminated via a shared `To_Base_String` helper.
 
 The remaining large functions have defensible reasons:
 - `Evaluate` (~220 lines) is a structural `case` on expression kind — it is linear in AST node types, not a dispatch chain.
-- `Run_One_Step` (`sdata-interpreter.adb:1107`) is ~175 lines doing filter rebuilding, logical/physical mapping, BOG/EOG computation, PDV management, and output flushing — multiple distinct concerns in one procedure. Still an open item.
+- ~~`Run_One_Step` (`sdata-interpreter.adb:1107`) is ~175 lines doing filter rebuilding, logical/physical mapping, BOG/EOG computation, PDV management, and output flushing — multiple distinct concerns in one procedure.~~ **Fixed** — dissolved into four single-responsibility procedures: `Rebuild_Filter_Map`, `Process_One_Record`, `Commit_Step`, and `Is_First/Last_In_Group` (promoted to package scope). `Run_One_Step` is now a 15-line coordinator.
 - `Handle_Math`, `Handle_Trig`, `Handle_Aggregate`, `Handle_Misc` retain their family-handler structure (70–120 lines each); these families have fewer members and the chains are shorter.
 
 ### 2.3 Comment Quality
@@ -177,7 +177,7 @@ That is a clean, well-defined change surface with no risk of disturbing unrelate
 | ~~Integer literal classification via `Float'Floor` may misclassify large integers~~ | ~~`sdata-evaluator.adb:1259-1263`~~ | — | **Fixed** — `Is_Integer`/`Int_Value` stored at parse time |
 | Database pointer not freed on cleanup | `sdata-table.adb:36-44` | Blocked on upstream library fix | Stable |
 | ~~`Handle_String_Ops`, `Handle_Statistics`, `Handle_Navigation` SRP violations~~ | ~~`sdata-evaluator.adb`~~ | — | **Fixed** — dissolved into 81 individual handlers; dispatch table is now the sole dispatch layer |
-| `Run_One_Step` does filter rebuild, BOG/EOG, PDV management, output flush | `sdata-interpreter.adb:1107` | 4 hours | Stable |
+| ~~`Run_One_Step` does filter rebuild, BOG/EOG, PDV management, output flush~~ | ~~`sdata-interpreter.adb:1107`~~ | — | **Fixed** — `Rebuild_Filter_Map`, `Process_One_Record`, `Commit_Step` |
 
 ---
 
@@ -295,14 +295,14 @@ The macOS section is notably thorough: the Alire/GNAT SDK path issue (`C_INCLUDE
 | Category | Score |
 |---|---|
 | Architectural Integrity | 78/100 |
-| Code Quality | 78/100 |
+| Code Quality | 82/100 |
 | Efficiency | 92/100 |
 | Maintainability | 71/100 |
 | Error Handling | 88/100 |
 | Security | 82/100 |
 | Operational Readiness | 75/100 |
 | Documentation | 80/100 |
-| **TOTAL** | **644/800** |
+| **TOTAL** | **648/800** |
 
 ---
 
@@ -370,3 +370,4 @@ Trust this at 3 AM? Yes — with higher confidence than at first review.
 | ~~Backing store opened with default SQLite durability settings~~ | `sdata-table.adb: Initialize_Backing_Store` | DB open | **Fixed** — `journal_mode=OFF`, `synchronous=OFF`, `cache_size=-65536`, `temp_store=MEMORY` |
 | ~~`Get_Column_Names` heap-allocates a `String_List`; callers must free — 3 confirmed leaks in range-expansion functions~~ | `sdata-table.adb`, `sdata-interpreter.adb`, `sdata-file_io.adb`, `sdata-variables.adb` | 17 call sites | **Fixed** — function removed from public API; all callers migrated to `Column_Count`/`Column_Name(I)`; leaks in `Expand_Range`, `Set_Hold_For_Range`, `Resolve_Range` eliminated |
 | ~~`Execute_IO` swallows `Open_Output` failures silently~~ | `sdata-interpreter.adb`, `sdata-io.adb` | Stmt_OUTPUT handler | **Fixed** — `Open_Output` raises `Script_Error` for `Name_Error`/`Use_Error`; suppressing `when others` handler removed from interpreter |
+| ~~`Run_One_Step` SRP violation — filter rebuild, BOG/EOG, PDV, output flush in one procedure~~ | `sdata-interpreter.adb` | ~175 lines | **Fixed** — dissolved into `Rebuild_Filter_Map`, `Process_One_Record`, `Commit_Step`; `Is_First/Last_In_Group` promoted to package scope; `Run_One_Step` is now a 15-line coordinator |
