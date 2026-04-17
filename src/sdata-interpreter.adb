@@ -66,30 +66,6 @@ package body SData.Interpreter is
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT;
    end Is_Immediate;
 
-   --  In_Same_Group: both Idx1 and Idx2 are *physical* row indices.
-   --  Returns True when the two rows have identical values for every BY
-   --  variable, or when no BY grouping is active (vacuously true).
-   function In_Same_Group (Idx1, Idx2 : Positive) return Boolean is
-      Num_Recs : constant Natural := Row_Count;
-   begin
-      if Current_By_Vars.Is_Empty then return True; end if;
-      if Idx1 = Idx2 then return True; end if;
-      if Idx1 > Num_Recs or else Idx2 > Num_Recs then return False; end if;
-
-      for V of Current_By_Vars loop
-         declare
-            Name : constant String := To_String(V);
-            Val1 : constant Value  := Get_Value (Idx1, Name);
-            Val2 : constant Value  := Get_Value (Idx2, Name);
-         begin
-            if not (Val1 = Val2) then
-               return False;
-            end if;
-         end;
-      end loop;
-      return True;
-   end In_Same_Group;
-
    procedure Set_Interactive (Val : Boolean) is
    begin
       SData.IO.Set_Interactive (Val);
@@ -184,6 +160,7 @@ package body SData.Interpreter is
       Active_Program_Tail := null;
       SData.Table.Clear_Index_Map;
       Current_By_Vars.Clear;
+      SData.Table.Clear_By_Vars;
    end Clear_Active_Program;
 
    procedure Run_Active_Program is
@@ -911,6 +888,7 @@ package body SData.Interpreter is
             end;
          when Stmt_BY =>
             Current_By_Vars.Clear;
+            SData.Table.Clear_By_Vars;
             declare
                Curr_Var : Variable_List := Stmt.Sort_Vars;
                Count    : Natural := 0;
@@ -928,6 +906,7 @@ package body SData.Interpreter is
                         Crit (Idx).Len := Curr_Var.Var.Start_Len;
                         Crit (Idx).Dir := Ascending;
                         Current_By_Vars.Append (To_Unbounded_String (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len))));
+                        SData.Table.Add_By_Var (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
                         Idx := Idx + 1; Curr_Var := Curr_Var.Next;
                      end loop;
                      Sort (Crit);

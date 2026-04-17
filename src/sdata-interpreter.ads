@@ -24,9 +24,6 @@ package SData.Interpreter is
    --  Add new statement kinds here when they should not be deferred.
    function Is_Immediate (Kind : Statement_Kind) return Boolean;
 
-   --  Checks if two records belong to the same BY group.
-   function In_Same_Group (Idx1, Idx2 : Positive) return Boolean;
-
    procedure Set_Interactive (Val : Boolean);
 
 end SData.Interpreter;

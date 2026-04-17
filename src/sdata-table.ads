@@ -97,6 +97,13 @@ package SData.Table is
    procedure Set_Record_Explicitly_Written (State : Boolean);
    function Get_Record_Explicitly_Written return Boolean;
 
+   --  BY-group support.  The interpreter registers the active BY variable
+   --  names here so that the evaluator can query group membership without
+   --  depending on the interpreter package.
+   procedure Clear_By_Vars;
+   procedure Add_By_Var (Name : String);
+   function In_Same_Group (Idx1, Idx2 : Positive) return Boolean;
+
    --  Package to store lists of column names.
    package Name_Vectors is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
 

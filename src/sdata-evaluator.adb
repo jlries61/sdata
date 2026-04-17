@@ -1,4 +1,3 @@
-with SData.Interpreter;
 with SData.Variables; use SData.Variables;
 with SData.Config;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
@@ -798,7 +797,7 @@ package body SData.Evaluator is
             Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Log_Idx);
             Phys_Prev : constant Positive := SData.Table.Logical_To_Physical (Log_Idx - N);
          begin
-            if not SData.Interpreter.In_Same_Group (Phys_Curr, Phys_Prev) then
+            if not SData.Table.In_Same_Group (Phys_Curr, Phys_Prev) then
                return (Kind => Val_Missing);
             end if;
             return SData.Table.Get_Value_Upper (Phys_Prev, To_Upper (SData.Values.To_String (Var)));
@@ -831,7 +830,7 @@ package body SData.Evaluator is
             Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Log_Idx);
             Phys_Next : constant Positive := SData.Table.Logical_To_Physical (Log_Idx + N);
          begin
-            if not SData.Interpreter.In_Same_Group (Phys_Curr, Phys_Next) then
+            if not SData.Table.In_Same_Group (Phys_Curr, Phys_Next) then
                return (Kind => Val_Missing);
             end if;
             return SData.Table.Get_Value_Upper (Phys_Next, To_Upper (SData.Values.To_String (Var)));

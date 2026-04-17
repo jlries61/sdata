@@ -43,7 +43,10 @@ package body SData.Table is
 
    -- Filtered View Mapping
    type Index_Array_Access is access Index_Array;
-   Filter_Map : Index_Array_Access := null;
+   Filter_Map    : Index_Array_Access := null;
+
+   -- BY-group variable names (upper-cased); mirrored from the interpreter.
+   Table_By_Vars : Name_Vectors.Vector;
 
    -----------
    -- Clear --
@@ -490,6 +493,42 @@ package body SData.Table is
          Free (Filter_Map);
       end if;
    end Clear_Index_Map;
+
+   -------------------
+   -- Clear_By_Vars --
+   -------------------
+   procedure Clear_By_Vars is
+   begin
+      Table_By_Vars.Clear;
+   end Clear_By_Vars;
+
+   -----------------
+   -- Add_By_Var  --
+   -----------------
+   procedure Add_By_Var (Name : String) is
+   begin
+      Table_By_Vars.Append (To_Unbounded_String (Name));
+   end Add_By_Var;
+
+   -------------------
+   -- In_Same_Group --
+   -------------------
+   function In_Same_Group (Idx1, Idx2 : Positive) return Boolean is
+   begin
+      if Table_By_Vars.Is_Empty then return True; end if;
+      if Idx1 = Idx2 then return True; end if;
+      if Idx1 > Table_Row_Count or else Idx2 > Table_Row_Count then return False; end if;
+      for V of Table_By_Vars loop
+         declare
+            Name : constant String := To_String (V);
+            Val1 : constant Value  := Get_Value_Upper (Idx1, Name);
+            Val2 : constant Value  := Get_Value_Upper (Idx2, Name);
+         begin
+            if not (Val1 = Val2) then return False; end if;
+         end;
+      end loop;
+      return True;
+   end In_Same_Group;
 
    -------------------------
    -- Logical_To_Physical --
