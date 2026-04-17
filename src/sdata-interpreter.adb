@@ -968,31 +968,34 @@ package body SData.Interpreter is
                end if;
                Submit_Chain.Insert (Final);
                declare
-                  File   : Ada.Streams.Stream_IO.File_Type;
-                  Stream : Ada.Streams.Stream_IO.Stream_Access;
+                  type String_Access is access String;
+                  procedure Free_Buf is new Ada.Unchecked_Deallocation (String, String_Access);
+                  File     : Ada.Streams.Stream_IO.File_Type;
+                  Stream   : Ada.Streams.Stream_IO.Stream_Access;
+                  Contents : String_Access;  --  heap-allocated; avoids stack pressure
                begin
                   Ada.Streams.Stream_IO.Open (File, Ada.Streams.Stream_IO.In_File, Final);
+                  Contents := new String (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
                   Stream := Ada.Streams.Stream_IO.Stream (File);
+                  String'Read (Stream, Contents.all);
+                  Ada.Streams.Stream_IO.Close (File);
                   declare
-                     Contents : String (1 .. Integer (Ada.Streams.Stream_IO.Size (File)));
+                     Sub_Ctx  : Parser_Context;
+                     Sub_Prog : Statement_Access;
                   begin
-                     String'Read (Stream, Contents);
-                     Ada.Streams.Stream_IO.Close (File);
-                     declare
-                        Sub_Ctx  : Parser_Context;
-                        Sub_Prog : Statement_Access;
-                     begin
-                        Initialize (Sub_Ctx, Contents);
-                        Sub_Prog := Parse_Program (Sub_Ctx);
-                        Execute (Sub_Prog);
-                        SData.AST.Free_Program (Sub_Prog);
-                     end;
+                     Initialize (Sub_Ctx, Contents.all);
+                     Sub_Prog := Parse_Program (Sub_Ctx);
+                     Execute (Sub_Prog);
+                     SData.AST.Free_Program (Sub_Prog);
                   end;
+                  Free_Buf (Contents);
                exception
                   when Ada.Streams.Stream_IO.Name_Error =>
+                     Free_Buf (Contents);
                      Submit_Chain.Delete (Final);
                      raise Script_Error with "SUBMIT: file not found: " & Final;
                   when others =>
+                     Free_Buf (Contents);
                      Submit_Chain.Delete (Final);
                      raise;
                end;

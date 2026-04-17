@@ -7,6 +7,7 @@ with Ada.Text_IO.Unbounded_IO;
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Streams.Stream_IO;
+with Ada.Unchecked_Deallocation;
 with Ada.Exceptions; use Ada.Exceptions;
 with SData.Parser; use SData.Parser;
 with SData.AST; use SData.AST;
@@ -18,7 +19,10 @@ with SData.IO;          use SData.IO;
 procedure SData_Main is
    
    --  Helper to read the entire contents of a file into a single String buffer.
+   --  The buffer is heap-allocated to avoid placing large scripts on the stack.
    function Read_File (Filename : String) return String is
+      type String_Access is access String;
+      procedure Free_Buf is new Ada.Unchecked_Deallocation (String, String_Access);
       File   : Ada.Streams.Stream_IO.File_Type;
       Stream : Ada.Streams.Stream_IO.Stream_Access;
    begin
@@ -39,11 +43,16 @@ procedure SData_Main is
          end if;
          Stream := Ada.Streams.Stream_IO.Stream (File);
          declare
-            Result : String (1 .. Integer (Size));
+            Buf : String_Access := new String (1 .. Integer (Size));
          begin
-            String'Read (Stream, Result);
+            String'Read (Stream, Buf.all);
             Ada.Streams.Stream_IO.Close (File);
-            return Result;
+            declare
+               Ret : constant String := Buf.all;  --  copy; Buf can now be freed
+            begin
+               Free_Buf (Buf);
+               return Ret;
+            end;
          end;
       end;
    end Read_File;

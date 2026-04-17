@@ -128,7 +128,7 @@ This is a pragmatic workaround for a library defect, clearly documented. For a C
 
 - Cold start: sub-millisecond (no dynamic loading, no JIT, native binary)
 - Idle memory: minimal; no background threads
-- The `SUBMIT` implementation reads the entire file into a stack-allocated `String` (`sdata-interpreter.adb:991`). On extremely large scripts this could exhaust stack — the same pattern used in `sdata_main.adb:42` for the top-level script. On Linux with default 8MB stacks and typical script sizes this is unlikely to matter in practice.
+- ~~`SUBMIT` and `Read_File` read entire script files into stack-allocated `String` buffers — deep SUBMIT chains with large scripts could exhaust the stack~~ **Fixed** — both sites now heap-allocate the read buffer (`new String (1 .. Size)`) and free it after parse/execute; stack pressure from nested SUBMITs is eliminated.
 
 ---
 
@@ -356,7 +356,7 @@ Trust this at 3 AM? Yes — with higher confidence than at first review.
 | Duplicate coercion logic | `sdata-table.adb` | 191-223 and 578-607 | `Set_Value_Upper` and `Set_Output_Value_Upper` are near-identical |
 | ~~BOG/EOG state in wrong package~~ | `sdata-evaluator.adb` | 60-61 | **Retracted** — flags are private implementation state for `BOG()`/`EOG()` functions; evaluator ownership is correct |
 | Acknowledged DB pointer leak | `sdata-table.adb` | 36-44 | Comment documents deliberate non-free to avoid finalization crash |
-| Stack allocation for file content | `sdata-interpreter.adb` | 991 | `String (1 .. Integer(Ada.Streams.Stream_IO.Size(File)))` on stack |
+| ~~Stack allocation for file content in SUBMIT and Read_File~~ | `sdata-interpreter.adb`, `sdata_main.adb` | SUBMIT block, Read_File | **Fixed** — heap-allocated with `new String (1 .. Size)`; freed after parse/execute |
 | ~~Duplicate DIGITS comment~~ | `sdata-config.ads` | 53-54 | **Fixed** — duplicate line removed |
 | ~~Inconsistent indentation (tabs vs spaces)~~ | `sdata-evaluator.adb` | 1279-1282 | **Fixed** — no tabs remain |
 | ~~Design doc not in repo~~ | External | N/A | **Resolved** — `doc/design.odt` and `doc/feasibility_assessment.md` copied into repo |
