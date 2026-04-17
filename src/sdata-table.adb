@@ -20,30 +20,26 @@ package body SData.Table is
    procedure Spill_Output_To_Disk;
    procedure Spill_Table_To_Disk (T : in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive);
 
-   ---------------------------
-   -- Backing Store Cleanup --
-   ---------------------------
-   procedure Cleanup_Backing_Store is
+   --------------
+   -- Finalize --
+   --------------
+   overriding procedure Finalize (S : in out Backing_Store) is
       Success : Boolean;
    begin
-      if Store.Is_Active then
-         --  We avoid manual Free of the Database pointer here because it 
-         --  triggers a double-finalization crash with the library's internal 
-         --  state management during program exit. The library will clean 
-         --  up the handle, and the OS will reclaim the memory.
-         declare
-            Path : constant String := Ada.Strings.Unbounded.To_String (Store.Temp_Path);
-         begin
-            --  Attempt to delete the file. On some systems this may fail 
-            --  if SQLite still has a lock, but it's better than crashing.
-            GNAT.OS_Lib.Delete_File (Path, Success);
-         end;
-         pragma Unreferenced (Success);
-         Store.Is_Active := False;
-      end if;
+      if not S.Is_Active then return; end if;
+      --  Mark inactive first so a second call (explicit + automatic) is a no-op.
+      S.Is_Active := False;
+      declare
+         Path : constant String := Ada.Strings.Unbounded.To_String (S.Temp_Path);
+      begin
+         --  We avoid manually freeing S.DB here: doing so triggers a
+         --  double-finalization crash inside the Ada_Sqlite3 library.
+         --  The OS reclaims the memory; we only need to remove the file.
+         GNAT.OS_Lib.Delete_File (Path, Success);
+      end;
       Cached_Row_ID := 0;
       Cached_Row_Data.Clear;
-   end Cleanup_Backing_Store;
+   end Finalize;
 
    -- Filtered View Mapping
    type Index_Array_Access is access Index_Array;
@@ -54,7 +50,7 @@ package body SData.Table is
    -----------
    procedure Clear is
    begin
-      Cleanup_Backing_Store;
+      Finalize (Store);
       Data_Table.Clear;
       Column_Order.Clear;
       Table_Row_Count := 0;

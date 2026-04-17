@@ -3,13 +3,13 @@
 --  Columns are typed (Numeric or String) and the table maintains consistency 
 --  between rows.
 
+with Ada.Finalization;
 with Ada.Strings.Hash;
 with GNAT.Strings;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Containers.Vectors;
 with SData.Values; use SData.Values;
-
 
 with Ada_Sqlite3;
 
@@ -165,13 +165,16 @@ private
    Cached_Row_ID   : Natural := 0;
 
    --  SQLite Backing Store
+   --  Derived from Limited_Controlled so that Finalize runs automatically at
+   --  program exit (including on unhandled exception), deleting the temp file.
    type Database_Access is access all Ada_Sqlite3.Database;
-   type Backing_Store is record
+   type Backing_Store is new Ada.Finalization.Limited_Controlled with record
       DB          : Database_Access := null;
       Is_Active   : Boolean := False;
       Temp_Path   : Unbounded_String;
       Row_Limit   : Natural := 0; -- -m value
    end record;
+   overriding procedure Finalize (S : in out Backing_Store);
 
    Store : Backing_Store;
 
