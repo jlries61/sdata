@@ -1,3 +1,9 @@
+sdata (0.5.2-1) unstable; urgency=medium
+
+  * Register SIGTERM/SIGINT handlers for temp-file cleanup; extract SData.Config.Runtime; complete dispatch table; break evaluator-interpreter cycle.
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 17 Apr 2026 20:01:12 -0700
+
 sdata (0.5.1-1) unstable; urgency=medium
 
   * Fix storage engine stability and data ordering; improve internal pager newline handling.
