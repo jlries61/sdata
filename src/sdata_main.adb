@@ -15,6 +15,8 @@ with SData.AST; use SData.AST;
 with SData.Interpreter; use SData.Interpreter;
 with SData.Config;      use SData.Config;
 with SData.IO;          use SData.IO;
+with SData.Signals;
+pragma Unreferenced (SData.Signals);
 
 procedure SData_Main is
    

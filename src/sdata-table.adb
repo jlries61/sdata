@@ -1,6 +1,7 @@
 with Ada.Characters.Handling;
 with Ada.Containers;
 with SData.Config;
+with SData.Signals;
 
 with GNAT.OS_Lib;
 with GNAT.Strings;
@@ -29,6 +30,7 @@ package body SData.Table is
       if not S.Is_Active then return; end if;
       --  Mark inactive first so a second call (explicit + automatic) is a no-op.
       S.Is_Active := False;
+      SData.Signals.Clear_Cleanup_Path;
       declare
          Path : constant String := Ada.Strings.Unbounded.To_String (S.Temp_Path);
       begin
@@ -530,6 +532,18 @@ package body SData.Table is
       return True;
    end In_Same_Group;
 
+   ----------------------------
+   -- Get_Backing_Store_Path --
+   ----------------------------
+   function Get_Backing_Store_Path return String is
+   begin
+      if Store.Is_Active then
+         return Ada.Strings.Unbounded.To_String (Store.Temp_Path);
+      else
+         return "";
+      end if;
+   end Get_Backing_Store_Path;
+
    -------------------------
    -- Logical_To_Physical --
    -------------------------
@@ -703,6 +717,7 @@ package body SData.Table is
       Store.DB.Execute ("PRAGMA cache_size = -65536");  --  64 MB (negative = KiB)
       Store.DB.Execute ("PRAGMA temp_store = MEMORY");
       Store.Is_Active := True;
+      SData.Signals.Register_Cleanup_Path (Temp_Name.all);
       GNAT.Strings.Free (Temp_Name);
    end Initialize_Backing_Store;
 

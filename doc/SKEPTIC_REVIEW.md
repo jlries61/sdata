@@ -11,10 +11,10 @@
 ## Overall Posture
 
 ```
-⚠  Drifting — coherent intent undermined by accumulating decisions
+▲  Recovering — three structural items resolved; residual concerns are operational, deferred, or rejected
 ```
 
-**In one sentence:** The core execution model is sound and considerable cleanup has landed recently, but the evaluator has grown a structural dependency that inverts its place in the architecture, and the dispatch table refactoring is only half-complete.
+**In one sentence:** The evaluator→interpreter cycle is broken, the dispatch table is complete, and Config/Runtime are separated; the open structural concern is temp-file cleanup on abnormal termination.
 
 ---
 
@@ -24,8 +24,9 @@
 
 ### Findings
 
-**🔴 Problem — The evaluator depends on the interpreter**
+**🔴 Problem — The evaluator depends on the interpreter** ✅ Fixed 2026-04-17
 `src/sdata-evaluator.adb`, line 1
+> `In_Same_Group` moved to `SData.Table`; `with SData.Interpreter` removed from evaluator; BY-var state mirrored via `Clear_By_Vars`/`Add_By_Var`.
 
 ```ada
 with SData.Interpreter;
@@ -33,13 +34,15 @@ with SData.Interpreter;
 
 The intended dependency direction is `Interpreter → Evaluator`: the interpreter drives the data step, calls the evaluator to compute expressions, and owns BY-group state. Instead, the evaluator reaches back into `SData.Interpreter` to call `In_Same_Group` (lines 801, 834) when computing `LAG` and `NEXT` across group boundaries. This is a cycle at the body level: the evaluator cannot be compiled, loaded, or tested without the interpreter, and the interpreter cannot be tested without the evaluator. Any future change to `In_Same_Group`'s contract requires understanding both packages simultaneously. This is the most structurally consequential problem in the codebase.
 
-**⚠ Concern — The dispatch table refactoring is half-complete**
+**⚠ Concern — The dispatch table refactoring is half-complete** ✅ Fixed 2026-04-17
 `src/sdata-evaluator.adb`, lines 39–43 (comment), `Handle_Math`, `Handle_Trig`
+> All four shared family handlers dissolved; 53 per-function subprograms registered individually. Dispatch table is now the sole dispatch layer.
 
 The comment documents the current state honestly: "Math, trig, aggregate, and misc families share a handler and use Name to discriminate among members." String, navigation, and statistics functions each have a dedicated Ada subprogram registered individually in the dispatch table. But `Handle_Math`, `Handle_Trig`, and the aggregate/misc handlers are shared functions with internal if-elsif chains. The per-function dispatch table pattern is already in the codebase — finishing the migration for the math and trig families is mechanical work, not design work.
 
-**⚠ Concern — `Config` bundles three distinct responsibilities**
+**⚠ Concern — `Config` bundles three distinct responsibilities** ✅ Fixed 2026-04-17
 `src/sdata-config.ads`
+> Runtime state extracted to `SData.Config.Runtime` child package with its own `Reset` procedure. `SData.Config` is now spec-only (CLI startup configuration only). Version constants remain in `SData.Config`; separation to `SData.Version` deferred.
 
 The Config package holds: (1) static CLI configuration (Input_Format, Output_Format, file paths, constraint limits, mode flags), (2) runtime interpreter state in `Runtime_State_Record` (Save pending, REPEAT mode, FPATH directories), and (3) version metadata (Version_Major/Minor/Patch). The introduction of `Runtime_State_Record` is a real improvement — runtime state is now explicitly grouped and `Reset_Runtime_State` has a clear scope. But all three responsibilities still live in one package, so any package that needs only version info must `with` the same package that owns mutable runtime state.
 
@@ -55,13 +58,15 @@ Break the evaluator→interpreter cycle first. `In_Same_Group` compares BY-group
 
 ### Findings
 
-**🔴 Problem — Circular dependency inverts the evaluator's intended role**
+**🔴 Problem — Circular dependency inverts the evaluator's intended role** ✅ Fixed 2026-04-17
 `src/sdata-evaluator.adb`, line 1; `src/sdata-interpreter.ads`, line 28
+> See Fowler finding above.
 
 The evaluator exists to serve the interpreter. In no layered architecture should the evaluator depend on the interpreter. The current cycle means that `In_Same_Group` — a query about BY-group membership — is declared on the interpreter's public interface even though it is only called by the evaluator. This pollutes the interpreter's API surface with an obligation that belongs elsewhere, and it makes it impossible to satisfy the Dependency Inversion Principle: there is no abstraction the evaluator can depend on that the interpreter also satisfies without the cycle.
 
-**⚠ Concern — Config SRP: three responsibilities, one package**
+**⚠ Concern — Config SRP: three responsibilities, one package** ✅ Fixed 2026-04-17
 `src/sdata-config.ads`
+> See Fowler finding above.
 
 The `Runtime_State_Record` grouping is a step in the right direction — runtime state can now be reset atomically via `Reset_Runtime_State`. But `SData.Config` is still both the package a CLI argument parser writes to and the package the interpreter reads runtime state from. A package that is simultaneously a startup-configuration store and a per-run mutable state store cannot have its invariants reasoned about independently.
 
@@ -94,7 +99,7 @@ Break the evaluator→interpreter cycle first — that is what creates the seam 
 
 ### Findings
 
-**⚠ Concern — No test seam for the evaluator**
+**⚠ Concern — No test seam for the evaluator** ✅ Cycle broken 2026-04-17 — unit tests deferred to Phase 6
 `src/sdata-evaluator.adb`, line 1
 
 The evaluator→interpreter circular dependency means the evaluator has no visible seam. Any change to expression evaluation — a domain error fix, a rounding edge case, a missing-value propagation rule — can only be characterized through the full pipeline. If something breaks silently, the regression suite will not catch it if the output format is unchanged. This is the specific form in which the circular dependency inflicts ongoing cost: not as a compile error, but as a permanently coarse feedback loop for the package doing the most computational work.
@@ -143,24 +148,24 @@ Audit whether `--infmt` and `--outfmt` are exercised by any test that couldn't b
 
 ### Dominant Failure Mode
 
-**The evaluator→interpreter circular dependency** is the one structural problem that blocks everything else. It prevents evaluator unit testing (Beck), removes the seam needed for safe refactoring (Feathers), pollutes the interpreter's public API (Uncle Bob), and violates the intended dependency direction of the architecture (Fowler). It has been one call site for some time and has not grown — but the dispatch table refactoring, when it resumes, will require writing evaluator unit tests to be done safely. Those tests cannot be written until the cycle is broken.
+~~**The evaluator→interpreter circular dependency**~~ ✅ Resolved 2026-04-17. The cycle is broken, the dispatch table is complete, and `SData.Config.Runtime` is a separate child package. The seam needed for evaluator unit tests now exists; writing those tests is deferred to Phase 6.
 
-The Config package situation is a lower-temperature version of the same problem: a package that is simultaneously a CLI-configuration store and a mutable runtime-state store will eventually make it impossible to reason about invariants. The `Runtime_State_Record` grouping is an honest improvement; the next step is extraction.
+**The remaining open concern** is operational: abnormal process termination (SIGTERM, SIGINT, OOM kill) can leave orphaned SQLite temp files when the backing store is active. This is addressed by priority 5.
 
 ### Highest-Leverage Intervention
 
-**Break the evaluator→interpreter circular dependency.** Move `In_Same_Group` from `SData.Interpreter` to `SData.Table`, adjust its implementation to use BY-variable state visible at that layer, and update the two call sites in `sdata-evaluator.adb` (lines 801, 834). Remove the `with SData.Interpreter` clause. This is a 15-line function move with no behavior change. The regression suite is adequate coverage for the mechanical step. Once done: write five evaluator unit tests; resume the dispatch table migration for `Handle_Math` and `Handle_Trig`.
+~~**Break the evaluator→interpreter circular dependency.**~~ Done. The current highest-leverage remaining action is registering SIGTERM/SIGINT cleanup handlers (priority 5) to address the operational temp-file concern.
 
 ### Prioritized Remediation Order
 
-| Priority | Action | Voice(s) | Effort | Risk if Deferred |
-|---|---|---|---|---|
-| 1 | Break evaluator→interpreter cycle: move `In_Same_Group` to `SData.Table` | Fowler, Uncle Bob, Beck, Feathers | S | High — structural; blocks unit testing and safe dispatch-table refactor |
-| 2 | Complete dispatch table: per-function handlers for `Handle_Math` and `Handle_Trig` | Fowler | M | Med — deferring makes it harder as math family grows |
-| 3 | Extract `SData.Config.Runtime` (or `SData.Runtime`) from `SData.Config` | Uncle Bob, Fowler | M | Low now; Med as feature count grows |
-| 4 | Add evaluator and statistics unit tests (enabled by item 1) | Beck | M | Med — silent internal breakage goes undetected |
-| 5 | Register SIGTERM/SIGINT handler for temp file cleanup | Kleppmann | S | Low — operational nuisance; SIGKILL cannot be caught regardless |
-| 6 | Audit and deprecate `--infmt`/`--outfmt` if redundant | Jobs | S | Low — cosmetic but reduces help-text confusion |
+| Priority | Action | Voice(s) | Effort | Risk if Deferred | Status |
+|---|---|---|---|---|---|
+| 1 | Break evaluator→interpreter cycle: move `In_Same_Group` to `SData.Table` | Fowler, Uncle Bob, Beck, Feathers | S | High — structural; blocks unit testing and safe dispatch-table refactor | ✅ Fixed 2026-04-17 |
+| 2 | Complete dispatch table: per-function handlers for `Handle_Math` and `Handle_Trig` | Fowler | M | Med — deferring makes it harder as math family grows | ✅ Fixed 2026-04-17 |
+| 3 | Extract `SData.Config.Runtime` (or `SData.Runtime`) from `SData.Config` | Uncle Bob, Fowler | M | Low now; Med as feature count grows | ✅ Fixed 2026-04-17 |
+| 4 | Add evaluator and statistics unit tests (enabled by item 1) | Beck | M | Med — silent internal breakage goes undetected | ⏸ Deferred to Phase 6 |
+| 5 | Register SIGTERM/SIGINT handler for temp file cleanup | Kleppmann | S | Low — operational nuisance; SIGKILL cannot be caught regardless | ✅ Fixed 2026-04-17 |
+| 6 | Audit and deprecate `--infmt`/`--outfmt` if redundant | Jobs | S | Low — cosmetic but reduces help-text confusion | ❌ Rejected |
 
 ---
 

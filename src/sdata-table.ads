@@ -97,6 +97,10 @@ package SData.Table is
    procedure Set_Record_Explicitly_Written (State : Boolean);
    function Get_Record_Explicitly_Written return Boolean;
 
+   --  Returns the backing-store temp file path, or "" if the store is not active.
+   --  Used by the signal handler to clean up on SIGTERM/SIGINT.
+   function Get_Backing_Store_Path return String;
+
    --  BY-group support.  The interpreter registers the active BY variable
    --  names here so that the evaluator can query group membership without
    --  depending on the interpreter package.
