@@ -10,7 +10,8 @@ with SData.Parser; use SData.Parser;
 with Ada.Streams.Stream_IO;
 with Ada.Exceptions;
 with SData.File_IO;
-with SData.Config;    use SData.Config;
+with SData.Config;         use SData.Config;
+with SData.Config.Runtime;
 with SData.IO;        use SData.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Sets;
@@ -938,7 +939,7 @@ package body SData.Interpreter is
             SData.Variables.Clear_Temporary;
             SData.Variables.Initialize_PDV;
             Clear_Active_Program;
-            SData.Config.Reset_Runtime_State;
+            SData.Config.Runtime.Reset;
          when others => null;
       end case;
    end Execute_Declarative;

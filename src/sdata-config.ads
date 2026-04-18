@@ -1,7 +1,7 @@
---  Package SData.Config holds global configuration settings and flags for the SData interpreter,
---  typically populated from command-line arguments.
-
-with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+--  Package SData.Config holds startup configuration set by the CLI and
+--  constant across the lifetime of the process.  Per-run interpreter state
+--  that changes during execution (SAVE path, REPEAT mode, FPATH directories)
+--  lives in the child package SData.Config.Runtime.
 
 package SData.Config is
 
@@ -17,33 +17,13 @@ package SData.Config is
    --  Optional input file from command line (-u).
    Input_File_Path : String (1 .. 1024) := (others => ' ');
    Input_File_Len  : Natural := 0;
-   
+
    --  If True, suppresses informational messages (e.g., "Dataset opened").
    Quiet_Mode    : Boolean := False;
 
    --  Optional file to redirect console output (set via -o).
-   Output_File   : String (1 .. 1024) := (others => ' ');
+   Output_File     : String (1 .. 1024) := (others => ' ');
    Output_File_Len : Natural := 0;
-
-   --  Runtime state (reset by NEW)
-   type Runtime_State_Record is record
-      Save_File_Path      : String (1 .. 1024) := (others => ' ');
-      Save_File_Len       : Natural            := 0;
-      Save_File_Active    : Boolean            := False;
-      Save_File_Fmt       : Format_Type        := CSV;
-      Save_Sheet_Name     : String (1 .. 64)   := (others => ' ');
-      Save_Sheet_Name_Len : Natural            := 0;
-      FPath_Use           : Unbounded_String   := Null_Unbounded_String;
-      FPath_Save          : Unbounded_String   := Null_Unbounded_String;
-      FPath_Submit        : Unbounded_String   := Null_Unbounded_String;
-      FPath_Output        : Unbounded_String   := Null_Unbounded_String;
-      Repeat_Count        : Natural            := 0;
-      Repeat_Active       : Boolean            := False;
-   end record;
-
-   Runtime : Runtime_State_Record;
-
-   procedure Reset_Runtime_State;
 
    --  DIGITS state (controlling float precision in output).
    Print_Digits  : Natural := 5;
