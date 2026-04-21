@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.5.2
+Version:        0.6.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -52,6 +52,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Tue Apr 21 2026 John L. Ries <john@theyarnbard.com> - 0.6.0-1
+- Add DISPLAY command, LIST program-buffer display, DELETE n[-m] program-buffer deletion, ERR/ERL functions
+
 * Fri Apr 17 2026 John L. Ries <john@theyarnbard.com> - 0.5.2-1
 - Register SIGTERM/SIGINT handlers for temp-file cleanup; extract SData.Config.Runtime; complete dispatch table; break evaluator-interpreter cycle.
 

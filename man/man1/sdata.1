@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-04-17" "sdata 0.5.2" "User Commands"
+.TH SDATA 1 "2026-04-21" "sdata 0.6.0" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -51,6 +51,11 @@ Continue executing the script after a statement\-level error rather than
 aborting.
 The error message is printed to standard error and processing resumes with
 the next statement.
+After a caught error,
+.BR ERR ()
+returns 1 and
+.BR ERL ()
+returns the record number where the error occurred.
 .TP
 .B \-\-ignore\-math\-errors
 Instead of halting on a floating\-point domain error (e.g. LOG of a negative
@@ -81,6 +86,11 @@ Accepted values:
 Override the output dataset format.
 Accepted values:
 .BR CSV ", " ODF ", " OOXML .
+.TP
+.B \-\-debug
+Trace each statement and current record number to standard error as the
+interpreter executes them.
+Useful for debugging scripts.
 .SH LANGUAGE OVERVIEW
 The
 .B sdata
@@ -159,6 +169,36 @@ Re\-order the data table.
 .B NAMES
 List all permanent and temporary variables currently defined.
 .TP
+.B LIST
+Display the numbered contents of the program buffer (the deferred statements
+queued for the next
+.BR RUN ).
+Reports
+.I "(Empty program buffer)"
+when nothing is queued.
+.TP
+.B DISPLAY [\fIvar\fR ...]
+Show the current Data Table as a formatted table with a record\-number column.
+With no arguments all columns are shown; with a variable list only those
+columns appear.
+Column ranges are supported:
+.BR "DISPLAY A-Z" .
+Respects any active
+.B SELECT
+filter.
+.TP
+.BR "DELETE " \fIn\fR [ \fB\-\fIm\fR ]
+Remove program buffer entries
+.I n
+through
+.I m
+(1\-based, inclusive).
+Omitting
+.I m
+removes only entry
+.IR n .
+Only meaningful in interactive mode.
+.TP
 .B SUBMIT \fIfile\fR
 Execute commands from an external script file (default extension
 .BR .CMD ).
@@ -214,6 +254,11 @@ Post\-test loop.
 .TP
 .B DELETE
 Discard the current record; no output is written for it.
+See
+.B "DELETE n[-m]"
+under
+.I "Immediate commands"
+for program\-buffer deletion.
 .TP
 .B WRITE
 Explicitly write the current PDV to the output table.
@@ -381,6 +426,18 @@ is non\-zero or non\-empty, else
 .BR SHELL( cmd$ )
 \(em run a shell command; returns 0 on success (disabled by
 .BR \-\-noshell ).
+.br
+.BR ERR ()
+\(em last caught error code: 1 after an error caught by
+.BR \-k ,
+0 otherwise.
+Reset to 0 by
+.BR NEW .
+.br
+.BR ERL ()
+\(em record number where the last caught error occurred; 0 if none.
+Reset to 0 by
+.BR NEW .
 .SS Statistical distributions
 Each distribution family provides four function variants.
 The one\-letter prefix identifies the distribution; the suffix identifies
