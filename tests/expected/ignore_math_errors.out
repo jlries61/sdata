@@ -1,0 +1,11 @@
+Warning: Argument to LOG must be positive.
+Warning: Argument to SQRT must be non-negative.
+Warning: ARCSIN argument must be in [-1, 1].
+Warning: ARCCOS argument must be in [-1, 1].
+Warning: Division by zero in MOD.
+LOG(0): .
+SQRT(-4): .
+ARCSIN(2): .
+ARCCOS(-2): .
+MOD(7,0): .
+RUN complete. 1 records and 5 variables processed.

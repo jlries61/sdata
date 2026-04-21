@@ -1,0 +1,12 @@
+X: .
+X+1: .
+X*2: .
+X/2: .
+-X: .
+ABS(X): .
+MSS(X): 1.00000
+MSS(1): 0.00000
+IF(.,..): .
+IF(M,99): 99.00000
+NMISS: 2.00000
+RUN complete. 1 records and 11 variables processed.
