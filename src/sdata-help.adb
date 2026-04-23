@@ -67,9 +67,12 @@ package body SData.Help is
       Put_Line ("  /FMT=format  Specifies the file format (CSV, ODF, OOXML).");
       Put_Line ("               Default is auto-detected from file extension.");
       Put_Line ("  /NSCAN=n     Number of rows to scan for type detection (default: 20).");
-      Put_Line ("Note: If the file contains formula cells and LibreOffice (soffice) is");
-      Put_Line ("      available on PATH, formulas are recalculated before import.");
-      Put_Line ("      Otherwise cached values from the last save are used.");
+      Put_Line ("Formula cells (ODF/OOXML):");
+      Put_Line ("  sdata has no built-in formula evaluator.");
+      Put_Line ("  If LibreOffice (soffice) is on PATH, it is invoked to recalculate");
+      Put_Line ("  formulas before import.  Otherwise cached values from the last save");
+      Put_Line ("  are used -- correct for normally-saved files, but potentially stale");
+      Put_Line ("  for volatile functions (TODAY, NOW, RAND) or manual-recalc files.");
       Put_Line ("Execution: Immediate -- loads the dataset at once.");
    end Help_USE;
 

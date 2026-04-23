@@ -517,6 +517,51 @@ File format is auto\-detected from the file extension when not specified
 explicitly.
 Script files conventionally use the extension
 .BR .CMD .
+.SS Formula cells in spreadsheets
+.B sdata
+does not contain a spreadsheet formula evaluator.
+When a spreadsheet file (ODF or OOXML) is opened and formula cells are
+detected,
+.B sdata
+attempts to recalculate them by invoking
+.BR "LibreOffice headless" :
+.PP
+.RS
+.nf
+soffice \-\-headless \-\-convert\-to ...
+.fi
+.RE
+.PP
+If
+.B soffice
+is found on
+.BR PATH ,
+the file is converted to the opposite format (ODS\(->XLSX or XLSX\(->ODS),
+which forces recalculation; the converted file is then parsed and the
+temporary copy deleted.
+.PP
+If
+.B soffice
+is not available, or if the conversion fails,
+.B sdata
+falls back to the
+.I cached values
+stored in the file at the time it was last saved.
+For files saved normally by LibreOffice or Excel this produces correct
+results, because both applications cache formula results in the file.
+A warning is printed to stderr in this case (suppressed by
+.BR \-q ).
+.PP
+Cached values may be stale or absent in files that contain volatile
+functions
+.RB ( =TODAY() ,
+.BR =NOW() ,
+.BR =RAND() ),
+were saved with manual recalculation mode enabled, or were generated
+programmatically without caching results.
+In those cases the affected cells will read as missing values.
+.PP
+A built\-in formula evaluator is planned for a future release.
 .SH EXAMPLES
 .SS Interactive session
 .nf
