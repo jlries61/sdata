@@ -267,6 +267,7 @@ package body SData.Lexer is
                elsif Upper = "RUN" then T.Kind := Token_RUN;
                elsif Upper = "NAMES" then T.Kind := Token_NAMES;
                elsif Upper = "LIST" then T.Kind := Token_LIST;
+               elsif Upper = "DISPLAY" then T.Kind := Token_DISPLAY;
                elsif Upper = "TO" then T.Kind := Token_TO;
                elsif Upper = "STEP" then T.Kind := Token_STEP;
                else

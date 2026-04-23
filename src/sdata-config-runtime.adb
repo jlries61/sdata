@@ -14,6 +14,8 @@ package body SData.Config.Runtime is
       FPath_Output        := Null_Unbounded_String;
       Repeat_Count        := 0;
       Repeat_Active       := False;
+      Last_Error_Code     := 0;
+      Last_Error_Line     := 0;
    end Reset;
 
 end SData.Config.Runtime;

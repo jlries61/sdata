@@ -143,8 +143,10 @@ package SData.AST is
       Stmt_DIGITS, -- Set precision
       Stmt_FPATH,  -- Set default directories
       Stmt_HELP,   -- Display help
-      Stmt_RUN,    -- Execute and export
-      Stmt_NEW     -- Reset environment
+      Stmt_RUN,            -- Execute and export
+      Stmt_NEW,            -- Reset environment
+      Stmt_PROGRAM_DELETE, -- Delete line(s) from program buffer (immediate)
+      Stmt_DISPLAY         -- Display Data Table rows (immediate)
    );
 
    type Statement (Kind : Statement_Kind) is record
@@ -178,7 +180,7 @@ package SData.AST is
             Sheet_Name_Len   : Natural := 0;
          when Stmt_REPEAT =>
             Count : Natural;
-         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_LIST =>
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
             Vars         : Variable_List;
             Arr_Name     : String (1 .. 32);
             Arr_Name_Len : Natural;
@@ -219,6 +221,9 @@ package SData.AST is
             Echo_State : Boolean;
          when Stmt_DIGITS =>
             Digits_Count   : Natural;
+         when Stmt_PROGRAM_DELETE =>
+            Delete_From : Positive := 1;
+            Delete_To   : Positive := 1;
          when others =>
             null;
       end case;

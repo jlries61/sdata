@@ -1,0 +1,5 @@
+Error: Division by zero.
+RUN complete. 3 records and 1 variables processed.
+ERR after error: 1
+ERL (record of error): 2
+RUN complete. 1 records and 0 variables processed.

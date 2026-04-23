@@ -1,18 +1,15 @@
--- Test LIST command
+-- Test DISPLAY command (shows Data Table records)
+-- and LIST command (shows program buffer in REPL; empty buffer in batch)
 REPEAT 5
 LET A = RECNO
 LET B = RECNO * 10
 RUN
 
-PRINT "Listing all variables:"
-LIST
-
-PRINT "Listing specific variable A:"
-LIST A
+DISPLAY
+DISPLAY A
 
 SELECT A > 2
 RUN
-PRINT "Listing filtered (A > 2):"
-LIST
+DISPLAY
 
 QUIT

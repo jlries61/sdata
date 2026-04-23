@@ -11,7 +11,11 @@ package SData.Interpreter is
    procedure Execute (Prog : Statement_Access);
 
    --  Adds a statement to the global active program (for REPL deferred execution).
-   procedure Add_To_Active_Program (Stmt : Statement_Access);
+   --  Source is the source text of the statement (for LIST display).
+   procedure Add_To_Active_Program (Stmt : Statement_Access; Source : String := "");
+
+   --  Returns the number of entries in the program buffer.
+   function Program_Buffer_Length return Natural;
 
    --  Clears the global active program.
    procedure Clear_Active_Program;

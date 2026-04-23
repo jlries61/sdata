@@ -958,8 +958,41 @@ package body SData.Parser is
             Stmt := new Statement ((if Tok.Kind = Token_SORT then Stmt_SORT else Stmt_BY));
             Stmt.Sort_Vars := Parse_Variable_List (Ctx);
 
-         when Token_DELETE | Token_WRITE =>
-            Stmt := new Statement ((if Tok.Kind = Token_DELETE then Stmt_DELETE else Stmt_WRITE));
+         when Token_DELETE =>
+            declare
+               Next_Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if Next_Tok.Kind = Token_Numeric_Literal then
+                  --  DELETE n[-m]: immediate program buffer deletion
+                  declare
+                     Num_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     From_Num : Positive;
+                  begin
+                     From_Num := Positive (Float'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
+                     Stmt := new Statement (Stmt_PROGRAM_DELETE);
+                     Stmt.Delete_From := From_Num;
+                     Stmt.Delete_To   := From_Num;
+                     declare
+                        Maybe_Minus : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                     begin
+                        if Maybe_Minus.Kind = Token_Minus then
+                           declare
+                              Ignored  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              To_Tok   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              pragma Unreferenced (Ignored);
+                           begin
+                              Stmt.Delete_To := Positive (Float'Value (To_Tok.Text (1 .. To_Tok.Length)));
+                           end;
+                        end if;
+                     end;
+                  end;
+               else
+                  --  Bare DELETE: deferred, marks current record for deletion
+                  Stmt := new Statement (Stmt_DELETE);
+               end if;
+            end;
+         when Token_WRITE =>
+            Stmt := new Statement (Stmt_WRITE);
 
          when Token_RSEED =>
             Stmt := new Statement (Stmt_RSEED);
@@ -1061,19 +1094,21 @@ package body SData.Parser is
                end if;
             end;
 
+         when Token_DISPLAY =>
+            Stmt := new Statement (Stmt_DISPLAY);
+            Stmt.Vars := Parse_Variable_List (Ctx);
+
          when Token_END | Token_QUIT | Token_NAMES | Token_LIST | Token_NEW | Token_HELP =>
             declare
-               K : constant Statement_Kind := (if Tok.Kind = Token_END then Stmt_END 
-                                             elsif Tok.Kind = Token_QUIT then Stmt_QUIT 
+               K : constant Statement_Kind := (if Tok.Kind = Token_END then Stmt_END
+                                             elsif Tok.Kind = Token_QUIT then Stmt_QUIT
                                              elsif Tok.Kind = Token_NEW then Stmt_NEW
                                              elsif Tok.Kind = Token_HELP then Stmt_HELP
                                              elsif Tok.Kind = Token_LIST then Stmt_LIST
                                              else Stmt_NAMES);
             begin
                Stmt := new Statement (K);
-               if K = Stmt_LIST then
-                  Stmt.Vars := Parse_Variable_List (Ctx);
-               elsif K = Stmt_HELP then
+               if K = Stmt_HELP then
                   declare
                      Next_T : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin

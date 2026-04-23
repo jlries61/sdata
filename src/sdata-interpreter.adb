@@ -57,14 +57,24 @@ package body SData.Interpreter is
    --  grouping is active.  Populated by Stmt_BY; cleared by bare BY or NEW.
    Current_By_Vars : By_Group_Names.Vector;
 
+   --  Program buffer vector — mirrors Active_Program_Head/Tail linked list
+   --  but provides indexed access for LIST and DELETE n[-m].
+   type Program_Entry is record
+      Stmt   : Statement_Access;
+      Source : Unbounded_String;
+   end record;
+   package Program_Vectors is new Ada.Containers.Vectors (Positive, Program_Entry);
+   Active_Program_Vec : Program_Vectors.Vector;
+
    function Is_Immediate (Kind : Statement_Kind) return Boolean is
    begin
       return Kind in
          Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP |
-         Stmt_RENAME | Stmt_NAMES | Stmt_LIST | Stmt_RUN | Stmt_QUIT | Stmt_END |
+         Stmt_RENAME | Stmt_NAMES | Stmt_LIST | Stmt_DISPLAY | Stmt_RUN | Stmt_QUIT | Stmt_END |
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
-         Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT;
+         Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
+         Stmt_PROGRAM_DELETE;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -78,8 +88,9 @@ package body SData.Interpreter is
    procedure Execute_Assignment   (Stmt : Statement_Access);
    procedure Execute_Print        (Stmt : Statement_Access);
    procedure Execute_Control_Flow (Stmt : Statement_Access);
-   procedure Execute_Metadata     (Stmt : Statement_Access);
-   procedure Execute_Declarative  (Stmt : Statement_Access);
+   procedure Execute_Metadata        (Stmt : Statement_Access);
+   procedure Execute_Program_Delete  (Stmt : Statement_Access);
+   procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
    function  Is_First_In_Group    (Logical_Idx : Positive) return Boolean;
    function  Is_Last_In_Group     (Logical_Idx : Positive; Logical_Count : Natural) return Boolean;
@@ -140,7 +151,7 @@ package body SData.Interpreter is
    Active_Program_Head : Statement_Access := null;
    Active_Program_Tail : Statement_Access := null;
 
-   procedure Add_To_Active_Program (Stmt : Statement_Access) is
+   procedure Add_To_Active_Program (Stmt : Statement_Access; Source : String := "") is
    begin
       if Stmt = null then return; end if;
       Stmt.Next := null;
@@ -151,18 +162,22 @@ package body SData.Interpreter is
          Active_Program_Tail.Next := Stmt;
          Active_Program_Tail := Stmt;
       end if;
+      Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
    end Add_To_Active_Program;
 
    procedure Clear_Active_Program is
    begin
-      --  Free the self-owned filter expression.
       SData.AST.Free_Expression (Select_Filter_Expr);
       SData.AST.Free_Program (Active_Program_Head);
       Active_Program_Tail := null;
+      Active_Program_Vec.Clear;
       SData.Table.Clear_Index_Map;
       Current_By_Vars.Clear;
       SData.Table.Clear_By_Vars;
    end Clear_Active_Program;
+
+   function Program_Buffer_Length return Natural is
+     (Natural (Active_Program_Vec.Length));
 
    procedure Run_Active_Program is
    begin
@@ -742,6 +757,21 @@ package body SData.Interpreter is
                if S_Names /= null then declare Old : String_List_Access := S_Names; begin GNAT.Strings.Free (Old); end; end if;
             end;
          when Stmt_LIST =>
+            --  LIST always shows the program buffer.
+            if Active_Program_Vec.Is_Empty then
+               Put_Line ("(Empty program buffer)");
+            else
+               for I in Active_Program_Vec.First_Index .. Active_Program_Vec.Last_Index loop
+                  declare
+                     S : constant String := To_String (Active_Program_Vec (I).Source);
+                  begin
+                     Put (Ada.Strings.Fixed.Trim (I'Image, Ada.Strings.Both) & ": ");
+                     Put_Line (if S = "" then "?" else S);
+                  end;
+               end loop;
+            end if;
+
+         when Stmt_DISPLAY =>
             declare
                V    : Name_Vectors.Vector;
                Rows : constant Natural := SData.Table.Logical_Row_Count;
@@ -786,16 +816,14 @@ package body SData.Interpreter is
                end if;
 
                if V.Is_Empty then
-                  Put_Line ("(No columns to list)");
+                  Put_Line ("(No columns to display)");
                   return;
                end if;
 
-               -- Header
                Put ("REC# ");
                for Name of V loop Put (To_String (Name) & " "); end loop;
                New_Line;
 
-               -- Data
                for R in 1 .. Rows loop
                   declare
                      Phys_R : constant Positive := SData.Table.Logical_To_Physical (R);
@@ -811,6 +839,49 @@ package body SData.Interpreter is
          when others => null;
       end case;
    end Execute_Metadata;
+
+   --  Execute_Program_Delete — removes entries From..To (1-based) from the
+   --  program buffer and rebuilds the linked list.
+   procedure Execute_Program_Delete (Stmt : Statement_Access) is
+      From : constant Positive := Stmt.Delete_From;
+      To   : constant Positive := Stmt.Delete_To;
+      Last : constant Natural  := Natural (Active_Program_Vec.Length);
+   begin
+      if Last = 0 then
+         Put_Line_Error ("Warning: program buffer is empty.");
+         return;
+      end if;
+      if From > Last or else To > Last or else From > To then
+         Put_Line_Error ("Warning: DELETE range out of range (buffer has"
+                         & Last'Image & " entries).");
+         return;
+      end if;
+      --  Free deleted AST nodes.
+      for I in From .. To loop
+         declare
+            E : Program_Entry := Active_Program_Vec (I);
+         begin
+            SData.AST.Free_Program (E.Stmt);
+         end;
+      end loop;
+      --  Remove from vector (iterate backwards to preserve indices).
+      for I in reverse From .. To loop
+         Active_Program_Vec.Delete (I);
+      end loop;
+      --  Rebuild linked list from remaining vector entries.
+      Active_Program_Head := null;
+      Active_Program_Tail := null;
+      for E of Active_Program_Vec loop
+         E.Stmt.Next := null;
+         if Active_Program_Head = null then
+            Active_Program_Head := E.Stmt;
+            Active_Program_Tail := E.Stmt;
+         else
+            Active_Program_Tail.Next := E.Stmt;
+            Active_Program_Tail := E.Stmt;
+         end if;
+      end loop;
+   end Execute_Program_Delete;
 
    --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW.
    procedure Execute_Declarative (Stmt : Statement_Access) is
@@ -1051,8 +1122,10 @@ package body SData.Interpreter is
          when Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT =>
             Execute_Control_Flow (Stmt);
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET
-            | Stmt_RENAME | Stmt_ARRAY | Stmt_DIM | Stmt_NAMES | Stmt_LIST =>
+            | Stmt_RENAME | Stmt_ARRAY | Stmt_DIM | Stmt_NAMES | Stmt_LIST | Stmt_DISPLAY =>
             Execute_Metadata (Stmt);
+         when Stmt_PROGRAM_DELETE =>
+            Execute_Program_Delete (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW =>
             Execute_Declarative (Stmt);
@@ -1267,10 +1340,14 @@ package body SData.Interpreter is
                   when E : Script_Error =>
                      if SData.Config.Continue_On_Error then
                         Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                        SData.Config.Runtime.Last_Error_Code := 1;
+                        SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
                      else raise; end if;
                   when E : others =>
                      if SData.Config.Continue_On_Error then
                         Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                        SData.Config.Runtime.Last_Error_Code := 1;
+                        SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
                      else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
                end;
             when others => null;
@@ -1370,10 +1447,14 @@ package body SData.Interpreter is
                when E : Script_Error =>
                   if SData.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                     SData.Config.Runtime.Last_Error_Code := 1;
+                     SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
                   else raise; end if;
                when E : others =>
                   if SData.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                     SData.Config.Runtime.Last_Error_Code := 1;
+                     SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
                   else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
             end;
          end if;
