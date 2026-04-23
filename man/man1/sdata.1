@@ -286,7 +286,10 @@ Functions may appear anywhere in an expression.
 Missing\-value propagation is automatic: if any required argument is missing
 the result is missing, unless noted otherwise.
 .SS Mathematical
-.BR ABS (x),\  SQRT (x),\  EXP (x)
+.BR ABS (x),\  SQRT (x)\  /\  SQR (x),\  EXP (x)
+.br
+.BR SGN (x)
+\(em sign of x: \-1, 0, or 1.
 .br
 Natural log:
 .BR LOG (x)\  /\  LN (x)\  /\  LOGE (x)
@@ -325,9 +328,12 @@ Degree variants:
 .br
 .BR TRIM$ (s$),\  LTRIM$ (s$),\  RTRIM$ (s$)
 .br
-.BR UCASE$ / UPPER$ (s$),\  LCASE$ / LOWER$ (s$),\  POS (needle$,haystack$)
+.BR UCASE$ / UPPER$ (s$),\  LCASE$ / LOWER$ (s$)
 .br
-.BR CHR$ (n),\  ASCII (s$),\  STR$ (x),\  NUM$ (x),\  VAL (s$),\  NUM (x)
+.BR POS (needle$,haystack$),\  INSTR (haystack$,needle$)
+\(em INSTR uses BW BASIC argument order (haystack first).
+.br
+.BR CHR$ (n),\  ASCII (s$)\  /\  ASC (s$),\  STR$ (x),\  NUM$ (x),\  VAL (s$),\  NUM (x)
 .SS Base conversion
 .BR HEX$ (n),\  OCT$ (n),\  BIN$ (n)
 .SS Aggregate (row\-wise, across argument list)
@@ -412,7 +418,7 @@ is non\-zero or non\-empty, else
 .BR TRUE
 \(em the constant 1.
 .br
-.BR RAN ()\ /\ RANDOM ()
+.BR RAN ()\ /\ RANDOM ()\ /\ RND ()
 \(em uniform random number in [0,\ 1).
 .br
 .BR DATE$ ()
@@ -552,6 +558,81 @@ Successful completion.
 .TP
 .B 1
 An error occurred (parse error, file not found, unhandled exception, etc.).
+.SH COMPATIBILITY NOTES
+.B sdata
+is a statistical data\-step interpreter, not a BASIC interpreter.
+Its expression syntax and some function names are loosely modelled on
+BW BASIC (Bywater BASIC), but the two systems differ in fundamental ways.
+.PP
+.B Intentional divergences from BW BASIC:
+.TP
+.B No line numbers
+.B sdata
+programs have no line numbers.
+.B LIST
+displays program\-buffer entries by sequential index (1, 2, 3, \&...).
+.B DELETE\ n[\-m]
+removes entries by index, not by BASIC line number.
+.TP
+.B No GOTO / GOSUB
+Unstructured branching is not supported.
+Control flow is provided by
+.BR IF / THEN / ELSE ,
+.BR FOR / NEXT ,
+.BR WHILE / WEND ,
+.BR REPEAT ,
+and
+.BR SELECT\ CASE .
+.TP
+.B ERL() returns a record index
+In BW BASIC,
+.B ERL
+is the line number where the error occurred.
+In
+.BR sdata ,
+.B ERL()
+returns the logical record number being processed when the error was caught,
+which is more useful in a data\-step context.
+.TP
+.B Numeric output format
+.B sdata
+displays numeric values with five decimal places in fixed\-point notation
+(e.g.\& \fB3.14159\fR).
+BW BASIC uses a different default format.
+.TP
+.B Data\-table commands
+.BR USE ,
+.BR SAVE ,
+.BR RUN ,
+.BR BY ,
+.BR SELECT\ (filter) ,
+.BR DISPLAY ,
+.BR REPEAT ,
+and the statistical functions have no BW BASIC equivalent.
+They are specific to the
+.B sdata
+data\-step model.
+.TP
+.B Function name aliases
+Several function names supported by
+.B sdata
+are provided for BW BASIC compatibility:
+.B SQR
+(synonym for
+.BR SQRT ),
+.B SGN
+(sign function),
+.B RND
+(synonym for
+.BR RAN ),
+.B INSTR
+(like
+.B POS
+but with haystack\-first argument order),
+and
+.B ASC
+(synonym for
+.BR ASCII ).
 .SH SEE ALSO
 .BR awk (1),
 .BR gawk (1),

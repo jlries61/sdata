@@ -1,5 +1,6 @@
 with SData.Variables; use SData.Variables;
 with SData.Config;
+with SData.Config.Runtime;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData.Statistics;
@@ -277,6 +278,19 @@ package body SData.Evaluator is
          else return Handle_Domain_Error ("Argument to SQRT must be non-negative."); end if;
       end;
    end Handle_Sqrt_Fn;
+
+   function Handle_Sgn_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if V > 0.0 then return (Kind => Val_Integer, Int_Val => 1);
+         elsif V < 0.0 then return (Kind => Val_Integer, Int_Val => -1);
+         else return (Kind => Val_Integer, Int_Val => 0);
+         end if;
+      end;
+   end Handle_Sgn_Fn;
 
    ---------------------------------------------------------------------------
    --  Trig handlers — one subprogram per language function
@@ -824,6 +838,24 @@ package body SData.Evaluator is
                  Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
       end;
    end Handle_Pos;
+
+   --  INSTR(haystack, needle) — BW BASIC argument order (reversed from POS)
+   function Handle_Instr (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         Haystack : constant Value := Vals.Element (1);
+         Needle   : constant Value := Vals.Element (2);
+      begin
+         if Needle.Kind /= Val_String or else Haystack.Kind /= Val_String then
+            return (Kind => Val_Missing);
+         end if;
+         if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
+         return (Kind    => Val_Integer,
+                 Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
+      end;
+   end Handle_Instr;
 
    function Handle_Chr (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
@@ -1535,6 +1567,18 @@ package body SData.Evaluator is
       return (Kind => Val_Integer, Int_Val => 1);
    end Handle_True;
 
+   function Handle_Err_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => SData.Config.Runtime.Last_Error_Code);
+   end Handle_Err_Fn;
+
+   function Handle_Erl_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => SData.Config.Runtime.Last_Error_Line);
+   end Handle_Erl_Fn;
+
    function Handle_Date (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
       R   : Value (Val_String);
@@ -2010,6 +2054,8 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("FP",     Handle_Fp_Fn'Access);
       Dispatch_Table.Insert ("MOD",    Handle_Mod_Fn'Access);
       Dispatch_Table.Insert ("SQRT",   Handle_Sqrt_Fn'Access);
+      Dispatch_Table.Insert ("SQR",    Handle_Sqrt_Fn'Access);
+      Dispatch_Table.Insert ("SGN",    Handle_Sgn_Fn'Access);
 
       --  Trigonometry
       Dispatch_Table.Insert ("SIN",    Handle_Sin_Fn'Access);
@@ -2059,11 +2105,13 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("LTRIM$", Handle_Ltrim'Access);
       Dispatch_Table.Insert ("RTRIM$", Handle_Rtrim'Access);
       Dispatch_Table.Insert ("ASCII",  Handle_ASCII'Access);
+      Dispatch_Table.Insert ("ASC",    Handle_ASCII'Access);
       Dispatch_Table.Insert ("UCASE$", Handle_Upper'Access);
       Dispatch_Table.Insert ("UPPER$", Handle_Upper'Access);
       Dispatch_Table.Insert ("LCASE$", Handle_Lower'Access);
       Dispatch_Table.Insert ("LOWER$", Handle_Lower'Access);
       Dispatch_Table.Insert ("POS",    Handle_Pos'Access);
+      Dispatch_Table.Insert ("INSTR",  Handle_Instr'Access);
       Dispatch_Table.Insert ("CHR$",   Handle_Chr'Access);
       Dispatch_Table.Insert ("STR$",   Handle_Str'Access);
       Dispatch_Table.Insert ("VAL",    Handle_Val'Access);
@@ -2144,6 +2192,7 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("FRN",    Handle_FRN'Access);
       Dispatch_Table.Insert ("RAN",    Handle_Ran'Access);
       Dispatch_Table.Insert ("RANDOM", Handle_Ran'Access);
+      Dispatch_Table.Insert ("RND",    Handle_Ran'Access);
 
       --  Miscellaneous
       Dispatch_Table.Insert ("MISSING", Handle_Missing'Access);
@@ -2153,6 +2202,8 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("TIME$",   Handle_Time'Access);
       Dispatch_Table.Insert ("SHELL",   Handle_Shell'Access);
       Dispatch_Table.Insert ("NUM",     Handle_Num'Access);
+      Dispatch_Table.Insert ("ERR",     Handle_Err_Fn'Access);
+      Dispatch_Table.Insert ("ERL",     Handle_Erl_Fn'Access);
    end Register_All_Functions;
 
 begin

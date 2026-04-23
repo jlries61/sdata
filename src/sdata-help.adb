@@ -12,7 +12,7 @@ package body SData.Help is
    begin
       Put_Line ("SData version " & SData.Config.Version_Str);
       Put_Line ("Available Commands:");
-      Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE");
+      Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, DISPLAY");
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
       Put_Line ("  Arrays:      ARRAY, DIM");
       Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT");
@@ -22,18 +22,18 @@ package body SData.Help is
       Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
       New_Line;
       Put_Line ("Available Functions:");
-      Put_Line ("  Math:        ABS, SQRT, LOG/LN/LOGE, LOG2, LOG10/CLG/LGT, EXP,");
-      Put_Line ("               ROUND, CEIL, FLOOR, INT, FIX/IP, FP, MOD");
+      Put_Line ("  Math:        ABS, SQRT/SQR, LOG/LN/LOGE, LOG2, LOG10/CLG/LGT, EXP,");
+      Put_Line ("               ROUND, CEIL, FLOOR, INT, FIX/IP, FP, MOD, SGN");
       Put_Line ("  Trig (rad):  SIN, COS, TAN, ATN/ARCTAN, ATAN2, ARCSIN, ARCCOS,");
       Put_Line ("               COT, CSC, SEC, SINH/HSN, COSH/HCS, TANH/HTN, DEG/DEGREE");
       Put_Line ("  Trig (deg):  SIND, COSD, TAND, ATND, ATAN2D");
       Put_Line ("  String:      LEN, LEFT$, RIGHT$, MID$, TRIM$, LTRIM$, RTRIM$,");
-      Put_Line ("               UCASE$/UPPER$, LCASE$/LOWER$, POS, CHR$, ASCII,");
-      Put_Line ("               STR$, VAL, NUM$");
+      Put_Line ("               UCASE$/UPPER$, LCASE$/LOWER$, POS, INSTR, CHR$,");
+      Put_Line ("               ASCII/ASC, STR$, VAL, NUM$");
       Put_Line ("  Conversion:  NUM, HEX$, OCT$, BIN$");
       Put_Line ("  Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, NEXT, NEXTC$, OBS, OBSC$");
-      Put_Line ("  Special:     MISSING, NMISS, RAN, RANDOM, DATE$, TIME$, SHELL,");
-      Put_Line ("               FALSE, TRUE");
+      Put_Line ("  Special:     MISSING, NMISS, RAN/RANDOM/RND, DATE$, TIME$, SHELL,");
+      Put_Line ("               FALSE, TRUE, ERR, ERL");
       Put_Line ("  Aggregate:   SUM, MEAN, GMEAN, HMEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS");
       Put_Line ("  Stat PDF:    ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF,");
       Put_Line ("               MDF, WDF, LDF");
@@ -191,12 +191,24 @@ package body SData.Help is
 
    procedure Help_LIST is
    begin
-      Put_Line ("Command: LIST [variable(s)]");
+      Put_Line ("Command: LIST");
       Put_Line ("Execution: Immediate");
-      Put_Line ("Displays the values of the current Data Table records for the");
-      Put_Line ("specified variables (or all permanent variables if omitted).");
-      Put_Line ("Respects any active SELECT filter and BY grouping.");
+      Put_Line ("Displays the numbered contents of the program buffer (deferred statements");
+      Put_Line ("queued for the next RUN).  If the buffer is empty, reports that fact.");
+      Put_Line ("See also: DISPLAY to show Data Table records.");
+      Put_Line ("          DELETE n[-m] to remove program buffer entries.");
    end Help_LIST;
+
+   procedure Help_DISPLAY is
+   begin
+      Put_Line ("Command: DISPLAY [variable(s)]");
+      Put_Line ("Execution: Immediate");
+      Put_Line ("Displays the current Data Table as a formatted table.");
+      Put_Line ("  DISPLAY         -- show all columns.");
+      Put_Line ("  DISPLAY varlist -- show only the named columns.");
+      Put_Line ("Respects any active SELECT filter (only visible records are shown).");
+      Put_Line ("Column ranges are supported:  DISPLAY A-Z");
+   end Help_DISPLAY;
 
    procedure Help_NAMES is
    begin
@@ -208,8 +220,13 @@ package body SData.Help is
    procedure Help_DELETE is
    begin
       Put_Line ("Command: DELETE");
-      Put_Line ("Discards the current record; processing moves to the next record.");
-      Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
+      Put_Line ("Two forms:");
+      Put_Line ("  DELETE           Discard the current record; no output is produced for it.");
+      Put_Line ("                   Execution: Deferred -- executed per record in the data step.");
+      Put_Line ("  DELETE n[-m]     Remove program buffer entries n through m (1-based).");
+      Put_Line ("                   A single number removes one entry; n-m removes a range.");
+      Put_Line ("                   Execution: Immediate -- takes effect at once.");
+      Put_Line ("                   Only meaningful in interactive (REPL) mode.");
    end Help_DELETE;
 
    procedure Help_HOLD is
@@ -419,9 +436,9 @@ package body SData.Help is
       Put_Line ("              REPEAT n, KEEP, DROP, FPATH");
       New_Line;
       Put_Line ("  Immediate -- execute at once, outside any data step.");
-      Put_Line ("    Commands: RUN, SORT, NEW, NAMES, UNSET, RENAME, SYSTEM,");
-      Put_Line ("              SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,");
-      Put_Line ("              QUIT, END");
+      Put_Line ("    Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET, RENAME,");
+      Put_Line ("              SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,");
+      Put_Line ("              DELETE n[-m], QUIT, END");
       New_Line;
       Put_Line ("  Deferred -- queued between RUN markers; executed once per");
       Put_Line ("    record during the data step.");
@@ -442,7 +459,8 @@ package body SData.Help is
    -- ==========================================================================
 
    procedure Help_ABS   is begin Put_Line ("Function: ABS(x)  ->  |x|"); end Help_ABS;
-   procedure Help_SQRT  is begin Put_Line ("Function: SQRT(x)  ->  square root of x (x >= 0)"); end Help_SQRT;
+   procedure Help_SQRT  is begin Put_Line ("Function: SQRT(x) / SQR(x)  ->  square root of x (x >= 0)"); end Help_SQRT;
+   procedure Help_SGN   is begin Put_Line ("Function: SGN(x)  ->  sign of x: -1, 0, or 1"); end Help_SGN;
    procedure Help_LOG   is begin Put_Line ("Function: LOG(x)  ->  natural logarithm (x > 0)"); end Help_LOG;
    procedure Help_LOG10 is begin Put_Line ("Function: LOG10(x)  ->  base-10 logarithm (x > 0)"); end Help_LOG10;
    procedure Help_EXP   is begin Put_Line ("Function: EXP(x)  ->  e raised to the power x"); end Help_EXP;
@@ -501,8 +519,9 @@ package body SData.Help is
    procedure Help_UCASES is begin Put_Line ("Function: UCASE$(s$) / UPPER$(s$)  ->  convert to upper case"); end Help_UCASES;
    procedure Help_LCASES is begin Put_Line ("Function: LCASE$(s$) / LOWER$(s$)  ->  convert to lower case"); end Help_LCASES;
    procedure Help_POS    is begin Put_Line ("Function: POS(needle$, haystack$)  ->  1-based position, 0=not found"); end Help_POS;
+   procedure Help_INSTR  is begin Put_Line ("Function: INSTR(haystack$, needle$)  ->  1-based position, 0=not found (BW BASIC argument order)"); end Help_INSTR;
    procedure Help_CHRS   is begin Put_Line ("Function: CHR$(n)  ->  character with ASCII code n"); end Help_CHRS;
-   procedure Help_ASCII  is begin Put_Line ("Function: ASCII(s$)  ->  ASCII code of first character of s$"); end Help_ASCII;
+   procedure Help_ASCII  is begin Put_Line ("Function: ASCII(s$) / ASC(s$)  ->  ASCII code of first character of s$"); end Help_ASCII;
    procedure Help_STRS   is begin Put_Line ("Function: STR$(x)  ->  numeric x formatted as string"); end Help_STRS;
    procedure Help_VAL    is begin Put_Line ("Function: VAL(s$)  ->  parse string s$ as a number"); end Help_VAL;
    procedure Help_NUMS   is begin Put_Line ("Function: NUM$(x)  ->  numeric x formatted as string (alias for STR$)"); end Help_NUMS;
@@ -591,7 +610,7 @@ package body SData.Help is
 
    procedure Help_RAN is
    begin
-      Put_Line ("Function: RAN() / RANDOM()  ->  uniform random number in [0, 1)");
+      Put_Line ("Function: RAN() / RANDOM() / RND()  ->  uniform random number in [0, 1)");
       Put_Line ("  Use RSEED n before calling to get a reproducible sequence.");
    end Help_RAN;
 
@@ -606,6 +625,22 @@ package body SData.Help is
 
    procedure Help_FALSE is begin Put_Line ("Function: FALSE  ->  0 (numeric false constant)"); end Help_FALSE;
    procedure Help_TRUE  is begin Put_Line ("Function: TRUE   ->  1 (numeric true constant)"); end Help_TRUE;
+
+   procedure Help_ERR is
+   begin
+      Put_Line ("Function: ERR()  ->  last error code (0 = no error, 1 = error caught)");
+      Put_Line ("  Set when an error is caught by -k (--continue-on-error).");
+      Put_Line ("  Not set by --ignore-math-errors domain warnings.");
+      Put_Line ("  Reset to 0 by the NEW command.");
+   end Help_ERR;
+
+   procedure Help_ERL is
+   begin
+      Put_Line ("Function: ERL()  ->  record number where the last caught error occurred");
+      Put_Line ("  Returns 0 if no error has been caught in the current session.");
+      Put_Line ("  Set alongside ERR() when -k catches a runtime error.");
+      Put_Line ("  Reset to 0 by the NEW command.");
+   end Help_ERL;
 
    -- ==========================================================================
    --  Aggregate functions
@@ -901,6 +936,7 @@ package body SData.Help is
    K_SORT         : aliased constant String := "SORT";
    K_NEW          : aliased constant String := "NEW";
    K_LIST         : aliased constant String := "LIST";
+   K_DISPLAY      : aliased constant String := "DISPLAY";
    K_NAMES        : aliased constant String := "NAMES";
    K_DELETE       : aliased constant String := "DELETE";
    K_HOLD         : aliased constant String := "HOLD";
@@ -942,6 +978,8 @@ package body SData.Help is
    K_CLG          : aliased constant String := "CLG";
    K_LGT          : aliased constant String := "LGT";
    K_MOD          : aliased constant String := "MOD";
+   K_SQR          : aliased constant String := "SQR";
+   K_SGN          : aliased constant String := "SGN";
    K_SIN          : aliased constant String := "SIN";
    K_COS          : aliased constant String := "COS";
    K_TAN          : aliased constant String := "TAN";
@@ -978,8 +1016,10 @@ package body SData.Help is
    K_LCASES       : aliased constant String := "LCASE$";
    K_LOWERS       : aliased constant String := "LOWER$";
    K_POS          : aliased constant String := "POS";
+   K_INSTR        : aliased constant String := "INSTR";
    K_CHRS         : aliased constant String := "CHR$";
    K_ASCII        : aliased constant String := "ASCII";
+   K_ASC          : aliased constant String := "ASC";
    K_STRS         : aliased constant String := "STR$";
    K_VAL          : aliased constant String := "VAL";
    K_NUMS         : aliased constant String := "NUM$";
@@ -1001,11 +1041,14 @@ package body SData.Help is
    K_MISSING      : aliased constant String := "MISSING";
    K_RAN          : aliased constant String := "RAN";
    K_RANDOM       : aliased constant String := "RANDOM";
+   K_RND          : aliased constant String := "RND";
    K_DATES        : aliased constant String := "DATE$";
    K_TIMES        : aliased constant String := "TIME$";
    K_SHELL        : aliased constant String := "SHELL";
    K_FALSE        : aliased constant String := "FALSE";
    K_TRUE         : aliased constant String := "TRUE";
+   K_ERR          : aliased constant String := "ERR";
+   K_ERL          : aliased constant String := "ERL";
    K_SUM          : aliased constant String := "SUM";
    K_MEAN         : aliased constant String := "MEAN";
    K_GMEAN        : aliased constant String := "GMEAN";
@@ -1095,6 +1138,7 @@ package body SData.Help is
       (K_SORT'Access,     Help_SORT'Access,     C, N),
       (K_NEW'Access,      Help_NEW'Access,      C, N),
       (K_LIST'Access,     Help_LIST'Access,     C, N),
+      (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),
       (K_NAMES'Access,    Help_NAMES'Access,    C, N),
       (K_DELETE'Access,   Help_DELETE'Access,   C, N),
       (K_HOLD'Access,     Help_HOLD'Access,     C, N),
@@ -1121,6 +1165,8 @@ package body SData.Help is
       --  Math functions
       (K_ABS'Access,      Help_ABS'Access,      N, F),
       (K_SQRT'Access,     Help_SQRT'Access,     N, F),
+      (K_SQR'Access,      Help_SQRT'Access,     N, N),   --  BW BASIC alias
+      (K_SGN'Access,      Help_SGN'Access,      N, F),
       (K_LOG'Access,      Help_LOG'Access,      N, F),
       (K_LOG10'Access,    Help_LOG10'Access,    N, F),
       (K_EXP'Access,      Help_EXP'Access,      N, F),
@@ -1176,8 +1222,10 @@ package body SData.Help is
       (K_LCASES'Access,   Help_LCASES'Access,   N, F),
       (K_LOWERS'Access,   Help_LCASES'Access,   N, N),   --  alias
       (K_POS'Access,      Help_POS'Access,      N, F),
+      (K_INSTR'Access,    Help_INSTR'Access,    N, F),
       (K_CHRS'Access,     Help_CHRS'Access,     N, F),
       (K_ASCII'Access,    Help_ASCII'Access,    N, F),
+      (K_ASC'Access,      Help_ASCII'Access,    N, N),   --  BW BASIC alias
       (K_STRS'Access,     Help_STRS'Access,     N, F),
       (K_VAL'Access,      Help_VAL'Access,      N, F),
       (K_NUMS'Access,     Help_NUMS'Access,     N, F),
@@ -1202,11 +1250,14 @@ package body SData.Help is
       (K_MISSING'Access,  Help_MISSING'Access,  N, F),
       (K_RAN'Access,      Help_RAN'Access,      N, F),
       (K_RANDOM'Access,   Help_RAN'Access,      N, N),   --  alias
+      (K_RND'Access,      Help_RAN'Access,      N, N),   --  BW BASIC alias
       (K_DATES'Access,    Help_DATES'Access,    N, F),
       (K_TIMES'Access,    Help_TIMES'Access,    N, F),
       (K_SHELL'Access,    Help_SHELL'Access,    N, F),
       (K_FALSE'Access,    Help_FALSE'Access,    N, F),
       (K_TRUE'Access,     Help_TRUE'Access,     N, F),
+      (K_ERR'Access,      Help_ERR'Access,      N, F),
+      (K_ERL'Access,      Help_ERL'Access,      N, F),
       --  Aggregate functions
       (K_SUM'Access,      Help_SUM'Access,      N, F),
       (K_MEAN'Access,     Help_MEAN'Access,     N, F),
