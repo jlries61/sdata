@@ -83,15 +83,27 @@ within the same order-of-magnitude as the synthetic benchmarks.
 
 ### 5. Spillover vs. In-Memory (100,000 rows × 10 cols, `LET Y = V1 + V2`)
 
+**Before fix (0.6.0):**
+
 | Mode | Real time | User time | Slowdown vs. in-memory |
 |------|-----------|-----------|------------------------|
 | In-memory (no `-m`) | 6.1 s | 4.3 s | — |
 | Spillover (`-m 10000`, 10 segments) | 614 s | 437 s | **~101×** |
 
-This is the most significant performance finding.  Enabling disk spillover
-at a segment size of 10,000 rows (10 segments for a 100,000-row dataset)
-produces a 101× slowdown — making spillover mode practically unusable at
-any dataset size where it would actually be needed.
+**After Priority 1 fix (segment-level prefetch + reference-type spill):**
+
+| Mode | Real time | User time | Slowdown vs. in-memory |
+|------|-----------|-----------|------------------------|
+| In-memory (no `-m`) | 4.2 s | 3.0 s | — |
+| Spillover (`-m 10000`, 10 segments) | 6.1 s | 4.5 s | **~1.5×** |
+
+The 101× penalty has been eliminated.  Two bugs were responsible:
+1. **Cell-by-cell SQL reads**: `Fetch_From_Disk` issued one `SELECT` per cell;
+   replaced with one `SELECT` per segment (10,000× reduction in query count).
+2. **Deep-copy in `Spill_Table_To_Disk`**: `T.Element(Key)` inside the inner
+   loop copied the entire column `Vector` (O(N) values) for every cell, producing
+   O(N²) allocations per spill call.  Fixed by using `Constant_Reference` via
+   pre-computed cursors.
 
 ---
 
@@ -151,12 +163,12 @@ by a factor of `segment_size`.
 
 The following improvements are listed in priority order based on impact.
 
-### Priority 1 — Fix spillover read access (blocker)
+### Priority 1 — Fix spillover read access (blocker) ✓ DONE
 
-The 101× slowdown makes spillover mode practically unusable.  A targeted
-change to the SQLite fetch path to prefetch full segments would likely
-recover 95%+ of the penalty.  This is a self-contained change to
-`SData.Table` with no impact on the public interface.
+The 101× slowdown has been eliminated (now ~1.5×) by two fixes:
+segment-level prefetch in `Fetch_From_Disk` and switching
+`Spill_Table_To_Disk` from `T.Element` (deep copy per cell) to
+`Constant_Reference` via pre-computed cursors.
 
 ### Priority 2 — Pre-resolve variable names (high value)
 
@@ -180,9 +192,9 @@ datasets up to a few hundred thousand rows.
 ## Summary
 
 In-memory performance is predictably linear in both row and column count,
-with no pathological cases at large sizes.  The two actionable problems are
-the 101× spillover penalty (which makes the `-m` option a performance trap
-rather than a safety valve) and the 30 μs/row evaluation overhead (which
+with no pathological cases at large sizes.  The spillover penalty has been
+reduced from 101× to ~1.5×, making the `-m` option a practical safety valve.
+The remaining actionable problem is the 30 μs/row evaluation overhead (which
 makes `RUN` with even simple programs several times more expensive than
-loading).  Both have clear, bounded fixes that do not require architectural
+loading).  This has a clear, bounded fix that does not require architectural
 changes.
