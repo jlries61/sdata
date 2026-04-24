@@ -45,8 +45,9 @@ package SData.AST is
          when Expr_String_Literal =>
             Str_Value : Ada.Strings.Unbounded.Unbounded_String;
          when Expr_Variable =>
-            Var_Name : String (1 .. 32);
-            Var_Len  : Natural;
+            Var_Name  : String (1 .. 32);
+            Var_Len   : Natural;
+            Var_Index : Natural := 0;  -- 0 = unresolved; positive = 1-based PDV_Vec slot
          when Expr_Binary_Op =>
             Left  : Expression_Access;
             Right : Expression_Access;

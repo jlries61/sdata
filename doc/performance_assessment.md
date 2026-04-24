@@ -56,15 +56,23 @@ short rows or few wide rows.
 Each row processed by `RUN` incurs interpreter overhead beyond the base
 load cost.  The following measures a single `LET Y = V1 + V2` statement:
 
+**Before Priority 2 fix (0.6.0/0.6.1 baseline):**
+
 | Rows | Load only (user) | Load + RUN (user) | Per-row overhead |
 |------|-----------------|-------------------|-----------------|
 | 10,000 | 0.147 s | 0.457 s | ~31 μs |
 | 100,000 | 1.293 s | 4.267 s | ~30 μs |
 
-A single `LET` statement with two variable references costs approximately
-**30 μs per row**, which roughly triples the total cost of a bare `USE`
-at any row count.  This overhead scales linearly with both row count and
-statement count.
+**After Priority 2 fix (indexed PDV + pre-resolved AST variables):**
+
+| Rows | Load only (user) | Load + RUN (user) | Per-row overhead |
+|------|-----------------|-------------------|-----------------|
+| 100,000 | 1.293 s | 1.942 s | ~6 μs |
+
+Per-row overhead dropped from **~30 μs to ~6 μs** — a **5× reduction**.
+The fix replaced `Permanent_Symbols` (a hash map) with a flat `PDV_Vec`
+vector, and pre-resolves all `Expr_Variable` AST node indices once per RUN
+so that the hot evaluation path performs zero hash lookups per variable access.
 
 ### 4. Real Datasets
 
@@ -170,13 +178,12 @@ segment-level prefetch in `Fetch_From_Disk` and switching
 `Spill_Table_To_Disk` from `T.Element` (deep copy per cell) to
 `Constant_Reference` via pre-computed cursors.
 
-### Priority 2 — Pre-resolve variable names (high value)
+### Priority 2 — Pre-resolve variable names (high value) ✓ DONE
 
-Eliminating per-row hash-map lookups would reduce the 30 μs/row evaluation
-overhead substantially.  The change requires storing a column index
-alongside each variable reference in the AST at program-buffer commit time,
-and updating the interpreter's `RUN` loop to use indexed access.  This
-would benefit all users regardless of dataset size.
+Per-row overhead reduced from ~30 μs to ~6 μs (5×) by:
+replacing `Permanent_Symbols` hash map with a flat `PDV_Vec` vector,
+adding `Var_Index` to `Expr_Variable` AST nodes, and pre-resolving all
+variable indices once per RUN so the hot evaluation path does no hash lookups.
 
 ### Priority 3 — Faster CSV tokenisation (moderate value)
 
@@ -192,9 +199,8 @@ datasets up to a few hundred thousand rows.
 ## Summary
 
 In-memory performance is predictably linear in both row and column count,
-with no pathological cases at large sizes.  The spillover penalty has been
-reduced from 101× to ~1.5×, making the `-m` option a practical safety valve.
-The remaining actionable problem is the 30 μs/row evaluation overhead (which
-makes `RUN` with even simple programs several times more expensive than
-loading).  This has a clear, bounded fix that does not require architectural
+with no pathological cases at large sizes.  Both high-priority bottlenecks have been eliminated.  The spillover penalty
+is down from 101× to ~1.5×, and per-row evaluation overhead is down from
+~30 μs to ~6 μs.  The one remaining actionable item is Priority 3, the
+CSV parser ceiling (~700,000 cells/sec), which does not require architectural
 changes.

@@ -1385,6 +1385,105 @@ package body SData.Interpreter is
       end if;
    end Commit_Step;
 
+   --  Resolve_Expr_Indices — walk every Expr_Variable node reachable from the
+   --  statement list and cache its PDV slot index.  Called once per RUN after
+   --  Initialize_PDV has built the PDV_Index map, so the cache is valid for
+   --  the entire data step without any per-row hash lookup.
+   procedure Resolve_Expr_Indices (Start, Boundary : Statement_Access) is
+
+      procedure Resolve_Expr (Expr : Expression_Access);
+
+      procedure Resolve_Expr_List (List : Expression_List) is
+         Node : Expression_List := List;
+      begin
+         while Node /= null loop
+            Resolve_Expr (Node.Expr);
+            Node := Node.Next;
+         end loop;
+      end Resolve_Expr_List;
+
+      procedure Resolve_Expr (Expr : Expression_Access) is
+      begin
+         if Expr = null then return; end if;
+         case Expr.Kind is
+            when Expr_Variable =>
+               declare
+                  Upper : constant String :=
+                     To_Upper (Expr.Var_Name (1 .. Expr.Var_Len));
+               begin
+                  Expr.Var_Index := SData.Variables.PDV_Resolve (Upper);
+               end;
+            when Expr_Binary_Op =>
+               Resolve_Expr (Expr.Left);
+               Resolve_Expr (Expr.Right);
+            when Expr_Unary_Op =>
+               Resolve_Expr (Expr.Operand);
+            when Expr_Function_Call =>
+               Resolve_Expr_List (Expr.Arguments);
+            when Expr_Array_Access =>
+               Resolve_Expr_List (Expr.Arr_Idx);
+            when others => null;
+         end case;
+      end Resolve_Expr;
+
+      procedure Resolve_Stmt_List (Stmt  : Statement_Access;
+                                   Bound : Statement_Access);
+
+      procedure Resolve_Stmt (S : Statement_Access) is
+      begin
+         if S = null then return; end if;
+         Resolve_Expr (S.Expr);
+         Resolve_Expr (S.Arr_Idx);
+         case S.Kind is
+            when Stmt_PRINT =>
+               Resolve_Expr_List (S.Print_Args);
+            when Stmt_IF =>
+               Resolve_Expr (S.Condition);
+               Resolve_Stmt_List (S.Then_Branch, null);
+               Resolve_Stmt_List (S.Else_Branch, null);
+            when Stmt_FOR =>
+               Resolve_Expr (S.For_Start);
+               Resolve_Expr (S.For_End);
+               Resolve_Expr (S.For_Step);
+               Resolve_Stmt_List (S.For_Body, null);
+            when Stmt_WHILE =>
+               Resolve_Expr (S.While_Cond);
+               Resolve_Stmt_List (S.While_Body, null);
+            when Stmt_LOOP_REPEAT =>
+               Resolve_Stmt_List (S.Repeat_Body, null);
+               Resolve_Expr (S.Until_Cond);
+            when Stmt_SELECT =>
+               Resolve_Expr (S.Selector);
+               declare
+                  B : Case_Branch := S.Branches;
+               begin
+                  while B /= null loop
+                     Resolve_Expr_List (B.Conditions);
+                     Resolve_Stmt_List (B.Branch_Body, null);
+                     B := B.Next;
+                  end loop;
+               end;
+               Resolve_Stmt_List (S.Otherwise_Part, null);
+            when Stmt_RSEED =>
+               Resolve_Expr (S.Seed_Expr);
+            when others => null;
+         end case;
+      end Resolve_Stmt;
+
+      procedure Resolve_Stmt_List (Stmt  : Statement_Access;
+                                   Bound : Statement_Access) is
+         Cur : Statement_Access := Stmt;
+      begin
+         while Cur /= null and then Cur /= Bound loop
+            Resolve_Stmt (Cur);
+            Cur := Cur.Next;
+         end loop;
+      end Resolve_Stmt_List;
+
+   begin
+      Resolve_Stmt_List (Start, Boundary);
+   end Resolve_Expr_Indices;
+
    --  Run_One_Step — executes the deferred statement list once per record.
    --  Start..Boundary is the slice of the statement list belonging to this RUN.
    procedure Run_One_Step (Start, Boundary : Statement_Access) is
@@ -1394,6 +1493,7 @@ package body SData.Interpreter is
           else (if Row_Count > 0 then Row_Count else 1));
    begin
       Initialize_PDV;
+      Resolve_Expr_Indices (Start, Boundary);
       SData.Table.Initialize_Output_Table;
       Rebuild_Filter_Map;
       declare

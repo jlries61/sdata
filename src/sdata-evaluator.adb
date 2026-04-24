@@ -1826,11 +1826,14 @@ package body SData.Evaluator is
          when Expr_Variable =>
             declare
                VName : constant String := To_Upper (Expr.Var_Name (1 .. Expr.Var_Len));
-               VVal  : constant Value  := Get (VName);
+               VVal  : constant Value  :=
+                  (if Expr.Var_Index > 0
+                   then Get_PDV_Value (Expr.Var_Index)
+                   else Get (VName));
             begin
                if VVal.Kind = Val_Missing then
                   --  Fall back to zero-arg functions (optional parentheses)
-                  if Vname in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |
+                  if VName in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |
                               "DATE$" | "TIME$" | "RAN" | "RANDOM" | "LRN" |
                               "FALSE" | "TRUE" then
                      return Evaluate_Function (VName, null);
