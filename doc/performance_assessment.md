@@ -1,5 +1,5 @@
 # SData Performance Assessment
-**Version:** 0.6.0  
+**Version:** 0.6.1  
 **Date:** 2026-04-24  
 **Build:** `-O2` optimisation, debug info retained (`-g`)  
 **Platform:** x86-64 Linux
