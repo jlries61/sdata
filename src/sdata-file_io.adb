@@ -1,4 +1,5 @@
 with Ada.Text_IO;
+with Ada.Unchecked_Deallocation;
 with Ada.Exceptions;
 with SData.IO;        use SData.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
@@ -263,108 +264,205 @@ package body SData.File_IO is
    ---------------
    procedure Parse_CSV (File_Name : String) is
       File : Ada.Text_IO.File_Type;
-      type String_Array is array (Positive range <>) of Unbounded_String;
-      
-      function Split (L : String) return String_Array is
-         Start : Positive := L'First;
-         Pos   : Natural;
-         Count : Natural := 0;
-      begin
-         if L'Length = 0 then return (1 .. 0 => Null_Unbounded_String); end if;
-         for I in L'Range loop if L (I) = ',' then Count := Count + 1; end if; end loop;
-         declare
-            Res : String_Array (1 .. Count + 1);
-            Idx : Positive := 1;
-         begin
-            loop
-               Pos := Index (L (Start .. L'Last), ",");
-               if Pos = 0 then
-                  Res (Idx) := To_Unbounded_String (Trim (L (Start .. L'Last), Ada.Strings.Both));
-                  exit;
-               else
-                  Res (Idx) := To_Unbounded_String (Trim (L (Start .. Pos - 1), Ada.Strings.Both));
-                  Start := Pos + 1;
-                  Idx := Idx + 1;
-               end if;
-            end loop;
-            return Res;
-         end;
-      end Split;
 
-      procedure Process_Row (Fields : String_Array; Names : String_List) is
+      --  Single heap-allocated line buffer shared for the entire parse.
+      --  1 MB handles all real-world CSV lines; lines longer than this
+      --  are not supported (Get_Line will truncate and subsequent calls
+      --  will read the remainder as the next "line", producing garbled data).
+      Max_Line : constant := 1_048_576;
+      subtype Line_Buf_T is String (1 .. Max_Line);
+      type    Line_Buf_Access is access Line_Buf_T;
+      procedure Free_Buf is new
+         Ada.Unchecked_Deallocation (Line_Buf_T, Line_Buf_Access);
+
+      Line_Buf  : Line_Buf_Access := new Line_Buf_T;
+      Line_Last : Natural := 0;
+
+      --  Fast decimal parser: handles integers and simple N.M decimals
+      --  without invoking the Ada runtime.  Scientific notation and other
+      --  edge cases fall through to Float'Value.
+      --  Returns True and sets Result for any valid floating-point value.
+      --  Returns False only if the string cannot represent a number.
+      function Try_Fast_Float (S : String; Result : out Float) return Boolean is
+         I         : Integer := S'First;
+         Whole     : Float   := 0.0;
+         Frac      : Float   := 0.0;
+         Denom     : Float   := 1.0;
+         Sign      : Float   := 1.0;
+         After_Dot : Boolean := False;
+         Has_Digit : Boolean := False;
+      begin
+         if I > S'Last then return False; end if;
+         if    S (I) = '-' then Sign := -1.0; I := I + 1;
+         elsif S (I) = '+' then               I := I + 1;
+         end if;
+         while I <= S'Last loop
+            case S (I) is
+               when '0' .. '9' =>
+                  Has_Digit := True;
+                  if After_Dot then
+                     Denom := Denom * 10.0;
+                     Frac  := Frac + Float (Character'Pos (S (I)) - 48) / Denom;
+                  else
+                     Whole := Whole * 10.0 + Float (Character'Pos (S (I)) - 48);
+                  end if;
+               when '.' =>
+                  if After_Dot then return False; end if;
+                  After_Dot := True;
+               when 'E' | 'e' | 'D' | 'd' =>
+                  --  Scientific notation: fall back to Ada runtime.
+                  begin
+                     Result := Float'Value (S);
+                     return True;
+                  exception
+                     when others => return False;
+                  end;
+               when others => return False;
+            end case;
+            I := I + 1;
+         end loop;
+         if not Has_Digit then return False; end if;
+         Result := Sign * (Whole + Frac);
+         return True;
+      end Try_Fast_Float;
+
+      --  Process one CSV line in-place: finds commas and processes each
+      --  field as a slice of the line string — no per-field heap allocation.
+      procedure Process_Line_Direct (Line : String; Names : String_List) is
+         Start       : Integer := Line'First;
+         Field_Count : Natural := 0;
       begin
          Add_Row;
-         for I in Fields'Range loop
-            if I <= Names'Length then
+         loop
+            declare
+               Comma : Natural := 0;
+               Val   : Value;
+               Num   : Float;
+            begin
+               for K in Start .. Line'Last loop
+                  if Line (K) = ',' then Comma := K; exit; end if;
+               end loop;
                declare
-                  Val_Str : constant String := To_String (Fields (I));
-                  Val : Value;
+                  Raw : constant String :=
+                     (if Comma > 0 then Line (Start .. Comma - 1)
+                      else            Line (Start .. Line'Last));
+                  F   : constant String := Trim (Raw, Ada.Strings.Both);
                begin
-                  if Val_Str = "" or Val_Str = "." then
-                     Val := (Kind => Val_Missing);
-                  else
-                     begin
-                        Val := (Kind => Val_Numeric, Num_Val => Float'Value (Val_Str));
-                     exception
-                        when others =>
-                           Val := (Kind => Val_String, Str_Val => To_Unbounded_String (Val_Str));
-                     end;
+                  Field_Count := Field_Count + 1;
+                  if Field_Count <= Names'Length then
+                     if F = "" or else F = "." then
+                        Val := (Kind => Val_Missing);
+                     elsif Try_Fast_Float (F, Num) then
+                        Val := (Kind => Val_Numeric, Num_Val => Num);
+                     else
+                        Val := (Kind    => Val_String,
+                                Str_Val => To_Unbounded_String (F));
+                     end if;
+                     Set_Value_Upper (Row_Count, Names (Field_Count).all, Val);
                   end if;
-                  Set_Value_Upper (Row_Count, Names (I).all, Val);
                end;
-            end if;
+               exit when Comma = 0;
+               Start := Comma + 1;
+            end;
          end loop;
-      end Process_Row;
+      end Process_Line_Direct;
 
-      Header_Line : Unbounded_String;
+      --  Determine whether a field string is numeric (for NSCAN type detection).
+      function Is_Numeric_Field (F : String) return Boolean is
+         Dummy : Float;
+      begin
+         return Try_Fast_Float (F, Dummy);
+      end Is_Numeric_Field;
+
+      --  Parse a CSV line into up to Max_Fields field slices stored as
+      --  (start, end) index pairs into the Line string.  Used only during
+      --  the NSCAN type-detection phase (at most 20 rows).
+      Max_Fields : constant := 65536;
+      type Field_Pair is record S, E : Natural; end record;
+      type Field_Array is array (1 .. Max_Fields) of Field_Pair;
+
+      function Split_Indices (Line : String; N_Fields : out Natural)
+         return Field_Array
+      is
+         Res   : Field_Array;
+         Start : Integer := Line'First;
+         Count : Natural := 0;
+      begin
+         N_Fields := 0;
+         if Line'Length = 0 then return Res; end if;
+         loop
+            declare
+               Comma : Natural := 0;
+            begin
+               for K in Start .. Line'Last loop
+                  if Line (K) = ',' then Comma := K; exit; end if;
+               end loop;
+               Count := Count + 1;
+               if Count <= Max_Fields then
+                  Res (Count).S := Start;
+                  Res (Count).E := (if Comma > 0 then Comma - 1 else Line'Last);
+               end if;
+               exit when Comma = 0;
+               Start := Comma + 1;
+            end;
+         end loop;
+         N_Fields := Count;
+         return Res;
+      end Split_Indices;
+
       Has_Header  : Boolean := False;
-      NSCAN : constant := 20;
+      NSCAN       : constant := 20;
 
-      --  Buffer to hold up to NSCAN data lines for type scanning
-      type UB_Array is array (Positive range <>) of Unbounded_String;
-      Scan_Lines  : UB_Array (1 .. NSCAN);
+      --  Store up to NSCAN scan lines as Unbounded_Strings for type detection.
+      --  Only 20 rows — the allocation cost is negligible.
+      type UB_Array is array (1 .. NSCAN) of Unbounded_String;
+      Scan_Lines  : UB_Array;
       Scan_Count  : Natural := 0;
+      Header_Line : Unbounded_String;
    begin
       Ada.Text_IO.Open (File, Ada.Text_IO.In_File, File_Name);
+
+      --  Read header line.
       if not Ada.Text_IO.End_Of_File (File) then
-         Header_Line := To_Unbounded_String (Ada.Text_IO.Get_Line (File));
-         Has_Header := True;
+         Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+         Header_Line := To_Unbounded_String (Line_Buf (1 .. Line_Last));
+         Has_Header  := True;
       end if;
-      --  Read up to NSCAN data lines for type detection
+
+      --  Buffer up to NSCAN data lines for column-type detection.
       while not Ada.Text_IO.End_Of_File (File) and then Scan_Count < NSCAN loop
+         Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
          Scan_Count := Scan_Count + 1;
-         Scan_Lines (Scan_Count) := To_Unbounded_String (Ada.Text_IO.Get_Line (File));
+         Scan_Lines (Scan_Count) := To_Unbounded_String (Line_Buf (1 .. Line_Last));
       end loop;
+
       if Has_Header then
          declare
-            Headers : constant String_Array := Split (To_String (Header_Line));
-            Names   : String_List (1 .. Headers'Length);
-            --  Track whether each column has been determined yet
-            Col_Determined : array (Headers'Range) of Boolean := (others => False);
-            Col_Types      : array (Headers'Range) of Column_Type := (others => Col_Numeric);
+            H_Str : constant String := To_String (Header_Line);
+            N_Hdr : Natural;
+            H_Idx : constant Field_Array := Split_Indices (H_Str, N_Hdr);
+            Names : String_List (1 .. N_Hdr);
+            Col_Determined : array (1 .. N_Hdr) of Boolean      := (others => False);
+            Col_Types      : array (1 .. N_Hdr) of Column_Type  := (others => Col_Numeric);
          begin
-            --  Scan up to NSCAN rows to determine column types
+            --  Detect column types from up to NSCAN rows.
             for R in 1 .. Scan_Count loop
                declare
-                  DF : constant String_Array := Split (To_String (Scan_Lines (R)));
+                  D_Str : constant String := To_String (Scan_Lines (R));
+                  N_Fld : Natural;
+                  D_Idx : constant Field_Array := Split_Indices (D_Str, N_Fld);
                begin
-                  for I in Headers'Range loop
-                     if not Col_Determined (I) and then I <= DF'Length then
+                  for I in 1 .. N_Hdr loop
+                     if not Col_Determined (I) and then I <= N_Fld then
                         declare
-                           Val_Str : constant String := To_String (DF (I));
+                           F : constant String :=
+                              Trim (D_Str (D_Idx (I).S .. D_Idx (I).E),
+                                    Ada.Strings.Both);
                         begin
-                           if Val_Str /= "" and then Val_Str /= "." then
-                              --  Non-missing value: try to parse as numeric
-                              begin
-                                 declare Dummy : Float;
-                                 begin
-                                    Dummy := Float'Value (Val_Str);
-                                    Col_Types (I) := Col_Numeric;
-                                 end;
-                              exception
-                                 when others =>
-                                    Col_Types (I) := Col_String;
-                              end;
+                           if F /= "" and then F /= "." then
+                              Col_Types (I) :=
+                                 (if Is_Numeric_Field (F) then Col_Numeric
+                                  else Col_String);
                               Col_Determined (I) := True;
                            end if;
                         end;
@@ -372,34 +470,45 @@ package body SData.File_IO is
                   end loop;
                end;
             end loop;
+
             Clear;
-            for I in Headers'Range loop
+            for I in 1 .. N_Hdr loop
                declare
-                  Name : constant String := Safe_Name (To_String (Headers (I)), "COL" & Trim (I'Img, Ada.Strings.Both));
+                  Raw_Name : constant String :=
+                     Trim (H_Str (H_Idx (I).S .. H_Idx (I).E), Ada.Strings.Both);
+                  Name : constant String :=
+                     Safe_Name (Raw_Name, "COL" & Trim (I'Img, Ada.Strings.Both));
                begin
                   Names (I) := new String'(Name);
                   Add_Column (Name, Col_Types (I));
                end;
             end loop;
+
             if Scan_Count = 0 then
-               SData.IO.Put_Line_Error ("Warning: File contains a header but no data records.");
+               SData.IO.Put_Line_Error
+                  ("Warning: File contains a header but no data records.");
             end if;
-            --  Process the buffered scan lines
+
+            --  Process buffered scan lines.
             for R in 1 .. Scan_Count loop
-               Process_Row (Split (To_String (Scan_Lines (R))), Names);
+               Process_Line_Direct (To_String (Scan_Lines (R)), Names);
             end loop;
-            --  Process remaining lines
+
+            --  Process remaining lines using the heap buffer.
             while not Ada.Text_IO.End_Of_File (File) loop
-               Process_Row (Split (Ada.Text_IO.Get_Line (File)), Names);
+               Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+               Process_Line_Direct (Line_Buf (1 .. Line_Last), Names);
             end loop;
-            for I in Names'Range loop
-               Free (Names (I));
-            end loop;
+
+            for I in Names'Range loop Free (Names (I)); end loop;
          end;
       end if;
+
+      Free_Buf (Line_Buf);
       Ada.Text_IO.Close (File);
    exception
       when others =>
+         Free_Buf (Line_Buf);
          if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
          raise;
    end Parse_CSV;

@@ -25,31 +25,21 @@ tested.
 
 ### 1. CSV Load — Row Scaling (10 columns, pure numeric)
 
-| Rows | File size | User time | Rows/sec |
-|------|-----------|-----------|----------|
-| 1,000 | 77 KB | 0.014 s | 71,000 |
-| 10,000 | 771 KB | 0.147 s | 68,000 |
-| 100,000 | 7.5 MB | 1.293 s | 77,000 |
-| 1,000,000 | 75 MB | 12.829 s | 78,000 |
+**Before Priority 3 fix:** ~75,000 rows/sec (~1.29 s for 100K rows)  
+**After Priority 3 fix:** ~170,000 rows/sec (~0.59 s for 100K rows) — **2.2× faster**
 
-Load rate is consistently **~75,000 rows/second** for a 10-column numeric
-file.  Scaling is clean linear across three decades of row count with no
-sign of degradation at large sizes.
+| Rows | Before (user) | After (user) |
+|------|---------------|--------------|
+| 100,000 | 1.293 s | 0.585 s |
 
 ### 2. CSV Load — Column Scaling (10,000 rows, pure numeric)
 
-| Columns | File size | User time | Cells/sec |
-|---------|-----------|-----------|-----------|
-| 10 | 771 KB | 0.147 s | 680,000 |
-| 50 | 3.8 MB | 0.695 s | 719,000 |
-| 100 | 7.5 MB | 1.356 s | 737,000 |
-| 250 | 19 MB | 3.566 s | 699,000 |
-| 500 | 38 MB | 7.361 s | 679,000 |
+**Before Priority 3 fix:** ~700,000 cells/sec  
+**After Priority 3 fix:** ~1,700,000 cells/sec — **2.4× faster**
 
-Column scaling is also linear, with throughput stable at **~700,000
-cells/second** across all column counts tested.  The per-cell cost is
-essentially constant regardless of whether the data is arranged as many
-short rows or few wide rows.
+| Columns | Before (user) | After (user) |
+|---------|---------------|--------------|
+| 100 | 1.356 s | 0.583 s |
 
 ### 3. Expression Evaluation Overhead
 
@@ -185,22 +175,22 @@ replacing `Permanent_Symbols` hash map with a flat `PDV_Vec` vector,
 adding `Var_Index` to `Expr_Variable` AST nodes, and pre-resolving all
 variable indices once per RUN so the hot evaluation path does no hash lookups.
 
-### Priority 3 — Faster CSV tokenisation (moderate value)
+### Priority 3 — Faster CSV tokenisation (moderate value) ✓ DONE
 
-Replacing `Ada.Text_IO.Get_Line` with stream-based bulk reads, removing
-the double `Unbounded_String` allocation in `Split`, and inlining a fast
-float parser would improve the ~700,000 cells/sec load ceiling.  This is
-the most mechanical of the three changes but also the one with the narrowest
-impact — it only helps during `USE`, and the current rate is acceptable for
-datasets up to a few hundred thousand rows.
+Load throughput improved from ~700K to ~1.7M cells/sec (2.4×) by:
+using a heap-allocated line buffer with the procedure form of `Get_Line`
+(eliminates one string allocation per line), replacing `Split` with
+in-place field parsing via `Process_Line_Direct` (eliminates N
+`Unbounded_String` allocations per row), and adding `Try_Fast_Float`
+(inline decimal parser; `Float'Value` fallback only for scientific notation).
 
 ---
 
 ## Summary
 
 In-memory performance is predictably linear in both row and column count,
-with no pathological cases at large sizes.  Both high-priority bottlenecks have been eliminated.  The spillover penalty
-is down from 101× to ~1.5×, and per-row evaluation overhead is down from
-~30 μs to ~6 μs.  The one remaining actionable item is Priority 3, the
-CSV parser ceiling (~700,000 cells/sec), which does not require architectural
+with no pathological cases at large sizes.  All three priority bottlenecks have been eliminated.  The spillover penalty
+is down from 101× to ~1.5×, per-row evaluation overhead is down from ~30 μs
+to ~6 μs, and CSV load throughput is up from ~700K to ~1.7M cells/sec.
+None of the fixes required architectural
 changes.
