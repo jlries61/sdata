@@ -5,8 +5,8 @@
 # Synthetic CSV files are generated in /tmp and cleaned up on exit.
 
 SDATA=${SDATA:-./bin/sdata}
-TMPDIR=${TMPDIR:-/tmp}
-WORKDIR="$TMPDIR/sdata_bench_$$"
+_BENCH_TMP=${TMPDIR:-/tmp}
+WORKDIR="$_BENCH_TMP/sdata_bench_$$"
 mkdir -p "$WORKDIR"
 
 cleanup() { rm -rf "$WORKDIR"; }
@@ -20,9 +20,9 @@ trap cleanup EXIT INT TERM
 gen_csv() {
     local file="$1" rows="$2" cols="$3"
     # Header
-    printf "V1"
-    i=2; while [ "$i" -le "$cols" ]; do printf ",V%d" "$i"; i=$((i+1)); done
-    printf "\n"
+    printf "V1" > "$file"
+    i=2; while [ "$i" -le "$cols" ]; do printf ",V%d" "$i"; i=$((i+1)); done >> "$file"
+    printf "\n" >> "$file"
     # Data rows: awk fills with pseudo-random 4-decimal floats
     awk -v rows="$rows" -v cols="$cols" 'BEGIN {
         srand(42)
@@ -152,8 +152,8 @@ echo "Binary: $SDATA"
 section1
 section2
 section3
-section5
 section4
+section5
 
 echo ""
 echo "Done."
