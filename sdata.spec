@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.6.1
+Version:        0.6.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -52,6 +52,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Mon Apr 27 2026 John L. Ries <john@theyarnbard.com> - 0.6.2-1
+- Bump to 0.6.2
+
 * Fri Apr 24 2026 John L. Ries <john@theyarnbard.com> - 0.6.1-1
 - Fix 101x spillover penalty: segment-level prefetch and Constant_Reference spill.
 
