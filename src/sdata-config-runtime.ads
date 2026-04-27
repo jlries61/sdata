@@ -25,6 +25,19 @@ package SData.Config.Runtime is
    Last_Error_Code     : Natural            := 0;
    Last_Error_Line     : Natural            := 0;
 
+   --  OPTIONS command runtime state
+   Options_CSVDLM      : Character        := ',';
+   Options_Header      : Boolean          := True;
+   Options_SAVEOVERWRT : Boolean          := True;
+   Options_TXTFMT      : String (1 .. 8)  := "AUTO    ";
+   Options_TXTFMT_Len  : Natural          := 4;
+   Options_CHARSET     : String (1 .. 64) := (others => ' ');
+   Options_CHARSET_Len : Natural          := 0;
+
+   --  Effective delimiter/header saved at SAVE-statement time for use at write time
+   Save_DLM    : Character := ',';
+   Save_Header : Boolean   := True;
+
    procedure Reset;
 
 end SData.Config.Runtime;

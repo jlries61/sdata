@@ -1,4 +1,5 @@
 with Ada.Text_IO;
+with Ada.Directories;
 with Ada.Unchecked_Deallocation;
 with Ada.Exceptions;
 with SData.IO;        use SData.IO;
@@ -173,7 +174,11 @@ package body SData.File_IO is
       return "";
    end Convert_Via_LibreOffice;
 
-   procedure Open_Input (File_Name : String; Fmt : Format_Type; Sheet_Name : String := "") is
+   procedure Open_Input (File_Name   : String;
+                         Fmt         : Format_Type;
+                         Sheet_Name  : String    := "";
+                         Delimiter   : Character := ',';
+                         Read_Header : Boolean   := True) is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       U_Name  : constant String := To_Upper (File_Name);
@@ -212,7 +217,7 @@ package body SData.File_IO is
 
       case Actual_Fmt is
          when CSV =>
-            Parse_CSV (File_Name);
+            Parse_CSV (File_Name, Delimiter, Read_Header);
          when ODF =>
             Parse_ODF (File_Name, Sheet_Name);
          when OOXML =>
@@ -227,7 +232,12 @@ package body SData.File_IO is
    -----------------
    -- Open_Output --
    -----------------
-   procedure Open_Output (File_Name : String; Fmt : Format_Type; Sheet_Name : String := "") is
+   procedure Open_Output (File_Name       : String;
+                          Fmt             : Format_Type;
+                          Sheet_Name      : String    := "";
+                          Delimiter       : Character := ',';
+                          Write_Header    : Boolean   := True;
+                          Allow_Overwrite : Boolean   := True) is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       Sname   : constant String := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
@@ -251,7 +261,7 @@ package body SData.File_IO is
 
       case Actual_Fmt is
          when CSV =>
-            Write_CSV (File_Name);
+            Write_CSV (File_Name, Delimiter, Write_Header, Allow_Overwrite);
          when ODF =>
             Write_ODF (File_Name, Sname);
          when OOXML =>
@@ -262,7 +272,9 @@ package body SData.File_IO is
    ---------------
    -- Parse_CSV --
    ---------------
-   procedure Parse_CSV (File_Name : String) is
+   procedure Parse_CSV (File_Name   : String;
+                        Delimiter   : Character := ',';
+                        Read_Header : Boolean   := True) is
       File : Ada.Text_IO.File_Type;
 
       --  Single heap-allocated line buffer shared for the entire parse.
@@ -326,7 +338,7 @@ package body SData.File_IO is
          return True;
       end Try_Fast_Float;
 
-      --  Process one CSV line in-place: finds commas and processes each
+      --  Process one CSV line in-place: finds delimiters and processes each
       --  field as a slice of the line string — no per-field heap allocation.
       procedure Process_Line_Direct (Line : String; Names : String_List) is
          Start       : Integer := Line'First;
@@ -340,7 +352,7 @@ package body SData.File_IO is
                Num   : Float;
             begin
                for K in Start .. Line'Last loop
-                  if Line (K) = ',' then Comma := K; exit; end if;
+                  if Line (K) = Delimiter then Comma := K; exit; end if;
                end loop;
                declare
                   Raw : constant String :=
@@ -395,7 +407,7 @@ package body SData.File_IO is
                Comma : Natural := 0;
             begin
                for K in Start .. Line'Last loop
-                  if Line (K) = ',' then Comma := K; exit; end if;
+                  if Line (K) = Delimiter then Comma := K; exit; end if;
                end loop;
                Count := Count + 1;
                if Count <= Max_Fields then
@@ -410,7 +422,7 @@ package body SData.File_IO is
          return Res;
       end Split_Indices;
 
-      Has_Header  : Boolean := False;
+      Has_File_Header : Boolean := False;
       NSCAN       : constant := 20;
 
       --  Store up to NSCAN scan lines as Unbounded_Strings for type detection.
@@ -419,14 +431,88 @@ package body SData.File_IO is
       Scan_Lines  : UB_Array;
       Scan_Count  : Natural := 0;
       Header_Line : Unbounded_String;
+
+      --  Inner helper: detect types, build columns, and stream data rows.
+      procedure Load_Columns_And_Data
+         (H_Str  : String;
+          Names_From_Header : Boolean)
+      is
+         N_Hdr : Natural;
+         H_Idx : constant Field_Array := Split_Indices (H_Str, N_Hdr);
+         Names : String_List (1 .. N_Hdr);
+         Col_Determined : array (1 .. N_Hdr) of Boolean     := (others => False);
+         Col_Types      : array (1 .. N_Hdr) of Column_Type := (others => Col_Numeric);
+      begin
+         --  Detect column types from up to NSCAN scan rows.
+         for R in 1 .. Scan_Count loop
+            declare
+               D_Str : constant String := To_String (Scan_Lines (R));
+               N_Fld : Natural;
+               D_Idx : constant Field_Array := Split_Indices (D_Str, N_Fld);
+            begin
+               for I in 1 .. N_Hdr loop
+                  if not Col_Determined (I) and then I <= N_Fld then
+                     declare
+                        F : constant String :=
+                           Trim (D_Str (D_Idx (I).S .. D_Idx (I).E),
+                                 Ada.Strings.Both);
+                     begin
+                        if F /= "" and then F /= "." then
+                           Col_Types (I) :=
+                              (if Is_Numeric_Field (F) then Col_Numeric
+                               else Col_String);
+                           Col_Determined (I) := True;
+                        end if;
+                     end;
+                  end if;
+               end loop;
+            end;
+         end loop;
+
+         Clear;
+         for I in 1 .. N_Hdr loop
+            declare
+               Name : constant String :=
+                  (if Names_From_Header
+                   then Safe_Name (Trim (H_Str (H_Idx (I).S .. H_Idx (I).E),
+                                         Ada.Strings.Both),
+                                   "COL" & Trim (I'Img, Ada.Strings.Both))
+                   else "COL" & Trim (I'Img, Ada.Strings.Both));
+            begin
+               Names (I) := new String'(Name);
+               Add_Column (Name, Col_Types (I));
+            end;
+         end loop;
+
+         if Names_From_Header and then Scan_Count = 0 then
+            SData.IO.Put_Line_Error
+               ("Warning: File contains a header but no data records.");
+         end if;
+
+         --  Process buffered scan lines (all of them when no-header mode).
+         for R in 1 .. Scan_Count loop
+            Process_Line_Direct (To_String (Scan_Lines (R)), Names);
+         end loop;
+
+         --  Process remaining lines using the heap buffer.
+         while not Ada.Text_IO.End_Of_File (File) loop
+            Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+            Process_Line_Direct (Line_Buf (1 .. Line_Last), Names);
+         end loop;
+
+         for I in Names'Range loop Free (Names (I)); end loop;
+      end Load_Columns_And_Data;
+
    begin
       Ada.Text_IO.Open (File, Ada.Text_IO.In_File, File_Name);
 
-      --  Read header line.
-      if not Ada.Text_IO.End_Of_File (File) then
-         Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
-         Header_Line := To_Unbounded_String (Line_Buf (1 .. Line_Last));
-         Has_Header  := True;
+      if Read_Header then
+         --  Read the first line as a named header.
+         if not Ada.Text_IO.End_Of_File (File) then
+            Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+            Header_Line    := To_Unbounded_String (Line_Buf (1 .. Line_Last));
+            Has_File_Header := True;
+         end if;
       end if;
 
       --  Buffer up to NSCAN data lines for column-type detection.
@@ -436,72 +522,11 @@ package body SData.File_IO is
          Scan_Lines (Scan_Count) := To_Unbounded_String (Line_Buf (1 .. Line_Last));
       end loop;
 
-      if Has_Header then
-         declare
-            H_Str : constant String := To_String (Header_Line);
-            N_Hdr : Natural;
-            H_Idx : constant Field_Array := Split_Indices (H_Str, N_Hdr);
-            Names : String_List (1 .. N_Hdr);
-            Col_Determined : array (1 .. N_Hdr) of Boolean      := (others => False);
-            Col_Types      : array (1 .. N_Hdr) of Column_Type  := (others => Col_Numeric);
-         begin
-            --  Detect column types from up to NSCAN rows.
-            for R in 1 .. Scan_Count loop
-               declare
-                  D_Str : constant String := To_String (Scan_Lines (R));
-                  N_Fld : Natural;
-                  D_Idx : constant Field_Array := Split_Indices (D_Str, N_Fld);
-               begin
-                  for I in 1 .. N_Hdr loop
-                     if not Col_Determined (I) and then I <= N_Fld then
-                        declare
-                           F : constant String :=
-                              Trim (D_Str (D_Idx (I).S .. D_Idx (I).E),
-                                    Ada.Strings.Both);
-                        begin
-                           if F /= "" and then F /= "." then
-                              Col_Types (I) :=
-                                 (if Is_Numeric_Field (F) then Col_Numeric
-                                  else Col_String);
-                              Col_Determined (I) := True;
-                           end if;
-                        end;
-                     end if;
-                  end loop;
-               end;
-            end loop;
-
-            Clear;
-            for I in 1 .. N_Hdr loop
-               declare
-                  Raw_Name : constant String :=
-                     Trim (H_Str (H_Idx (I).S .. H_Idx (I).E), Ada.Strings.Both);
-                  Name : constant String :=
-                     Safe_Name (Raw_Name, "COL" & Trim (I'Img, Ada.Strings.Both));
-               begin
-                  Names (I) := new String'(Name);
-                  Add_Column (Name, Col_Types (I));
-               end;
-            end loop;
-
-            if Scan_Count = 0 then
-               SData.IO.Put_Line_Error
-                  ("Warning: File contains a header but no data records.");
-            end if;
-
-            --  Process buffered scan lines.
-            for R in 1 .. Scan_Count loop
-               Process_Line_Direct (To_String (Scan_Lines (R)), Names);
-            end loop;
-
-            --  Process remaining lines using the heap buffer.
-            while not Ada.Text_IO.End_Of_File (File) loop
-               Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
-               Process_Line_Direct (Line_Buf (1 .. Line_Last), Names);
-            end loop;
-
-            for I in Names'Range loop Free (Names (I)); end loop;
-         end;
+      if Has_File_Header then
+         Load_Columns_And_Data (To_String (Header_Line), Names_From_Header => True);
+      elsif Scan_Count > 0 then
+         --  No header: synthesise column names from the first data row's field count.
+         Load_Columns_And_Data (To_String (Scan_Lines (1)), Names_From_Header => False);
       end if;
 
       Free_Buf (Line_Buf);
@@ -516,17 +541,30 @@ package body SData.File_IO is
    ---------------
    -- Write_CSV --
    ---------------
-   procedure Write_CSV (File_Name : String) is
-      File : Ada.Text_IO.File_Type;
-      N    : constant Natural := Column_Count;
+   procedure Write_CSV (File_Name       : String;
+                        Delimiter       : Character := ',';
+                        Write_Header    : Boolean   := True;
+                        Allow_Overwrite : Boolean   := True) is
+      use Ada.Directories;
+      File  : Ada.Text_IO.File_Type;
+      N     : constant Natural := Column_Count;
+      D_Str : constant String (1 .. 1) := (1 => Delimiter);
    begin
+      if not Allow_Overwrite and then Exists (File_Name) then
+         SData.IO.Put_Line_Error
+            ("Error: SAVE aborted — file already exists: " & File_Name &
+             " (use OPTIONS SAVEOVERWRT YES to allow overwriting)");
+         raise Save_Refused;
+      end if;
       Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, File_Name);
       if N > 0 then
-         for I in 1 .. N loop
-            Ada.Text_IO.Put (File, Column_Name (I));
-            if I /= N then Ada.Text_IO.Put (File, ","); end if;
-         end loop;
-         Ada.Text_IO.New_Line (File);
+         if Write_Header then
+            for I in 1 .. N loop
+               Ada.Text_IO.Put (File, Column_Name (I));
+               if I /= N then Ada.Text_IO.Put (File, D_Str); end if;
+            end loop;
+            Ada.Text_IO.New_Line (File);
+         end if;
          for R in 1 .. Row_Count loop
             for C in 1 .. N loop
                declare
@@ -542,7 +580,7 @@ package body SData.File_IO is
                      Ada.Text_IO.Put (File, ".");
                   end if;
                end;
-               if C /= N then Ada.Text_IO.Put (File, ","); end if;
+               if C /= N then Ada.Text_IO.Put (File, D_Str); end if;
             end loop;
             Ada.Text_IO.New_Line (File);
          end loop;

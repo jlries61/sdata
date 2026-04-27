@@ -74,7 +74,7 @@ package body SData.Interpreter is
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
-         Stmt_PROGRAM_DELETE;
+         Stmt_PROGRAM_DELETE | Stmt_OPTIONS;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -883,17 +883,34 @@ package body SData.Interpreter is
       end loop;
    end Execute_Program_Delete;
 
-   --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW.
+   --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW / OPTIONS.
    procedure Execute_Declarative (Stmt : Statement_Access) is
+
+      --  Convert a DLM string (e.g. "," "\t" "TAB" "|") to a single Character.
+      function Dlm_To_Char (S : String) return Character is
+      begin
+         if S'Length = 0           then return ','; end if;
+         if S = "\t" or else S = "TAB" then return Character'Val (9); end if;
+         return S (S'First);
+      end Dlm_To_Char;
+
    begin
       case Stmt.Kind is
          when Stmt_USE =>
             SData.Config.Runtime.Repeat_Active := False;
             SData.Config.Runtime.Repeat_Count := 0;
             declare
-               File_Name : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
-               Expanded  : String (1 .. 1024);
-               Exp_Len   : Natural := 0;
+               File_Name  : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
+               Expanded   : String (1 .. 1024);
+               Exp_Len    : Natural := 0;
+               Eff_DLM    : constant Character :=
+                  (if Stmt.DLM_Len > 0
+                   then Dlm_To_Char (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
+                   else SData.Config.Runtime.Options_CSVDLM);
+               Eff_Header : constant Boolean :=
+                  (if Stmt.Header_Specified
+                   then Stmt.Header_Val
+                   else SData.Config.Runtime.Options_Header);
             begin
                if Stmt.Is_Mock then
                   Exp_Len := 4; Expanded (1 .. 4) := "MOCK";
@@ -903,7 +920,8 @@ package body SData.Interpreter is
                end if;
                SData.File_IO.Open_Input (Expanded (1 .. Exp_Len),
                  (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format),
-                 Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len));
+                 Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
+                 Eff_DLM, Eff_Header);
             end;
             Input_File_Columns.Clear;
             Refresh_PDV_Names;
@@ -921,6 +939,14 @@ package body SData.Interpreter is
                SData.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
                SData.Config.Runtime.Save_Sheet_Name_Len := SLen;
                SData.Config.Runtime.Save_File_Active := True;
+               SData.Config.Runtime.Save_DLM :=
+                  (if Stmt.DLM_Len > 0
+                   then Dlm_To_Char (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
+                   else SData.Config.Runtime.Options_CSVDLM);
+               SData.Config.Runtime.Save_Header :=
+                  (if Stmt.Header_Specified
+                   then Stmt.Header_Val
+                   else SData.Config.Runtime.Options_Header);
             end;
          when Stmt_SORT =>
             declare
@@ -953,8 +979,18 @@ package body SData.Interpreter is
                             VC (VC'First + 1 .. VC'Last) & " variables processed.");
                end;
                if SData.Config.Runtime.Save_File_Active then
-                  SData.File_IO.Open_Output (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"), SData.Config.Runtime.Save_File_Fmt, SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len));
-                  if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+                  begin
+                     SData.File_IO.Open_Output
+                        (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"),
+                         SData.Config.Runtime.Save_File_Fmt,
+                         SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
+                         SData.Config.Runtime.Save_DLM,
+                         SData.Config.Runtime.Save_Header,
+                         SData.Config.Runtime.Options_SAVEOVERWRT);
+                     if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+                  exception
+                     when SData.File_IO.Save_Refused => null;
+                  end;
                   SData.Config.Runtime.Save_File_Active := False;
                end if;
             end;
@@ -1011,6 +1047,50 @@ package body SData.Interpreter is
             SData.Variables.Initialize_PDV;
             Clear_Active_Program;
             SData.Config.Runtime.Reset;
+         when Stmt_OPTIONS =>
+            declare
+               Key : constant String :=
+                  Stmt.Options_Key (1 .. Stmt.Options_Key_Len);
+               Val : constant String :=
+                  Stmt.Options_Val (1 .. Stmt.Options_Val_Len);
+               Val_Upper : constant String := To_Upper (Val);
+            begin
+               if Key = "MAXINTAB" then
+                  SData.Config.Max_Table_Rows := Natural'Value (Val);
+               elsif Key = "MAXTEMPMEM" then
+                  SData.Config.Max_Temp_Vars := Natural'Value (Val);
+               elsif Key = "CSVDLM" then
+                  SData.Config.Runtime.Options_CSVDLM := Dlm_To_Char (Val);
+               elsif Key = "HEADER" then
+                  SData.Config.Runtime.Options_Header := (Val_Upper = "YES");
+               elsif Key = "SAVEOVERWRT" then
+                  SData.Config.Runtime.Options_SAVEOVERWRT := (Val_Upper = "YES");
+               elsif Key = "TXTFMT" then
+                  declare
+                     VL : constant Natural := Natural'Min (Val_Upper'Length, 8);
+                  begin
+                     SData.Config.Runtime.Options_TXTFMT := (others => ' ');
+                     SData.Config.Runtime.Options_TXTFMT (1 .. VL) :=
+                        Val_Upper (Val_Upper'First .. Val_Upper'First + VL - 1);
+                     SData.Config.Runtime.Options_TXTFMT_Len := VL;
+                  end;
+               elsif Key = "CHARSET" then
+                  declare
+                     VL : constant Natural := Natural'Min (Val'Length, 64);
+                  begin
+                     SData.Config.Runtime.Options_CHARSET := (others => ' ');
+                     SData.Config.Runtime.Options_CHARSET (1 .. VL) :=
+                        Val (Val'First .. Val'First + VL - 1);
+                     SData.Config.Runtime.Options_CHARSET_Len := VL;
+                  end;
+               else
+                  Put_Line_Error ("Warning: Unknown OPTIONS key: " & Key);
+               end if;
+            exception
+               when Constraint_Error =>
+                  Put_Line_Error
+                     ("Error: Invalid value for OPTIONS " & Key & ": " & Val);
+            end;
          when others => null;
       end case;
    end Execute_Declarative;
@@ -1127,7 +1207,8 @@ package body SData.Interpreter is
          when Stmt_PROGRAM_DELETE =>
             Execute_Program_Delete (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
-            | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW =>
+            | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
+            | Stmt_OPTIONS =>
             Execute_Declarative (Stmt);
          when Stmt_SUBMIT | Stmt_SYSTEM | Stmt_OUTPUT | Stmt_FPATH =>
             Execute_IO (Stmt);
@@ -1379,8 +1460,18 @@ package body SData.Interpreter is
       Set_Current_Record_Index (0);
       Apply_Pending_Mods;
       if SData.Config.Runtime.Save_File_Active then
-         SData.File_IO.Open_Output (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"), SData.Config.Runtime.Save_File_Fmt, SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len));
-         if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+         begin
+            SData.File_IO.Open_Output
+               (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"),
+                SData.Config.Runtime.Save_File_Fmt,
+                SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
+                SData.Config.Runtime.Save_DLM,
+                SData.Config.Runtime.Save_Header,
+                SData.Config.Runtime.Options_SAVEOVERWRT);
+            if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+         exception
+            when SData.File_IO.Save_Refused => null;
+         end;
          SData.Config.Runtime.Save_File_Active := False;
       end if;
    end Commit_Step;

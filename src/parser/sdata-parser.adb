@@ -1053,6 +1053,25 @@ package body SData.Parser is
                Stmt.Digits_Count := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
             end;
 
+         when Token_OPTIONS =>
+            declare
+               Key_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Key_Str : constant String :=
+                  To_Upper (Key_Tok.Text (1 .. Key_Tok.Length));
+               Val_Str : constant String := Val_Tok.Text (1 .. Val_Tok.Length);
+               K_Len   : constant Natural :=
+                  Natural'Min (Key_Tok.Length, 32);
+               V_Len   : constant Natural :=
+                  Natural'Min (Val_Tok.Length, 256);
+            begin
+               Stmt := new Statement (Stmt_OPTIONS);
+               Stmt.Options_Key (1 .. K_Len) := Key_Str (Key_Str'First .. Key_Str'First + K_Len - 1);
+               Stmt.Options_Key_Len := K_Len;
+               Stmt.Options_Val (1 .. V_Len) := Val_Str (Val_Str'First .. Val_Str'First + V_Len - 1);
+               Stmt.Options_Val_Len := V_Len;
+            end;
+
          when Token_RENAME =>
             Stmt := new Statement (Stmt_RENAME);
             Stmt.Rename_Pairs := Parse_Rename_List (Ctx);

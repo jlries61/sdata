@@ -417,7 +417,18 @@ package body SData.Help is
 
    procedure Help_OPTIONS is
    begin
-      Put_Line ("Runtime Configuration Flags:");
+      Put_Line ("Command: OPTIONS key value");
+      Put_Line ("Sets a runtime option. Execution: Immediate -- takes effect at once.");
+      Put_Line ("");
+      Put_Line ("  OPTIONS MAXINTAB n         : Max rows in Data Table (0 = unlimited)");
+      Put_Line ("  OPTIONS MAXTEMPMEM n       : Max temporary variables (0 = unlimited)");
+      Put_Line ("  OPTIONS CSVDLM "",""|""\t""|"";""|""|""  : CSV field delimiter (default: comma)");
+      Put_Line ("  OPTIONS HEADER YES|NO      : CSV files have a header row (default: YES)");
+      Put_Line ("  OPTIONS SAVEOVERWRT YES|NO : Overwrite existing files on SAVE (default: YES)");
+      Put_Line ("  OPTIONS TXTFMT AUTO|LF|CRLF|CR  : Line ending for CSV output (default: AUTO)");
+      Put_Line ("  OPTIONS CHARSET name       : Character set label (stored, advisory only)");
+      Put_Line ("");
+      Put_Line ("CLI flags (set at startup, not runtime):");
       Put_Line ("  --noshell            : Disable SYSTEM/SHELL; also disables -p");
       Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
       Put_Line ("  --clen <n>           : Set max character variable length");

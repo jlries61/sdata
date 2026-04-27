@@ -147,7 +147,8 @@ package SData.AST is
       Stmt_RUN,            -- Execute and export
       Stmt_NEW,            -- Reset environment
       Stmt_PROGRAM_DELETE, -- Delete line(s) from program buffer (immediate)
-      Stmt_DISPLAY         -- Display Data Table rows (immediate)
+      Stmt_DISPLAY,        -- Display Data Table rows (immediate)
+      Stmt_OPTIONS         -- Set runtime option (OPTIONS key value)
    );
 
    type Statement (Kind : Statement_Kind) is record
@@ -225,6 +226,11 @@ package SData.AST is
          when Stmt_PROGRAM_DELETE =>
             Delete_From : Positive := 1;
             Delete_To   : Positive := 1;
+         when Stmt_OPTIONS =>
+            Options_Key     : String (1 .. 32);
+            Options_Key_Len : Natural;
+            Options_Val     : String (1 .. 256);
+            Options_Val_Len : Natural;
          when others =>
             null;
       end case;
