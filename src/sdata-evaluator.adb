@@ -745,6 +745,28 @@ package body SData.Evaluator is
       end;
    end Handle_Mid;
 
+   function Handle_Seg (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      declare
+         V     : constant Value   := Vals.Element (1);
+         Start : Integer          := Integer (Convert_To_Float (Vals.Element (2)));
+         Len   : constant Integer := Integer (Convert_To_Float (Vals.Element (3)));
+         R     : Value (Val_String);
+         S, E  : Integer;
+      begin
+         if V.Kind /= Val_String or else Len <= 0 then return (Kind => Val_Missing); end if;
+         if Start <= 0 then Start := 1; end if;
+         S := Start;
+         E := Integer'Min (S + Len - 1, Length (V.Str_Val));
+         if S > Length (V.Str_Val) then R.Str_Val := Null_Unbounded_String;
+         else R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, S, E));
+         end if;
+         return R;
+      end;
+   end Handle_Seg;
+
    function Handle_Trim (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
       V : Value;
@@ -914,6 +936,21 @@ package body SData.Evaluator is
          (To_Base_String (Integer (Convert_To_Float (Vals.Element (1))), 16));
       return R;
    end Handle_Hex;
+
+   function Handle_Hex_From_Str (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare
+         V : constant Value := Vals.Element (1);
+         S : constant String := (if V.Kind = Val_String then To_String (V.Str_Val)
+                                 else Integer'Image (Integer (Convert_To_Float (V))));
+      begin
+         return (Kind => Val_Integer, Int_Val => Integer'Value ("16#" & S & "#"));
+      exception
+         when Constraint_Error => return (Kind => Val_Missing);
+      end;
+   end Handle_Hex_From_Str;
 
    function Handle_Oct (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
@@ -2259,6 +2296,7 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("FIX",    Handle_Fix_Fn'Access);
       Dispatch_Table.Insert ("IP",     Handle_Fix_Fn'Access);
       Dispatch_Table.Insert ("FP",     Handle_Fp_Fn'Access);
+      Dispatch_Table.Insert ("FRAC",   Handle_Fp_Fn'Access);
       Dispatch_Table.Insert ("MOD",    Handle_Mod_Fn'Access);
       Dispatch_Table.Insert ("SQRT",   Handle_Sqrt_Fn'Access);
       Dispatch_Table.Insert ("SQR",    Handle_Sqrt_Fn'Access);
@@ -2308,6 +2346,7 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("LEFT$",  Handle_Left'Access);
       Dispatch_Table.Insert ("RIGHT$", Handle_Right'Access);
       Dispatch_Table.Insert ("MID$",   Handle_Mid'Access);
+      Dispatch_Table.Insert ("SEG$",   Handle_Seg'Access);
       Dispatch_Table.Insert ("TRIM$",  Handle_Trim'Access);
       Dispatch_Table.Insert ("LTRIM$", Handle_Ltrim'Access);
       Dispatch_Table.Insert ("RTRIM$", Handle_Rtrim'Access);
@@ -2323,6 +2362,7 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("STR$",   Handle_Str'Access);
       Dispatch_Table.Insert ("VAL",    Handle_Val'Access);
       Dispatch_Table.Insert ("HEX$",   Handle_Hex'Access);
+      Dispatch_Table.Insert ("HEX",    Handle_Hex_From_Str'Access);
       Dispatch_Table.Insert ("OCT$",   Handle_Oct'Access);
       Dispatch_Table.Insert ("BIN$",   Handle_Bin'Access);
       Dispatch_Table.Insert ("NUM$",   Handle_Num_Str'Access);

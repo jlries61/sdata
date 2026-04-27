@@ -23,16 +23,16 @@ package body SData.Help is
       New_Line;
       Put_Line ("Available Functions:");
       Put_Line ("  Math:        ABS, SQRT/SQR, LOG/LN/LOGE, LOG2, LOG10/CLG/LGT, EXP,");
-      Put_Line ("               ROUND, CEIL, FLOOR, INT, FIX/IP, FP, MOD, SGN,");
+      Put_Line ("               ROUND, CEIL, FLOOR, INT, FIX/IP, FP/FRAC, MOD, SGN,");
       Put_Line ("               TRUNCATE, PI, LTW");
       Put_Line ("  Trig (rad):  SIN, COS, TAN, ATN/ARCTAN, ATAN2, ARCSIN, ARCCOS,");
       Put_Line ("               COT, CSC, SEC, SINH/HSN, COSH/HCS, TANH/HTN, DEG/DEGREE,");
       Put_Line ("               RAD/RADIAN");
       Put_Line ("  Trig (deg):  SIND, COSD, TAND, ATND, ATAN2D");
-      Put_Line ("  String:      LEN, LEFT$, RIGHT$, MID$, TRIM$, LTRIM$, RTRIM$,");
+      Put_Line ("  String:      LEN, LEFT$, RIGHT$, MID$, SEG$, TRIM$, LTRIM$, RTRIM$,");
       Put_Line ("               UCASE$/UPPER$, LCASE$/LOWER$, POS, INSTR, INDEX, MATCH,");
       Put_Line ("               CHR$, ASCII/ASC, STR$, VAL, NUM$, MAXLEN");
-      Put_Line ("  Conversion:  NUM, HEX$, OCT$, BIN$");
+      Put_Line ("  Conversion:  NUM, HEX, HEX$, OCT$, BIN$");
       Put_Line ("  Arrays:      LBOUND, UBOUND");
       Put_Line ("  Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, NEXT, NEXTC$, OBS, OBSC$");
       Put_Line ("  Special:     MISSING, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,");
@@ -531,6 +531,8 @@ package body SData.Help is
    procedure Help_LEFTS  is begin Put_Line ("Function: LEFT$(s$, n)  ->  leftmost n characters"); end Help_LEFTS;
    procedure Help_RIGHTS is begin Put_Line ("Function: RIGHT$(s$, n)  ->  rightmost n characters"); end Help_RIGHTS;
    procedure Help_MIDS   is begin Put_Line ("Function: MID$(s$, start [, len])  ->  substring"); end Help_MIDS;
+   procedure Help_SEGS   is begin Put_Line ("Function: SEG$(s$, start, len)  ->  substring (start 0=1; len > 0 required)"); end Help_SEGS;
+   procedure Help_FRAC   is begin Put_Line ("Function: FRAC(x)  ->  fractional part of x (alias for FP)"); end Help_FRAC;
    procedure Help_TRIMS  is begin Put_Line ("Function: TRIM$(s$)  ->  strip leading and trailing spaces"); end Help_TRIMS;
    procedure Help_LTRIMS is begin Put_Line ("Function: LTRIM$(s$)  ->  strip leading spaces"); end Help_LTRIMS;
    procedure Help_RTRIMS is begin Put_Line ("Function: RTRIM$(s$)  ->  strip trailing spaces"); end Help_RTRIMS;
@@ -550,6 +552,7 @@ package body SData.Help is
    -- ==========================================================================
 
    procedure Help_HEXS is begin Put_Line ("Function: HEX$(n)  ->  hexadecimal string for integer n"); end Help_HEXS;
+   procedure Help_HEX  is begin Put_Line ("Function: HEX(s$)  ->  integer value of hexadecimal string s$"); end Help_HEX;
    procedure Help_OCTS is begin Put_Line ("Function: OCT$(n)  ->  octal string for integer n"); end Help_OCTS;
    procedure Help_BINS is begin Put_Line ("Function: BIN$(n)  ->  binary string for integer n"); end Help_BINS;
 
@@ -1026,6 +1029,8 @@ package body SData.Help is
    K_LEFTS        : aliased constant String := "LEFT$";
    K_RIGHTS       : aliased constant String := "RIGHT$";
    K_MIDS         : aliased constant String := "MID$";
+   K_SEGS         : aliased constant String := "SEG$";
+   K_FRAC         : aliased constant String := "FRAC";
    K_TRIMS        : aliased constant String := "TRIM$";
    K_LTRIMS       : aliased constant String := "LTRIM$";
    K_RTRIMS       : aliased constant String := "RTRIM$";
@@ -1043,6 +1048,7 @@ package body SData.Help is
    K_NUMS         : aliased constant String := "NUM$";
    K_NUM          : aliased constant String := "NUM";
    K_HEXS         : aliased constant String := "HEX$";
+   K_HEX          : aliased constant String := "HEX";
    K_OCTS         : aliased constant String := "OCT$";
    K_BINS         : aliased constant String := "BIN$";
    K_RECNO        : aliased constant String := "RECNO";
@@ -1195,6 +1201,7 @@ package body SData.Help is
       (K_FIX'Access,      Help_FIX'Access,      N, F),
       (K_IP'Access,       Help_FIX'Access,      N, N),   --  alias
       (K_FP'Access,       Help_FP'Access,       N, F),
+      (K_FRAC'Access,     Help_FRAC'Access,     N, N),   --  alias
       (K_LN'Access,       Help_LN'Access,       N, F),
       (K_LOGE'Access,     Help_LN'Access,       N, N),   --  alias
       (K_LOG2'Access,     Help_LOG2'Access,     N, F),
@@ -1232,6 +1239,7 @@ package body SData.Help is
       (K_LEFTS'Access,    Help_LEFTS'Access,    N, F),
       (K_RIGHTS'Access,   Help_RIGHTS'Access,   N, F),
       (K_MIDS'Access,     Help_MIDS'Access,     N, F),
+      (K_SEGS'Access,     Help_SEGS'Access,     N, F),
       (K_TRIMS'Access,    Help_TRIMS'Access,    N, F),
       (K_LTRIMS'Access,   Help_LTRIMS'Access,   N, F),
       (K_RTRIMS'Access,   Help_RTRIMS'Access,   N, F),
@@ -1250,6 +1258,7 @@ package body SData.Help is
       (K_NUM'Access,      Help_NUM'Access,      N, F),
       --  Base conversion
       (K_HEXS'Access,     Help_HEXS'Access,     N, F),
+      (K_HEX'Access,      Help_HEX'Access,      N, F),
       (K_OCTS'Access,     Help_OCTS'Access,     N, F),
       (K_BINS'Access,     Help_BINS'Access,     N, F),
       --  Record navigation

@@ -1021,13 +1021,42 @@ package body SData.Parser is
                else
                   Stmt.File_Len := 0; -- Cancel output redirection
                end if;
-               -- Skip any options for now
+               -- Parse OUTPUT-specific flags: /FMT= and /CHARSET=
                loop
                   declare P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin
                      if P.Kind = Token_Slash then
-                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                        declare Discard_Opt : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                        declare
+                           Discard   : Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Flag_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Flag_Name : constant String := To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+                        begin
+                           Discard := Peek_Next_Token (Ctx.Lex_Ctx);
+                           if Discard.Kind = Token_Equal then
+                              Discard := Get_Next_Token (Ctx.Lex_Ctx);
+                              declare
+                                 Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                 Val_Str : constant String := To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+                              begin
+                                 if Flag_Name = "FMT" then
+                                    declare
+                                       L : constant Natural := Natural'Min (Val_Str'Length, 8);
+                                    begin
+                                       Stmt.Output_FMT_Val (1 .. L) := Val_Str (Val_Str'First .. Val_Str'First + L - 1);
+                                       Stmt.Output_FMT_Len := L;
+                                    end;
+                                 elsif Flag_Name = "CHARSET" then
+                                    declare
+                                       Raw : constant String := Val_Tok.Text (1 .. Val_Tok.Length);
+                                       L   : constant Natural := Natural'Min (Raw'Length, 64);
+                                    begin
+                                       Stmt.Output_CHARSET_Val (1 .. L) := Raw (Raw'First .. Raw'First + L - 1);
+                                       Stmt.Output_CHARSET_Len := L;
+                                    end;
+                                 end if;
+                              end;
+                           end if;
+                        end;
                      else exit; end if;
                   end;
                end loop;

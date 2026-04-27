@@ -1155,6 +1155,18 @@ package body SData.Interpreter is
             if Stmt.File_Len > 0 then
                SData.IO.Open_Output (Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT"));
             end if;
+            if Stmt.Output_FMT_Len > 0 then
+               SData.Config.Runtime.Options_TXTFMT := (others => ' ');
+               SData.Config.Runtime.Options_TXTFMT (1 .. Stmt.Output_FMT_Len) :=
+                  Stmt.Output_FMT_Val (1 .. Stmt.Output_FMT_Len);
+               SData.Config.Runtime.Options_TXTFMT_Len := Stmt.Output_FMT_Len;
+            end if;
+            if Stmt.Output_CHARSET_Len > 0 then
+               SData.Config.Runtime.Options_CHARSET := (others => ' ');
+               SData.Config.Runtime.Options_CHARSET (1 .. Stmt.Output_CHARSET_Len) :=
+                  Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len);
+               SData.Config.Runtime.Options_CHARSET_Len := Stmt.Output_CHARSET_Len;
+            end if;
          when Stmt_FPATH =>
             declare
                Path      : constant String  := (if Stmt.File_Len > 0 then Stmt.File_Path (1 .. Stmt.File_Len) else "");

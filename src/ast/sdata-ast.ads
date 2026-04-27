@@ -178,8 +178,12 @@ package SData.AST is
             Header_Val       : Boolean := True;
             DLM_Path         : String (1 .. 32) := (others => ' ');
             DLM_Len          : Natural := 0;
-            Sheet_Name       : String (1 .. 64) := (others => ' ');
-            Sheet_Name_Len   : Natural := 0;
+            Sheet_Name         : String (1 .. 64) := (others => ' ');
+            Sheet_Name_Len     : Natural := 0;
+            Output_FMT_Val     : String (1 .. 8)  := (others => ' ');
+            Output_FMT_Len     : Natural := 0;
+            Output_CHARSET_Val : String (1 .. 64) := (others => ' ');
+            Output_CHARSET_Len : Natural := 0;
          when Stmt_REPEAT =>
             Count : Natural;
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>

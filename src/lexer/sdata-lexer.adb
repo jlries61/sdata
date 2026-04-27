@@ -196,6 +196,36 @@ package body SData.Lexer is
                T.Text (T.Length) := Current_Char (Ctx);
                Advance (Ctx);
             end loop;
+            -- E-notation: consume E/e followed by optional sign and digits.
+            if not Is_End_Of_Source (Ctx)
+               and then (Current_Char (Ctx) = 'E' or else Current_Char (Ctx) = 'e')
+            then
+               declare
+                  Saved_Pos : constant Positive := Ctx.Pos;
+                  Saved_Len : constant Natural   := T.Length;
+               begin
+                  T.Length := T.Length + 1;
+                  T.Text (T.Length) := Current_Char (Ctx);
+                  Advance (Ctx);
+                  if not Is_End_Of_Source (Ctx)
+                     and then (Current_Char (Ctx) = '+' or else Current_Char (Ctx) = '-')
+                  then
+                     T.Length := T.Length + 1;
+                     T.Text (T.Length) := Current_Char (Ctx);
+                     Advance (Ctx);
+                  end if;
+                  if not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) then
+                     while not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) loop
+                        T.Length := T.Length + 1;
+                        T.Text (T.Length) := Current_Char (Ctx);
+                        Advance (Ctx);
+                     end loop;
+                  else
+                     Ctx.Pos := Saved_Pos;
+                     T.Length := Saved_Len;
+                  end if;
+               end;
+            end if;
 
          elsif Is_Letter (C) then
             while not Is_End_Of_Source (Ctx) and then (Is_Alphanumeric (Current_Char (Ctx)) or Current_Char (Ctx) = '_' or Current_Char (Ctx) = '$' or Current_Char (Ctx) = '%' or Current_Char (Ctx) = '.') loop
@@ -299,6 +329,19 @@ package body SData.Lexer is
                      end if;
                   end;
                end if;
+            end loop;
+            if not Is_End_Of_Source (Ctx) then
+               Advance (Ctx); -- skip closing quote
+            end if;
+
+         --  Single-quoted string literals.
+         elsif C = ''' then
+            T.Kind := Token_String_Literal;
+            Advance (Ctx); -- skip opening quote
+            while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= ''' loop
+               T.Length := T.Length + 1;
+               T.Text (T.Length) := Current_Char (Ctx);
+               Advance (Ctx);
             end loop;
             if not Is_End_Of_Source (Ctx) then
                Advance (Ctx); -- skip closing quote
