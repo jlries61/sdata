@@ -737,6 +737,10 @@ package body SData.Parser is
                                     end if;
                                  elsif Flag_Name = "NSCAN" then
                                     Stmt.NSCAN_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                                 elsif Flag_Name = "SKIP" then
+                                    Stmt.Skip_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                                 elsif Flag_Name = "MAXROWS" then
+                                    Stmt.Maxrows_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
                                  elsif Flag_Name = "HEADER" then
                                     Stmt.Header_Specified := True;
                                     Stmt.Header_Val := (Val_Str = "YES");

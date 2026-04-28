@@ -1033,7 +1033,8 @@ package body SData.Interpreter is
                SData.File_IO.Open_Input (Expanded (1 .. Exp_Len),
                  (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format),
                  Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
-                 Eff_DLM, Eff_Header, Eff_Charset);
+                 Eff_DLM, Eff_Header, Eff_Charset,
+                 Stmt.Skip_Val, Stmt.Maxrows_Val);
             end;
             Input_File_Columns.Clear;
             Refresh_PDV_Names;

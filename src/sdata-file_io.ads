@@ -20,7 +20,9 @@ package SData.File_IO is
                          Sheet_Name  : String  := "";
                          Delimiter   : String  := ",";
                          Read_Header : Boolean := True;
-                         Charset     : String  := "");
+                         Charset     : String  := "";
+                         Skip_Rows   : Natural := 0;
+                         Max_Rows    : Natural := 0);
 
    --  Writes the current Data Table to a file.
    --  Sheet_Name sets the output sheet name in ODF/OOXML files (default: "Sheet1").
@@ -38,9 +40,13 @@ package SData.File_IO is
    procedure Parse_CSV   (File_Name   : String;
                           Delimiter   : String  := ",";
                           Read_Header : Boolean := True;
-                          Charset     : String  := "");
-   procedure Parse_ODF   (File_Name : String; Sheet_Name : String := ""); -- Handles .ods files
-   procedure Parse_OOXML (File_Name : String; Sheet_Name : String := ""); -- Handles .xlsx files
+                          Charset     : String  := "";
+                          Skip_Rows   : Natural := 0;
+                          Max_Rows    : Natural := 0);
+   procedure Parse_ODF   (File_Name : String; Sheet_Name : String := "";
+                          Skip_Rows : Natural := 0; Max_Rows : Natural := 0);
+   procedure Parse_OOXML (File_Name : String; Sheet_Name : String := "";
+                          Skip_Rows : Natural := 0; Max_Rows : Natural := 0);
 
    procedure Write_CSV   (File_Name       : String;
                           Delimiter       : String  := ",";

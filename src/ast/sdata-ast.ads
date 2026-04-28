@@ -171,10 +171,12 @@ package SData.AST is
             Submit_Flag : Boolean := False; -- For FPATH
             Output_Flag : Boolean := False; -- For FPATH
             
-            -- Command-specific overrides (/FMT, /NSCAN, /DLM, /HEADER, /SHEET)
+            -- Command-specific overrides (/FMT, /NSCAN, /DLM, /HEADER, /SHEET, /SKIP, /MAXROWS)
             Format_Specified : Boolean := False;
             Fmt_Override     : SData.Config.Format_Type := SData.Config.CSV;
             NSCAN_Val        : Natural := 0;
+            Skip_Val         : Natural := 0;
+            Maxrows_Val      : Natural := 0;
             Header_Specified : Boolean := False;
             Header_Val       : Boolean := True;
             DLM_Path         : String (1 .. 32) := (others => ' ');

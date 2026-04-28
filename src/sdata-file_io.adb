@@ -184,7 +184,9 @@ package body SData.File_IO is
                          Sheet_Name  : String  := "";
                          Delimiter   : String  := ",";
                          Read_Header : Boolean := True;
-                         Charset     : String  := "") is
+                         Charset     : String  := "";
+                         Skip_Rows   : Natural := 0;
+                         Max_Rows    : Natural := 0) is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       U_Name  : constant String := To_Upper (File_Name);
@@ -223,11 +225,11 @@ package body SData.File_IO is
 
       case Actual_Fmt is
          when CSV =>
-            Parse_CSV (File_Name, Delimiter, Read_Header, Charset);
+            Parse_CSV (File_Name, Delimiter, Read_Header, Charset, Skip_Rows, Max_Rows);
          when ODF =>
-            Parse_ODF (File_Name, Sheet_Name);
+            Parse_ODF (File_Name, Sheet_Name, Skip_Rows, Max_Rows);
          when OOXML =>
-            Parse_OOXML (File_Name, Sheet_Name);
+            Parse_OOXML (File_Name, Sheet_Name, Skip_Rows, Max_Rows);
       end case;
 
       if not SData.Config.Quiet_Mode then
@@ -282,7 +284,9 @@ package body SData.File_IO is
    procedure Parse_CSV (File_Name   : String;
                         Delimiter   : String  := ",";
                         Read_Header : Boolean := True;
-                        Charset     : String  := "") is
+                        Charset     : String  := "";
+                        Skip_Rows   : Natural := 0;
+                        Max_Rows    : Natural := 0) is
       File : Ada.Text_IO.File_Type;
 
       --  Charset handling: buffered path for UTF-16, ASCII validation flag.
@@ -291,6 +295,7 @@ package body SData.File_IO is
       All_Lines_Idx   : Natural := 0;
       Is_Buffered     : Boolean := False;
       Needs_ASCII_Chk : Boolean := False;
+      Rows_Written    : Natural := 0;
 
       procedure Validate_ASCII (S : String) is
       begin
@@ -471,6 +476,8 @@ package body SData.File_IO is
          Start       : Integer := Line'First;
          Field_Count : Natural := 0;
       begin
+         if Max_Rows > 0 and then Rows_Written >= Max_Rows then return; end if;
+         Rows_Written := Rows_Written + 1;
          Add_Row;
          loop
             declare
@@ -632,17 +639,20 @@ package body SData.File_IO is
 
          --  Process buffered scan lines (all of them when no-header mode).
          for R in 1 .. Scan_Count loop
+            exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
             Process_Line_Direct (To_String (Scan_Lines (R)), Names);
          end loop;
 
          --  Process remaining lines (text file or pre-loaded buffer).
          if Is_Buffered then
             while All_Lines_Idx < Natural (All_Lines.Length) loop
+               exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
                All_Lines_Idx := All_Lines_Idx + 1;
                Process_Line_Direct (To_String (All_Lines (All_Lines_Idx)), Names);
             end loop;
          else
             while not Ada.Text_IO.End_Of_File (File) loop
+               exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
                Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
                if Needs_ASCII_Chk then
                   Validate_ASCII (Line_Buf (1 .. Line_Last));
@@ -752,8 +762,14 @@ package body SData.File_IO is
             Has_File_Header := True;
             All_Lines_Idx   := 1;
          end if;
+         --  SKIP: advance past the first Skip_Rows data lines.
+         if Skip_Rows > 0 then
+            All_Lines_Idx :=
+               Natural'Min (All_Lines_Idx + Skip_Rows, Natural (All_Lines.Length));
+         end if;
          while All_Lines_Idx < Natural (All_Lines.Length)
             and then Scan_Count < NSCAN
+            and then (Max_Rows = 0 or else Scan_Count < Max_Rows)
          loop
             All_Lines_Idx := All_Lines_Idx + 1;
             Scan_Count    := Scan_Count + 1;
@@ -780,9 +796,17 @@ package body SData.File_IO is
             end if;
          end if;
 
-         --  Buffer up to NSCAN data lines for column-type detection.
+         --  SKIP: discard the first Skip_Rows data lines.
+         for I in 1 .. Skip_Rows loop
+            exit when Ada.Text_IO.End_Of_File (File);
+            Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+            if Needs_ASCII_Chk then Validate_ASCII (Line_Buf (1 .. Line_Last)); end if;
+         end loop;
+
+         --  Buffer up to NSCAN data lines (capped at MAXROWS) for column-type detection.
          while not Ada.Text_IO.End_Of_File (File)
             and then Scan_Count < NSCAN
+            and then (Max_Rows = 0 or else Scan_Count < Max_Rows)
          loop
             Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
             if Needs_ASCII_Chk then
@@ -923,7 +947,8 @@ package body SData.File_IO is
    ------------------
    --  Parse_ODF  --
    ------------------
-   procedure Parse_ODF (File_Name : String; Sheet_Name : String := "") is
+   procedure Parse_ODF (File_Name : String; Sheet_Name : String := "";
+                        Skip_Rows : Natural := 0; Max_Rows : Natural := 0) is
       use DOM.Core;
       use DOM.Core.Nodes;
       use DOM.Core.Elements;
@@ -1110,54 +1135,64 @@ package body SData.File_IO is
             Col_Count := Column_Count;
 
             -- Data Rows
-            for I in 1 .. Length (Rows) - 1 loop
-               declare
-                  Row_Node : constant Node := Item (Rows, I);
-                  Row_Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Row_Node), "table:number-rows-repeated");
-                  Row_Repeat_Count : constant Positive := (if Row_Repeat_Attr = "" then 1 else Positive'Value (Row_Repeat_Attr));
-               begin
-                  -- Heuristic: If we see a huge number of repeated rows, it's usually just empty padding at the end of the sheet
-                  exit when Row_Repeat_Count > 1000;
-
-                  for R_Count in 1 .. Row_Repeat_Count loop
-                     Add_Row;
-                     Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Row_Node), "table:table-cell");
-                     declare
-                        Col_Idx : Positive := 1;
-                     begin
-                        for J in 0 .. Length (Cells) - 1 loop
+            declare
+               Rows_To_Skip : Natural := Skip_Rows;
+               Rows_Written : Natural := 0;
+            begin
+               for I in 1 .. Length (Rows) - 1 loop
+                  declare
+                     Row_Node : constant Node := Item (Rows, I);
+                     Row_Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Row_Node), "table:number-rows-repeated");
+                     Row_Repeat_Count : constant Positive := (if Row_Repeat_Attr = "" then 1 else Positive'Value (Row_Repeat_Attr));
+                  begin
+                     exit when Row_Repeat_Count > 1000;
+                     exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+                     for R_Count in 1 .. Row_Repeat_Count loop
+                        if Rows_To_Skip > 0 then
+                           Rows_To_Skip := Rows_To_Skip - 1;
+                        else
+                           exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+                           Rows_Written := Rows_Written + 1;
+                           Add_Row;
+                           Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Row_Node), "table:table-cell");
                            declare
-                              Cell : constant Node := Item (Cells, J);
-                              Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
-                              Repeat_Count : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
-                              Val : constant Value := Get_Cell_Value (Cell);
+                              Col_Idx : Positive := 1;
                            begin
-                              for K in 1 .. Repeat_Count loop
-                                 if Col_Idx <= Col_Count then
-                                    if Val.Kind /= Val_Missing then
-                                       begin
-                                          Set_Value (Row_Count, Column_Name (Col_Idx), Val);
-                                       exception
-                                          when E : others =>
-                                             if not SData.Config.Quiet_Mode then
-                                                Put_Line_Error ("Warning: ODF import skipped cell at row" &
-                                                   Row_Count'Image & ", column """ &
-                                                   Column_Name (Col_Idx) & """: " &
-                                                   Ada.Exceptions.Exception_Message (E));
-                                             end if;
-                                       end;
-                                    end if;
-                                    Col_Idx := Col_Idx + 1;
-                                 end if;
+                              for J in 0 .. Length (Cells) - 1 loop
+                                 declare
+                                    Cell : constant Node := Item (Cells, J);
+                                    Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
+                                    Repeat_Count : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
+                                    Val : constant Value := Get_Cell_Value (Cell);
+                                 begin
+                                    for K in 1 .. Repeat_Count loop
+                                       if Col_Idx <= Col_Count then
+                                          if Val.Kind /= Val_Missing then
+                                             begin
+                                                Set_Value (Row_Count, Column_Name (Col_Idx), Val);
+                                             exception
+                                                when E : others =>
+                                                   if not SData.Config.Quiet_Mode then
+                                                      Put_Line_Error ("Warning: ODF import skipped cell at row" &
+                                                         Row_Count'Image & ", column """ &
+                                                         Column_Name (Col_Idx) & """: " &
+                                                         Ada.Exceptions.Exception_Message (E));
+                                                   end if;
+                                             end;
+                                          end if;
+                                          Col_Idx := Col_Idx + 1;
+                                       end if;
+                                    end loop;
+                                 end;
+                                 exit when Col_Idx > Col_Count;
                               end loop;
                            end;
-                           exit when Col_Idx > Col_Count;
-                        end loop;
-                     end;
-                     Free (Cells);
-                  end loop;
-               end;
-            end loop;
+                           Free (Cells);
+                        end if;
+                     end loop;
+                  end;
+               end loop;
+            end;
          end;
          end if;
 
@@ -1181,7 +1216,8 @@ package body SData.File_IO is
    -----------------
    -- Parse_OOXML --
    -----------------
-   procedure Parse_OOXML (File_Name : String; Sheet_Name : String := "") is
+   procedure Parse_OOXML (File_Name : String; Sheet_Name : String := "";
+                          Skip_Rows : Natural := 0; Max_Rows : Natural := 0) is
       use DOM.Core;
       use DOM.Core.Nodes;
       use DOM.Core.Elements;
@@ -1484,30 +1520,41 @@ package body SData.File_IO is
             Col_Count := Column_Count;
 
             -- Data Rows
-            for I in 1 .. Length (Rows) - 1 loop
-               Add_Row;
-               Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, I)), "c");
-               for J in 0 .. Length (Cells) - 1 loop
-                  if J < Col_Count then
-                     declare
-                        V : constant Value := Get_Cell_Value (Item (Cells, J));
-                     begin
-                        if V.Kind /= Val_Missing then
-                           Set_Value (Row_Count, Column_Name (J + 1), V);
+            declare
+               Rows_To_Skip : Natural := Skip_Rows;
+               Rows_Written : Natural := 0;
+            begin
+               for I in 1 .. Length (Rows) - 1 loop
+                  exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+                  if Rows_To_Skip > 0 then
+                     Rows_To_Skip := Rows_To_Skip - 1;
+                  else
+                     Rows_Written := Rows_Written + 1;
+                     Add_Row;
+                     Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, I)), "c");
+                     for J in 0 .. Length (Cells) - 1 loop
+                        if J < Col_Count then
+                           declare
+                              V : constant Value := Get_Cell_Value (Item (Cells, J));
+                           begin
+                              if V.Kind /= Val_Missing then
+                                 Set_Value (Row_Count, Column_Name (J + 1), V);
+                              end if;
+                           exception
+                              when E : others =>
+                                 if not SData.Config.Quiet_Mode then
+                                    Put_Line_Error ("Warning: OOXML import skipped cell at row" &
+                                       Row_Count'Image & ", column """ &
+                                       Column_Name (J + 1) & """: " &
+                                       Ada.Exceptions.Exception_Message (E));
+                                 end if;
+                           end;
                         end if;
-                     exception
-                        when E : others =>
-                           if not SData.Config.Quiet_Mode then
-                              Put_Line_Error ("Warning: OOXML import skipped cell at row" &
-                                 Row_Count'Image & ", column """ &
-                                 Column_Name (J + 1) & """: " &
-                                 Ada.Exceptions.Exception_Message (E));
-                           end if;
-                     end;
+                     end loop;
+                     Free (Cells);
                   end if;
                end loop;
-               Free (Cells);
-            end loop;
+            end;
          end if;
 
          Free (Rows);
