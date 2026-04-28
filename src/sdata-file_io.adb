@@ -1,5 +1,7 @@
 with Ada.Text_IO;
+with Ada.Streams.Stream_IO;
 with Ada.Directories;
+with SData.Config.Runtime;
 with Ada.Unchecked_Deallocation;
 with Ada.Exceptions;
 with SData.IO;        use SData.IO;
@@ -546,7 +548,18 @@ package body SData.File_IO is
                         Write_Header    : Boolean   := True;
                         Allow_Overwrite : Boolean   := True) is
       use Ada.Directories;
-      File  : Ada.Text_IO.File_Type;
+
+      TXTFMT_Len : constant Natural := SData.Config.Runtime.Options_TXTFMT_Len;
+      TXTFMT_Raw : constant String  :=
+         (if TXTFMT_Len > 0 then SData.Config.Runtime.Options_TXTFMT (1 .. TXTFMT_Len)
+          else "AUTO");
+      EOL : constant String :=
+         (if    TXTFMT_Raw = "CRLF" then "" & ASCII.CR & ASCII.LF
+          elsif TXTFMT_Raw = "CR"   then "" & ASCII.CR
+          else                           "" & ASCII.LF);
+
+      File  : Ada.Streams.Stream_IO.File_Type;
+      Strm  : Ada.Streams.Stream_IO.Stream_Access;
       N     : constant Natural := Column_Count;
       D_Str : constant String (1 .. 1) := (1 => Delimiter);
    begin
@@ -556,14 +569,15 @@ package body SData.File_IO is
              " (use OPTIONS SAVEOVERWRT YES to allow overwriting)");
          raise Save_Refused;
       end if;
-      Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, File_Name);
+      Ada.Streams.Stream_IO.Create (File, Ada.Streams.Stream_IO.Out_File, File_Name);
+      Strm := Ada.Streams.Stream_IO.Stream (File);
       if N > 0 then
          if Write_Header then
             for I in 1 .. N loop
-               Ada.Text_IO.Put (File, Column_Name (I));
-               if I /= N then Ada.Text_IO.Put (File, D_Str); end if;
+               String'Write (Strm, Column_Name (I));
+               if I /= N then String'Write (Strm, D_Str); end if;
             end loop;
-            Ada.Text_IO.New_Line (File);
+            String'Write (Strm, EOL);
          end if;
          for R in 1 .. Row_Count loop
             for C in 1 .. N loop
@@ -571,24 +585,26 @@ package body SData.File_IO is
                   Val : constant Value := Get_Value_Upper (R, Column_Name (C));
                begin
                   if Val.Kind = Val_Numeric then
-                     Ada.Text_IO.Put (File, Trim (Val.Num_Val'Img, Ada.Strings.Both));
+                     String'Write (Strm, Trim (Val.Num_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_Integer then
-                     Ada.Text_IO.Put (File, Trim (Val.Int_Val'Img, Ada.Strings.Both));
+                     String'Write (Strm, Trim (Val.Int_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_String then
-                     Ada.Text_IO.Put (File, SData.Values.To_String (Val));
+                     String'Write (Strm, SData.Values.To_String (Val));
                   else
-                     Ada.Text_IO.Put (File, ".");
+                     String'Write (Strm, ".");
                   end if;
                end;
-               if C /= N then Ada.Text_IO.Put (File, D_Str); end if;
+               if C /= N then String'Write (Strm, D_Str); end if;
             end loop;
-            Ada.Text_IO.New_Line (File);
+            String'Write (Strm, EOL);
          end loop;
       end if;
-      Ada.Text_IO.Close (File);
+      Ada.Streams.Stream_IO.Close (File);
    exception
       when others =>
-         if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
+         if Ada.Streams.Stream_IO.Is_Open (File) then
+            Ada.Streams.Stream_IO.Close (File);
+         end if;
          raise;
    end Write_CSV;
 
