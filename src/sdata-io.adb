@@ -77,6 +77,8 @@ package body SData.IO is
       Interactive_Mode := Val;
    end Set_Interactive;
 
+   function Is_Interactive return Boolean is (Interactive_Mode);
+
    procedure Set_Local_Echo (Val : Boolean) is
    begin
       Local_Echo := Val;

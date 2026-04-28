@@ -5,6 +5,6 @@ RUN
 
 -- With -m 3, it should spill.
 SORT X
-LIST X
+DISPLAY X
 RUN
 QUIT

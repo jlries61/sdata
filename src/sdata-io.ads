@@ -12,6 +12,7 @@ package SData.IO is
    function Is_Redirected return Boolean;
 
    procedure Set_Interactive (Val : Boolean);
+   function Is_Interactive return Boolean;
    procedure Set_Local_Echo (Val : Boolean);
 
    --  External pager support (interactive mode only).

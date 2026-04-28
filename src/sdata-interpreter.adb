@@ -57,14 +57,24 @@ package body SData.Interpreter is
    --  grouping is active.  Populated by Stmt_BY; cleared by bare BY or NEW.
    Current_By_Vars : By_Group_Names.Vector;
 
+   --  Program buffer vector — mirrors Active_Program_Head/Tail linked list
+   --  but provides indexed access for LIST and DELETE n[-m].
+   type Program_Entry is record
+      Stmt   : Statement_Access;
+      Source : Unbounded_String;
+   end record;
+   package Program_Vectors is new Ada.Containers.Vectors (Positive, Program_Entry);
+   Active_Program_Vec : Program_Vectors.Vector;
+
    function Is_Immediate (Kind : Statement_Kind) return Boolean is
    begin
       return Kind in
          Stmt_USE | Stmt_SAVE | Stmt_KEEP | Stmt_DROP |
-         Stmt_RENAME | Stmt_NAMES | Stmt_LIST | Stmt_RUN | Stmt_QUIT | Stmt_END |
+         Stmt_RENAME | Stmt_NAMES | Stmt_LIST | Stmt_DISPLAY | Stmt_RUN | Stmt_QUIT | Stmt_END |
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
-         Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT;
+         Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
+         Stmt_PROGRAM_DELETE | Stmt_OPTIONS;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -78,8 +88,9 @@ package body SData.Interpreter is
    procedure Execute_Assignment   (Stmt : Statement_Access);
    procedure Execute_Print        (Stmt : Statement_Access);
    procedure Execute_Control_Flow (Stmt : Statement_Access);
-   procedure Execute_Metadata     (Stmt : Statement_Access);
-   procedure Execute_Declarative  (Stmt : Statement_Access);
+   procedure Execute_Metadata        (Stmt : Statement_Access);
+   procedure Execute_Program_Delete  (Stmt : Statement_Access);
+   procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
    function  Is_First_In_Group    (Logical_Idx : Positive) return Boolean;
    function  Is_Last_In_Group     (Logical_Idx : Positive; Logical_Count : Natural) return Boolean;
@@ -140,7 +151,7 @@ package body SData.Interpreter is
    Active_Program_Head : Statement_Access := null;
    Active_Program_Tail : Statement_Access := null;
 
-   procedure Add_To_Active_Program (Stmt : Statement_Access) is
+   procedure Add_To_Active_Program (Stmt : Statement_Access; Source : String := "") is
    begin
       if Stmt = null then return; end if;
       Stmt.Next := null;
@@ -151,18 +162,22 @@ package body SData.Interpreter is
          Active_Program_Tail.Next := Stmt;
          Active_Program_Tail := Stmt;
       end if;
+      Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
    end Add_To_Active_Program;
 
    procedure Clear_Active_Program is
    begin
-      --  Free the self-owned filter expression.
       SData.AST.Free_Expression (Select_Filter_Expr);
       SData.AST.Free_Program (Active_Program_Head);
       Active_Program_Tail := null;
+      Active_Program_Vec.Clear;
       SData.Table.Clear_Index_Map;
       Current_By_Vars.Clear;
       SData.Table.Clear_By_Vars;
    end Clear_Active_Program;
+
+   function Program_Buffer_Length return Natural is
+     (Natural (Active_Program_Vec.Length));
 
    procedure Run_Active_Program is
    begin
@@ -266,6 +281,69 @@ package body SData.Interpreter is
       Clear_Pending_Mods;
    end Apply_Pending_Mods;
 
+   --  Splits Name into an alphabetic prefix and trailing integer suffix.
+   --  Returns True on success; Prefix and Num are set on success only.
+   function Split_Numeric_Suffix (Name   :     String;
+                                   Prefix : out Unbounded_String;
+                                   Num    : out Natural) return Boolean is
+      I : Integer := Name'Last;
+   begin
+      while I >= Name'First and then Name (I) in '0' .. '9' loop
+         I := I - 1;
+      end loop;
+      if I = Name'Last then
+         Prefix := Null_Unbounded_String; Num := 0; return False;
+      end if;
+      Prefix := To_Unbounded_String (Name (Name'First .. I));
+      Num    := Natural'Value (Name (I + 1 .. Name'Last));
+      return True;
+   end Split_Numeric_Suffix;
+
+   --  Expand a colon range (Start_Name:End_Name) into a numerically ordered
+   --  vector of names.  Returns an empty vector if either name lacks a
+   --  numeric suffix or the alphabetic prefixes differ.
+   --  When Create_Missing is True, variables not found in the current table
+   --  are added as missing-valued columns (used for ARRAY declarations).
+   function Expand_Colon_Names (Start_Name    : String;
+                                 End_Name      : String;
+                                 Create_Missing : Boolean := False)
+      return Name_Vectors.Vector
+   is
+      Result       : Name_Vectors.Vector;
+      Start_Prefix : Unbounded_String;
+      End_Prefix   : Unbounded_String;
+      Start_Num    : Natural;
+      End_Num      : Natural;
+      Lo, Hi       : Natural;
+   begin
+      if not Split_Numeric_Suffix (Start_Name, Start_Prefix, Start_Num) or else
+         not Split_Numeric_Suffix (End_Name,   End_Prefix,   End_Num)
+      then
+         return Result;  -- names lack numeric suffixes — silent no-op
+      end if;
+      if Start_Prefix /= End_Prefix then
+         return Result;  -- mismatched prefixes — silent no-op
+      end if;
+      Lo := Natural'Min (Start_Num, End_Num);
+      Hi := Natural'Max (Start_Num, End_Num);
+      declare
+         Pfx : constant String := To_String (Start_Prefix);
+      begin
+         for N in Lo .. Hi loop
+            declare
+               Var_Name : constant String :=
+                  Pfx & Ada.Strings.Fixed.Trim (Natural'Image (N), Ada.Strings.Both);
+            begin
+               if Create_Missing and then not Has_Column (Var_Name) then
+                  Add_Column (Var_Name, Col_Numeric);
+               end if;
+               Result.Append (To_Unbounded_String (Var_Name));
+            end;
+         end loop;
+      end;
+      return Result;
+   end Expand_Colon_Names;
+
    procedure Expand_Range (Kind : Column_Mod_Kind; Range_Spec : Variable_Range) is
       Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
       End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
@@ -273,6 +351,17 @@ package body SData.Interpreter is
    begin
       if not Range_Spec.Is_Range then
          Add_Pending_Mod (Kind, Start_Name);
+      elsif Range_Spec.Is_Colon_Range then
+         --  Colon range: numeric order; no creation for DROP, create for others.
+         declare
+            Names : constant Name_Vectors.Vector :=
+               Expand_Colon_Names (Start_Name, End_Name,
+                                   Create_Missing => (Kind /= Mod_Drop));
+         begin
+            for N of Names loop
+               Add_Pending_Mod (Kind, To_String (N));
+            end loop;
+         end;
       else
          for I in 1 .. Column_Count loop
             declare Name : constant String := Column_Name (I); begin
@@ -622,6 +711,13 @@ package body SData.Interpreter is
                      begin
                         if not Range_Spec.Is_Range then
                            Set_Hold (Start_Name, State);
+                        elsif Range_Spec.Is_Colon_Range then
+                           declare
+                              Names : constant Name_Vectors.Vector :=
+                                 Expand_Colon_Names (Start_Name, End_Name, Create_Missing => True);
+                           begin
+                              for N of Names loop Set_Hold (To_String (N), State); end loop;
+                           end;
                         else
                            for I in 1 .. Column_Count loop
                               declare Name : constant String := Column_Name (I); begin
@@ -660,51 +756,64 @@ package body SData.Interpreter is
                end loop;
             end;
          when Stmt_ARRAY =>
-            declare
-               V        : Name_Vectors.Vector;
-               Curr_Var : Variable_List := Stmt.Arr_Vars;
-               procedure Resolve_Range (Range_Spec : Variable_Range) is
-                  Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
-                  End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
-                  Start_Idx, End_Idx : Natural := 0;
-               begin
-                  if not Range_Spec.Is_Range then
-                     if Has_Array (Start_Name) then
-                        declare Lo, Hi : Integer;
+            if Stmt.Arr_Name_Len = 0 then
+               List_Virtual_Arrays;
+            elsif Stmt.Arr_Vars = null then
+               Undefine_Virtual_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len));
+            else
+               declare
+                  V        : Name_Vectors.Vector;
+                  Curr_Var : Variable_List := Stmt.Arr_Vars;
+                  procedure Resolve_Range (Range_Spec : Variable_Range) is
+                     Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                     End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                     Start_Idx, End_Idx : Natural := 0;
+                  begin
+                     if not Range_Spec.Is_Range then
+                        if Has_Array (Start_Name) then
+                           declare Lo, Hi : Integer;
+                           begin
+                              Get_Array_Bounds (Start_Name, Lo, Hi);
+                              for I in Lo .. Hi loop
+                                 V.Append (To_Unbounded_String (Start_Name & "(" & Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both) & ")"));
+                              end loop;
+                           end;
+                        else
+                           V.Append (To_Unbounded_String (Start_Name));
+                        end if;
+                     elsif Range_Spec.Is_Colon_Range then
+                        declare
+                           Names : constant Name_Vectors.Vector :=
+                              Expand_Colon_Names (Start_Name, End_Name, Create_Missing => True);
                         begin
-                           Get_Array_Bounds (Start_Name, Lo, Hi);
-                           for I in Lo .. Hi loop
-                              V.Append (To_Unbounded_String (Start_Name & "(" & Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both) & ")"));
-                           end loop;
+                           for N of Names loop V.Append (N); end loop;
                         end;
                      else
-                        V.Append (To_Unbounded_String (Start_Name));
-                     end if;
-                  else
-                     for I in 1 .. Column_Count loop
-                        declare Name : constant String := Column_Name (I); begin
-                           if Name = Start_Name then Start_Idx := I; end if;
-                           if Name = End_Name   then End_Idx   := I; end if;
-                        end;
-                     end loop;
-                     if Start_Idx > 0 and End_Idx > 0 then
-                        if Start_Idx > End_Idx then
-                           declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                        for I in 1 .. Column_Count loop
+                           declare Name : constant String := Column_Name (I); begin
+                              if Name = Start_Name then Start_Idx := I; end if;
+                              if Name = End_Name   then End_Idx   := I; end if;
+                           end;
+                        end loop;
+                        if Start_Idx > 0 and End_Idx > 0 then
+                           if Start_Idx > End_Idx then
+                              declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                           end if;
+                           for I in Start_Idx .. End_Idx loop V.Append (To_Unbounded_String (Column_Name (I))); end loop;
                         end if;
-                        for I in Start_Idx .. End_Idx loop V.Append (To_Unbounded_String (Column_Name (I))); end loop;
                      end if;
-                  end if;
-               end Resolve_Range;
-            begin
-               while Curr_Var /= null loop
-                  Resolve_Range (Curr_Var.Var);
-                  Curr_Var := Curr_Var.Next;
-               end loop;
-               Define_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len), V);
-            exception
-               when E : others =>
-                  raise Script_Error with "Error defining array " & Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
-            end;
+                  end Resolve_Range;
+               begin
+                  while Curr_Var /= null loop
+                     Resolve_Range (Curr_Var.Var);
+                     Curr_Var := Curr_Var.Next;
+                  end loop;
+                  Define_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len), V);
+               exception
+                  when E : others =>
+                     raise Script_Error with "Error defining array " & Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
+               end;
+            end if;
          when Stmt_DIM =>
             declare
                function Eval_Bound (Expr : Expression_Access; Label : String) return Integer is
@@ -742,6 +851,21 @@ package body SData.Interpreter is
                if S_Names /= null then declare Old : String_List_Access := S_Names; begin GNAT.Strings.Free (Old); end; end if;
             end;
          when Stmt_LIST =>
+            --  LIST always shows the program buffer.
+            if Active_Program_Vec.Is_Empty then
+               Put_Line ("(Empty program buffer)");
+            else
+               for I in Active_Program_Vec.First_Index .. Active_Program_Vec.Last_Index loop
+                  declare
+                     S : constant String := To_String (Active_Program_Vec (I).Source);
+                  begin
+                     Put (Ada.Strings.Fixed.Trim (I'Image, Ada.Strings.Both) & ": ");
+                     Put_Line (if S = "" then "?" else S);
+                  end;
+               end loop;
+            end if;
+
+         when Stmt_DISPLAY =>
             declare
                V    : Name_Vectors.Vector;
                Rows : constant Natural := SData.Table.Logical_Row_Count;
@@ -760,6 +884,13 @@ package body SData.Interpreter is
                      begin
                         if not R.Is_Range then
                            V.Append (To_Unbounded_String (U_Start));
+                        elsif R.Is_Colon_Range then
+                           declare
+                              Names : constant Name_Vectors.Vector :=
+                                 Expand_Colon_Names (U_Start, U_End, Create_Missing => False);
+                           begin
+                              for N of Names loop V.Append (N); end loop;
+                           end;
                         else
                            for I in 1 .. Column_Count loop
                               declare Name : constant String := Column_Name (I); begin
@@ -786,16 +917,14 @@ package body SData.Interpreter is
                end if;
 
                if V.Is_Empty then
-                  Put_Line ("(No columns to list)");
+                  Put_Line ("(No columns to display)");
                   return;
                end if;
 
-               -- Header
                Put ("REC# ");
                for Name of V loop Put (To_String (Name) & " "); end loop;
                New_Line;
 
-               -- Data
                for R in 1 .. Rows loop
                   declare
                      Phys_R : constant Positive := SData.Table.Logical_To_Physical (R);
@@ -812,17 +941,88 @@ package body SData.Interpreter is
       end case;
    end Execute_Metadata;
 
-   --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW.
+   --  Execute_Program_Delete — removes entries From..To (1-based) from the
+   --  program buffer and rebuilds the linked list.
+   procedure Execute_Program_Delete (Stmt : Statement_Access) is
+      From : constant Positive := Stmt.Delete_From;
+      To   : constant Positive := Stmt.Delete_To;
+      Last : constant Natural  := Natural (Active_Program_Vec.Length);
+   begin
+      if Last = 0 then
+         Put_Line_Error ("Warning: program buffer is empty.");
+         return;
+      end if;
+      if From > Last or else To > Last or else From > To then
+         Put_Line_Error ("Warning: DELETE range out of range (buffer has"
+                         & Last'Image & " entries).");
+         return;
+      end if;
+      --  Free deleted AST nodes.
+      for I in From .. To loop
+         declare
+            E : Program_Entry := Active_Program_Vec (I);
+         begin
+            SData.AST.Free_Program (E.Stmt);
+         end;
+      end loop;
+      --  Remove from vector (iterate backwards to preserve indices).
+      for I in reverse From .. To loop
+         Active_Program_Vec.Delete (I);
+      end loop;
+      --  Rebuild linked list from remaining vector entries.
+      Active_Program_Head := null;
+      Active_Program_Tail := null;
+      for E of Active_Program_Vec loop
+         E.Stmt.Next := null;
+         if Active_Program_Head = null then
+            Active_Program_Head := E.Stmt;
+            Active_Program_Tail := E.Stmt;
+         else
+            Active_Program_Tail.Next := E.Stmt;
+            Active_Program_Tail := E.Stmt;
+         end if;
+      end loop;
+   end Execute_Program_Delete;
+
+   --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW / OPTIONS.
    procedure Execute_Declarative (Stmt : Statement_Access) is
+
+      --  Convert a DLM string (e.g. "," "\t" "TAB" "|") to a single Character.
+      function Dlm_To_Str (S : String) return String is
+         U : constant String := To_Upper (S);
+      begin
+         if U'Length = 0                then return ","; end if;
+         if U = "\T" or else U = "TAB" then return "" & ASCII.HT; end if;
+         if U = "NEWLINE"              then return "" & ASCII.LF; end if;
+         if U = "PIPE"                 then return "|"; end if;
+         if U = "SPACE"                then return " "; end if;
+         if U = "COMMA"                then return ","; end if;
+         return S;
+      end Dlm_To_Str;
+
    begin
       case Stmt.Kind is
          when Stmt_USE =>
             SData.Config.Runtime.Repeat_Active := False;
             SData.Config.Runtime.Repeat_Count := 0;
             declare
-               File_Name : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
-               Expanded  : String (1 .. 1024);
-               Exp_Len   : Natural := 0;
+               File_Name  : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
+               Expanded   : String (1 .. 1024);
+               Exp_Len    : Natural := 0;
+               Eff_DLM     : constant String :=
+                  (if Stmt.DLM_Len > 0
+                   then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
+                   else SData.Config.Runtime.Options_CSVDLM
+                           (1 .. SData.Config.Runtime.Options_CSVDLM_Len));
+               Eff_Header  : constant Boolean :=
+                  (if Stmt.Header_Specified
+                   then Stmt.Header_Val
+                   else SData.Config.Runtime.Options_Header);
+               Eff_Charset : constant String :=
+                  (if Stmt.Output_CHARSET_Len > 0
+                   then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
+                   else SData.Config.Runtime.Options_CHARSET
+                           (1 .. SData.Config.Runtime.Options_CHARSET_Len));
             begin
                if Stmt.Is_Mock then
                   Exp_Len := 4; Expanded (1 .. 4) := "MOCK";
@@ -832,7 +1032,9 @@ package body SData.Interpreter is
                end if;
                SData.File_IO.Open_Input (Expanded (1 .. Exp_Len),
                  (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format),
-                 Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len));
+                 Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
+                 Eff_DLM, Eff_Header, Eff_Charset,
+                 Stmt.Skip_Val, Stmt.Maxrows_Val);
             end;
             Input_File_Columns.Clear;
             Refresh_PDV_Names;
@@ -840,17 +1042,47 @@ package body SData.Interpreter is
                Input_File_Columns.Include (Column_Name (I));
             end loop;
          when Stmt_SAVE =>
-            declare
-               Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
-               SLen  : constant Natural := Stmt.Sheet_Name_Len;
-            begin
-               SData.Config.Runtime.Save_File_Path (1 .. Full'Length) := Full;
-               SData.Config.Runtime.Save_File_Len := Full'Length;
-               SData.Config.Runtime.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
-               SData.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
-               SData.Config.Runtime.Save_Sheet_Name_Len := SLen;
-               SData.Config.Runtime.Save_File_Active := True;
-            end;
+            if Stmt.File_Len = 0 then
+               SData.Config.Runtime.Save_File_Active := False;
+               SData.Config.Runtime.Save_File_Len := 0;
+            else
+               declare
+                  Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
+                  SLen  : constant Natural := Stmt.Sheet_Name_Len;
+               begin
+                  SData.Config.Runtime.Save_File_Path (1 .. Full'Length) := Full;
+                  SData.Config.Runtime.Save_File_Len := Full'Length;
+                  SData.Config.Runtime.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
+                  SData.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
+                  SData.Config.Runtime.Save_Sheet_Name_Len := SLen;
+                  SData.Config.Runtime.Save_File_Active := True;
+                  declare
+                     Eff_DLM : constant String :=
+                        (if Stmt.DLM_Len > 0
+                         then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
+                         else SData.Config.Runtime.Options_CSVDLM
+                                 (1 .. SData.Config.Runtime.Options_CSVDLM_Len));
+                     EL : constant Natural := Eff_DLM'Length;
+                  begin
+                     SData.Config.Runtime.Save_DLM (1 .. EL) := Eff_DLM;
+                     SData.Config.Runtime.Save_DLM_Len := EL;
+                  end;
+                  SData.Config.Runtime.Save_Header :=
+                     (if Stmt.Header_Specified
+                      then Stmt.Header_Val
+                      else SData.Config.Runtime.Options_Header);
+                  if Stmt.Output_CHARSET_Len > 0 then
+                     SData.Config.Runtime.Save_Charset (1 .. Stmt.Output_CHARSET_Len) :=
+                        Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len);
+                     SData.Config.Runtime.Save_Charset_Len := Stmt.Output_CHARSET_Len;
+                  else
+                     SData.Config.Runtime.Save_Charset :=
+                        SData.Config.Runtime.Options_CHARSET;
+                     SData.Config.Runtime.Save_Charset_Len :=
+                        SData.Config.Runtime.Options_CHARSET_Len;
+                  end if;
+               end;
+            end if;
          when Stmt_SORT =>
             declare
                Curr_Var : Variable_List := Stmt.Sort_Vars;
@@ -882,8 +1114,20 @@ package body SData.Interpreter is
                             VC (VC'First + 1 .. VC'Last) & " variables processed.");
                end;
                if SData.Config.Runtime.Save_File_Active then
-                  SData.File_IO.Open_Output (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"), SData.Config.Runtime.Save_File_Fmt, SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len));
-                  if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+                  begin
+                     SData.File_IO.Open_Output
+                        (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"),
+                         SData.Config.Runtime.Save_File_Fmt,
+                         SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
+                         SData.Config.Runtime.Save_DLM (1 .. SData.Config.Runtime.Save_DLM_Len),
+                         SData.Config.Runtime.Save_Header,
+                         SData.Config.Runtime.Options_SAVEOVERWRT,
+                         SData.Config.Runtime.Save_Charset
+                            (1 .. SData.Config.Runtime.Save_Charset_Len));
+                     if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+                  exception
+                     when SData.File_IO.Save_Refused => null;
+                  end;
                   SData.Config.Runtime.Save_File_Active := False;
                end if;
             end;
@@ -940,6 +1184,57 @@ package body SData.Interpreter is
             SData.Variables.Initialize_PDV;
             Clear_Active_Program;
             SData.Config.Runtime.Reset;
+         when Stmt_OPTIONS =>
+            declare
+               Key : constant String :=
+                  Stmt.Options_Key (1 .. Stmt.Options_Key_Len);
+               Val : constant String :=
+                  Stmt.Options_Val (1 .. Stmt.Options_Val_Len);
+               Val_Upper : constant String := To_Upper (Val);
+            begin
+               if Key = "MAXINTAB" then
+                  SData.Config.Max_Table_Rows := Natural'Value (Val);
+               elsif Key = "MAXTEMPMEM" then
+                  SData.Config.Max_Temp_Vars := Natural'Value (Val);
+               elsif Key = "CSVDLM" then
+                  declare
+                     DS : constant String := Dlm_To_Str (Val);
+                     DL : constant Natural := Natural'Min (DS'Length, 8);
+                  begin
+                     SData.Config.Runtime.Options_CSVDLM := (others => ' ');
+                     SData.Config.Runtime.Options_CSVDLM (1 .. DL) := DS (DS'First .. DS'First + DL - 1);
+                     SData.Config.Runtime.Options_CSVDLM_Len := DL;
+                  end;
+               elsif Key = "HEADER" then
+                  SData.Config.Runtime.Options_Header := (Val_Upper = "YES");
+               elsif Key = "SAVEOVERWRT" then
+                  SData.Config.Runtime.Options_SAVEOVERWRT := (Val_Upper = "YES");
+               elsif Key = "TXTFMT" then
+                  declare
+                     VL : constant Natural := Natural'Min (Val_Upper'Length, 8);
+                  begin
+                     SData.Config.Runtime.Options_TXTFMT := (others => ' ');
+                     SData.Config.Runtime.Options_TXTFMT (1 .. VL) :=
+                        Val_Upper (Val_Upper'First .. Val_Upper'First + VL - 1);
+                     SData.Config.Runtime.Options_TXTFMT_Len := VL;
+                  end;
+               elsif Key = "CHARSET" then
+                  declare
+                     VL : constant Natural := Natural'Min (Val'Length, 64);
+                  begin
+                     SData.Config.Runtime.Options_CHARSET := (others => ' ');
+                     SData.Config.Runtime.Options_CHARSET (1 .. VL) :=
+                        Val (Val'First .. Val'First + VL - 1);
+                     SData.Config.Runtime.Options_CHARSET_Len := VL;
+                  end;
+               else
+                  Put_Line_Error ("Warning: Unknown OPTIONS key: " & Key);
+               end if;
+            exception
+               when Constraint_Error =>
+                  Put_Line_Error
+                     ("Error: Invalid value for OPTIONS " & Key & ": " & Val);
+            end;
          when others => null;
       end case;
    end Execute_Declarative;
@@ -1004,6 +1299,18 @@ package body SData.Interpreter is
             if Stmt.File_Len > 0 then
                SData.IO.Open_Output (Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT"));
             end if;
+            if Stmt.Output_FMT_Len > 0 then
+               SData.Config.Runtime.Options_TXTFMT := (others => ' ');
+               SData.Config.Runtime.Options_TXTFMT (1 .. Stmt.Output_FMT_Len) :=
+                  Stmt.Output_FMT_Val (1 .. Stmt.Output_FMT_Len);
+               SData.Config.Runtime.Options_TXTFMT_Len := Stmt.Output_FMT_Len;
+            end if;
+            if Stmt.Output_CHARSET_Len > 0 then
+               SData.Config.Runtime.Options_CHARSET := (others => ' ');
+               SData.Config.Runtime.Options_CHARSET (1 .. Stmt.Output_CHARSET_Len) :=
+                  Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len);
+               SData.Config.Runtime.Options_CHARSET_Len := Stmt.Output_CHARSET_Len;
+            end if;
          when Stmt_FPATH =>
             declare
                Path      : constant String  := (if Stmt.File_Len > 0 then Stmt.File_Path (1 .. Stmt.File_Len) else "");
@@ -1051,10 +1358,13 @@ package body SData.Interpreter is
          when Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT =>
             Execute_Control_Flow (Stmt);
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET
-            | Stmt_RENAME | Stmt_ARRAY | Stmt_DIM | Stmt_NAMES | Stmt_LIST =>
+            | Stmt_RENAME | Stmt_ARRAY | Stmt_DIM | Stmt_NAMES | Stmt_LIST | Stmt_DISPLAY =>
             Execute_Metadata (Stmt);
+         when Stmt_PROGRAM_DELETE =>
+            Execute_Program_Delete (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
-            | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW =>
+            | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
+            | Stmt_OPTIONS =>
             Execute_Declarative (Stmt);
          when Stmt_SUBMIT | Stmt_SYSTEM | Stmt_OUTPUT | Stmt_FPATH =>
             Execute_IO (Stmt);
@@ -1259,7 +1569,7 @@ package body SData.Interpreter is
             when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
                | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT
                | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO
-               | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM
+               | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
                | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                begin
                   Execute_Statement (Iter);
@@ -1267,10 +1577,14 @@ package body SData.Interpreter is
                   when E : Script_Error =>
                      if SData.Config.Continue_On_Error then
                         Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                        SData.Config.Runtime.Last_Error_Code := 1;
+                        SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
                      else raise; end if;
                   when E : others =>
                      if SData.Config.Continue_On_Error then
                         Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                        SData.Config.Runtime.Last_Error_Code := 1;
+                        SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
                      else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
                end;
             when others => null;
@@ -1302,11 +1616,122 @@ package body SData.Interpreter is
       Set_Current_Record_Index (0);
       Apply_Pending_Mods;
       if SData.Config.Runtime.Save_File_Active then
-         SData.File_IO.Open_Output (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"), SData.Config.Runtime.Save_File_Fmt, SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len));
-         if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+         begin
+            SData.File_IO.Open_Output
+               (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"),
+                SData.Config.Runtime.Save_File_Fmt,
+                SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
+                SData.Config.Runtime.Save_DLM (1 .. SData.Config.Runtime.Save_DLM_Len),
+                SData.Config.Runtime.Save_Header,
+                SData.Config.Runtime.Options_SAVEOVERWRT,
+                SData.Config.Runtime.Save_Charset
+                   (1 .. SData.Config.Runtime.Save_Charset_Len));
+            if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+         exception
+            when SData.File_IO.Save_Refused => null;
+         end;
          SData.Config.Runtime.Save_File_Active := False;
       end if;
    end Commit_Step;
+
+   --  Resolve_Expr_Indices — walk every Expr_Variable node reachable from the
+   --  statement list and cache its PDV slot index.  Called once per RUN after
+   --  Initialize_PDV has built the PDV_Index map, so the cache is valid for
+   --  the entire data step without any per-row hash lookup.
+   procedure Resolve_Expr_Indices (Start, Boundary : Statement_Access) is
+
+      procedure Resolve_Expr (Expr : Expression_Access);
+
+      procedure Resolve_Expr_List (List : Expression_List) is
+         Node : Expression_List := List;
+      begin
+         while Node /= null loop
+            Resolve_Expr (Node.Expr);
+            Node := Node.Next;
+         end loop;
+      end Resolve_Expr_List;
+
+      procedure Resolve_Expr (Expr : Expression_Access) is
+      begin
+         if Expr = null then return; end if;
+         case Expr.Kind is
+            when Expr_Variable =>
+               declare
+                  Upper : constant String :=
+                     To_Upper (Expr.Var_Name (1 .. Expr.Var_Len));
+               begin
+                  Expr.Var_Index := SData.Variables.PDV_Resolve (Upper);
+               end;
+            when Expr_Binary_Op =>
+               Resolve_Expr (Expr.Left);
+               Resolve_Expr (Expr.Right);
+            when Expr_Unary_Op =>
+               Resolve_Expr (Expr.Operand);
+            when Expr_Function_Call =>
+               Resolve_Expr_List (Expr.Arguments);
+            when Expr_Array_Access =>
+               Resolve_Expr_List (Expr.Arr_Idx);
+            when others => null;
+         end case;
+      end Resolve_Expr;
+
+      procedure Resolve_Stmt_List (Stmt  : Statement_Access;
+                                   Bound : Statement_Access);
+
+      procedure Resolve_Stmt (S : Statement_Access) is
+      begin
+         if S = null then return; end if;
+         Resolve_Expr (S.Expr);
+         Resolve_Expr (S.Arr_Idx);
+         case S.Kind is
+            when Stmt_PRINT =>
+               Resolve_Expr_List (S.Print_Args);
+            when Stmt_IF =>
+               Resolve_Expr (S.Condition);
+               Resolve_Stmt_List (S.Then_Branch, null);
+               Resolve_Stmt_List (S.Else_Branch, null);
+            when Stmt_FOR =>
+               Resolve_Expr (S.For_Start);
+               Resolve_Expr (S.For_End);
+               Resolve_Expr (S.For_Step);
+               Resolve_Stmt_List (S.For_Body, null);
+            when Stmt_WHILE =>
+               Resolve_Expr (S.While_Cond);
+               Resolve_Stmt_List (S.While_Body, null);
+            when Stmt_LOOP_REPEAT =>
+               Resolve_Stmt_List (S.Repeat_Body, null);
+               Resolve_Expr (S.Until_Cond);
+            when Stmt_SELECT =>
+               Resolve_Expr (S.Selector);
+               declare
+                  B : Case_Branch := S.Branches;
+               begin
+                  while B /= null loop
+                     Resolve_Expr_List (B.Conditions);
+                     Resolve_Stmt_List (B.Branch_Body, null);
+                     B := B.Next;
+                  end loop;
+               end;
+               Resolve_Stmt_List (S.Otherwise_Part, null);
+            when Stmt_RSEED =>
+               Resolve_Expr (S.Seed_Expr);
+            when others => null;
+         end case;
+      end Resolve_Stmt;
+
+      procedure Resolve_Stmt_List (Stmt  : Statement_Access;
+                                   Bound : Statement_Access) is
+         Cur : Statement_Access := Stmt;
+      begin
+         while Cur /= null and then Cur /= Bound loop
+            Resolve_Stmt (Cur);
+            Cur := Cur.Next;
+         end loop;
+      end Resolve_Stmt_List;
+
+   begin
+      Resolve_Stmt_List (Start, Boundary);
+   end Resolve_Expr_Indices;
 
    --  Run_One_Step — executes the deferred statement list once per record.
    --  Start..Boundary is the slice of the statement list belonging to this RUN.
@@ -1317,6 +1742,7 @@ package body SData.Interpreter is
           else (if Row_Count > 0 then Row_Count else 1));
    begin
       Initialize_PDV;
+      Resolve_Expr_Indices (Start, Boundary);
       SData.Table.Initialize_Output_Table;
       Rebuild_Filter_Map;
       declare
@@ -1362,7 +1788,7 @@ package body SData.Interpreter is
             and then Current.Kind /= Stmt_FOR     and then Current.Kind /= Stmt_WHILE
             and then Current.Kind /= Stmt_LOOP_REPEAT and then Current.Kind /= Stmt_SELECT
             and then Current.Kind /= Stmt_DELETE  and then Current.Kind /= Stmt_WRITE
-            and then Current.Kind /= Stmt_DIM     and then Current.Kind /= Stmt_ARRAY
+            and then Current.Kind /= Stmt_DIM
          then
             begin
                Execute_Statement (Current);
@@ -1370,10 +1796,14 @@ package body SData.Interpreter is
                when E : Script_Error =>
                   if SData.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                     SData.Config.Runtime.Last_Error_Code := 1;
+                     SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
                   else raise; end if;
                when E : others =>
                   if SData.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                     SData.Config.Runtime.Last_Error_Code := 1;
+                     SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
                   else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
             end;
          end if;

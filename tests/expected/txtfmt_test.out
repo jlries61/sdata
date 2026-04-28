@@ -1,0 +1,16 @@
+Generating mock data...
+Dataset saved: tests/data/txtfmt_crlf.csv
+RUN complete. 3 records and 3 variables processed.
+Dataset opened: tests/data/txtfmt_crlf.csv
+Alice
+Bob
+Charlie
+RUN complete. 3 records and 3 variables processed.
+Generating mock data...
+Dataset saved: tests/data/txtfmt_lf.csv
+RUN complete. 3 records and 3 variables processed.
+Dataset opened: tests/data/txtfmt_lf.csv
+Alice
+Bob
+Charlie
+RUN complete. 3 records and 3 variables processed.

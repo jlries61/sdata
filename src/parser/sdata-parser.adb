@@ -442,20 +442,25 @@ package body SData.Parser is
             Node.Var.Start_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
             Node.Var.Start_Len := Tok.Length;
             
-            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Minus or else Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon then
-               declare
-                  Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                  End_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               begin
-                  if End_Tok.Kind /= Token_Identifier then
-                     Put_Line_Error ("Error: Expected identifier after '" & Discard.Kind'Image & "' in range");
-                  else
-                     Node.Var.Is_Range := True;
-                     Node.Var.End_Name (1 .. End_Tok.Length) := End_Tok.Text (1 .. End_Tok.Length);
-                     Node.Var.End_Len := End_Tok.Length;
-                  end if;
-               end;
-            end if;
+            declare
+               P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if P.Kind = Token_Minus or else P.Kind = Token_Colon then
+                  declare
+                     Sep     : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     End_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if End_Tok.Kind /= Token_Identifier then
+                        Put_Line_Error ("Error: Expected identifier after '" & Sep.Kind'Image & "' in range");
+                     else
+                        Node.Var.Is_Range       := True;
+                        Node.Var.Is_Colon_Range := (Sep.Kind = Token_Colon);
+                        Node.Var.End_Name (1 .. End_Tok.Length) := End_Tok.Text (1 .. End_Tok.Length);
+                        Node.Var.End_Len := End_Tok.Length;
+                     end if;
+                  end;
+               end if;
+            end;
             
             if First = null then
                First := Node;
@@ -732,12 +737,60 @@ package body SData.Parser is
                                     end if;
                                  elsif Flag_Name = "NSCAN" then
                                     Stmt.NSCAN_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                                 elsif Flag_Name = "SKIP" then
+                                    Stmt.Skip_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                                 elsif Flag_Name = "MAXROWS" then
+                                    Stmt.Maxrows_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
                                  elsif Flag_Name = "HEADER" then
                                     Stmt.Header_Specified := True;
                                     Stmt.Header_Val := (Val_Str = "YES");
                                  elsif Flag_Name = "DLM" then
                                     Stmt.DLM_Len := Val_Tok.Length;
                                     Stmt.DLM_Path (1 .. Val_Tok.Length) := Val_Tok.Text (1 .. Val_Tok.Length);
+                                 elsif Flag_Name = "CHARSET" then
+                                    --  Consume multi-token charset names (e.g. UTF - 16 LE)
+                                    declare
+                                       Buf : String (1 .. 64) := (others => ' ');
+                                       Len : Natural := Val_Tok.Length;
+                                       P2  : Token;
+                                    begin
+                                       Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
+                                       P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                       if P2.Kind = Token_Minus then
+                                          declare
+                                             Discard2 : Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                             Mid_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                             M_Len    : constant Natural := Mid_Tok.Length;
+                                          begin
+                                             pragma Unreferenced (Discard2);
+                                             Buf (Len + 1) := '-';
+                                             Buf (Len + 2 .. Len + 1 + M_Len) :=
+                                                Mid_Tok.Text (1 .. M_Len);
+                                             Len := Len + 1 + M_Len;
+                                             P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                             if P2.Kind = Token_Identifier then
+                                                declare
+                                                   S_Upper : constant String :=
+                                                      To_Upper (P2.Text (1 .. P2.Length));
+                                                begin
+                                                   if S_Upper = "LE" or else S_Upper = "BE" then
+                                                      declare
+                                                         Suf_Tok : constant Token :=
+                                                            Get_Next_Token (Ctx.Lex_Ctx);
+                                                         S_Len   : constant Natural := Suf_Tok.Length;
+                                                      begin
+                                                         Buf (Len + 1 .. Len + S_Len) :=
+                                                            Suf_Tok.Text (1 .. S_Len);
+                                                         Len := Len + S_Len;
+                                                      end;
+                                                   end if;
+                                                end;
+                                             end if;
+                                          end;
+                                       end if;
+                                       Stmt.Output_CHARSET_Val (1 .. Len) := Buf (1 .. Len);
+                                       Stmt.Output_CHARSET_Len := Len;
+                                    end;
                                  end if;
                               end;
                            end if;
@@ -760,17 +813,31 @@ package body SData.Parser is
                New_Kind : constant Statement_Kind := (if Tok.Kind = Token_ARRAY then Stmt_ARRAY else Stmt_DIM);
             begin
                Stmt := new Statement (New_Kind);
-               declare
-                  Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               begin
-                  Stmt.Arr_Name_Len := Name_Tok.Length;
-                  Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
-                  
-                  if New_Kind = Stmt_ARRAY then
-                     -- ARRAY arrayname variable_list
-                     Stmt.Arr_Vars := Parse_Variable_List (Ctx);
-                  else
-                     -- DIM arrayname (lower TO upper) [/TEMP]
+               if New_Kind = Stmt_ARRAY then
+                  declare
+                     P_Arr : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if P_Arr.Kind = Token_Newline or else P_Arr.Kind = Token_Semicolon
+                        or else P_Arr.Kind = Token_EOF
+                     then
+                        null;  --  Bare ARRAY: list virtual arrays (Arr_Name_Len stays 0)
+                     else
+                        declare
+                           Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           Stmt.Arr_Name_Len := Name_Tok.Length;
+                           Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
+                           Stmt.Arr_Vars := Parse_Variable_List (Ctx);
+                        end;
+                     end if;
+                  end;
+               else
+                  --  DIM arrayname (lower TO upper) [/TEMP]
+                  declare
+                     Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     Stmt.Arr_Name_Len := Name_Tok.Length;
+                     Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
                      declare
                         Tok_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      begin
@@ -778,19 +845,17 @@ package body SData.Parser is
                            Put_Line_Error ("Error: Expected '(' after DIM array name");
                            return null;
                         end if;
-                        
-                        -- Parse first bound expression
+
                         Stmt.Arr_Start_Expr := Parse_Expression (Ctx);
                         if Stmt.Arr_Start_Expr = null then
                            Put_Line_Error ("Error: Expected bound expression in DIM");
                            return null;
                         end if;
-                        
+
                         declare
                            Tok_Next : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
                            if Tok_Next.Kind = Token_TO then
-                              -- DIM X(lower TO upper)
                               Stmt.Arr_End_Expr := Parse_Expression (Ctx);
                               if Stmt.Arr_End_Expr = null then
                                  Put_Line_Error ("Error: Expected upper bound expression after TO");
@@ -801,7 +866,6 @@ package body SData.Parser is
                                  return null;
                               end if;
                            elsif Tok_Next.Kind = Token_Right_Paren then
-                              -- Simple dimension: DIM X(n) means 1 to n
                               Stmt.Arr_End_Expr := Stmt.Arr_Start_Expr;
                               Stmt.Arr_Start_Expr := new Expression (Expr_Numeric_Literal);
                               Stmt.Arr_Start_Expr.Value      := 1.0;
@@ -813,12 +877,11 @@ package body SData.Parser is
                            end if;
                         end;
                      end;
-                     
-                     -- Check for /TEMP
+
                      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash then
                         declare
                            Discard_Slash : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                           Tok_Temp : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Tok_Temp      : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
                            if Tok_Temp.Length >= 4 and then To_Upper (Tok_Temp.Text (1 .. 4)) = "TEMP" then
                               Stmt.Is_Temporary_Dim := True;
@@ -828,8 +891,8 @@ package body SData.Parser is
                            end if;
                         end;
                      end if;
-                  end if;
-               end;
+                  end;
+               end if;
             end;
 
          when Token_SELECT =>
@@ -958,8 +1021,41 @@ package body SData.Parser is
             Stmt := new Statement ((if Tok.Kind = Token_SORT then Stmt_SORT else Stmt_BY));
             Stmt.Sort_Vars := Parse_Variable_List (Ctx);
 
-         when Token_DELETE | Token_WRITE =>
-            Stmt := new Statement ((if Tok.Kind = Token_DELETE then Stmt_DELETE else Stmt_WRITE));
+         when Token_DELETE =>
+            declare
+               Next_Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if Next_Tok.Kind = Token_Numeric_Literal then
+                  --  DELETE n[-m]: immediate program buffer deletion
+                  declare
+                     Num_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     From_Num : Positive;
+                  begin
+                     From_Num := Positive (Float'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
+                     Stmt := new Statement (Stmt_PROGRAM_DELETE);
+                     Stmt.Delete_From := From_Num;
+                     Stmt.Delete_To   := From_Num;
+                     declare
+                        Maybe_Minus : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                     begin
+                        if Maybe_Minus.Kind = Token_Minus then
+                           declare
+                              Ignored  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              To_Tok   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              pragma Unreferenced (Ignored);
+                           begin
+                              Stmt.Delete_To := Positive (Float'Value (To_Tok.Text (1 .. To_Tok.Length)));
+                           end;
+                        end if;
+                     end;
+                  end;
+               else
+                  --  Bare DELETE: deferred, marks current record for deletion
+                  Stmt := new Statement (Stmt_DELETE);
+               end if;
+            end;
+         when Token_WRITE =>
+            Stmt := new Statement (Stmt_WRITE);
 
          when Token_RSEED =>
             Stmt := new Statement (Stmt_RSEED);
@@ -988,13 +1084,77 @@ package body SData.Parser is
                else
                   Stmt.File_Len := 0; -- Cancel output redirection
                end if;
-               -- Skip any options for now
+               -- Parse OUTPUT-specific flags: /FMT= and /CHARSET=
                loop
                   declare P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin
                      if P.Kind = Token_Slash then
-                        declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                        declare Discard_Opt : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                        declare
+                           Discard   : Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Flag_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Flag_Name : constant String := To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+                        begin
+                           Discard := Peek_Next_Token (Ctx.Lex_Ctx);
+                           if Discard.Kind = Token_Equal then
+                              Discard := Get_Next_Token (Ctx.Lex_Ctx);
+                              declare
+                                 Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                 Val_Str : constant String := To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+                              begin
+                                 if Flag_Name = "FMT" then
+                                    declare
+                                       L : constant Natural := Natural'Min (Val_Str'Length, 8);
+                                    begin
+                                       Stmt.Output_FMT_Val (1 .. L) := Val_Str (Val_Str'First .. Val_Str'First + L - 1);
+                                       Stmt.Output_FMT_Len := L;
+                                    end;
+                                 elsif Flag_Name = "CHARSET" then
+                                    declare
+                                       Buf : String (1 .. 64) := (others => ' ');
+                                       Len : Natural := Val_Tok.Length;
+                                       P2  : Token;
+                                    begin
+                                       Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
+                                       P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                       if P2.Kind = Token_Minus then
+                                          declare
+                                             Discard2 : Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                             Mid_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                             M_Len    : constant Natural := Mid_Tok.Length;
+                                          begin
+                                             pragma Unreferenced (Discard2);
+                                             Buf (Len + 1) := '-';
+                                             Buf (Len + 2 .. Len + 1 + M_Len) :=
+                                                Mid_Tok.Text (1 .. M_Len);
+                                             Len := Len + 1 + M_Len;
+                                             P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                             if P2.Kind = Token_Identifier then
+                                                declare
+                                                   S_Upper : constant String :=
+                                                      To_Upper (P2.Text (1 .. P2.Length));
+                                                begin
+                                                   if S_Upper = "LE" or else S_Upper = "BE" then
+                                                      declare
+                                                         Suf_Tok : constant Token :=
+                                                            Get_Next_Token (Ctx.Lex_Ctx);
+                                                         S_Len   : constant Natural := Suf_Tok.Length;
+                                                      begin
+                                                         Buf (Len + 1 .. Len + S_Len) :=
+                                                            Suf_Tok.Text (1 .. S_Len);
+                                                         Len := Len + S_Len;
+                                                      end;
+                                                   end if;
+                                                end;
+                                             end if;
+                                          end;
+                                       end if;
+                                       Stmt.Output_CHARSET_Val (1 .. Len) := Buf (1 .. Len);
+                                       Stmt.Output_CHARSET_Len := Len;
+                                    end;
+                                 end if;
+                              end;
+                           end if;
+                        end;
                      else exit; end if;
                   end;
                end loop;
@@ -1018,6 +1178,25 @@ package body SData.Parser is
             begin
                Stmt := new Statement (Stmt_DIGITS);
                Stmt.Digits_Count := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+            end;
+
+         when Token_OPTIONS =>
+            declare
+               Key_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Key_Str : constant String :=
+                  To_Upper (Key_Tok.Text (1 .. Key_Tok.Length));
+               Val_Str : constant String := Val_Tok.Text (1 .. Val_Tok.Length);
+               K_Len   : constant Natural :=
+                  Natural'Min (Key_Tok.Length, 32);
+               V_Len   : constant Natural :=
+                  Natural'Min (Val_Tok.Length, 256);
+            begin
+               Stmt := new Statement (Stmt_OPTIONS);
+               Stmt.Options_Key (1 .. K_Len) := Key_Str (Key_Str'First .. Key_Str'First + K_Len - 1);
+               Stmt.Options_Key_Len := K_Len;
+               Stmt.Options_Val (1 .. V_Len) := Val_Str (Val_Str'First .. Val_Str'First + V_Len - 1);
+               Stmt.Options_Val_Len := V_Len;
             end;
 
          when Token_RENAME =>
@@ -1061,19 +1240,21 @@ package body SData.Parser is
                end if;
             end;
 
+         when Token_DISPLAY =>
+            Stmt := new Statement (Stmt_DISPLAY);
+            Stmt.Vars := Parse_Variable_List (Ctx);
+
          when Token_END | Token_QUIT | Token_NAMES | Token_LIST | Token_NEW | Token_HELP =>
             declare
-               K : constant Statement_Kind := (if Tok.Kind = Token_END then Stmt_END 
-                                             elsif Tok.Kind = Token_QUIT then Stmt_QUIT 
+               K : constant Statement_Kind := (if Tok.Kind = Token_END then Stmt_END
+                                             elsif Tok.Kind = Token_QUIT then Stmt_QUIT
                                              elsif Tok.Kind = Token_NEW then Stmt_NEW
                                              elsif Tok.Kind = Token_HELP then Stmt_HELP
                                              elsif Tok.Kind = Token_LIST then Stmt_LIST
                                              else Stmt_NAMES);
             begin
                Stmt := new Statement (K);
-               if K = Stmt_LIST then
-                  Stmt.Vars := Parse_Variable_List (Ctx);
-               elsif K = Stmt_HELP then
+               if K = Stmt_HELP then
                   declare
                      Next_T : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                   begin

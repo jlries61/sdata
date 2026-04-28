@@ -1,4 +1,4 @@
 USE "tests/data/sample.ods"
-PRINT NAME
+PRINT NAME$
 RUN
 END

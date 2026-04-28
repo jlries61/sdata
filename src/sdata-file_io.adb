@@ -1,4 +1,11 @@
 with Ada.Text_IO;
+with Ada.Streams.Stream_IO;
+with Ada.Streams;
+with Ada.Directories;
+with Ada.Strings.UTF_Encoding;             use Ada.Strings.UTF_Encoding;
+with Ada.Strings.UTF_Encoding.Conversions;
+with SData.Config.Runtime;
+with Ada.Unchecked_Deallocation;
 with Ada.Exceptions;
 with SData.IO;        use SData.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
@@ -172,20 +179,27 @@ package body SData.File_IO is
       return "";
    end Convert_Via_LibreOffice;
 
-   procedure Open_Input (File_Name : String; Fmt : Format_Type; Sheet_Name : String := "") is
+   procedure Open_Input (File_Name   : String;
+                         Fmt         : Format_Type;
+                         Sheet_Name  : String  := "";
+                         Delimiter   : String  := ",";
+                         Read_Header : Boolean := True;
+                         Charset     : String  := "";
+                         Skip_Rows   : Natural := 0;
+                         Max_Rows    : Natural := 0) is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       U_Name  : constant String := To_Upper (File_Name);
    begin
       if U_Name = "MOCK" or U_Name = "MOCK_DATA" then
-         Clear; Add_Column ("ID", Col_Integer); Add_Column ("NAME", Col_String); Add_Column ("SALARY", Col_Numeric);
+         Clear; Add_Column ("ID", Col_Integer); Add_Column ("NAME$", Col_String); Add_Column ("SALARY", Col_Numeric);
          for I in 1 .. 3 loop
             Add_Row; Set_Value (I, "ID", (Kind => Val_Integer, Int_Val => I));
             Set_Value (I, "SALARY", (Kind => Val_Numeric, Num_Val => 50000.0 + Float(I - 1) * 10000.0));
          end loop;
-         Set_Value(1, "NAME", (Kind => Val_String, Str_Val => To_Unbounded_String ("Alice")));
-         Set_Value(2, "NAME", (Kind => Val_String, Str_Val => To_Unbounded_String ("Bob")));
-         Set_Value(3, "NAME", (Kind => Val_String, Str_Val => To_Unbounded_String ("Charlie")));
+         Set_Value(1, "NAME$", (Kind => Val_String, Str_Val => To_Unbounded_String ("Alice")));
+         Set_Value(2, "NAME$", (Kind => Val_String, Str_Val => To_Unbounded_String ("Bob")));
+         Set_Value(3, "NAME$", (Kind => Val_String, Str_Val => To_Unbounded_String ("Charlie")));
          if not SData.Config.Quiet_Mode then
             Put_Line ("Generating mock data...");
          end if;
@@ -211,11 +225,11 @@ package body SData.File_IO is
 
       case Actual_Fmt is
          when CSV =>
-            Parse_CSV (File_Name);
+            Parse_CSV (File_Name, Delimiter, Read_Header, Charset, Skip_Rows, Max_Rows);
          when ODF =>
-            Parse_ODF (File_Name, Sheet_Name);
+            Parse_ODF (File_Name, Sheet_Name, Skip_Rows, Max_Rows);
          when OOXML =>
-            Parse_OOXML (File_Name, Sheet_Name);
+            Parse_OOXML (File_Name, Sheet_Name, Skip_Rows, Max_Rows);
       end case;
 
       if not SData.Config.Quiet_Mode then
@@ -226,7 +240,13 @@ package body SData.File_IO is
    -----------------
    -- Open_Output --
    -----------------
-   procedure Open_Output (File_Name : String; Fmt : Format_Type; Sheet_Name : String := "") is
+   procedure Open_Output (File_Name       : String;
+                          Fmt             : Format_Type;
+                          Sheet_Name      : String  := "";
+                          Delimiter       : String  := ",";
+                          Write_Header    : Boolean := True;
+                          Allow_Overwrite : Boolean := True;
+                          Charset         : String  := "") is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       Sname   : constant String := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
@@ -250,7 +270,7 @@ package body SData.File_IO is
 
       case Actual_Fmt is
          when CSV =>
-            Write_CSV (File_Name);
+            Write_CSV (File_Name, Delimiter, Write_Header, Allow_Overwrite, Charset);
          when ODF =>
             Write_ODF (File_Name, Sname);
          when OOXML =>
@@ -261,145 +281,555 @@ package body SData.File_IO is
    ---------------
    -- Parse_CSV --
    ---------------
-   procedure Parse_CSV (File_Name : String) is
+   procedure Parse_CSV (File_Name   : String;
+                        Delimiter   : String  := ",";
+                        Read_Header : Boolean := True;
+                        Charset     : String  := "";
+                        Skip_Rows   : Natural := 0;
+                        Max_Rows    : Natural := 0) is
       File : Ada.Text_IO.File_Type;
-      type String_Array is array (Positive range <>) of Unbounded_String;
-      
-      function Split (L : String) return String_Array is
-         Start : Positive := L'First;
-         Pos   : Natural;
-         Count : Natural := 0;
-      begin
-         if L'Length = 0 then return (1 .. 0 => Null_Unbounded_String); end if;
-         for I in L'Range loop if L (I) = ',' then Count := Count + 1; end if; end loop;
-         declare
-            Res : String_Array (1 .. Count + 1);
-            Idx : Positive := 1;
-         begin
-            loop
-               Pos := Index (L (Start .. L'Last), ",");
-               if Pos = 0 then
-                  Res (Idx) := To_Unbounded_String (Trim (L (Start .. L'Last), Ada.Strings.Both));
-                  exit;
-               else
-                  Res (Idx) := To_Unbounded_String (Trim (L (Start .. Pos - 1), Ada.Strings.Both));
-                  Start := Pos + 1;
-                  Idx := Idx + 1;
-               end if;
-            end loop;
-            return Res;
-         end;
-      end Split;
 
-      procedure Process_Row (Fields : String_Array; Names : String_List) is
+      --  Charset handling: buffered path for UTF-16, ASCII validation flag.
+      package Line_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
+      All_Lines       : Line_Vecs.Vector;
+      All_Lines_Idx   : Natural := 0;
+      Is_Buffered     : Boolean := False;
+      Needs_ASCII_Chk : Boolean := False;
+      Rows_Written    : Natural := 0;
+
+      procedure Validate_ASCII (S : String) is
       begin
-         Add_Row;
-         for I in Fields'Range loop
-            if I <= Names'Length then
-               declare
-                  Val_Str : constant String := To_String (Fields (I));
-                  Val : Value;
-               begin
-                  if Val_Str = "" or Val_Str = "." then
-                     Val := (Kind => Val_Missing);
-                  else
-                     begin
-                        Val := (Kind => Val_Numeric, Num_Val => Float'Value (Val_Str));
-                     exception
-                        when others =>
-                           Val := (Kind => Val_String, Str_Val => To_Unbounded_String (Val_Str));
-                     end;
-                  end if;
-                  Set_Value_Upper (Row_Count, Names (I).all, Val);
-               end;
+         for I in S'Range loop
+            if Character'Pos (S (I)) > 127 then
+               SData.IO.Put_Line_Error
+                  ("Warning: non-ASCII byte (value" &
+                   Integer'Image (Character'Pos (S (I))) &
+                   ") found in """ & File_Name & """");
+               return;
             end if;
          end loop;
-      end Process_Row;
+      end Validate_ASCII;
 
-      Header_Line : Unbounded_String;
-      Has_Header  : Boolean := False;
-      NSCAN : constant := 20;
-
-      --  Buffer to hold up to NSCAN data lines for type scanning
-      type UB_Array is array (Positive range <>) of Unbounded_String;
-      Scan_Lines  : UB_Array (1 .. NSCAN);
-      Scan_Count  : Natural := 0;
-   begin
-      Ada.Text_IO.Open (File, Ada.Text_IO.In_File, File_Name);
-      if not Ada.Text_IO.End_Of_File (File) then
-         Header_Line := To_Unbounded_String (Ada.Text_IO.Get_Line (File));
-         Has_Header := True;
-      end if;
-      --  Read up to NSCAN data lines for type detection
-      while not Ada.Text_IO.End_Of_File (File) and then Scan_Count < NSCAN loop
-         Scan_Count := Scan_Count + 1;
-         Scan_Lines (Scan_Count) := To_Unbounded_String (Ada.Text_IO.Get_Line (File));
-      end loop;
-      if Has_Header then
-         declare
-            Headers : constant String_Array := Split (To_String (Header_Line));
-            Names   : String_List (1 .. Headers'Length);
-            --  Track whether each column has been determined yet
-            Col_Determined : array (Headers'Range) of Boolean := (others => False);
-            Col_Types      : array (Headers'Range) of Column_Type := (others => Col_Numeric);
-         begin
-            --  Scan up to NSCAN rows to determine column types
-            for R in 1 .. Scan_Count loop
+      procedure Split_Into_Lines (S : String) is
+         Start : Natural := S'First;
+         I     : Natural := S'First;
+      begin
+         while I <= S'Last loop
+            if S (I) = ASCII.LF then
                declare
-                  DF : constant String_Array := Split (To_String (Scan_Lines (R)));
+                  E : Natural := I - 1;
                begin
-                  for I in Headers'Range loop
-                     if not Col_Determined (I) and then I <= DF'Length then
-                        declare
-                           Val_Str : constant String := To_String (DF (I));
-                        begin
-                           if Val_Str /= "" and then Val_Str /= "." then
-                              --  Non-missing value: try to parse as numeric
-                              begin
-                                 declare Dummy : Float;
-                                 begin
-                                    Dummy := Float'Value (Val_Str);
-                                    Col_Types (I) := Col_Numeric;
-                                 end;
-                              exception
-                                 when others =>
-                                    Col_Types (I) := Col_String;
-                              end;
-                              Col_Determined (I) := True;
-                           end if;
-                        end;
-                     end if;
-                  end loop;
+                  if E >= Start and then S (E) = ASCII.CR then
+                     E := E - 1;
+                  end if;
+                  All_Lines.Append (To_Unbounded_String
+                     (if E >= Start then S (Start .. E) else ""));
                end;
-            end loop;
-            Clear;
-            for I in Headers'Range loop
-               declare
-                  Name : constant String := Safe_Name (To_String (Headers (I)), "COL" & Trim (I'Img, Ada.Strings.Both));
-               begin
-                  Names (I) := new String'(Name);
-                  Add_Column (Name, Col_Types (I));
-               end;
-            end loop;
-            if Scan_Count = 0 then
-               SData.IO.Put_Line_Error ("Warning: File contains a header but no data records.");
+               Start := I + 1;
             end if;
-            --  Process the buffered scan lines
-            for R in 1 .. Scan_Count loop
-               Process_Row (Split (To_String (Scan_Lines (R))), Names);
+            I := I + 1;
+         end loop;
+         if Start <= S'Last then
+            All_Lines.Append (To_Unbounded_String (S (Start .. S'Last)));
+         end if;
+      end Split_Into_Lines;
+
+      --  Single heap-allocated line buffer shared for the entire parse.
+      --  1 MB handles all real-world CSV lines; lines longer than this
+      --  are not supported (Get_Line will truncate and subsequent calls
+      --  will read the remainder as the next "line", producing garbled data).
+      Max_Line : constant := 1_048_576;
+      subtype Line_Buf_T is String (1 .. Max_Line);
+      type    Line_Buf_Access is access Line_Buf_T;
+      procedure Free_Buf is new
+         Ada.Unchecked_Deallocation (Line_Buf_T, Line_Buf_Access);
+
+      Line_Buf  : Line_Buf_Access := new Line_Buf_T;
+      Line_Last : Natural := 0;
+
+      --  Fast decimal parser: handles integers and simple N.M decimals
+      --  without invoking the Ada runtime.  Scientific notation and other
+      --  edge cases fall through to Float'Value.
+      --  Returns True and sets Result for any valid floating-point value.
+      --  Returns False only if the string cannot represent a number.
+      function Try_Fast_Float (S : String; Result : out Float) return Boolean is
+         I         : Integer := S'First;
+         Whole     : Float   := 0.0;
+         Frac      : Float   := 0.0;
+         Denom     : Float   := 1.0;
+         Sign      : Float   := 1.0;
+         After_Dot : Boolean := False;
+         Has_Digit : Boolean := False;
+      begin
+         if I > S'Last then return False; end if;
+         if    S (I) = '-' then Sign := -1.0; I := I + 1;
+         elsif S (I) = '+' then               I := I + 1;
+         end if;
+         while I <= S'Last loop
+            case S (I) is
+               when '0' .. '9' =>
+                  Has_Digit := True;
+                  if After_Dot then
+                     Denom := Denom * 10.0;
+                     Frac  := Frac + Float (Character'Pos (S (I)) - 48) / Denom;
+                  else
+                     Whole := Whole * 10.0 + Float (Character'Pos (S (I)) - 48);
+                  end if;
+               when '.' =>
+                  if After_Dot then return False; end if;
+                  After_Dot := True;
+               when 'E' | 'e' | 'D' | 'd' =>
+                  --  Scientific notation: fall back to Ada runtime.
+                  begin
+                     Result := Float'Value (S);
+                     return True;
+                  exception
+                     when others => return False;
+                  end;
+               when others => return False;
+            end case;
+            I := I + 1;
+         end loop;
+         if not Has_Digit then return False; end if;
+         Result := Sign * (Whole + Frac);
+         return True;
+      end Try_Fast_Float;
+
+      --  Scan forward from Pos, honouring quote-enclosed fields.
+      --  Returns the position of the first byte of the delimiter that ends the
+      --  field, or 0 if no delimiter was found (final field).  Supports
+      --  multi-character delimiters.  Quoted fields follow the spec: same-type
+      --  doubled quotes are treated as a literal quote; the opposite quote type
+      --  is taken literally inside a quoted field.
+      DLen : constant Positive :=
+         (if Delimiter'Length > 0 then Delimiter'Length else 1);
+
+      function At_Delimiter (Line : String; Pos : Positive) return Boolean is
+      begin
+         if Pos + DLen - 1 > Line'Last then return False; end if;
+         if DLen = 1 then return Line (Pos) = Delimiter (Delimiter'First); end if;
+         return Line (Pos .. Pos + DLen - 1) = Delimiter;
+      end At_Delimiter;
+
+      function CSV_Field_End (Line : String; From : Positive) return Natural is
+         I : Positive := From;
+         Q : Character;
+      begin
+         if I > Line'Last then return 0; end if;
+         if Line (I) = '"' or else Line (I) = ''' then
+            Q := Line (I);
+            I := I + 1;
+            while I <= Line'Last loop
+               if Line (I) = Q then
+                  if I < Line'Last and then Line (I + 1) = Q then
+                     I := I + 2;   --  doubled quote → literal
+                  else
+                     I := I + 1;   --  closing quote
+                     exit;
+                  end if;
+               else
+                  I := I + 1;
+               end if;
             end loop;
-            --  Process remaining lines
+            --  After the closing quote, the next chars must be the delimiter.
+            if At_Delimiter (Line, I) then return I; end if;
+            return 0;
+         else
+            for K in From .. Line'Last loop
+               if At_Delimiter (Line, K) then return K; end if;
+            end loop;
+            return 0;
+         end if;
+      end CSV_Field_End;
+
+      --  Extract the unquoted, unescaped value from a raw CSV field slice.
+      --  For quoted fields: strips surrounding quotes and collapses doubled
+      --  same-type quotes.  For unquoted fields: returns Trim(Raw).
+      function CSV_Unquote (Raw : String) return String is
+         T : constant String := Trim (Raw, Ada.Strings.Both);
+         Q : Character;
+         R : Unbounded_String;
+         I : Positive;
+      begin
+         if T'Length >= 2
+            and then (T (T'First) = '"' or else T (T'First) = ''')
+            and then T (T'Last) = T (T'First)
+         then
+            Q := T (T'First);
+            I := T'First + 1;
+            while I <= T'Last - 1 loop
+               if T (I) = Q and then I < T'Last - 1 and then T (I + 1) = Q then
+                  Append (R, Q);
+                  I := I + 2;
+               else
+                  Append (R, T (I));
+                  I := I + 1;
+               end if;
+            end loop;
+            return To_String (R);
+         end if;
+         return T;
+      end CSV_Unquote;
+
+      --  Process one CSV line with RFC-4180-style quote handling.
+      procedure Process_Line_Direct (Line : String; Names : String_List) is
+         Start       : Integer := Line'First;
+         Field_Count : Natural := 0;
+      begin
+         if Max_Rows > 0 and then Rows_Written >= Max_Rows then return; end if;
+         Rows_Written := Rows_Written + 1;
+         Add_Row;
+         loop
+            declare
+               Delim_Pos : constant Natural := CSV_Field_End (Line, Start);
+               Val       : Value;
+               Num       : Float;
+            begin
+               declare
+                  Raw : constant String :=
+                     (if Delim_Pos > 0 then Line (Start .. Delim_Pos - 1)
+                      else                  Line (Start .. Line'Last));
+                  F   : constant String := CSV_Unquote (Raw);
+               begin
+                  Field_Count := Field_Count + 1;
+                  if Field_Count <= Names'Length then
+                     if F = "" or else F = "." then
+                        Val := (Kind => Val_Missing);
+                     elsif Try_Fast_Float (F, Num) then
+                        Val := (Kind => Val_Numeric, Num_Val => Num);
+                     else
+                        Val := (Kind    => Val_String,
+                                Str_Val => To_Unbounded_String (F));
+                     end if;
+                     Set_Value_Upper (Row_Count, Names (Field_Count).all, Val);
+                  end if;
+               end;
+               exit when Delim_Pos = 0;
+               Start := Delim_Pos + DLen;
+            end;
+         end loop;
+      end Process_Line_Direct;
+
+      --  Determine whether a field string is numeric (for NSCAN type detection).
+      function Is_Numeric_Field (F : String) return Boolean is
+         Dummy : Float;
+      begin
+         return Try_Fast_Float (F, Dummy);
+      end Is_Numeric_Field;
+
+      --  Parse a CSV line into up to Max_Fields field slices stored as
+      --  (start, end) index pairs into the Line string.  Used only during
+      --  the NSCAN type-detection phase (at most 20 rows).
+      Max_Fields : constant := 65536;
+      type Field_Pair is record S, E : Natural; end record;
+      type Field_Array is array (1 .. Max_Fields) of Field_Pair;
+
+      function Split_Indices (Line : String; N_Fields : out Natural)
+         return Field_Array
+      is
+         Res   : Field_Array;
+         Start : Integer := Line'First;
+         Count : Natural := 0;
+      begin
+         N_Fields := 0;
+         if Line'Length = 0 then return Res; end if;
+         loop
+            declare
+               Delim : constant Natural := CSV_Field_End (Line, Start);
+            begin
+               Count := Count + 1;
+               if Count <= Max_Fields then
+                  Res (Count).S := Start;
+                  Res (Count).E := (if Delim > 0 then Delim - 1 else Line'Last);
+               end if;
+               exit when Delim = 0;
+               Start := Delim + DLen;
+            end;
+         end loop;
+         N_Fields := Count;
+         return Res;
+      end Split_Indices;
+
+      Has_File_Header : Boolean := False;
+      NSCAN       : constant := 20;
+
+      --  Store up to NSCAN scan lines as Unbounded_Strings for type detection.
+      --  Only 20 rows — the allocation cost is negligible.
+      type UB_Array is array (1 .. NSCAN) of Unbounded_String;
+      Scan_Lines  : UB_Array;
+      Scan_Count  : Natural := 0;
+      Header_Line : Unbounded_String;
+
+      --  Inner helper: detect types, build columns, and stream data rows.
+      procedure Load_Columns_And_Data
+         (H_Str  : String;
+          Names_From_Header : Boolean)
+      is
+         N_Hdr : Natural;
+         H_Idx : constant Field_Array := Split_Indices (H_Str, N_Hdr);
+         Names : String_List (1 .. N_Hdr);
+         Col_Determined : array (1 .. N_Hdr) of Boolean     := (others => False);
+         Col_Types      : array (1 .. N_Hdr) of Column_Type := (others => Col_Numeric);
+      begin
+         --  Per spec: a column whose header already ends in "$" is forced character.
+         if Names_From_Header then
+            for I in 1 .. N_Hdr loop
+               declare
+                  Raw : constant String :=
+                     Trim (H_Str (H_Idx (I).S .. H_Idx (I).E), Ada.Strings.Both);
+               begin
+                  if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
+                     Col_Types (I) := Col_String;
+                     Col_Determined (I) := True;
+                  end if;
+               end;
+            end loop;
+         end if;
+
+         --  Detect column types from up to NSCAN scan rows.
+         for R in 1 .. Scan_Count loop
+            declare
+               D_Str : constant String := To_String (Scan_Lines (R));
+               N_Fld : Natural;
+               D_Idx : constant Field_Array := Split_Indices (D_Str, N_Fld);
+            begin
+               for I in 1 .. N_Hdr loop
+                  if not Col_Determined (I) and then I <= N_Fld then
+                     declare
+                        F : constant String :=
+                           CSV_Unquote (D_Str (D_Idx (I).S .. D_Idx (I).E));
+                     begin
+                        if F /= "" and then F /= "." then
+                           Col_Types (I) :=
+                              (if Is_Numeric_Field (F) then Col_Numeric
+                               else Col_String);
+                           Col_Determined (I) := True;
+                        end if;
+                     end;
+                  end if;
+               end loop;
+            end;
+         end loop;
+
+         Clear;
+         for I in 1 .. N_Hdr loop
+            declare
+               Base_Name : constant String :=
+                  (if Names_From_Header
+                   then Safe_Name (CSV_Unquote (H_Str (H_Idx (I).S .. H_Idx (I).E)),
+                                   "COL" & Trim (I'Img, Ada.Strings.Both))
+                   else "COL" & Trim (I'Img, Ada.Strings.Both));
+               --  Per spec: append "$" to string column names that don't already end in "$"
+               Name : constant String :=
+                  (if Col_Types (I) = Col_String
+                      and then (Base_Name'Length = 0
+                                or else Base_Name (Base_Name'Last) /= '$')
+                   then Base_Name & "$"
+                   else Base_Name);
+            begin
+               Names (I) := new String'(Name);
+               Add_Column (Name, Col_Types (I));
+            end;
+         end loop;
+
+         if Names_From_Header and then Scan_Count = 0 then
+            SData.IO.Put_Line_Error
+               ("Warning: File contains a header but no data records.");
+         end if;
+
+         --  Process buffered scan lines (all of them when no-header mode).
+         for R in 1 .. Scan_Count loop
+            exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+            Process_Line_Direct (To_String (Scan_Lines (R)), Names);
+         end loop;
+
+         --  Process remaining lines (text file or pre-loaded buffer).
+         if Is_Buffered then
+            while All_Lines_Idx < Natural (All_Lines.Length) loop
+               exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+               All_Lines_Idx := All_Lines_Idx + 1;
+               Process_Line_Direct (To_String (All_Lines (All_Lines_Idx)), Names);
+            end loop;
+         else
             while not Ada.Text_IO.End_Of_File (File) loop
-               Process_Row (Split (Ada.Text_IO.Get_Line (File)), Names);
+               exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+               Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+               if Needs_ASCII_Chk then
+                  Validate_ASCII (Line_Buf (1 .. Line_Last));
+               end if;
+               Process_Line_Direct (Line_Buf (1 .. Line_Last), Names);
             end loop;
-            for I in Names'Range loop
-               Free (Names (I));
+         end if;
+
+         for I in Names'Range loop Free (Names (I)); end loop;
+      end Load_Columns_And_Data;
+
+   begin
+      --  Charset setup: determine encoding and load whole file for UTF-16.
+      declare
+         use Ada.Streams;
+         UC : constant String := To_Upper (Trim (Charset, Ada.Strings.Both));
+
+         procedure Load_As_UTF16
+            (Scheme : Ada.Strings.UTF_Encoding.Encoding_Scheme)
+         is
+            F    : Ada.Streams.Stream_IO.File_Type;
+            Sz   : constant Ada.Directories.File_Size :=
+               Ada.Directories.Size (File_Name);
+            Buf  : Ada.Streams.Stream_Element_Array
+               (1 .. Ada.Streams.Stream_Element_Offset (Sz));
+            Last : Ada.Streams.Stream_Element_Offset;
+            Raw  : String (1 .. Natural (Sz));
+         begin
+            Ada.Streams.Stream_IO.Open
+               (F, Ada.Streams.Stream_IO.In_File, File_Name);
+            Ada.Streams.Stream_IO.Read (F, Buf, Last);
+            Ada.Streams.Stream_IO.Close (F);
+            for I in 1 .. Natural (Last) loop
+               Raw (I) :=
+                  Character'Val (Buf (Ada.Streams.Stream_Element_Offset (I)));
             end loop;
-         end;
+            declare
+               UTF8     : constant String :=
+                  Ada.Strings.UTF_Encoding.Conversions.Convert
+                     (Raw (1 .. Natural (Last)), Scheme,
+                      Ada.Strings.UTF_Encoding.UTF_8);
+               Start_At : Natural := UTF8'First;
+            begin
+               if UTF8'Length >= 3
+                  and then UTF8 (UTF8'First .. UTF8'First + 2) = BOM_8
+               then
+                  Start_At := UTF8'First + 3;
+               end if;
+               Split_Into_Lines (UTF8 (Start_At .. UTF8'Last));
+               Is_Buffered := True;
+            end;
+         exception
+            when others =>
+               if Ada.Streams.Stream_IO.Is_Open (F) then
+                  Ada.Streams.Stream_IO.Close (F);
+               end if;
+               raise;
+         end Load_As_UTF16;
+
+         procedure Detect_And_Load is
+            F      : Ada.Streams.Stream_IO.File_Type;
+            Detect : Ada.Streams.Stream_Element_Array (1 .. 4);
+            Last   : Ada.Streams.Stream_Element_Offset;
+         begin
+            Ada.Streams.Stream_IO.Open
+               (F, Ada.Streams.Stream_IO.In_File, File_Name);
+            Ada.Streams.Stream_IO.Read (F, Detect, Last);
+            Ada.Streams.Stream_IO.Close (F);
+            if Last >= 2
+               and then Detect (1) = 16#FF# and then Detect (2) = 16#FE#
+            then
+               Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16LE);
+            elsif Last >= 2
+               and then Detect (1) = 16#FE# and then Detect (2) = 16#FF#
+            then
+               Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16BE);
+            end if;
+         exception
+            when others =>
+               if Ada.Streams.Stream_IO.Is_Open (F) then
+                  Ada.Streams.Stream_IO.Close (F);
+               end if;
+               raise;
+         end Detect_And_Load;
+
+      begin
+         if UC = "UTF-16" or else UC = "UTF-16LE" then
+            Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16LE);
+         elsif UC = "UTF-16BE" then
+            Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16BE);
+         elsif UC = "" or else UC = "AUTO" then
+            Detect_And_Load;
+         elsif UC = "ASCII" then
+            Needs_ASCII_Chk := True;
+         end if;
+      end;
+
+      --  Open text file for non-buffered (ASCII / UTF-8 / no charset) path.
+      if not Is_Buffered then
+         Ada.Text_IO.Open (File, Ada.Text_IO.In_File, File_Name);
       end if;
-      Ada.Text_IO.Close (File);
+
+      if Is_Buffered then
+         --  Header and scan lines come from the pre-loaded buffer.
+         if Read_Header and then Natural (All_Lines.Length) >= 1 then
+            Header_Line     := All_Lines (1);
+            Has_File_Header := True;
+            All_Lines_Idx   := 1;
+         end if;
+         --  SKIP: advance past the first Skip_Rows data lines.
+         if Skip_Rows > 0 then
+            All_Lines_Idx :=
+               Natural'Min (All_Lines_Idx + Skip_Rows, Natural (All_Lines.Length));
+         end if;
+         while All_Lines_Idx < Natural (All_Lines.Length)
+            and then Scan_Count < NSCAN
+            and then (Max_Rows = 0 or else Scan_Count < Max_Rows)
+         loop
+            All_Lines_Idx := All_Lines_Idx + 1;
+            Scan_Count    := Scan_Count + 1;
+            Scan_Lines (Scan_Count) := All_Lines (All_Lines_Idx);
+         end loop;
+      else
+         if Read_Header then
+            --  Read the first line as a named header; strip UTF-8 BOM if present.
+            if not Ada.Text_IO.End_Of_File (File) then
+               Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+               declare
+                  L : constant String := Line_Buf (1 .. Line_Last);
+               begin
+                  if L'Length >= 3
+                     and then L (L'First .. L'First + 2) = BOM_8
+                  then
+                     Header_Line :=
+                        To_Unbounded_String (L (L'First + 3 .. L'Last));
+                  else
+                     Header_Line := To_Unbounded_String (L);
+                  end if;
+               end;
+               Has_File_Header := True;
+            end if;
+         end if;
+
+         --  SKIP: discard the first Skip_Rows data lines.
+         for I in 1 .. Skip_Rows loop
+            exit when Ada.Text_IO.End_Of_File (File);
+            Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+            if Needs_ASCII_Chk then Validate_ASCII (Line_Buf (1 .. Line_Last)); end if;
+         end loop;
+
+         --  Buffer up to NSCAN data lines (capped at MAXROWS) for column-type detection.
+         while not Ada.Text_IO.End_Of_File (File)
+            and then Scan_Count < NSCAN
+            and then (Max_Rows = 0 or else Scan_Count < Max_Rows)
+         loop
+            Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+            if Needs_ASCII_Chk then
+               Validate_ASCII (Line_Buf (1 .. Line_Last));
+            end if;
+            Scan_Count := Scan_Count + 1;
+            Scan_Lines (Scan_Count) :=
+               To_Unbounded_String (Line_Buf (1 .. Line_Last));
+         end loop;
+      end if;
+
+      if Has_File_Header then
+         Load_Columns_And_Data (To_String (Header_Line), Names_From_Header => True);
+      elsif Scan_Count > 0 then
+         --  No header: synthesise column names from the first data row's field count.
+         Load_Columns_And_Data (To_String (Scan_Lines (1)), Names_From_Header => False);
+      end if;
+
+      Free_Buf (Line_Buf);
+      if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
    exception
       when others =>
+         Free_Buf (Line_Buf);
          if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
          raise;
    end Parse_CSV;
@@ -407,48 +837,118 @@ package body SData.File_IO is
    ---------------
    -- Write_CSV --
    ---------------
-   procedure Write_CSV (File_Name : String) is
-      File : Ada.Text_IO.File_Type;
-      N    : constant Natural := Column_Count;
+   procedure Write_CSV (File_Name       : String;
+                        Delimiter       : String  := ",";
+                        Write_Header    : Boolean := True;
+                        Allow_Overwrite : Boolean := True;
+                        Charset         : String  := "") is
+      use Ada.Directories;
+
+      TXTFMT_Len : constant Natural := SData.Config.Runtime.Options_TXTFMT_Len;
+      TXTFMT_Raw : constant String  :=
+         (if TXTFMT_Len > 0 then SData.Config.Runtime.Options_TXTFMT (1 .. TXTFMT_Len)
+          else "AUTO");
+      EOL : constant String :=
+         (if    TXTFMT_Raw = "CRLF" then "" & ASCII.CR & ASCII.LF
+          elsif TXTFMT_Raw = "CR"   then "" & ASCII.CR
+          else                           "" & ASCII.LF);
+
+      Eff_Charset  : constant String :=
+         To_Upper (Trim (Charset, Ada.Strings.Both));
+      Is_UTF16     : constant Boolean :=
+         Eff_Charset = "UTF-16" or else
+         Eff_Charset = "UTF-16LE" or else
+         Eff_Charset = "UTF-16BE";
+      Is_UTF16BE_W : constant Boolean := Eff_Charset = "UTF-16BE";
+      Is_ASCII_Chk : constant Boolean := Eff_Charset = "ASCII";
+      Out_Scheme   : constant Ada.Strings.UTF_Encoding.Encoding_Scheme :=
+         (if Is_UTF16BE_W
+          then Ada.Strings.UTF_Encoding.UTF_16BE
+          else Ada.Strings.UTF_Encoding.UTF_16LE);
+      Out_BOM      : constant String :=
+         (if Is_UTF16 then (if Is_UTF16BE_W then BOM_16BE else BOM_16LE)
+          else "");
+
+      File  : Ada.Streams.Stream_IO.File_Type;
+      Strm  : Ada.Streams.Stream_IO.Stream_Access;
+      N     : constant Natural := Column_Count;
+      D_Str : constant String := Delimiter;
+
+      procedure Write_String (S : String) is
+      begin
+         if Is_UTF16 then
+            String'Write (Strm,
+               Ada.Strings.UTF_Encoding.Conversions.Convert
+                  (S, Ada.Strings.UTF_Encoding.UTF_8, Out_Scheme));
+         else
+            if Is_ASCII_Chk then
+               for I in S'Range loop
+                  if Character'Pos (S (I)) > 127 then
+                     SData.IO.Put_Line_Error
+                        ("Warning: non-ASCII byte (value" &
+                         Integer'Image (Character'Pos (S (I))) &
+                         ") in output for """ & File_Name & """");
+                     exit;
+                  end if;
+               end loop;
+            end if;
+            String'Write (Strm, S);
+         end if;
+      end Write_String;
+
    begin
-      Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, File_Name);
+      if not Allow_Overwrite and then Exists (File_Name) then
+         SData.IO.Put_Line_Error
+            ("Error: SAVE aborted — file already exists: " & File_Name &
+             " (use OPTIONS SAVEOVERWRT YES to allow overwriting)");
+         raise Save_Refused;
+      end if;
+      Ada.Streams.Stream_IO.Create (File, Ada.Streams.Stream_IO.Out_File, File_Name);
+      Strm := Ada.Streams.Stream_IO.Stream (File);
+      if Is_UTF16 then
+         String'Write (Strm, Out_BOM);
+      end if;
       if N > 0 then
-         for I in 1 .. N loop
-            Ada.Text_IO.Put (File, Column_Name (I));
-            if I /= N then Ada.Text_IO.Put (File, ","); end if;
-         end loop;
-         Ada.Text_IO.New_Line (File);
+         if Write_Header then
+            for I in 1 .. N loop
+               Write_String (Column_Name (I));
+               if I /= N then Write_String (D_Str); end if;
+            end loop;
+            Write_String (EOL);
+         end if;
          for R in 1 .. Row_Count loop
             for C in 1 .. N loop
                declare
                   Val : constant Value := Get_Value_Upper (R, Column_Name (C));
                begin
                   if Val.Kind = Val_Numeric then
-                     Ada.Text_IO.Put (File, Trim (Val.Num_Val'Img, Ada.Strings.Both));
+                     Write_String (Trim (Val.Num_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_Integer then
-                     Ada.Text_IO.Put (File, Trim (Val.Int_Val'Img, Ada.Strings.Both));
+                     Write_String (Trim (Val.Int_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_String then
-                     Ada.Text_IO.Put (File, SData.Values.To_String (Val));
-                  else
-                     Ada.Text_IO.Put (File, ".");
+                     Write_String (SData.Values.To_String (Val));
                   end if;
+                  --  Missing values: write nothing (consecutive delimiters per spec)
                end;
-               if C /= N then Ada.Text_IO.Put (File, ","); end if;
+               if C /= N then Write_String (D_Str); end if;
             end loop;
-            Ada.Text_IO.New_Line (File);
+            Write_String (EOL);
          end loop;
       end if;
-      Ada.Text_IO.Close (File);
+      Ada.Streams.Stream_IO.Close (File);
    exception
       when others =>
-         if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
+         if Ada.Streams.Stream_IO.Is_Open (File) then
+            Ada.Streams.Stream_IO.Close (File);
+         end if;
          raise;
    end Write_CSV;
 
    ------------------
    --  Parse_ODF  --
    ------------------
-   procedure Parse_ODF (File_Name : String; Sheet_Name : String := "") is
+   procedure Parse_ODF (File_Name : String; Sheet_Name : String := "";
+                        Skip_Rows : Natural := 0; Max_Rows : Natural := 0) is
       use DOM.Core;
       use DOM.Core.Nodes;
       use DOM.Core.Elements;
@@ -597,6 +1097,16 @@ package body SData.File_IO is
                Data_Cells : Node_List;
                Col_Idx    : Natural := 0;
             begin
+               --  Per spec: column names already ending in "$" are forced character.
+               for I in 1 .. N loop
+                  declare
+                     Raw : constant String := To_String (Col_Name_Vec (I));
+                  begin
+                     if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
+                        Col_Types (I) := Col_String;
+                     end if;
+                  end;
+               end loop;
                if Length (Rows) > 1 then
                   Data_Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 1)), "table:table-cell");
                   for J in 0 .. Length (Data_Cells) - 1 loop
@@ -609,60 +1119,80 @@ package body SData.File_IO is
                   Free (Data_Cells);
                end if;
                for I in 1 .. N loop
-                  Add_Column (To_String (Col_Name_Vec (I)), Col_Types (I));
+                  declare
+                     Raw_Name  : constant String := To_String (Col_Name_Vec (I));
+                     Final_Name : constant String :=
+                        (if Col_Types (I) = Col_String
+                            and then (Raw_Name'Length = 0
+                                      or else Raw_Name (Raw_Name'Last) /= '$')
+                         then Raw_Name & "$"
+                         else Raw_Name);
+                  begin
+                     Add_Column (Final_Name, Col_Types (I));
+                  end;
                end loop;
             end;
             Col_Count := Column_Count;
 
             -- Data Rows
-            for I in 1 .. Length (Rows) - 1 loop
-               declare
-                  Row_Node : constant Node := Item (Rows, I);
-                  Row_Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Row_Node), "table:number-rows-repeated");
-                  Row_Repeat_Count : constant Positive := (if Row_Repeat_Attr = "" then 1 else Positive'Value (Row_Repeat_Attr));
-               begin
-                  -- Heuristic: If we see a huge number of repeated rows, it's usually just empty padding at the end of the sheet
-                  exit when Row_Repeat_Count > 1000;
-
-                  for R_Count in 1 .. Row_Repeat_Count loop
-                     Add_Row;
-                     Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Row_Node), "table:table-cell");
-                     declare
-                        Col_Idx : Positive := 1;
-                     begin
-                        for J in 0 .. Length (Cells) - 1 loop
+            declare
+               Rows_To_Skip : Natural := Skip_Rows;
+               Rows_Written : Natural := 0;
+            begin
+               for I in 1 .. Length (Rows) - 1 loop
+                  declare
+                     Row_Node : constant Node := Item (Rows, I);
+                     Row_Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Row_Node), "table:number-rows-repeated");
+                     Row_Repeat_Count : constant Positive := (if Row_Repeat_Attr = "" then 1 else Positive'Value (Row_Repeat_Attr));
+                  begin
+                     exit when Row_Repeat_Count > 1000;
+                     exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+                     for R_Count in 1 .. Row_Repeat_Count loop
+                        if Rows_To_Skip > 0 then
+                           Rows_To_Skip := Rows_To_Skip - 1;
+                        else
+                           exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+                           Rows_Written := Rows_Written + 1;
+                           Add_Row;
+                           Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Row_Node), "table:table-cell");
                            declare
-                              Cell : constant Node := Item (Cells, J);
-                              Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
-                              Repeat_Count : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
-                              Val : constant Value := Get_Cell_Value (Cell);
+                              Col_Idx : Positive := 1;
                            begin
-                              for K in 1 .. Repeat_Count loop
-                                 if Col_Idx <= Col_Count then
-                                    if Val.Kind /= Val_Missing then
-                                       begin
-                                          Set_Value (Row_Count, Column_Name (Col_Idx), Val);
-                                       exception
-                                          when E : others =>
-                                             if not SData.Config.Quiet_Mode then
-                                                Put_Line_Error ("Warning: ODF import skipped cell at row" &
-                                                   Row_Count'Image & ", column """ &
-                                                   Column_Name (Col_Idx) & """: " &
-                                                   Ada.Exceptions.Exception_Message (E));
-                                             end if;
-                                       end;
-                                    end if;
-                                    Col_Idx := Col_Idx + 1;
-                                 end if;
+                              for J in 0 .. Length (Cells) - 1 loop
+                                 declare
+                                    Cell : constant Node := Item (Cells, J);
+                                    Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
+                                    Repeat_Count : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
+                                    Val : constant Value := Get_Cell_Value (Cell);
+                                 begin
+                                    for K in 1 .. Repeat_Count loop
+                                       if Col_Idx <= Col_Count then
+                                          if Val.Kind /= Val_Missing then
+                                             begin
+                                                Set_Value (Row_Count, Column_Name (Col_Idx), Val);
+                                             exception
+                                                when E : others =>
+                                                   if not SData.Config.Quiet_Mode then
+                                                      Put_Line_Error ("Warning: ODF import skipped cell at row" &
+                                                         Row_Count'Image & ", column """ &
+                                                         Column_Name (Col_Idx) & """: " &
+                                                         Ada.Exceptions.Exception_Message (E));
+                                                   end if;
+                                             end;
+                                          end if;
+                                          Col_Idx := Col_Idx + 1;
+                                       end if;
+                                    end loop;
+                                 end;
+                                 exit when Col_Idx > Col_Count;
                               end loop;
                            end;
-                           exit when Col_Idx > Col_Count;
-                        end loop;
-                     end;
-                     Free (Cells);
-                  end loop;
-               end;
-            end loop;
+                           Free (Cells);
+                        end if;
+                     end loop;
+                  end;
+               end loop;
+            end;
          end;
          end if;
 
@@ -686,7 +1216,8 @@ package body SData.File_IO is
    -----------------
    -- Parse_OOXML --
    -----------------
-   procedure Parse_OOXML (File_Name : String; Sheet_Name : String := "") is
+   procedure Parse_OOXML (File_Name : String; Sheet_Name : String := "";
+                          Skip_Rows : Natural := 0; Max_Rows : Natural := 0) is
       use DOM.Core;
       use DOM.Core.Nodes;
       use DOM.Core.Elements;
@@ -950,6 +1481,16 @@ package body SData.File_IO is
                   Data_Cells : Node_List;
                   Col_Idx    : Natural := 0;
                begin
+                  --  Per spec: column names already ending in "$" are forced character.
+                  for I in 1 .. N loop
+                     declare
+                        Raw : constant String := To_String (Col_Name_Vec (I));
+                     begin
+                        if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
+                           Col_Types (I) := Col_String;
+                        end if;
+                     end;
+                  end loop;
                   if Length (Rows) > 1 then
                      Data_Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 1)), "c");
                      for J in 0 .. Length (Data_Cells) - 1 loop
@@ -962,37 +1503,58 @@ package body SData.File_IO is
                      Free (Data_Cells);
                   end if;
                   for I in 1 .. N loop
-                     Add_Column (To_String (Col_Name_Vec (I)), Col_Types (I));
+                     declare
+                        Raw_Name  : constant String := To_String (Col_Name_Vec (I));
+                        Final_Name : constant String :=
+                           (if Col_Types (I) = Col_String
+                               and then (Raw_Name'Length = 0
+                                         or else Raw_Name (Raw_Name'Last) /= '$')
+                            then Raw_Name & "$"
+                            else Raw_Name);
+                     begin
+                        Add_Column (Final_Name, Col_Types (I));
+                     end;
                   end loop;
                end;
             end;
             Col_Count := Column_Count;
 
             -- Data Rows
-            for I in 1 .. Length (Rows) - 1 loop
-               Add_Row;
-               Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, I)), "c");
-               for J in 0 .. Length (Cells) - 1 loop
-                  if J < Col_Count then
-                     declare
-                        V : constant Value := Get_Cell_Value (Item (Cells, J));
-                     begin
-                        if V.Kind /= Val_Missing then
-                           Set_Value (Row_Count, Column_Name (J + 1), V);
+            declare
+               Rows_To_Skip : Natural := Skip_Rows;
+               Rows_Written : Natural := 0;
+            begin
+               for I in 1 .. Length (Rows) - 1 loop
+                  exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+                  if Rows_To_Skip > 0 then
+                     Rows_To_Skip := Rows_To_Skip - 1;
+                  else
+                     Rows_Written := Rows_Written + 1;
+                     Add_Row;
+                     Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, I)), "c");
+                     for J in 0 .. Length (Cells) - 1 loop
+                        if J < Col_Count then
+                           declare
+                              V : constant Value := Get_Cell_Value (Item (Cells, J));
+                           begin
+                              if V.Kind /= Val_Missing then
+                                 Set_Value (Row_Count, Column_Name (J + 1), V);
+                              end if;
+                           exception
+                              when E : others =>
+                                 if not SData.Config.Quiet_Mode then
+                                    Put_Line_Error ("Warning: OOXML import skipped cell at row" &
+                                       Row_Count'Image & ", column """ &
+                                       Column_Name (J + 1) & """: " &
+                                       Ada.Exceptions.Exception_Message (E));
+                                 end if;
+                           end;
                         end if;
-                     exception
-                        when E : others =>
-                           if not SData.Config.Quiet_Mode then
-                              Put_Line_Error ("Warning: OOXML import skipped cell at row" &
-                                 Row_Count'Image & ", column """ &
-                                 Column_Name (J + 1) & """: " &
-                                 Ada.Exceptions.Exception_Message (E));
-                           end if;
-                     end;
+                     end loop;
+                     Free (Cells);
                   end if;
                end loop;
-               Free (Cells);
-            end loop;
+            end;
          end if;
 
          Free (Rows);

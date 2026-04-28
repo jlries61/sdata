@@ -6,6 +6,7 @@ with Ada.Text_IO;
 with Ada.Text_IO.Unbounded_IO;
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with Ada.Strings.Fixed;
 with Ada.Streams.Stream_IO;
 with Ada.Unchecked_Deallocation;
 with Ada.Exceptions; use Ada.Exceptions;
@@ -112,27 +113,33 @@ procedure SData_Main is
             begin
                Prog := Parse_Program (Ctx);
 
-               -- If parsing succeeded, we can clear the buffer.
-               Buffer := Null_Unbounded_String;
+               --  Save source for program buffer display before clearing.
+               declare
+                  Source_Text : constant String := Ada.Strings.Fixed.Trim
+                    (To_String (Buffer), Ada.Strings.Right);
+               begin
+                  -- If parsing succeeded, we can clear the buffer.
+                  Buffer := Null_Unbounded_String;
 
-               while Prog /= null loop
-                  begin
-                     if Is_Immediate (Prog.Kind) then
-                        if Prog.Kind = Stmt_RUN then
-                           Run_Active_Program;
-                        elsif Prog.Kind = Stmt_QUIT or else Prog.Kind = Stmt_END then
-                           SData.IO.Flush_Pager_Buffer;
-                           exit REPL;
+                  while Prog /= null loop
+                     begin
+                        if Is_Immediate (Prog.Kind) then
+                           if Prog.Kind = Stmt_RUN then
+                              Run_Active_Program;
+                           elsif Prog.Kind = Stmt_QUIT or else Prog.Kind = Stmt_END then
+                              SData.IO.Flush_Pager_Buffer;
+                              exit REPL;
+                           else
+                              Execute (Prog);
+                           end if;
                         else
-                           Execute (Prog);
+                           --  Deferred statements are queued until RUN.
+                           Add_To_Active_Program (Prog, Source_Text);
                         end if;
-                     else
-                        -- Deferred statements are queued until RUN.
-                        Add_To_Active_Program (Prog);
-                     end if;
-                  end;
-                  Prog := Prog.Next;
-               end loop;
+                     end;
+                     Prog := Prog.Next;
+                  end loop;
+               end;
                SData.IO.Flush_Pager_Buffer;
 
             exception

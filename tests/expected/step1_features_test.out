@@ -1,0 +1,15 @@
+1.5E3: 1500.00000
+2.0E-2: 0.02000
+1.5E+2: 150.00000
+3E2: 300
+SQ: hello world
+SQ-LEN: 11
+HEX(FF): 255
+HEX(1a): 26
+HEX(0): 0
+SEG1: World
+SEG2: Hel
+SEG3: Hel
+FRAC1: 0.75000
+FRAC2: -0.30000
+RUN complete. 1 records and 1 variables processed.

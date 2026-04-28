@@ -62,20 +62,22 @@ package body SData.Variables is
    -------------------
    procedure Set_Permanent (Name : String; Val : Value) is
       Upper_Name : constant String := To_Upper (Name);
+      Cur        : constant PDV_Index_Pkg.Cursor := PDV_Index.Find (Upper_Name);
    begin
       --  Rule: LET implicitly unsets session variable (Promotion/Exclusivity)
       if Temp_Symbols.Contains (Upper_Name) and then not Is_Held (Upper_Name) then
          Temp_Symbols.Delete (Upper_Name);
       end if;
 
-      --  Update the Permanent symbols PDV.
-      if Permanent_Symbols.Contains (Upper_Name) then
-         Permanent_Symbols.Replace (Upper_Name, Val);
+      if PDV_Index_Pkg.Has_Element (Cur) then
+         PDV_Vec.Replace_Element (PDV_Index_Pkg.Element (Cur), Val);
       else
-         Permanent_Symbols.Insert (Upper_Name, Val);
+         --  New computed variable — allocate a new PDV slot.
+         PDV_Names.Append (To_Unbounded_String (Upper_Name));
+         PDV_Vec.Append (Val);
+         PDV_Index.Insert (Upper_Name, Positive (PDV_Names.Length));
       end if;
-      
-      -- If HELD, we must ensure it persists in the Temp_Symbols map for the next record
+
       if Is_Held (Upper_Name) then
          if Temp_Symbols.Contains (Upper_Name) then
             Temp_Symbols.Replace (Upper_Name, Val);
@@ -101,11 +103,12 @@ package body SData.Variables is
    ---------
    function Get (Name : String) return Value is
       Upper_Name : constant String := To_Upper (Name);
+      Cur        : constant PDV_Index_Pkg.Cursor := PDV_Index.Find (Upper_Name);
    begin
-      --  1. Check Permanent PDV first.
-      if Permanent_Symbols.Contains (Upper_Name) then
+      --  1. Check PDV vector first (one hash lookup, then direct access).
+      if PDV_Index_Pkg.Has_Element (Cur) then
          declare
-            V : constant Value := Permanent_Symbols.Element (Upper_Name);
+            V : constant Value := PDV_Vec.Element (PDV_Index_Pkg.Element (Cur));
          begin
             if V.Kind /= Val_Missing then
                return V;
@@ -113,13 +116,22 @@ package body SData.Variables is
          end;
       end if;
 
-      --  2. Check Temporary symbols.
+      --  2. Check Temporary symbols (held values, session vars, BOG/EOG flags).
       if Temp_Symbols.Contains (Upper_Name) then
          return Temp_Symbols.Element (Upper_Name);
       else
          return (Kind => Val_Missing);
       end if;
    end Get;
+
+   -------------
+   -- Defined --
+   -------------
+   function Defined (Name : String) return Boolean is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      return PDV_Index.Contains (Upper_Name) or else Temp_Symbols.Contains (Upper_Name);
+   end Defined;
 
    ---------------------
    -- Clear_Temporary --
@@ -161,46 +173,50 @@ package body SData.Variables is
    -- Initialize_PDV --
    --------------------
    procedure Initialize_PDV is
+      C : constant Natural := SData.Table.Column_Count;
    begin
-      Permanent_Symbols.Clear;
+      PDV_Vec.Clear;
+      PDV_Index.Clear;
+      PDV_Names.Clear;
+      PDV_Vec.Reserve_Capacity (Ada.Containers.Count_Type (C + 16));
+      for I in 1 .. C loop
+         declare
+            Name : constant String := SData.Table.Column_Name (I);
+         begin
+            PDV_Names.Append (To_Unbounded_String (Name));
+            PDV_Index.Insert (Name, I);
+            PDV_Vec.Append ((Kind => Val_Missing));
+         end;
+      end loop;
    end Initialize_PDV;
 
    -------------------------
    -- Load_PDV_From_Table --
    -------------------------
-   --  Iterates column names via Column_Count/Column_Name so no heap
-   --  allocation is needed just to obtain the list of column names.
+   --  Loads table columns directly into the pre-allocated PDV_Vec slots;
+   --  no hash lookups needed — slot I always corresponds to column I.
    procedure Load_PDV_From_Table (Row : Positive) is
       C : constant Natural := SData.Table.Column_Count;
    begin
       for I in 1 .. C loop
-         declare
-            Name : constant String := SData.Table.Column_Name (I);
-            Val  : constant Value  := SData.Table.Get_Value_Upper (Row, Name);
-         begin
-            if Permanent_Symbols.Contains (Name) then
-               Permanent_Symbols.Replace (Name, Val);
-            else
-               Permanent_Symbols.Insert (Name, Val);
-            end if;
-         end;
+         PDV_Vec.Replace_Element
+           (I, SData.Table.Get_Value_Upper (Row, To_String (PDV_Names.Element (I))));
       end loop;
    end Load_PDV_From_Table;
 
    -------------------------
    -- Load_PDV_One_Column --
    -------------------------
-   --  Loads a single column Col_Name (must be upper-cased) for Row into
-   --  the PDV.  Called by the SELECT filter scan, which first collects the
-   --  set of variable names the filter expression references so that only
-   --  those columns are loaded rather than all of them.
    procedure Load_PDV_One_Column (Row : Positive; Col_Name : String) is
       Val : constant Value := SData.Table.Get_Value_Upper (Row, Col_Name);
+      Cur : constant PDV_Index_Pkg.Cursor := PDV_Index.Find (Col_Name);
    begin
-      if Permanent_Symbols.Contains (Col_Name) then
-         Permanent_Symbols.Replace (Col_Name, Val);
+      if PDV_Index_Pkg.Has_Element (Cur) then
+         PDV_Vec.Replace_Element (PDV_Index_Pkg.Element (Cur), Val);
       else
-         Permanent_Symbols.Insert (Col_Name, Val);
+         PDV_Names.Append (To_Unbounded_String (Col_Name));
+         PDV_Vec.Append (Val);
+         PDV_Index.Insert (Col_Name, Positive (PDV_Names.Length));
       end if;
    end Load_PDV_One_Column;
 
@@ -213,8 +229,10 @@ package body SData.Variables is
          declare
             Name : constant String := SData.Table.Column_Name (I);
          begin
-            if not Permanent_Symbols.Contains (Name) then
-               Permanent_Symbols.Insert (Name, (Kind => Val_Missing));
+            if not PDV_Index.Contains (Name) then
+               PDV_Names.Append (To_Unbounded_String (Name));
+               PDV_Vec.Append ((Kind => Val_Missing));
+               PDV_Index.Insert (Name, Positive (PDV_Names.Length));
             end if;
          end;
       end loop;
@@ -224,43 +242,41 @@ package body SData.Variables is
    -- Reset_PDV_Non_Held --
    ------------------------
    procedure Reset_PDV_Non_Held is
-      Pos : Symbol_Table_Pkg.Cursor := Permanent_Symbols.First;
    begin
-      while Symbol_Table_Pkg.Has_Element (Pos) loop
+      for I in 1 .. Natural (PDV_Names.Length) loop
          declare
-            Name : constant String := Symbol_Table_Pkg.Key (Pos);
+            Name : constant String := To_String (PDV_Names.Element (I));
          begin
             if not Is_Held (Name) then
-               Permanent_Symbols.Replace_Element (Pos, (Kind => Val_Missing));
+               PDV_Vec.Replace_Element (I, (Kind => Val_Missing));
             else
-               -- If HELD, make sure the value is also in Temp_Symbols so Get finds it
-               if not Temp_Symbols.Contains (Name) then
-                  Temp_Symbols.Insert (Name, Symbol_Table_Pkg.Element (Pos));
-               else
-                  Temp_Symbols.Replace (Name, Symbol_Table_Pkg.Element (Pos));
-               end if;
+               declare
+                  V : constant Value := PDV_Vec.Element (I);
+               begin
+                  if not Temp_Symbols.Contains (Name) then
+                     Temp_Symbols.Insert (Name, V);
+                  else
+                     Temp_Symbols.Replace (Name, V);
+                  end if;
+               end;
             end if;
          end;
-         Symbol_Table_Pkg.Next (Pos);
       end loop;
    end Reset_PDV_Non_Held;
 
    -----------------------
-   -- Take_PDV_Snapshot --
+   -- Flush_PDV_To_Output --
    -----------------------
    procedure Flush_PDV_To_Output is
    begin
-      -- Ensure columns exist
-      for Pos in Permanent_Symbols.Iterate loop
+      for I in 1 .. Natural (PDV_Names.Length) loop
          declare
-            Name : constant String := Symbol_Table_Pkg.Key (Pos);
-            V    : constant Value := Symbol_Table_Pkg.Element (Pos);
+            Name : constant String := To_String (PDV_Names.Element (I));
+            V    : constant Value  := PDV_Vec.Element (I);
             Typ  : Column_Type := Col_Numeric;
          begin
             if V.Kind = Val_Integer then
                Typ := Col_Integer;
-            elsif V.Kind = Val_Numeric then
-               Typ := Col_Numeric;
             elsif V.Kind = Val_String then
                Typ := Col_String;
             end if;
@@ -272,25 +288,42 @@ package body SData.Variables is
       declare
          R : constant Positive := SData.Table.Output_Row_Count;
       begin
-         for Pos in Permanent_Symbols.Iterate loop
-            declare
-               Name : constant String := Symbol_Table_Pkg.Key (Pos);
-               V    : constant Value := Symbol_Table_Pkg.Element (Pos);
-            begin
-               SData.Table.Set_Output_Value_Upper (R, Name, V);
-            end;
+         for I in 1 .. Natural (PDV_Names.Length) loop
+            SData.Table.Set_Output_Value_Upper
+              (R, To_String (PDV_Names.Element (I)), PDV_Vec.Element (I));
          end loop;
       end;
    end Flush_PDV_To_Output;
 
    function Get_Type (Name : String) return Value_Kind is
       Upper : constant String := To_Upper (Name);
+      Cur   : constant PDV_Index_Pkg.Cursor := PDV_Index.Find (Upper);
    begin
-      if Permanent_Symbols.Contains (Upper) then
-         return Permanent_Symbols.Element (Upper).Kind;
+      if PDV_Index_Pkg.Has_Element (Cur) then
+         return PDV_Vec.Element (PDV_Index_Pkg.Element (Cur)).Kind;
       end if;
       return Val_Missing;
    end Get_Type;
+
+   -----------------
+   -- PDV_Resolve --
+   -----------------
+   function PDV_Resolve (Name : String) return Natural is
+      Cur : constant PDV_Index_Pkg.Cursor := PDV_Index.Find (Name);
+   begin
+      if PDV_Index_Pkg.Has_Element (Cur) then
+         return PDV_Index_Pkg.Element (Cur);
+      end if;
+      return 0;
+   end PDV_Resolve;
+
+   -------------------
+   -- Get_PDV_Value --
+   -------------------
+   function Get_PDV_Value (Idx : Positive) return Value is
+   begin
+      return PDV_Vec.Element (Idx);
+   end Get_PDV_Value;
 
    function Get_Session_Names return String_List_Access is
       Result : constant String_List_Access := new String_List (1 .. Integer (Temp_Symbols.Length));
@@ -307,15 +340,11 @@ package body SData.Variables is
    -- Get_PDV_Names --
    -------------------
    function Get_PDV_Names return String_List_Access is
-      Count : constant Natural := Natural (Permanent_Symbols.Length);
-      List : constant String_List_Access := new String_List (1 .. Count);
-      Pos  : Symbol_Table_Pkg.Cursor := Permanent_Symbols.First;
-      Idx  : Positive := 1;
+      Count : constant Natural := Natural (PDV_Names.Length);
+      List  : constant String_List_Access := new String_List (1 .. Count);
    begin
-      while Symbol_Table_Pkg.Has_Element (Pos) loop
-         List (Idx) := new String'(Symbol_Table_Pkg.Key (Pos));
-         Idx := Idx + 1;
-         Symbol_Table_Pkg.Next (Pos);
+      for I in 1 .. Count loop
+         List (I) := new String'(To_String (PDV_Names.Element (I)));
       end loop;
       return List;
    end Get_PDV_Names;
@@ -369,6 +398,50 @@ package body SData.Variables is
          Define_Array (Name, Constituents.all);
       end if;
    end Define_Array_Access;
+
+   ----------------------------
+   -- Undefine_Virtual_Array --
+   ----------------------------
+   procedure Undefine_Virtual_Array (Name : String) is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if Array_Symbols.Contains (Upper_Name)
+         and then Array_Symbols.Element (Upper_Name).Kind = Virtual_Array
+      then
+         Array_Symbols.Delete (Upper_Name);
+      end if;
+   end Undefine_Virtual_Array;
+
+   -------------------------
+   -- List_Virtual_Arrays --
+   -------------------------
+   procedure List_Virtual_Arrays is
+      Cursor : Array_Table_Pkg.Cursor := Array_Symbols.First;
+      Found  : Boolean := False;
+   begin
+      while Array_Table_Pkg.Has_Element (Cursor) loop
+         declare
+            Arr_Def : constant Array_Definition_Type := Array_Table_Pkg.Element (Cursor);
+         begin
+            if Arr_Def.Kind = Virtual_Array then
+               Found := True;
+               declare
+                  Line : Unbounded_String :=
+                     To_Unbounded_String (Array_Table_Pkg.Key (Cursor) & ":");
+               begin
+                  for I in 1 .. Natural (Arr_Def.Constituents.Length) loop
+                     Append (Line, " " & To_String (Arr_Def.Constituents (I)));
+                  end loop;
+                  SData.IO.Put_Line (To_String (Line));
+               end;
+            end if;
+         end;
+         Array_Table_Pkg.Next (Cursor);
+      end loop;
+      if not Found then
+         SData.IO.Put_Line ("(no virtual arrays defined)");
+      end if;
+   end List_Virtual_Arrays;
    
    -------------------------
    -- Create_Real_Elements --

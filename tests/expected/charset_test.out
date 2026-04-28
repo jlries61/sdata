@@ -1,0 +1,12 @@
+Dataset opened: tests/data/charset_utf8bom.csv
+Alice 90.00000
+Bob 85.00000
+RUN complete. 2 records and 2 variables processed.
+Dataset opened: tests/data/charset_utf16le.csv
+Alice 90.00000
+Bob 85.00000
+RUN complete. 2 records and 2 variables processed.
+Dataset opened: tests/data/charset_utf16le.csv
+Alice 90.00000
+Bob 85.00000
+RUN complete. 2 records and 2 variables processed.

@@ -45,8 +45,9 @@ package SData.AST is
          when Expr_String_Literal =>
             Str_Value : Ada.Strings.Unbounded.Unbounded_String;
          when Expr_Variable =>
-            Var_Name : String (1 .. 32);
-            Var_Len  : Natural;
+            Var_Name  : String (1 .. 32);
+            Var_Len   : Natural;
+            Var_Index : Natural := 0;  -- 0 = unresolved; positive = 1-based PDV_Vec slot
          when Expr_Binary_Op =>
             Left  : Expression_Access;
             Right : Expression_Access;
@@ -65,13 +66,14 @@ package SData.AST is
       end case;
    end record;
 
-   --  Represents a single variable or a range (e.g., VAR1-VAR10).
+   --  Represents a single variable or a range (e.g., VAR1-VAR10 or VAR1:VAR10).
    type Variable_Range is record
-      Start_Name : String (1 .. 32);
-      Start_Len  : Natural;
-      End_Name   : String (1 .. 32);
-      End_Len    : Natural;
-      Is_Range   : Boolean := False;
+      Start_Name     : String (1 .. 32);
+      Start_Len      : Natural;
+      End_Name       : String (1 .. 32);
+      End_Len        : Natural;
+      Is_Range       : Boolean := False;
+      Is_Colon_Range : Boolean := False;  -- True when separator was ':'
    end record;
 
    --  Linked list for variable lists in KEEP/DROP statements.
@@ -143,8 +145,11 @@ package SData.AST is
       Stmt_DIGITS, -- Set precision
       Stmt_FPATH,  -- Set default directories
       Stmt_HELP,   -- Display help
-      Stmt_RUN,    -- Execute and export
-      Stmt_NEW     -- Reset environment
+      Stmt_RUN,            -- Execute and export
+      Stmt_NEW,            -- Reset environment
+      Stmt_PROGRAM_DELETE, -- Delete line(s) from program buffer (immediate)
+      Stmt_DISPLAY,        -- Display Data Table rows (immediate)
+      Stmt_OPTIONS         -- Set runtime option (OPTIONS key value)
    );
 
    type Statement (Kind : Statement_Kind) is record
@@ -166,19 +171,25 @@ package SData.AST is
             Submit_Flag : Boolean := False; -- For FPATH
             Output_Flag : Boolean := False; -- For FPATH
             
-            -- Command-specific overrides (/FMT, /NSCAN, /DLM, /HEADER, /SHEET)
+            -- Command-specific overrides (/FMT, /NSCAN, /DLM, /HEADER, /SHEET, /SKIP, /MAXROWS)
             Format_Specified : Boolean := False;
             Fmt_Override     : SData.Config.Format_Type := SData.Config.CSV;
             NSCAN_Val        : Natural := 0;
+            Skip_Val         : Natural := 0;
+            Maxrows_Val      : Natural := 0;
             Header_Specified : Boolean := False;
             Header_Val       : Boolean := True;
             DLM_Path         : String (1 .. 32) := (others => ' ');
             DLM_Len          : Natural := 0;
-            Sheet_Name       : String (1 .. 64) := (others => ' ');
-            Sheet_Name_Len   : Natural := 0;
+            Sheet_Name         : String (1 .. 64) := (others => ' ');
+            Sheet_Name_Len     : Natural := 0;
+            Output_FMT_Val     : String (1 .. 8)  := (others => ' ');
+            Output_FMT_Len     : Natural := 0;
+            Output_CHARSET_Val : String (1 .. 64) := (others => ' ');
+            Output_CHARSET_Len : Natural := 0;
          when Stmt_REPEAT =>
             Count : Natural;
-         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_LIST =>
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
             Vars         : Variable_List;
             Arr_Name     : String (1 .. 32);
             Arr_Name_Len : Natural;
@@ -219,6 +230,14 @@ package SData.AST is
             Echo_State : Boolean;
          when Stmt_DIGITS =>
             Digits_Count   : Natural;
+         when Stmt_PROGRAM_DELETE =>
+            Delete_From : Positive := 1;
+            Delete_To   : Positive := 1;
+         when Stmt_OPTIONS =>
+            Options_Key     : String (1 .. 32);
+            Options_Key_Len : Natural;
+            Options_Val     : String (1 .. 256);
+            Options_Val_Len : Natural;
          when others =>
             null;
       end case;

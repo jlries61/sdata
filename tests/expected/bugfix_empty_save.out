@@ -4,11 +4,11 @@ RUN complete. 0 records and 4 variables processed.
 Warning: File contains a header but no data records.
 Dataset opened: tests/data/bugfix_empty_out.csv
 Permanent Variables (Table Columns):
-CATEGORY VAL1 VAL2 VAL3 
+CATEGORY$ VAL1 VAL2 VAL3 
 Session Variables (SET):
 (none)
 Permanent Variables (Table Columns):
-CATEGORY VAL1 VAL2 VAL3 
+CATEGORY$ VAL1 VAL2 VAL3 
 Session Variables (SET):
 (none)
 RUN complete. 1 records and 4 variables processed.

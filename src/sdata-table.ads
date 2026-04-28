@@ -156,19 +156,20 @@ private
    Current_Segment_Start : Positive := 1;
    Output_Segment_Start  : Positive := 1;
 
-   -- Statement Cache for Fetch_From_Disk
-   type Fn_Statement_Access is access all Ada_Sqlite3.Statement'Class;
-   Fetch_Stmt : Fn_Statement_Access := null;
-
-   -- One-row cache for disk lookups
-   package Value_Maps is new Ada.Containers.Indefinite_Hashed_Maps
-     (Key_Type => String,
-      Element_Type => Value,
-      Hash => Ada.Strings.Hash,
+   --  Segment-level prefetch cache for disk-backed rows.
+   --  Holds all rows for one spilled segment; populated on first access to
+   --  any row in that segment and reused until a different segment is needed.
+   --  Per-column data is stored in Value_Vectors.Vector, indexed by
+   --  (row - Seg_Start + 1).
+   package Seg_Data_Maps is new Ada.Containers.Indefinite_Hashed_Maps
+     (Key_Type        => String,
+      Element_Type    => Value_Vectors.Vector,
+      Hash            => Ada.Strings.Hash,
       Equivalent_Keys => "=",
-      "="             => SData.Values."=");
-   Cached_Row_Data : Value_Maps.Map;
-   Cached_Row_ID   : Natural := 0;
+      "="             => Value_Vectors."=");
+   Seg_Cache : Seg_Data_Maps.Map;
+   Seg_Start : Natural := 0;  --  0 = empty; first logical row of cached segment
+   Seg_End   : Natural := 0;  --  last logical row of cached segment
 
    --  SQLite Backing Store
    --  Derived from Limited_Controlled so that Finalize runs automatically at

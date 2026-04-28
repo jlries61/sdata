@@ -1,4 +1,4 @@
 USE "tests/data/sample.xlsx"
-PRINT NAME
+PRINT NAME$
 RUN
 END

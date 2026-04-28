@@ -1,7 +1,7 @@
 USE "tests/data/multi_sheet.xlsx[Scores]"
-PRINT NAME
+PRINT NAME$
 RUN
 USE "tests/data/multi_sheet.xlsx[Metadata]"
-PRINT KEY
+PRINT KEY$
 RUN
 END

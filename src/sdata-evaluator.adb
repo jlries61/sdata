@@ -1,5 +1,6 @@
 with SData.Variables; use SData.Variables;
 with SData.Config;
+with SData.Config.Runtime;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData.Statistics;
@@ -137,7 +138,8 @@ package body SData.Evaluator is
    function Is_Identifier_Ref_Function (N : String) return Boolean is
       U : constant String := To_Upper (N);
    begin
-      return U in "LAG" | "LAGC$" | "NEXT" | "NEXTC$" | "OBS" | "OBSC$";
+      return U in "LAG" | "LAGC$" | "NEXT" | "NEXTC$" | "OBS" | "OBSC$"
+                | "LBOUND" | "UBOUND";
    end Is_Identifier_Ref_Function;
 
 
@@ -277,6 +279,19 @@ package body SData.Evaluator is
          else return Handle_Domain_Error ("Argument to SQRT must be non-negative."); end if;
       end;
    end Handle_Sqrt_Fn;
+
+   function Handle_Sgn_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare V : constant Float := Convert_To_Float (Vals.Element (1));
+      begin
+         if V > 0.0 then return (Kind => Val_Integer, Int_Val => 1);
+         elsif V < 0.0 then return (Kind => Val_Integer, Int_Val => -1);
+         else return (Kind => Val_Integer, Int_Val => 0);
+         end if;
+      end;
+   end Handle_Sgn_Fn;
 
    ---------------------------------------------------------------------------
    --  Trig handlers — one subprogram per language function
@@ -730,6 +745,28 @@ package body SData.Evaluator is
       end;
    end Handle_Mid;
 
+   function Handle_Seg (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      declare
+         V     : constant Value   := Vals.Element (1);
+         Start : Integer          := Integer (Convert_To_Float (Vals.Element (2)));
+         Len   : constant Integer := Integer (Convert_To_Float (Vals.Element (3)));
+         R     : Value (Val_String);
+         S, E  : Integer;
+      begin
+         if V.Kind /= Val_String or else Len <= 0 then return (Kind => Val_Missing); end if;
+         if Start <= 0 then Start := 1; end if;
+         S := Start;
+         E := Integer'Min (S + Len - 1, Length (V.Str_Val));
+         if S > Length (V.Str_Val) then R.Str_Val := Null_Unbounded_String;
+         else R.Str_Val := To_Unbounded_String (Slice (V.Str_Val, S, E));
+         end if;
+         return R;
+      end;
+   end Handle_Seg;
+
    function Handle_Trim (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
       V : Value;
@@ -825,6 +862,24 @@ package body SData.Evaluator is
       end;
    end Handle_Pos;
 
+   --  INSTR(haystack, needle) — BW BASIC argument order (reversed from POS)
+   function Handle_Instr (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         Haystack : constant Value := Vals.Element (1);
+         Needle   : constant Value := Vals.Element (2);
+      begin
+         if Needle.Kind /= Val_String or else Haystack.Kind /= Val_String then
+            return (Kind => Val_Missing);
+         end if;
+         if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
+         return (Kind    => Val_Integer,
+                 Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
+      end;
+   end Handle_Instr;
+
    function Handle_Chr (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
       R : Value (Val_String);
@@ -881,6 +936,21 @@ package body SData.Evaluator is
          (To_Base_String (Integer (Convert_To_Float (Vals.Element (1))), 16));
       return R;
    end Handle_Hex;
+
+   function Handle_Hex_From_Str (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare
+         V : constant Value := Vals.Element (1);
+         S : constant String := (if V.Kind = Val_String then To_String (V.Str_Val)
+                                 else Integer'Image (Integer (Convert_To_Float (V))));
+      begin
+         return (Kind => Val_Integer, Int_Val => Integer'Value ("16#" & S & "#"));
+      exception
+         when Constraint_Error => return (Kind => Val_Missing);
+      end;
+   end Handle_Hex_From_Str;
 
    function Handle_Oct (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
@@ -1059,9 +1129,18 @@ package body SData.Evaluator is
 
    function Handle_ZDF (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      if N = 2 then raise SData.Script_Error with "ZDF requires 1 or 3 arguments, not 2."; end if;
+      if N >= 3 then
+         if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2)),
+                                                         Convert_To_Float (Vals.Element (3))));
+      else
+         if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      end if;
    end Handle_ZDF;
 
    function Handle_NDF (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1177,9 +1256,18 @@ package body SData.Evaluator is
 
    function Handle_ZCF (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      if N = 2 then raise SData.Script_Error with "ZCF requires 1 or 3 arguments, not 2."; end if;
+      if N >= 3 then
+         if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2)),
+                                                         Convert_To_Float (Vals.Element (3))));
+      else
+         if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      end if;
    end Handle_ZCF;
 
    function Handle_NCF (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1289,9 +1377,18 @@ package body SData.Evaluator is
 
    function Handle_ZIF (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      if N = 2 then raise SData.Script_Error with "ZIF requires 1 or 3 arguments, not 2."; end if;
+      if N >= 3 then
+         if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2)),
+                                                         Convert_To_Float (Vals.Element (3))));
+      else
+         if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      end if;
    end Handle_ZIF;
 
    function Handle_NIF (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1406,9 +1503,19 @@ package body SData.Evaluator is
    --  --- RN (random number) family ---
 
    function Handle_ZRN (Name : String; Vals : Value_Vectors.Vector) return Value is
-      pragma Unreferenced (Name, Vals);
+      pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      return Num_Result (SData.Statistics.Normal_RN (0.0, 1.0));
+      if N = 0 then
+         return Num_Result (SData.Statistics.Normal_RN (0.0, 1.0));
+      elsif N = 1 then
+         if Vals.Element (1).Kind = Val_Missing then return (Kind => Val_Missing); end if;
+         raise SData.Script_Error with "ZRN requires 0 or 2 arguments, not 1.";
+      else
+         if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
+                                                        Convert_To_Float (Vals.Element (2))));
+      end if;
    end Handle_ZRN;
 
    function Handle_NRN (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1421,10 +1528,18 @@ package body SData.Evaluator is
 
    function Handle_URN (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Uniform_RN (Convert_To_Float (Vals.Element (1)),
-                                                      Convert_To_Float (Vals.Element (2))));
+      if N = 0 then
+         return Num_Result (SData.Statistics.Uniform_RN (0.0, 1.0));
+      elsif N = 1 then
+         if Vals.Element (1).Kind = Val_Missing then return (Kind => Val_Missing); end if;
+         raise SData.Script_Error with "URN requires 0 or 2 arguments, not 1.";
+      else
+         if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Uniform_RN (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2))));
+      end if;
    end Handle_URN;
 
    function Handle_ERN (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1535,6 +1650,18 @@ package body SData.Evaluator is
       return (Kind => Val_Integer, Int_Val => 1);
    end Handle_True;
 
+   function Handle_Err_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => SData.Config.Runtime.Last_Error_Code);
+   end Handle_Err_Fn;
+
+   function Handle_Erl_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => SData.Config.Runtime.Last_Error_Line);
+   end Handle_Erl_Fn;
+
    function Handle_Date (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
       R   : Value (Val_String);
@@ -1624,6 +1751,209 @@ package body SData.Evaluator is
          end if;
       end;
    end Handle_Num;
+
+   ---------------------------------------------------------------------------
+   --  Handlers added in v0.6.2
+   ---------------------------------------------------------------------------
+
+   --  PI — value of pi (no arguments)
+   function Handle_Pi (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return Num_Result (Ada.Numerics.Pi);
+   end Handle_Pi;
+
+   --  TIMER — seconds elapsed since midnight (wall-clock)
+   function Handle_Timer (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return Num_Result (Float (Ada.Calendar.Seconds (Ada.Calendar.Clock)));
+   end Handle_Timer;
+
+   --  TRUNCATE(X, Y%) — truncate X to Y% decimal places (toward zero, no rounding)
+   function Handle_Truncate (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         X      : constant Float   := Convert_To_Float (Vals.Element (1));
+         Places : constant Integer := Integer (Convert_To_Float (Vals.Element (2)));
+         Factor : constant Float   := 10.0 ** Float (Places);
+      begin
+         if Places < 0 then return (Kind => Val_Missing); end if;
+         return Num_Result (Float'Truncation (X * Factor) / Factor);
+      end;
+   end Handle_Truncate;
+
+   --  LBOUND(arrayname) — lower bound of a DIM array
+   function Handle_Lbound (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if Integer (Vals.Length) < 1 or else Vals.Element (1).Kind /= Val_String then
+         return (Kind => Val_Missing);
+      end if;
+      declare
+         AName             : constant String := SData.Values.To_String (Vals.Element (1));
+         Start_Idx, End_Idx : Integer;
+      begin
+         Get_Array_Bounds (AName, Start_Idx, End_Idx);
+         if End_Idx < Start_Idx then return (Kind => Val_Missing); end if;
+         return (Kind => Val_Integer, Int_Val => Start_Idx);
+      end;
+   end Handle_Lbound;
+
+   --  UBOUND(arrayname) — upper bound of a DIM array
+   function Handle_Ubound (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if Integer (Vals.Length) < 1 or else Vals.Element (1).Kind /= Val_String then
+         return (Kind => Val_Missing);
+      end if;
+      declare
+         AName             : constant String := SData.Values.To_String (Vals.Element (1));
+         Start_Idx, End_Idx : Integer;
+      begin
+         Get_Array_Bounds (AName, Start_Idx, End_Idx);
+         if End_Idx < Start_Idx then return (Kind => Val_Missing); end if;
+         return (Kind => Val_Integer, Int_Val => End_Idx);
+      end;
+   end Handle_Ubound;
+
+   --  INDEX(A$, B$) — 1-based position of B$ in A$, or 0 if not found
+   function Handle_Index_Str (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+      declare
+         Haystack : constant Value := Vals.Element (1);
+         Needle   : constant Value := Vals.Element (2);
+      begin
+         if Haystack.Kind /= Val_String or else Needle.Kind /= Val_String then
+            return (Kind => Val_Missing);
+         end if;
+         if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
+         return (Kind    => Val_Integer,
+                 Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
+      end;
+   end Handle_Index_Str;
+
+   --  MATCH(A$, B$, X%) — 1-based position of B$ in A$ starting from position X%
+   function Handle_Match (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+      declare
+         Haystack : constant Value   := Vals.Element (1);
+         Needle   : constant Value   := Vals.Element (2);
+         Start    : constant Integer := Integer (Convert_To_Float (Vals.Element (3)));
+         H_Str    : constant String  := SData.Values.To_String (Haystack);
+         N_Str    : constant String  := SData.Values.To_String (Needle);
+         From     : constant Positive := Positive'Max (Start, 1);
+      begin
+         if Haystack.Kind /= Val_String or else Needle.Kind /= Val_String then
+            return (Kind => Val_Missing);
+         end if;
+         if From > H_Str'Length or else N_Str'Length = 0 then
+            return (Kind => Val_Integer, Int_Val => (if N_Str'Length = 0 then From else 0));
+         end if;
+         return (Kind    => Val_Integer,
+                 Int_Val => Ada.Strings.Fixed.Index (H_Str, N_Str, From));
+      end;
+   end Handle_Match;
+
+   --  MAXLEN(A$) — maximum string length capacity (global --clen setting)
+   function Handle_Maxlen (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => SData.Config.Max_String_Len);
+   end Handle_Maxlen;
+
+   --  MAXLVL — maximum supported FOR-loop nesting level (implementation constant)
+   function Handle_Maxlvl (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => 1_000);
+   end Handle_Maxlvl;
+
+   --  MAXINT — largest representable 32-bit signed integer
+   function Handle_Maxint (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => Integer'Last);
+   end Handle_Maxint;
+
+   --  MAXNUM — largest representable floating-point value
+   function Handle_Maxnum (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return Num_Result (Float'Last);
+   end Handle_Maxnum;
+
+   --  MININT — smallest (most negative) representable 32-bit signed integer
+   function Handle_Minint (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return (Kind => Val_Integer, Int_Val => Integer'First);
+   end Handle_Minint;
+
+   --  MINNUM — smallest positive representable floating-point value
+   function Handle_Minnum (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name, Vals);
+   begin
+      return Num_Result (Float'Model_Small);
+   end Handle_Minnum;
+
+   --  RAD / RADIAN — convert degrees to radians
+   function Handle_Rad (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      return Num_Result (Convert_To_Float (Vals.Element (1)) * Ada.Numerics.Pi / 180.0);
+   end Handle_Rad;
+
+   --  LTW(X) — Lambert W function W₀(x), principal branch (x ≥ -1/e)
+   --  Uses Halley's method; typically converges in 5-10 iterations.
+   function Handle_Ltw (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+      E_Inv : constant Float := 1.0 / Ada.Numerics.E;
+   begin
+      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+      declare
+         X : constant Float := Convert_To_Float (Vals.Element (1));
+         W : Float;
+         EW, WEW, F, Fp, Fpp : Float;
+      begin
+         if X < -E_Inv then
+            return Handle_Domain_Error ("LTW: argument must be >= -1/e (~-0.3679).");
+         end if;
+         if X = 0.0 then return Num_Result (0.0); end if;
+         --  Initial guess
+         if X >= 0.0 then
+            W := Log (1.0 + X);
+         else
+            W := -1.0 + Sqrt (2.0 * (1.0 + Ada.Numerics.E * X));
+         end if;
+         --  Halley iterations
+         for I in 1 .. 100 loop
+            EW  := Exp (W);
+            WEW := W * EW;
+            F   := WEW - X;
+            Fp  := EW * (W + 1.0);
+            Fpp := EW * (W + 2.0);
+            declare
+               Denom : constant Float := Fp - F * Fpp / (2.0 * Fp);
+            begin
+               exit when abs Denom < Float'Model_Small;
+               declare Step : constant Float := F / Denom;
+               begin
+                  W := W - Step;
+                  exit when abs Step < Float'Epsilon * abs W + Float'Model_Small;
+               end;
+            end;
+         end loop;
+         return Num_Result (W);
+      end;
+   end Handle_Ltw;
 
    ---------------------------------------------------------------------------
    --  Evaluate_Function — public entry point
@@ -1782,14 +2112,24 @@ package body SData.Evaluator is
          when Expr_Variable =>
             declare
                VName : constant String := To_Upper (Expr.Var_Name (1 .. Expr.Var_Len));
-               VVal  : constant Value  := Get (VName);
+               VVal  : constant Value  :=
+                  (if Expr.Var_Index > 0
+                   then Get_PDV_Value (Expr.Var_Index)
+                   else Get (VName));
             begin
                if VVal.Kind = Val_Missing then
                   --  Fall back to zero-arg functions (optional parentheses)
-                  if Vname in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |
-                              "DATE$" | "TIME$" | "RAN" | "RANDOM" | "LRN" |
+                  if VName in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |
+                              "DATE$" | "TIME$" | "RAN" | "RANDOM" | "RND" | "LRN" |
+                              "ZRN" | "URN" | "PI" | "TIMER" |
+                              "ERR" | "ERL" |
+                              "MAXLEN" | "MAXLVL" | "MAXINT" | "MAXNUM" |
+                              "MININT" | "MINNUM" |
                               "FALSE" | "TRUE" then
                      return Evaluate_Function (VName, null);
+                  end if;
+                  if not Defined (VName) then
+                     raise SData.Script_Error with "Undefined variable: " & VName;
                   end if;
                end if;
                return VVal;
@@ -2008,8 +2348,11 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("FIX",    Handle_Fix_Fn'Access);
       Dispatch_Table.Insert ("IP",     Handle_Fix_Fn'Access);
       Dispatch_Table.Insert ("FP",     Handle_Fp_Fn'Access);
+      Dispatch_Table.Insert ("FRAC",   Handle_Fp_Fn'Access);
       Dispatch_Table.Insert ("MOD",    Handle_Mod_Fn'Access);
       Dispatch_Table.Insert ("SQRT",   Handle_Sqrt_Fn'Access);
+      Dispatch_Table.Insert ("SQR",    Handle_Sqrt_Fn'Access);
+      Dispatch_Table.Insert ("SGN",    Handle_Sgn_Fn'Access);
 
       --  Trigonometry
       Dispatch_Table.Insert ("SIN",    Handle_Sin_Fn'Access);
@@ -2055,19 +2398,23 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("LEFT$",  Handle_Left'Access);
       Dispatch_Table.Insert ("RIGHT$", Handle_Right'Access);
       Dispatch_Table.Insert ("MID$",   Handle_Mid'Access);
+      Dispatch_Table.Insert ("SEG$",   Handle_Seg'Access);
       Dispatch_Table.Insert ("TRIM$",  Handle_Trim'Access);
       Dispatch_Table.Insert ("LTRIM$", Handle_Ltrim'Access);
       Dispatch_Table.Insert ("RTRIM$", Handle_Rtrim'Access);
       Dispatch_Table.Insert ("ASCII",  Handle_ASCII'Access);
+      Dispatch_Table.Insert ("ASC",    Handle_ASCII'Access);
       Dispatch_Table.Insert ("UCASE$", Handle_Upper'Access);
       Dispatch_Table.Insert ("UPPER$", Handle_Upper'Access);
       Dispatch_Table.Insert ("LCASE$", Handle_Lower'Access);
       Dispatch_Table.Insert ("LOWER$", Handle_Lower'Access);
       Dispatch_Table.Insert ("POS",    Handle_Pos'Access);
+      Dispatch_Table.Insert ("INSTR",  Handle_Instr'Access);
       Dispatch_Table.Insert ("CHR$",   Handle_Chr'Access);
       Dispatch_Table.Insert ("STR$",   Handle_Str'Access);
       Dispatch_Table.Insert ("VAL",    Handle_Val'Access);
       Dispatch_Table.Insert ("HEX$",   Handle_Hex'Access);
+      Dispatch_Table.Insert ("HEX",    Handle_Hex_From_Str'Access);
       Dispatch_Table.Insert ("OCT$",   Handle_Oct'Access);
       Dispatch_Table.Insert ("BIN$",   Handle_Bin'Access);
       Dispatch_Table.Insert ("NUM$",   Handle_Num_Str'Access);
@@ -2144,6 +2491,7 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("FRN",    Handle_FRN'Access);
       Dispatch_Table.Insert ("RAN",    Handle_Ran'Access);
       Dispatch_Table.Insert ("RANDOM", Handle_Ran'Access);
+      Dispatch_Table.Insert ("RND",    Handle_Ran'Access);
 
       --  Miscellaneous
       Dispatch_Table.Insert ("MISSING", Handle_Missing'Access);
@@ -2153,6 +2501,25 @@ package body SData.Evaluator is
       Dispatch_Table.Insert ("TIME$",   Handle_Time'Access);
       Dispatch_Table.Insert ("SHELL",   Handle_Shell'Access);
       Dispatch_Table.Insert ("NUM",     Handle_Num'Access);
+      Dispatch_Table.Insert ("ERR",     Handle_Err_Fn'Access);
+      Dispatch_Table.Insert ("ERL",     Handle_Erl_Fn'Access);
+
+      Dispatch_Table.Insert ("PI",      Handle_Pi'Access);
+      Dispatch_Table.Insert ("TIMER",   Handle_Timer'Access);
+      Dispatch_Table.Insert ("TRUNCATE", Handle_Truncate'Access);
+      Dispatch_Table.Insert ("LBOUND",  Handle_Lbound'Access);
+      Dispatch_Table.Insert ("UBOUND",  Handle_Ubound'Access);
+      Dispatch_Table.Insert ("INDEX",   Handle_Index_Str'Access);
+      Dispatch_Table.Insert ("MATCH",   Handle_Match'Access);
+      Dispatch_Table.Insert ("MAXLEN",  Handle_Maxlen'Access);
+      Dispatch_Table.Insert ("MAXLVL",  Handle_Maxlvl'Access);
+      Dispatch_Table.Insert ("MAXINT",  Handle_Maxint'Access);
+      Dispatch_Table.Insert ("MAXNUM",  Handle_Maxnum'Access);
+      Dispatch_Table.Insert ("MININT",  Handle_Minint'Access);
+      Dispatch_Table.Insert ("MINNUM",  Handle_Minnum'Access);
+      Dispatch_Table.Insert ("RAD",     Handle_Rad'Access);
+      Dispatch_Table.Insert ("RADIAN",  Handle_Rad'Access);
+      Dispatch_Table.Insert ("LTW",     Handle_Ltw'Access);
    end Register_All_Functions;
 
 begin

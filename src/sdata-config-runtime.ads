@@ -22,6 +22,25 @@ package SData.Config.Runtime is
    FPath_Output        : Unbounded_String   := Null_Unbounded_String;
    Repeat_Count        : Natural            := 0;
    Repeat_Active       : Boolean            := False;
+   Last_Error_Code     : Natural            := 0;
+   Last_Error_Line     : Natural            := 0;
+
+   --  OPTIONS command runtime state
+   Options_CSVDLM      : String (1 .. 8)  := (',' , others => ' ');
+   Options_CSVDLM_Len  : Natural          := 1;
+   Options_Header      : Boolean          := True;
+   Options_SAVEOVERWRT : Boolean          := True;
+   Options_TXTFMT      : String (1 .. 8)  := "AUTO    ";
+   Options_TXTFMT_Len  : Natural          := 4;
+   Options_CHARSET     : String (1 .. 64) := (others => ' ');
+   Options_CHARSET_Len : Natural          := 0;
+
+   --  Effective delimiter/header/charset saved at SAVE-statement time for use at write time
+   Save_DLM         : String (1 .. 8)  := (',' , others => ' ');
+   Save_DLM_Len     : Natural          := 1;
+   Save_Header      : Boolean          := True;
+   Save_Charset     : String (1 .. 64) := (others => ' ');
+   Save_Charset_Len : Natural          := 0;
 
    procedure Reset;
 

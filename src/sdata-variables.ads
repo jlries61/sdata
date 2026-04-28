@@ -4,6 +4,7 @@
 with SData.Values; use SData.Values;
 with SData.Table;  use SData.Table;
 with Ada.Containers.Indefinite_Hashed_Maps;
+with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with GNAT.Strings;
@@ -18,6 +19,10 @@ package SData.Variables is
 
    --  Retrieves a value. Lookup order: 1. Permanent PDV, 2. Temporary symbols.
    function Get (Name : String) return Value;
+
+   --  Returns True if the name exists in either the PDV or the temporary symbol table,
+   --  regardless of whether its current value is missing.
+   function Defined (Name : String) return Boolean;
 
    --  Removes a session variable.
    procedure Unset (Name : String);
@@ -34,7 +39,13 @@ package SData.Variables is
    procedure Load_PDV_One_Column (Row : Positive; Col_Name : String);
    procedure Reset_PDV_Non_Held;
    procedure Refresh_PDV_Names;
-   
+
+   --  Indexed PDV access — used by the evaluator hot path after pre-resolution.
+   --  Returns the 1-based slot index for Name in the PDV vector, 0 if absent.
+   function PDV_Resolve (Name : String) return Natural;
+   --  Direct slot read (caller must ensure Idx in 1 .. PDV_Size).
+   function Get_PDV_Value (Idx : Positive) return Value;
+
    package Symbol_Table_Pkg is new Ada.Containers.Indefinite_Hashed_Maps
      (Key_Type        => String,
       Element_Type   => Value,
@@ -55,6 +66,12 @@ package SData.Variables is
    procedure Define_Array (Name : String; Constituents : GNAT.Strings.String_List);
    procedure Define_Array (Name : String; Constituents : Name_Vectors.Vector); -- For internal use
    procedure Define_Array_Access (Name : String; Constituents : GNAT.Strings.String_List_Access);
+
+   -- Removes a virtual array definition by name (no effect on constituent variables or real arrays)
+   procedure Undefine_Virtual_Array (Name : String);
+
+   -- Prints all currently defined virtual arrays to console output
+   procedure List_Virtual_Arrays;
 
    -- Creates or resizes a real array (generates numbered variables)
    procedure Dim_Array (Name : String; Start_Idx, End_Idx : Integer; Is_Temp : Boolean);
@@ -109,7 +126,21 @@ private
 
    Current_Group_ID : Unbounded_String := Null_Unbounded_String;
 
-   -- Holds permanent variables for the current record (PDV).
-   Permanent_Symbols : Symbol_Table_Pkg.Map;
+   --  Flat vector of PDV values; slot I corresponds to PDV_Names(I).
+   --  Replaces the old Permanent_Symbols hash map for O(1) indexed access.
+   package PDV_Value_Vecs is new Ada.Containers.Vectors
+     (Index_Type   => Positive,
+      Element_Type => Value);
+
+   --  Name → 1-based slot index in PDV_Vec / PDV_Names.
+   package PDV_Index_Pkg is new Ada.Containers.Indefinite_Hashed_Maps
+     (Key_Type        => String,
+      Element_Type    => Positive,
+      Hash            => Ada.Strings.Hash,
+      Equivalent_Keys => "=");
+
+   PDV_Vec   : PDV_Value_Vecs.Vector;   -- indexed by slot (1-based)
+   PDV_Names : Name_Vectors.Vector;     -- slot → upper-case name
+   PDV_Index : PDV_Index_Pkg.Map;       -- upper-case name → slot
 
 end SData.Variables;

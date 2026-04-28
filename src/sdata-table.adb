@@ -14,12 +14,13 @@ package body SData.Table is
 
    procedure Clear_Fetch_Cache is
    begin
-      Cached_Row_ID := 0;
-      Cached_Row_Data.Clear;
+      Seg_Cache.Clear;
+      Seg_Start := 0;
+      Seg_End   := 0;
    end Clear_Fetch_Cache;
 
    procedure Spill_Output_To_Disk;
-   procedure Spill_Table_To_Disk (T : in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive);
+   procedure Spill_Table_To_Disk (T : aliased in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive);
 
    --------------
    -- Finalize --
@@ -39,8 +40,9 @@ package body SData.Table is
          --  The OS reclaims the memory; we only need to remove the file.
          GNAT.OS_Lib.Delete_File (Path, Success);
       end;
-      Cached_Row_ID := 0;
-      Cached_Row_Data.Clear;
+      Seg_Cache.Clear;
+      Seg_Start := 0;
+      Seg_End   := 0;
    end Finalize;
 
    -- Filtered View Mapping
@@ -88,14 +90,8 @@ package body SData.Table is
       Data_Table.Insert (Upper_Name, New_Col);
       Column_Order.Append (Ada.Strings.Unbounded.To_Unbounded_String (Upper_Name));
 
-      --  Clear the statement cache because the table schema has changed.
-      if Fetch_Stmt /= null then
-         declare
-            procedure Free_Stmt is new Ada.Unchecked_Deallocation (Ada_Sqlite3.Statement'Class, Fn_Statement_Access);
-         begin
-            Free_Stmt (Fetch_Stmt);
-         end;
-      end if;
+      --  Invalidate the segment cache: the schema has changed.
+      Clear_Fetch_Cache;
    end Add_Column;
 
    ----------------
@@ -724,34 +720,38 @@ package body SData.Table is
    ---------------------------
    -- Spill_Table_To_Disk --
    ---------------------------
-   procedure Spill_Table_To_Disk (T : in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive) is
+   procedure Spill_Table_To_Disk (T : aliased in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive) is
       SQL : Ada.Strings.Unbounded.Unbounded_String;
       Memory_Rows : Natural := 0;
       package Name_Vecs is new Ada.Containers.Vectors (Positive, Ada.Strings.Unbounded.Unbounded_String);
-      Col_Names : Name_Vecs.Vector;
+      package Cursor_Vecs is new Ada.Containers.Vectors (Positive, Column_Maps.Cursor, Column_Maps."=");
+      Col_Names   : Name_Vecs.Vector;
+      Col_Cursors : Cursor_Vecs.Vector;
    begin
       if T.Is_Empty then return; end if;
-      
+
       --  Clear cache because we might be modifying the table being cached.
       Clear_Fetch_Cache;
       for Pos in T.Iterate loop
          Col_Names.Append (Ada.Strings.Unbounded.To_Unbounded_String (Column_Maps.Key (Pos)));
+         Col_Cursors.Append (Pos);
          if Memory_Rows = 0 then
-            Memory_Rows := Natural (Column_Maps.Element (Pos).Data.Length);
+            Memory_Rows := Natural (Column_Maps.Constant_Reference (T, Pos).Element.all.Data.Length);
          end if;
       end loop;
       if Memory_Rows = 0 then return; end if;
       Initialize_Backing_Store;
       
       SQL := Ada.Strings.Unbounded.To_Unbounded_String ("CREATE TABLE IF NOT EXISTS [" & Table_Name & "] (record_id INTEGER PRIMARY KEY");
-      for Name of Col_Names loop
+      for C in 1 .. Natural (Col_Names.Length) loop
          declare
-            Typ : constant Column_Type := T.Element (Ada.Strings.Unbounded.To_String (Name)).Typ;
-            SQL_T : constant String := (if Typ = Col_Numeric then "REAL"
-                                        elsif Typ = Col_Integer then "INTEGER"
+            Ref   : constant Column_Maps.Constant_Reference_Type :=
+               Column_Maps.Constant_Reference (T, Col_Cursors.Element (C));
+            SQL_T : constant String := (if Ref.Element.all.Typ = Col_Numeric then "REAL"
+                                        elsif Ref.Element.all.Typ = Col_Integer then "INTEGER"
                                         else "TEXT");
          begin
-            Ada.Strings.Unbounded.Append (SQL, ", [" & Ada.Strings.Unbounded.To_String (Name) & "] " & SQL_T);
+            Ada.Strings.Unbounded.Append (SQL, ", [" & Ada.Strings.Unbounded.To_String (Col_Names.Element (C)) & "] " & SQL_T);
          end;
       end loop;
       Ada.Strings.Unbounded.Append (SQL, ")");
@@ -775,7 +775,9 @@ package body SData.Table is
             Stmt.Bind_Int (1, Start_Idx + R - 1);
             for C in 1 .. Natural (Col_Names.Length) loop
                declare
-                  Val : constant Value := T.Element (Ada.Strings.Unbounded.To_String (Col_Names.Element (C))).Data.Element (R);
+                  Ref : constant Column_Maps.Constant_Reference_Type :=
+                     Column_Maps.Constant_Reference (T, Col_Cursors.Element (C));
+                  Val : constant Value := Ref.Element.all.Data.Element (R);
                begin
                   case Val.Kind is
                      when Val_Numeric => Stmt.Bind_Double (C + 1, Val.Num_Val);
@@ -809,41 +811,83 @@ package body SData.Table is
    function Fetch_From_Disk (Row : Positive; Col_Name : String) return Value is
       U_Col : constant String := Ada.Characters.Handling.To_Upper (Col_Name);
    begin
-      if Row /= Cached_Row_ID then
+      --  Load a new segment when Row falls outside the cached range.
+      if Seg_Start = 0 or else Row < Seg_Start or else Row > Seg_End then
          declare
-            Stmt : Ada_Sqlite3.Statement := Store.DB.Prepare ("SELECT * FROM data WHERE record_id = ?");
+            Limit   : constant Positive :=
+               (if SData.Config.Max_Table_Rows > 0 then SData.Config.Max_Table_Rows else 1);
+            S_Idx   : constant Natural  := (Row - 1) / Limit;
+            S_Start : constant Positive := S_Idx * Limit + 1;
+            S_End   : constant Positive :=
+               Positive'Min (S_Start + Limit - 1, Table_Row_Count);
+            Num_Rows : constant Natural := S_End - S_Start + 1;
+            Stmt : Ada_Sqlite3.Statement := Store.DB.Prepare
+               ("SELECT * FROM [data] WHERE record_id >= ? AND record_id <= ?" &
+                " ORDER BY record_id");
+            Num_Cols : Integer;
          begin
-            Stmt.Bind_Int (1, Row);
-            if Stmt.Step = Ada_Sqlite3.ROW then
-               Cached_Row_Data.Clear;
-               for I in 1 .. Stmt.Column_Count - 1 loop
+            Stmt.Bind_Int (1, S_Start);
+            Stmt.Bind_Int (2, S_End);
+            Seg_Cache.Clear;
+
+            --  Column count is known from the prepared statement before stepping.
+            Num_Cols := Stmt.Column_Count - 1;  --  exclude record_id at index 0
+
+            --  Pre-insert an empty vector for each data column and reserve
+            --  capacity so that subsequent Appends do not reallocate.
+            for I in 1 .. Num_Cols loop
+               declare
+                  CName : constant String          := Stmt.Column_Name (I);
+                  Empty : constant Value_Vectors.Vector := Value_Vectors.Empty_Vector;
+               begin
+                  Seg_Cache.Include (CName, Empty);
+                  Seg_Cache.Reference (CName).Reserve_Capacity
+                     (Ada.Containers.Count_Type (Num_Rows));
+               end;
+            end loop;
+
+            --  Fetch all rows in one sequential scan.
+            while Stmt.Step = Ada_Sqlite3.ROW loop
+               for I in 1 .. Num_Cols loop
                   declare
-                     CName : constant String := Stmt.Column_Name (I);
+                     CName : constant String               := Stmt.Column_Name (I);
                      Typ   : constant Ada_Sqlite3.Column_Type := Stmt.Get_Column_Type (I);
+                     Val   : Value;
                   begin
                      if Stmt.Column_Is_Null (I) then
-                        Cached_Row_Data.Insert (CName, (Kind => Val_Missing));
+                        Val := (Kind => Val_Missing);
                      elsif Typ = Ada_Sqlite3.Float_Type then
-                        Cached_Row_Data.Insert (CName, (Kind => Val_Numeric, Num_Val => Stmt.Column_Double (I)));
+                        Val := (Kind => Val_Numeric, Num_Val => Stmt.Column_Double (I));
                      elsif Typ = Ada_Sqlite3.Integer_Type then
-                        Cached_Row_Data.Insert (CName, (Kind => Val_Integer, Int_Val => Stmt.Column_Int (I)));
+                        Val := (Kind => Val_Integer, Int_Val => Stmt.Column_Int (I));
                      else
-                        Cached_Row_Data.Insert (CName, (Kind => Val_String, Str_Val => Ada.Strings.Unbounded.To_Unbounded_String (Stmt.Column_Text (I))));
+                        Val := (Kind    => Val_String,
+                                Str_Val => Ada.Strings.Unbounded.To_Unbounded_String
+                                             (Stmt.Column_Text (I)));
                      end if;
+                     Seg_Cache.Reference (CName).Append (Val);
                   end;
                end loop;
-               Cached_Row_ID := Row;
-            else
-               return (Kind => Val_Missing);
+            end loop;
+
+            Seg_Start := S_Start;
+            Seg_End   := S_End;
+         end;
+      end if;
+
+      --  Return the cached value.
+      if Seg_Cache.Contains (U_Col) then
+         declare
+            Idx : constant Positive := Row - Seg_Start + 1;
+            Ref : constant Seg_Data_Maps.Constant_Reference_Type :=
+               Seg_Cache.Constant_Reference (U_Col);
+         begin
+            if Idx <= Natural (Ref.Length) then
+               return Ref.Element (Idx);
             end if;
          end;
       end if;
-      
-      if Cached_Row_Data.Contains (U_Col) then
-         return Cached_Row_Data.Element (U_Col);
-      else
-         return (Kind => Val_Missing);
-      end if;
+      return (Kind => Val_Missing);
    end Fetch_From_Disk;
 
 end SData.Table;

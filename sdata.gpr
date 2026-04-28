@@ -11,7 +11,7 @@ project SData is
    for Main use ("sdata_main.adb");
 
    package Compiler is
-      for Default_Switches ("Ada") use ("-gnat2012", "-gnatwa", "-gnatwl", "-gnatwu", "-g");
+      for Default_Switches ("Ada") use ("-gnat2012", "-gnatwa", "-gnatwl", "-gnatwu", "-g", "-O2");
    end Compiler;
 
    package Builder is

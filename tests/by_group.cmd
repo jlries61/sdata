@@ -1,6 +1,6 @@
 -- Test BY group processing, BOG() and EOG() functions, and row-wise aggregates
 USE "tests/data/sample.csv"
-BY CATEGORY
+BY CATEGORY$
 
 -- The initial RUN establishes the data and the grouping order.
 RUN
@@ -10,7 +10,7 @@ LET TOTAL = SUM(VAL1, VAL2, VAL3)
 LET IS_FIRST = BOG()
 LET IS_LAST = EOG()
 
-PRINT RECNO() CATEGORY IS_FIRST IS_LAST TOTAL
+PRINT RECNO() CATEGORY$ IS_FIRST IS_LAST TOTAL
 RUN
 RUN
 

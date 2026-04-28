@@ -12,6 +12,7 @@
 *.actual
 tests/output_test_capture.dat
 tests/data/output.csv
+tests/data/output_pipe.csv
 tests/data/test1_output.csv
 
 # Packaging artifacts

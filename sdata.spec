@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.6.0
+Version:        0.6.3
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -52,6 +52,17 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Mon Apr 28 2026 John L. Ries <john@theyarnbard.com> - 0.6.3-1
+- Bump to 0.6.3: SKIP/MAXROWS for USE; ZCF/ZDF/ZIF/ZRN optional mu/sigma;
+  URN/ZRN zero-arg defaults; undefined variable errors; expand no-paren
+  function whitelist; multi-char delimiters; CHARSET encoding for CSV
+
+* Mon Apr 27 2026 John L. Ries <john@theyarnbard.com> - 0.6.2-1
+- Bump to 0.6.2
+
+* Fri Apr 24 2026 John L. Ries <john@theyarnbard.com> - 0.6.1-1
+- Fix 101x spillover penalty: segment-level prefetch and Constant_Reference spill.
+
 * Tue Apr 21 2026 John L. Ries <john@theyarnbard.com> - 0.6.0-1
 - Add DISPLAY command, LIST program-buffer display, DELETE n[-m] program-buffer deletion, ERR/ERL functions
 

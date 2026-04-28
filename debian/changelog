@@ -1,3 +1,23 @@
+sdata (0.6.3-1) unstable; urgency=medium
+
+  * Bump to 0.6.3: SKIP/MAXROWS for USE; ZCF/ZDF/ZIF/ZRN optional mu/sigma;
+    URN/ZRN zero-arg defaults; undefined variable errors; expand no-paren
+    function whitelist; multi-char delimiters; CHARSET encoding for CSV
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 28 Apr 2026 14:00:00 -0700
+
+sdata (0.6.2-1) unstable; urgency=medium
+
+  * Bump to 0.6.2
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 27 Apr 2026 12:48:19 -0700
+
+sdata (0.6.1-1) unstable; urgency=medium
+
+  * Fix 101x spillover penalty: segment-level prefetch and Constant_Reference spill.
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 24 Apr 2026 12:29:26 -0700
+
 sdata (0.6.0-1) unstable; urgency=medium
 
   * Add DISPLAY command, LIST program-buffer display, DELETE n[-m] program-buffer deletion, ERR/ERL functions

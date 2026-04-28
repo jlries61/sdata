@@ -6,7 +6,7 @@
 #   new-version        e.g. 0.3.4
 #   changelog-summary  one-line description of changes for changelog entries
 #
-# The script updates nine locations across eight files, appends dated entries
+# The script updates ten locations across nine files, appends dated entries
 # to sdata.spec and debian/changelog, then optionally builds, tests, commits,
 # and tags.  All steps are confirmed before destructive actions.
 
@@ -109,7 +109,14 @@ sedi "s/VERSION=\${VERSION:-$OLD_VER}/VERSION=\${VERSION:-$NEW_VER}/" "$FILE"
 echo "  updated $FILE"
 
 # ---------------------------------------------------------------------------
-# 5. man/man1/sdata.1
+# 5. slackware/sdata.info
+# ---------------------------------------------------------------------------
+FILE="$ROOT/slackware/sdata.info"
+sedi "s/^VERSION=\"$OLD_VER\"/VERSION=\"$NEW_VER\"/" "$FILE"
+echo "  updated $FILE"
+
+# ---------------------------------------------------------------------------
+# 6. man/man1/sdata.1
 # ---------------------------------------------------------------------------
 FILE="$ROOT/man/man1/sdata.1"
 sedi "s/\"sdata $OLD_VER\"/\"sdata $NEW_VER\"/" "$FILE"
@@ -117,7 +124,7 @@ sedi "s/\"[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\" \"sdata /\"$TODAY\" \"sda
 echo "  updated $FILE"
 
 # ---------------------------------------------------------------------------
-# 6. README.md  (version strings in example output and filenames)
+# 7. README.md  (version strings in example output and filenames)
 # ---------------------------------------------------------------------------
 FILE="$ROOT/README.md"
 # Use a loop to avoid sed extended-regex portability issues with dots
@@ -127,7 +134,7 @@ sed "s/$OLD_ESC/$NEW_ESC/g" "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
 echo "  updated $FILE"
 
 # ---------------------------------------------------------------------------
-# 7. sdata.spec — version field + new changelog entry
+# 8. sdata.spec — version field + new changelog entry
 # ---------------------------------------------------------------------------
 FILE="$ROOT/sdata.spec"
 sedi "s/^Version:[[:space:]]*.*/Version:        $NEW_VER/" "$FILE"
@@ -141,7 +148,7 @@ awk -v date="$RPM_DATE" -v maint="$MAINTAINER" \
 echo "  updated $FILE"
 
 # ---------------------------------------------------------------------------
-# 8. debian/changelog — prepend new entry
+# 9. debian/changelog — prepend new entry
 # ---------------------------------------------------------------------------
 FILE="$ROOT/debian/changelog"
 # Write new entry to a temp file then concatenate with existing changelog.
@@ -168,6 +175,7 @@ REMAINING=$(grep -rl "$OLD_VER" \
     "$ROOT/Makefile" \
     "$ROOT/alire.toml" \
     "$ROOT/slackware/sdata.SlackBuild" \
+    "$ROOT/slackware/sdata.info" \
     "$ROOT/man/man1/sdata.1" \
     "$ROOT/README.md" \
     "$ROOT/sdata.spec" \
@@ -209,6 +217,7 @@ case "$DO_COMMIT" in
             Makefile \
             alire.toml \
             slackware/sdata.SlackBuild \
+            slackware/sdata.info \
             "man/man1/sdata.1" \
             README.md \
             sdata.spec \

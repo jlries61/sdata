@@ -196,6 +196,36 @@ package body SData.Lexer is
                T.Text (T.Length) := Current_Char (Ctx);
                Advance (Ctx);
             end loop;
+            -- E-notation: consume E/e followed by optional sign and digits.
+            if not Is_End_Of_Source (Ctx)
+               and then (Current_Char (Ctx) = 'E' or else Current_Char (Ctx) = 'e')
+            then
+               declare
+                  Saved_Pos : constant Positive := Ctx.Pos;
+                  Saved_Len : constant Natural   := T.Length;
+               begin
+                  T.Length := T.Length + 1;
+                  T.Text (T.Length) := Current_Char (Ctx);
+                  Advance (Ctx);
+                  if not Is_End_Of_Source (Ctx)
+                     and then (Current_Char (Ctx) = '+' or else Current_Char (Ctx) = '-')
+                  then
+                     T.Length := T.Length + 1;
+                     T.Text (T.Length) := Current_Char (Ctx);
+                     Advance (Ctx);
+                  end if;
+                  if not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) then
+                     while not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) loop
+                        T.Length := T.Length + 1;
+                        T.Text (T.Length) := Current_Char (Ctx);
+                        Advance (Ctx);
+                     end loop;
+                  else
+                     Ctx.Pos := Saved_Pos;
+                     T.Length := Saved_Len;
+                  end if;
+               end;
+            end if;
 
          elsif Is_Letter (C) then
             while not Is_End_Of_Source (Ctx) and then (Is_Alphanumeric (Current_Char (Ctx)) or Current_Char (Ctx) = '_' or Current_Char (Ctx) = '$' or Current_Char (Ctx) = '%' or Current_Char (Ctx) = '.') loop
@@ -267,6 +297,7 @@ package body SData.Lexer is
                elsif Upper = "RUN" then T.Kind := Token_RUN;
                elsif Upper = "NAMES" then T.Kind := Token_NAMES;
                elsif Upper = "LIST" then T.Kind := Token_LIST;
+               elsif Upper = "DISPLAY" then T.Kind := Token_DISPLAY;
                elsif Upper = "TO" then T.Kind := Token_TO;
                elsif Upper = "STEP" then T.Kind := Token_STEP;
                else
@@ -298,6 +329,19 @@ package body SData.Lexer is
                      end if;
                   end;
                end if;
+            end loop;
+            if not Is_End_Of_Source (Ctx) then
+               Advance (Ctx); -- skip closing quote
+            end if;
+
+         --  Single-quoted string literals.
+         elsif C = ''' then
+            T.Kind := Token_String_Literal;
+            Advance (Ctx); -- skip opening quote
+            while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= ''' loop
+               T.Length := T.Length + 1;
+               T.Text (T.Length) := Current_Char (Ctx);
+               Advance (Ctx);
             end loop;
             if not Is_End_Of_Source (Ctx) then
                Advance (Ctx); -- skip closing quote
@@ -335,6 +379,17 @@ package body SData.Lexer is
                when ',' => T.Kind := Token_Comma; Advance (Ctx);
                when ';' => T.Kind := Token_Semicolon; Advance (Ctx);
                when ':' => T.Kind := Token_Colon; Advance (Ctx);
+               when '|' =>
+                  T.Kind := Token_Pipe;
+                  T.Text (1) := '|';
+                  T.Length := 1;
+                  Advance (Ctx);
+                  --  Consume a second '|' if present (e.g. DLM=||).
+                  if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '|' then
+                     T.Text (2) := '|';
+                     T.Length := 2;
+                     Advance (Ctx);
+                  end if;
                when others =>
                   --  Unknown character, skip it and move on.
                   Advance (Ctx);

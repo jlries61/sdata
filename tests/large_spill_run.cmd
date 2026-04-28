@@ -4,5 +4,5 @@ LET X = RECNO
 RUN
 
 -- After commit, table should be on disk.
-LIST X
+DISPLAY X
 QUIT
