@@ -2128,9 +2128,6 @@ package body SData.Evaluator is
                               "FALSE" | "TRUE" then
                      return Evaluate_Function (VName, null);
                   end if;
-                  if not Defined (VName) then
-                     raise SData.Script_Error with "Undefined variable: " & VName;
-                  end if;
                end if;
                return VVal;
             end;
