@@ -815,7 +815,8 @@ package body SData.Help is
       Put_Line ("  UDF(x, lo, hi)   probability density (1/(hi-lo) for lo <= x <= hi)");
       Put_Line ("  UCF(x, lo, hi)   cumulative probability P(X <= x)");
       Put_Line ("  UIF(p, lo, hi)   quantile  (0 < p < 1)");
-      Put_Line ("  URN(lo, hi)      random variate");
+      Put_Line ("  URN(lo, hi)      random variate on [lo, hi]");
+      Put_Line ("  URN()            random variate on [0, 1] (default bounds)");
       Put_Line ("  lo, hi: interval bounds (lo < hi)");
    end Help_UDF;
 

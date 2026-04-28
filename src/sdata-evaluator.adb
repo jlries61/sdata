@@ -1491,10 +1491,18 @@ package body SData.Evaluator is
 
    function Handle_URN (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Uniform_RN (Convert_To_Float (Vals.Element (1)),
-                                                      Convert_To_Float (Vals.Element (2))));
+      if N = 0 then
+         return Num_Result (SData.Statistics.Uniform_RN (0.0, 1.0));
+      elsif N = 1 then
+         if Vals.Element (1).Kind = Val_Missing then return (Kind => Val_Missing); end if;
+         raise SData.Script_Error with "URN requires 0 or 2 arguments, not 1.";
+      else
+         if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Uniform_RN (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2))));
+      end if;
    end Handle_URN;
 
    function Handle_ERN (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -2075,7 +2083,11 @@ package body SData.Evaluator is
                if VVal.Kind = Val_Missing then
                   --  Fall back to zero-arg functions (optional parentheses)
                   if VName in "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |
-                              "DATE$" | "TIME$" | "RAN" | "RANDOM" | "LRN" |
+                              "DATE$" | "TIME$" | "RAN" | "RANDOM" | "RND" | "LRN" |
+                              "ZRN" | "URN" | "PI" | "TIMER" |
+                              "ERR" | "ERL" |
+                              "MAXLEN" | "MAXLVL" | "MAXINT" | "MAXNUM" |
+                              "MININT" | "MINNUM" |
                               "FALSE" | "TRUE" then
                      return Evaluate_Function (VName, null);
                   end if;
