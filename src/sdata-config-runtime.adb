@@ -24,8 +24,10 @@ package body SData.Config.Runtime is
       Options_TXTFMT_Len  := 4;
       Options_CHARSET     := (others => ' ');
       Options_CHARSET_Len := 0;
-      Save_DLM    := ',';
-      Save_Header := True;
+      Save_DLM         := ',';
+      Save_Header      := True;
+      Save_Charset     := (others => ' ');
+      Save_Charset_Len := 0;
    end Reset;
 
 end SData.Config.Runtime;

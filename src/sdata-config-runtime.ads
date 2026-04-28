@@ -34,9 +34,11 @@ package SData.Config.Runtime is
    Options_CHARSET     : String (1 .. 64) := (others => ' ');
    Options_CHARSET_Len : Natural          := 0;
 
-   --  Effective delimiter/header saved at SAVE-statement time for use at write time
-   Save_DLM    : Character := ',';
-   Save_Header : Boolean   := True;
+   --  Effective delimiter/header/charset saved at SAVE-statement time for use at write time
+   Save_DLM         : Character        := ',';
+   Save_Header      : Boolean          := True;
+   Save_Charset     : String (1 .. 64) := (others => ' ');
+   Save_Charset_Len : Natural          := 0;
 
    procedure Reset;
 

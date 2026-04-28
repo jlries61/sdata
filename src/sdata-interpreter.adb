@@ -1008,10 +1008,15 @@ package body SData.Interpreter is
                   (if Stmt.DLM_Len > 0
                    then Dlm_To_Char (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
                    else SData.Config.Runtime.Options_CSVDLM);
-               Eff_Header : constant Boolean :=
+               Eff_Header  : constant Boolean :=
                   (if Stmt.Header_Specified
                    then Stmt.Header_Val
                    else SData.Config.Runtime.Options_Header);
+               Eff_Charset : constant String :=
+                  (if Stmt.Output_CHARSET_Len > 0
+                   then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
+                   else SData.Config.Runtime.Options_CHARSET
+                           (1 .. SData.Config.Runtime.Options_CHARSET_Len));
             begin
                if Stmt.Is_Mock then
                   Exp_Len := 4; Expanded (1 .. 4) := "MOCK";
@@ -1022,7 +1027,7 @@ package body SData.Interpreter is
                SData.File_IO.Open_Input (Expanded (1 .. Exp_Len),
                  (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format),
                  Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
-                 Eff_DLM, Eff_Header);
+                 Eff_DLM, Eff_Header, Eff_Charset);
             end;
             Input_File_Columns.Clear;
             Refresh_PDV_Names;
@@ -1052,6 +1057,16 @@ package body SData.Interpreter is
                      (if Stmt.Header_Specified
                       then Stmt.Header_Val
                       else SData.Config.Runtime.Options_Header);
+                  if Stmt.Output_CHARSET_Len > 0 then
+                     SData.Config.Runtime.Save_Charset (1 .. Stmt.Output_CHARSET_Len) :=
+                        Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len);
+                     SData.Config.Runtime.Save_Charset_Len := Stmt.Output_CHARSET_Len;
+                  else
+                     SData.Config.Runtime.Save_Charset :=
+                        SData.Config.Runtime.Options_CHARSET;
+                     SData.Config.Runtime.Save_Charset_Len :=
+                        SData.Config.Runtime.Options_CHARSET_Len;
+                  end if;
                end;
             end if;
          when Stmt_SORT =>
@@ -1092,7 +1107,9 @@ package body SData.Interpreter is
                          SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
                          SData.Config.Runtime.Save_DLM,
                          SData.Config.Runtime.Save_Header,
-                         SData.Config.Runtime.Options_SAVEOVERWRT);
+                         SData.Config.Runtime.Options_SAVEOVERWRT,
+                         SData.Config.Runtime.Save_Charset
+                            (1 .. SData.Config.Runtime.Save_Charset_Len));
                      if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
                   exception
                      when SData.File_IO.Save_Refused => null;
@@ -1585,7 +1602,9 @@ package body SData.Interpreter is
                 SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
                 SData.Config.Runtime.Save_DLM,
                 SData.Config.Runtime.Save_Header,
-                SData.Config.Runtime.Options_SAVEOVERWRT);
+                SData.Config.Runtime.Options_SAVEOVERWRT,
+                SData.Config.Runtime.Save_Charset
+                   (1 .. SData.Config.Runtime.Save_Charset_Len));
             if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
          exception
             when SData.File_IO.Save_Refused => null;

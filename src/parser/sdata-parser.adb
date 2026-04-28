@@ -743,6 +743,50 @@ package body SData.Parser is
                                  elsif Flag_Name = "DLM" then
                                     Stmt.DLM_Len := Val_Tok.Length;
                                     Stmt.DLM_Path (1 .. Val_Tok.Length) := Val_Tok.Text (1 .. Val_Tok.Length);
+                                 elsif Flag_Name = "CHARSET" then
+                                    --  Consume multi-token charset names (e.g. UTF - 16 LE)
+                                    declare
+                                       Buf : String (1 .. 64) := (others => ' ');
+                                       Len : Natural := Val_Tok.Length;
+                                       P2  : Token;
+                                    begin
+                                       Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
+                                       P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                       if P2.Kind = Token_Minus then
+                                          declare
+                                             Discard2 : Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                             Mid_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                             M_Len    : constant Natural := Mid_Tok.Length;
+                                          begin
+                                             pragma Unreferenced (Discard2);
+                                             Buf (Len + 1) := '-';
+                                             Buf (Len + 2 .. Len + 1 + M_Len) :=
+                                                Mid_Tok.Text (1 .. M_Len);
+                                             Len := Len + 1 + M_Len;
+                                             P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                             if P2.Kind = Token_Identifier then
+                                                declare
+                                                   S_Upper : constant String :=
+                                                      To_Upper (P2.Text (1 .. P2.Length));
+                                                begin
+                                                   if S_Upper = "LE" or else S_Upper = "BE" then
+                                                      declare
+                                                         Suf_Tok : constant Token :=
+                                                            Get_Next_Token (Ctx.Lex_Ctx);
+                                                         S_Len   : constant Natural := Suf_Tok.Length;
+                                                      begin
+                                                         Buf (Len + 1 .. Len + S_Len) :=
+                                                            Suf_Tok.Text (1 .. S_Len);
+                                                         Len := Len + S_Len;
+                                                      end;
+                                                   end if;
+                                                end;
+                                             end if;
+                                          end;
+                                       end if;
+                                       Stmt.Output_CHARSET_Val (1 .. Len) := Buf (1 .. Len);
+                                       Stmt.Output_CHARSET_Len := Len;
+                                    end;
                                  end if;
                               end;
                            end if;
@@ -1062,11 +1106,46 @@ package body SData.Parser is
                                     end;
                                  elsif Flag_Name = "CHARSET" then
                                     declare
-                                       Raw : constant String := Val_Tok.Text (1 .. Val_Tok.Length);
-                                       L   : constant Natural := Natural'Min (Raw'Length, 64);
+                                       Buf : String (1 .. 64) := (others => ' ');
+                                       Len : Natural := Val_Tok.Length;
+                                       P2  : Token;
                                     begin
-                                       Stmt.Output_CHARSET_Val (1 .. L) := Raw (Raw'First .. Raw'First + L - 1);
-                                       Stmt.Output_CHARSET_Len := L;
+                                       Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
+                                       P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                       if P2.Kind = Token_Minus then
+                                          declare
+                                             Discard2 : Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                             Mid_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                             M_Len    : constant Natural := Mid_Tok.Length;
+                                          begin
+                                             pragma Unreferenced (Discard2);
+                                             Buf (Len + 1) := '-';
+                                             Buf (Len + 2 .. Len + 1 + M_Len) :=
+                                                Mid_Tok.Text (1 .. M_Len);
+                                             Len := Len + 1 + M_Len;
+                                             P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                             if P2.Kind = Token_Identifier then
+                                                declare
+                                                   S_Upper : constant String :=
+                                                      To_Upper (P2.Text (1 .. P2.Length));
+                                                begin
+                                                   if S_Upper = "LE" or else S_Upper = "BE" then
+                                                      declare
+                                                         Suf_Tok : constant Token :=
+                                                            Get_Next_Token (Ctx.Lex_Ctx);
+                                                         S_Len   : constant Natural := Suf_Tok.Length;
+                                                      begin
+                                                         Buf (Len + 1 .. Len + S_Len) :=
+                                                            Suf_Tok.Text (1 .. S_Len);
+                                                         Len := Len + S_Len;
+                                                      end;
+                                                   end if;
+                                                end;
+                                             end if;
+                                          end;
+                                       end if;
+                                       Stmt.Output_CHARSET_Val (1 .. Len) := Buf (1 .. Len);
+                                       Stmt.Output_CHARSET_Len := Len;
                                     end;
                                  end if;
                               end;

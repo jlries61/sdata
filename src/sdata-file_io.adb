@@ -1,6 +1,9 @@
 with Ada.Text_IO;
 with Ada.Streams.Stream_IO;
+with Ada.Streams;
 with Ada.Directories;
+with Ada.Strings.UTF_Encoding;             use Ada.Strings.UTF_Encoding;
+with Ada.Strings.UTF_Encoding.Conversions;
 with SData.Config.Runtime;
 with Ada.Unchecked_Deallocation;
 with Ada.Exceptions;
@@ -180,7 +183,8 @@ package body SData.File_IO is
                          Fmt         : Format_Type;
                          Sheet_Name  : String    := "";
                          Delimiter   : Character := ',';
-                         Read_Header : Boolean   := True) is
+                         Read_Header : Boolean   := True;
+                         Charset     : String    := "") is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       U_Name  : constant String := To_Upper (File_Name);
@@ -219,7 +223,7 @@ package body SData.File_IO is
 
       case Actual_Fmt is
          when CSV =>
-            Parse_CSV (File_Name, Delimiter, Read_Header);
+            Parse_CSV (File_Name, Delimiter, Read_Header, Charset);
          when ODF =>
             Parse_ODF (File_Name, Sheet_Name);
          when OOXML =>
@@ -239,7 +243,8 @@ package body SData.File_IO is
                           Sheet_Name      : String    := "";
                           Delimiter       : Character := ',';
                           Write_Header    : Boolean   := True;
-                          Allow_Overwrite : Boolean   := True) is
+                          Allow_Overwrite : Boolean   := True;
+                          Charset         : String    := "") is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       Sname   : constant String := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
@@ -263,7 +268,7 @@ package body SData.File_IO is
 
       case Actual_Fmt is
          when CSV =>
-            Write_CSV (File_Name, Delimiter, Write_Header, Allow_Overwrite);
+            Write_CSV (File_Name, Delimiter, Write_Header, Allow_Overwrite, Charset);
          when ODF =>
             Write_ODF (File_Name, Sname);
          when OOXML =>
@@ -276,8 +281,53 @@ package body SData.File_IO is
    ---------------
    procedure Parse_CSV (File_Name   : String;
                         Delimiter   : Character := ',';
-                        Read_Header : Boolean   := True) is
+                        Read_Header : Boolean   := True;
+                        Charset     : String    := "") is
       File : Ada.Text_IO.File_Type;
+
+      --  Charset handling: buffered path for UTF-16, ASCII validation flag.
+      package Line_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
+      All_Lines       : Line_Vecs.Vector;
+      All_Lines_Idx   : Natural := 0;
+      Is_Buffered     : Boolean := False;
+      Needs_ASCII_Chk : Boolean := False;
+
+      procedure Validate_ASCII (S : String) is
+      begin
+         for I in S'Range loop
+            if Character'Pos (S (I)) > 127 then
+               SData.IO.Put_Line_Error
+                  ("Warning: non-ASCII byte (value" &
+                   Integer'Image (Character'Pos (S (I))) &
+                   ") found in """ & File_Name & """");
+               return;
+            end if;
+         end loop;
+      end Validate_ASCII;
+
+      procedure Split_Into_Lines (S : String) is
+         Start : Natural := S'First;
+         I     : Natural := S'First;
+      begin
+         while I <= S'Last loop
+            if S (I) = ASCII.LF then
+               declare
+                  E : Natural := I - 1;
+               begin
+                  if E >= Start and then S (E) = ASCII.CR then
+                     E := E - 1;
+                  end if;
+                  All_Lines.Append (To_Unbounded_String
+                     (if E >= Start then S (Start .. E) else ""));
+               end;
+               Start := I + 1;
+            end if;
+            I := I + 1;
+         end loop;
+         if Start <= S'Last then
+            All_Lines.Append (To_Unbounded_String (S (Start .. S'Last)));
+         end if;
+      end Split_Into_Lines;
 
       --  Single heap-allocated line buffer shared for the entire parse.
       --  1 MB handles all real-world CSV lines; lines longer than this
@@ -576,33 +626,164 @@ package body SData.File_IO is
             Process_Line_Direct (To_String (Scan_Lines (R)), Names);
          end loop;
 
-         --  Process remaining lines using the heap buffer.
-         while not Ada.Text_IO.End_Of_File (File) loop
-            Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
-            Process_Line_Direct (Line_Buf (1 .. Line_Last), Names);
-         end loop;
+         --  Process remaining lines (text file or pre-loaded buffer).
+         if Is_Buffered then
+            while All_Lines_Idx < Natural (All_Lines.Length) loop
+               All_Lines_Idx := All_Lines_Idx + 1;
+               Process_Line_Direct (To_String (All_Lines (All_Lines_Idx)), Names);
+            end loop;
+         else
+            while not Ada.Text_IO.End_Of_File (File) loop
+               Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+               if Needs_ASCII_Chk then
+                  Validate_ASCII (Line_Buf (1 .. Line_Last));
+               end if;
+               Process_Line_Direct (Line_Buf (1 .. Line_Last), Names);
+            end loop;
+         end if;
 
          for I in Names'Range loop Free (Names (I)); end loop;
       end Load_Columns_And_Data;
 
    begin
-      Ada.Text_IO.Open (File, Ada.Text_IO.In_File, File_Name);
+      --  Charset setup: determine encoding and load whole file for UTF-16.
+      declare
+         use Ada.Streams;
+         UC : constant String := To_Upper (Trim (Charset, Ada.Strings.Both));
 
-      if Read_Header then
-         --  Read the first line as a named header.
-         if not Ada.Text_IO.End_Of_File (File) then
-            Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
-            Header_Line    := To_Unbounded_String (Line_Buf (1 .. Line_Last));
-            Has_File_Header := True;
+         procedure Load_As_UTF16
+            (Scheme : Ada.Strings.UTF_Encoding.Encoding_Scheme)
+         is
+            F    : Ada.Streams.Stream_IO.File_Type;
+            Sz   : constant Ada.Directories.File_Size :=
+               Ada.Directories.Size (File_Name);
+            Buf  : Ada.Streams.Stream_Element_Array
+               (1 .. Ada.Streams.Stream_Element_Offset (Sz));
+            Last : Ada.Streams.Stream_Element_Offset;
+            Raw  : String (1 .. Natural (Sz));
+         begin
+            Ada.Streams.Stream_IO.Open
+               (F, Ada.Streams.Stream_IO.In_File, File_Name);
+            Ada.Streams.Stream_IO.Read (F, Buf, Last);
+            Ada.Streams.Stream_IO.Close (F);
+            for I in 1 .. Natural (Last) loop
+               Raw (I) :=
+                  Character'Val (Buf (Ada.Streams.Stream_Element_Offset (I)));
+            end loop;
+            declare
+               UTF8     : constant String :=
+                  Ada.Strings.UTF_Encoding.Conversions.Convert
+                     (Raw (1 .. Natural (Last)), Scheme,
+                      Ada.Strings.UTF_Encoding.UTF_8);
+               Start_At : Natural := UTF8'First;
+            begin
+               if UTF8'Length >= 3
+                  and then UTF8 (UTF8'First .. UTF8'First + 2) = BOM_8
+               then
+                  Start_At := UTF8'First + 3;
+               end if;
+               Split_Into_Lines (UTF8 (Start_At .. UTF8'Last));
+               Is_Buffered := True;
+            end;
+         exception
+            when others =>
+               if Ada.Streams.Stream_IO.Is_Open (F) then
+                  Ada.Streams.Stream_IO.Close (F);
+               end if;
+               raise;
+         end Load_As_UTF16;
+
+         procedure Detect_And_Load is
+            F      : Ada.Streams.Stream_IO.File_Type;
+            Detect : Ada.Streams.Stream_Element_Array (1 .. 4);
+            Last   : Ada.Streams.Stream_Element_Offset;
+         begin
+            Ada.Streams.Stream_IO.Open
+               (F, Ada.Streams.Stream_IO.In_File, File_Name);
+            Ada.Streams.Stream_IO.Read (F, Detect, Last);
+            Ada.Streams.Stream_IO.Close (F);
+            if Last >= 2
+               and then Detect (1) = 16#FF# and then Detect (2) = 16#FE#
+            then
+               Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16LE);
+            elsif Last >= 2
+               and then Detect (1) = 16#FE# and then Detect (2) = 16#FF#
+            then
+               Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16BE);
+            end if;
+         exception
+            when others =>
+               if Ada.Streams.Stream_IO.Is_Open (F) then
+                  Ada.Streams.Stream_IO.Close (F);
+               end if;
+               raise;
+         end Detect_And_Load;
+
+      begin
+         if UC = "UTF-16" or else UC = "UTF-16LE" then
+            Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16LE);
+         elsif UC = "UTF-16BE" then
+            Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16BE);
+         elsif UC = "" or else UC = "AUTO" then
+            Detect_And_Load;
+         elsif UC = "ASCII" then
+            Needs_ASCII_Chk := True;
          end if;
+      end;
+
+      --  Open text file for non-buffered (ASCII / UTF-8 / no charset) path.
+      if not Is_Buffered then
+         Ada.Text_IO.Open (File, Ada.Text_IO.In_File, File_Name);
       end if;
 
-      --  Buffer up to NSCAN data lines for column-type detection.
-      while not Ada.Text_IO.End_Of_File (File) and then Scan_Count < NSCAN loop
-         Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
-         Scan_Count := Scan_Count + 1;
-         Scan_Lines (Scan_Count) := To_Unbounded_String (Line_Buf (1 .. Line_Last));
-      end loop;
+      if Is_Buffered then
+         --  Header and scan lines come from the pre-loaded buffer.
+         if Read_Header and then Natural (All_Lines.Length) >= 1 then
+            Header_Line     := All_Lines (1);
+            Has_File_Header := True;
+            All_Lines_Idx   := 1;
+         end if;
+         while All_Lines_Idx < Natural (All_Lines.Length)
+            and then Scan_Count < NSCAN
+         loop
+            All_Lines_Idx := All_Lines_Idx + 1;
+            Scan_Count    := Scan_Count + 1;
+            Scan_Lines (Scan_Count) := All_Lines (All_Lines_Idx);
+         end loop;
+      else
+         if Read_Header then
+            --  Read the first line as a named header; strip UTF-8 BOM if present.
+            if not Ada.Text_IO.End_Of_File (File) then
+               Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+               declare
+                  L : constant String := Line_Buf (1 .. Line_Last);
+               begin
+                  if L'Length >= 3
+                     and then L (L'First .. L'First + 2) = BOM_8
+                  then
+                     Header_Line :=
+                        To_Unbounded_String (L (L'First + 3 .. L'Last));
+                  else
+                     Header_Line := To_Unbounded_String (L);
+                  end if;
+               end;
+               Has_File_Header := True;
+            end if;
+         end if;
+
+         --  Buffer up to NSCAN data lines for column-type detection.
+         while not Ada.Text_IO.End_Of_File (File)
+            and then Scan_Count < NSCAN
+         loop
+            Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
+            if Needs_ASCII_Chk then
+               Validate_ASCII (Line_Buf (1 .. Line_Last));
+            end if;
+            Scan_Count := Scan_Count + 1;
+            Scan_Lines (Scan_Count) :=
+               To_Unbounded_String (Line_Buf (1 .. Line_Last));
+         end loop;
+      end if;
 
       if Has_File_Header then
          Load_Columns_And_Data (To_String (Header_Line), Names_From_Header => True);
@@ -612,7 +793,7 @@ package body SData.File_IO is
       end if;
 
       Free_Buf (Line_Buf);
-      Ada.Text_IO.Close (File);
+      if Ada.Text_IO.Is_Open (File) then Ada.Text_IO.Close (File); end if;
    exception
       when others =>
          Free_Buf (Line_Buf);
@@ -626,7 +807,8 @@ package body SData.File_IO is
    procedure Write_CSV (File_Name       : String;
                         Delimiter       : Character := ',';
                         Write_Header    : Boolean   := True;
-                        Allow_Overwrite : Boolean   := True) is
+                        Allow_Overwrite : Boolean   := True;
+                        Charset         : String    := "") is
       use Ada.Directories;
 
       TXTFMT_Len : constant Natural := SData.Config.Runtime.Options_TXTFMT_Len;
@@ -638,10 +820,49 @@ package body SData.File_IO is
           elsif TXTFMT_Raw = "CR"   then "" & ASCII.CR
           else                           "" & ASCII.LF);
 
+      Eff_Charset  : constant String :=
+         To_Upper (Trim (Charset, Ada.Strings.Both));
+      Is_UTF16     : constant Boolean :=
+         Eff_Charset = "UTF-16" or else
+         Eff_Charset = "UTF-16LE" or else
+         Eff_Charset = "UTF-16BE";
+      Is_UTF16BE_W : constant Boolean := Eff_Charset = "UTF-16BE";
+      Is_ASCII_Chk : constant Boolean := Eff_Charset = "ASCII";
+      Out_Scheme   : constant Ada.Strings.UTF_Encoding.Encoding_Scheme :=
+         (if Is_UTF16BE_W
+          then Ada.Strings.UTF_Encoding.UTF_16BE
+          else Ada.Strings.UTF_Encoding.UTF_16LE);
+      Out_BOM      : constant String :=
+         (if Is_UTF16 then (if Is_UTF16BE_W then BOM_16BE else BOM_16LE)
+          else "");
+
       File  : Ada.Streams.Stream_IO.File_Type;
       Strm  : Ada.Streams.Stream_IO.Stream_Access;
       N     : constant Natural := Column_Count;
       D_Str : constant String (1 .. 1) := (1 => Delimiter);
+
+      procedure Write_String (S : String) is
+      begin
+         if Is_UTF16 then
+            String'Write (Strm,
+               Ada.Strings.UTF_Encoding.Conversions.Convert
+                  (S, Ada.Strings.UTF_Encoding.UTF_8, Out_Scheme));
+         else
+            if Is_ASCII_Chk then
+               for I in S'Range loop
+                  if Character'Pos (S (I)) > 127 then
+                     SData.IO.Put_Line_Error
+                        ("Warning: non-ASCII byte (value" &
+                         Integer'Image (Character'Pos (S (I))) &
+                         ") in output for """ & File_Name & """");
+                     exit;
+                  end if;
+               end loop;
+            end if;
+            String'Write (Strm, S);
+         end if;
+      end Write_String;
+
    begin
       if not Allow_Overwrite and then Exists (File_Name) then
          SData.IO.Put_Line_Error
@@ -651,13 +872,16 @@ package body SData.File_IO is
       end if;
       Ada.Streams.Stream_IO.Create (File, Ada.Streams.Stream_IO.Out_File, File_Name);
       Strm := Ada.Streams.Stream_IO.Stream (File);
+      if Is_UTF16 then
+         String'Write (Strm, Out_BOM);
+      end if;
       if N > 0 then
          if Write_Header then
             for I in 1 .. N loop
-               String'Write (Strm, Column_Name (I));
-               if I /= N then String'Write (Strm, D_Str); end if;
+               Write_String (Column_Name (I));
+               if I /= N then Write_String (D_Str); end if;
             end loop;
-            String'Write (Strm, EOL);
+            Write_String (EOL);
          end if;
          for R in 1 .. Row_Count loop
             for C in 1 .. N loop
@@ -665,17 +889,17 @@ package body SData.File_IO is
                   Val : constant Value := Get_Value_Upper (R, Column_Name (C));
                begin
                   if Val.Kind = Val_Numeric then
-                     String'Write (Strm, Trim (Val.Num_Val'Img, Ada.Strings.Both));
+                     Write_String (Trim (Val.Num_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_Integer then
-                     String'Write (Strm, Trim (Val.Int_Val'Img, Ada.Strings.Both));
+                     Write_String (Trim (Val.Int_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_String then
-                     String'Write (Strm, SData.Values.To_String (Val));
+                     Write_String (SData.Values.To_String (Val));
                   end if;
                   --  Missing values: write nothing (consecutive delimiters per spec)
                end;
-               if C /= N then String'Write (Strm, D_Str); end if;
+               if C /= N then Write_String (D_Str); end if;
             end loop;
-            String'Write (Strm, EOL);
+            Write_String (EOL);
          end loop;
       end if;
       Ada.Streams.Stream_IO.Close (File);
