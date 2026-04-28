@@ -1129,9 +1129,18 @@ package body SData.Evaluator is
 
    function Handle_ZDF (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      if N = 2 then raise SData.Script_Error with "ZDF requires 1 or 3 arguments, not 2."; end if;
+      if N >= 3 then
+         if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2)),
+                                                         Convert_To_Float (Vals.Element (3))));
+      else
+         if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      end if;
    end Handle_ZDF;
 
    function Handle_NDF (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1247,9 +1256,18 @@ package body SData.Evaluator is
 
    function Handle_ZCF (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      if N = 2 then raise SData.Script_Error with "ZCF requires 1 or 3 arguments, not 2."; end if;
+      if N >= 3 then
+         if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2)),
+                                                         Convert_To_Float (Vals.Element (3))));
+      else
+         if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      end if;
    end Handle_ZCF;
 
    function Handle_NCF (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1359,9 +1377,18 @@ package body SData.Evaluator is
 
    function Handle_ZIF (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      if N = 2 then raise SData.Script_Error with "ZIF requires 1 or 3 arguments, not 2."; end if;
+      if N >= 3 then
+         if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)),
+                                                         Convert_To_Float (Vals.Element (2)),
+                                                         Convert_To_Float (Vals.Element (3))));
+      else
+         if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+      end if;
    end Handle_ZIF;
 
    function Handle_NIF (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1476,9 +1503,19 @@ package body SData.Evaluator is
    --  --- RN (random number) family ---
 
    function Handle_ZRN (Name : String; Vals : Value_Vectors.Vector) return Value is
-      pragma Unreferenced (Name, Vals);
+      pragma Unreferenced (Name);
+      N : constant Natural := Natural (Vals.Length);
    begin
-      return Num_Result (SData.Statistics.Normal_RN (0.0, 1.0));
+      if N = 0 then
+         return Num_Result (SData.Statistics.Normal_RN (0.0, 1.0));
+      elsif N = 1 then
+         if Vals.Element (1).Kind = Val_Missing then return (Kind => Val_Missing); end if;
+         raise SData.Script_Error with "ZRN requires 0 or 2 arguments, not 1.";
+      else
+         if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
+         return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
+                                                        Convert_To_Float (Vals.Element (2))));
+      end if;
    end Handle_ZRN;
 
    function Handle_NRN (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -2090,6 +2127,9 @@ package body SData.Evaluator is
                               "MININT" | "MINNUM" |
                               "FALSE" | "TRUE" then
                      return Evaluate_Function (VName, null);
+                  end if;
+                  if not Defined (VName) then
+                     raise SData.Script_Error with "Undefined variable: " & VName;
                   end if;
                end if;
                return VVal;

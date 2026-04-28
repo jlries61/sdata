@@ -124,6 +124,15 @@ package body SData.Variables is
       end if;
    end Get;
 
+   -------------
+   -- Defined --
+   -------------
+   function Defined (Name : String) return Boolean is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      return PDV_Index.Contains (Upper_Name) or else Temp_Symbols.Contains (Upper_Name);
+   end Defined;
+
    ---------------------
    -- Clear_Temporary --
    ---------------------

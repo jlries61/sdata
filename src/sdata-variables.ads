@@ -20,6 +20,10 @@ package SData.Variables is
    --  Retrieves a value. Lookup order: 1. Permanent PDV, 2. Temporary symbols.
    function Get (Name : String) return Value;
 
+   --  Returns True if the name exists in either the PDV or the temporary symbol table,
+   --  regardless of whether its current value is missing.
+   function Defined (Name : String) return Boolean;
+
    --  Removes a session variable.
    procedure Unset (Name : String);
 

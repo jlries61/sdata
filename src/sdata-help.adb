@@ -791,12 +791,12 @@ package body SData.Help is
 
    procedure Help_ZDF is
    begin
-      Put_Line ("Standard Normal distribution  (mu = 0, sigma = 1):");
-      Put_Line ("  ZDF(x)   probability density at x");
-      Put_Line ("  ZCF(x)   cumulative probability P(X <= x)");
-      Put_Line ("  ZIF(p)   quantile: x such that P(X <= x) = p  (0 < p < 1)");
-      Put_Line ("  ZRN()    random variate");
-      Put_Line ("See also: NDF for Normal with arbitrary mu and sigma.");
+      Put_Line ("Normal distribution (mu and sigma are optional; default mu=0, sigma=1):");
+      Put_Line ("  ZDF(x [, mu, sigma])   probability density at x");
+      Put_Line ("  ZCF(x [, mu, sigma])   cumulative probability P(X <= x)");
+      Put_Line ("  ZIF(p [, mu, sigma])   quantile: x such that P(X <= x) = p  (0 < p < 1)");
+      Put_Line ("  ZRN([mu, sigma])       random variate");
+      Put_Line ("See also: NDF/NCF/NIF/NRN (always require mu and sigma).");
    end Help_ZDF;
 
    procedure Help_NDF is
