@@ -17,10 +17,10 @@ package SData.File_IO is
    --  Charset specifies the character encoding ("", "AUTO", "UTF-8", "UTF-16", "ASCII").
    procedure Open_Input (File_Name   : String;
                          Fmt         : Format_Type;
-                         Sheet_Name  : String    := "";
-                         Delimiter   : Character := ',';
-                         Read_Header : Boolean   := True;
-                         Charset     : String    := "");
+                         Sheet_Name  : String  := "";
+                         Delimiter   : String  := ",";
+                         Read_Header : Boolean := True;
+                         Charset     : String  := "");
 
    --  Writes the current Data Table to a file.
    --  Sheet_Name sets the output sheet name in ODF/OOXML files (default: "Sheet1").
@@ -28,25 +28,25 @@ package SData.File_IO is
    --  Charset specifies the output character encoding ("", "AUTO", "UTF-8", "UTF-16", "ASCII").
    procedure Open_Output (File_Name       : String;
                           Fmt             : Format_Type;
-                          Sheet_Name      : String    := "";
-                          Delimiter       : Character := ',';
-                          Write_Header    : Boolean   := True;
-                          Allow_Overwrite : Boolean   := True;
-                          Charset         : String    := "");
+                          Sheet_Name      : String  := "";
+                          Delimiter       : String  := ",";
+                          Write_Header    : Boolean := True;
+                          Allow_Overwrite : Boolean := True;
+                          Charset         : String  := "");
 
    --  Individual parsers and writers for supported formats.
    procedure Parse_CSV   (File_Name   : String;
-                          Delimiter   : Character := ',';
-                          Read_Header : Boolean   := True;
-                          Charset     : String    := "");
+                          Delimiter   : String  := ",";
+                          Read_Header : Boolean := True;
+                          Charset     : String  := "");
    procedure Parse_ODF   (File_Name : String; Sheet_Name : String := ""); -- Handles .ods files
    procedure Parse_OOXML (File_Name : String; Sheet_Name : String := ""); -- Handles .xlsx files
 
    procedure Write_CSV   (File_Name       : String;
-                          Delimiter       : Character := ',';
-                          Write_Header    : Boolean   := True;
-                          Allow_Overwrite : Boolean   := True;
-                          Charset         : String    := "");
+                          Delimiter       : String  := ",";
+                          Write_Header    : Boolean := True;
+                          Allow_Overwrite : Boolean := True;
+                          Charset         : String  := "");
    procedure Write_ODF   (File_Name : String; Sheet_Name : String := "Sheet1");
    procedure Write_OOXML (File_Name : String; Sheet_Name : String := "Sheet1");
 

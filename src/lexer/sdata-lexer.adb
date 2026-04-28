@@ -379,6 +379,17 @@ package body SData.Lexer is
                when ',' => T.Kind := Token_Comma; Advance (Ctx);
                when ';' => T.Kind := Token_Semicolon; Advance (Ctx);
                when ':' => T.Kind := Token_Colon; Advance (Ctx);
+               when '|' =>
+                  T.Kind := Token_Pipe;
+                  T.Text (1) := '|';
+                  T.Length := 1;
+                  Advance (Ctx);
+                  --  Consume a second '|' if present (e.g. DLM=||).
+                  if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '|' then
+                     T.Text (2) := '|';
+                     T.Length := 2;
+                     Advance (Ctx);
+                  end if;
                when others =>
                   --  Unknown character, skip it and move on.
                   Advance (Ctx);

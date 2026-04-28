@@ -181,10 +181,10 @@ package body SData.File_IO is
 
    procedure Open_Input (File_Name   : String;
                          Fmt         : Format_Type;
-                         Sheet_Name  : String    := "";
-                         Delimiter   : Character := ',';
-                         Read_Header : Boolean   := True;
-                         Charset     : String    := "") is
+                         Sheet_Name  : String  := "";
+                         Delimiter   : String  := ",";
+                         Read_Header : Boolean := True;
+                         Charset     : String  := "") is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       U_Name  : constant String := To_Upper (File_Name);
@@ -240,11 +240,11 @@ package body SData.File_IO is
    -----------------
    procedure Open_Output (File_Name       : String;
                           Fmt             : Format_Type;
-                          Sheet_Name      : String    := "";
-                          Delimiter       : Character := ',';
-                          Write_Header    : Boolean   := True;
-                          Allow_Overwrite : Boolean   := True;
-                          Charset         : String    := "") is
+                          Sheet_Name      : String  := "";
+                          Delimiter       : String  := ",";
+                          Write_Header    : Boolean := True;
+                          Allow_Overwrite : Boolean := True;
+                          Charset         : String  := "") is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       Sname   : constant String := (if Sheet_Name = "" then "Sheet1" else Sheet_Name);
@@ -280,9 +280,9 @@ package body SData.File_IO is
    -- Parse_CSV --
    ---------------
    procedure Parse_CSV (File_Name   : String;
-                        Delimiter   : Character := ',';
-                        Read_Header : Boolean   := True;
-                        Charset     : String    := "") is
+                        Delimiter   : String  := ",";
+                        Read_Header : Boolean := True;
+                        Charset     : String  := "") is
       File : Ada.Text_IO.File_Type;
 
       --  Charset handling: buffered path for UTF-16, ASCII validation flag.
@@ -391,10 +391,21 @@ package body SData.File_IO is
       end Try_Fast_Float;
 
       --  Scan forward from Pos, honouring quote-enclosed fields.
-      --  Returns the position of the delimiter that ends the field, or 0 if
-      --  no delimiter was found (final field).  Quoted fields follow the
-      --  spec: same-type doubled quotes are treated as a literal quote;
-      --  the opposite quote type is taken literally inside a quoted field.
+      --  Returns the position of the first byte of the delimiter that ends the
+      --  field, or 0 if no delimiter was found (final field).  Supports
+      --  multi-character delimiters.  Quoted fields follow the spec: same-type
+      --  doubled quotes are treated as a literal quote; the opposite quote type
+      --  is taken literally inside a quoted field.
+      DLen : constant Positive :=
+         (if Delimiter'Length > 0 then Delimiter'Length else 1);
+
+      function At_Delimiter (Line : String; Pos : Positive) return Boolean is
+      begin
+         if Pos + DLen - 1 > Line'Last then return False; end if;
+         if DLen = 1 then return Line (Pos) = Delimiter (Delimiter'First); end if;
+         return Line (Pos .. Pos + DLen - 1) = Delimiter;
+      end At_Delimiter;
+
       function CSV_Field_End (Line : String; From : Positive) return Natural is
          I : Positive := From;
          Q : Character;
@@ -415,14 +426,12 @@ package body SData.File_IO is
                   I := I + 1;
                end if;
             end loop;
-            --  After the closing quote, the next char must be the delimiter
-            if I <= Line'Last and then Line (I) = Delimiter then
-               return I;
-            end if;
+            --  After the closing quote, the next chars must be the delimiter.
+            if At_Delimiter (Line, I) then return I; end if;
             return 0;
          else
             for K in From .. Line'Last loop
-               if Line (K) = Delimiter then return K; end if;
+               if At_Delimiter (Line, K) then return K; end if;
             end loop;
             return 0;
          end if;
@@ -489,7 +498,7 @@ package body SData.File_IO is
                   end if;
                end;
                exit when Delim_Pos = 0;
-               Start := Delim_Pos + 1;
+               Start := Delim_Pos + DLen;
             end;
          end loop;
       end Process_Line_Direct;
@@ -527,7 +536,7 @@ package body SData.File_IO is
                   Res (Count).E := (if Delim > 0 then Delim - 1 else Line'Last);
                end if;
                exit when Delim = 0;
-               Start := Delim + 1;
+               Start := Delim + DLen;
             end;
          end loop;
          N_Fields := Count;
@@ -805,10 +814,10 @@ package body SData.File_IO is
    -- Write_CSV --
    ---------------
    procedure Write_CSV (File_Name       : String;
-                        Delimiter       : Character := ',';
-                        Write_Header    : Boolean   := True;
-                        Allow_Overwrite : Boolean   := True;
-                        Charset         : String    := "") is
+                        Delimiter       : String  := ",";
+                        Write_Header    : Boolean := True;
+                        Allow_Overwrite : Boolean := True;
+                        Charset         : String  := "") is
       use Ada.Directories;
 
       TXTFMT_Len : constant Natural := SData.Config.Runtime.Options_TXTFMT_Len;
@@ -839,7 +848,7 @@ package body SData.File_IO is
       File  : Ada.Streams.Stream_IO.File_Type;
       Strm  : Ada.Streams.Stream_IO.Stream_Access;
       N     : constant Natural := Column_Count;
-      D_Str : constant String (1 .. 1) := (1 => Delimiter);
+      D_Str : constant String := Delimiter;
 
       procedure Write_String (S : String) is
       begin

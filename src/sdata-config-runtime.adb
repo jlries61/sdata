@@ -16,7 +16,9 @@ package body SData.Config.Runtime is
       Repeat_Active       := False;
       Last_Error_Code     := 0;
       Last_Error_Line     := 0;
-      Options_CSVDLM      := ',';
+      Options_CSVDLM      := (others => ' ');
+      Options_CSVDLM (1)  := ',';
+      Options_CSVDLM_Len  := 1;
       Options_Header      := True;
       Options_SAVEOVERWRT := True;
       Options_TXTFMT      := (others => ' ');
@@ -24,7 +26,9 @@ package body SData.Config.Runtime is
       Options_TXTFMT_Len  := 4;
       Options_CHARSET     := (others => ' ');
       Options_CHARSET_Len := 0;
-      Save_DLM         := ',';
+      Save_DLM         := (others => ' ');
+      Save_DLM (1)     := ',';
+      Save_DLM_Len     := 1;
       Save_Header      := True;
       Save_Charset     := (others => ' ');
       Save_Charset_Len := 0;

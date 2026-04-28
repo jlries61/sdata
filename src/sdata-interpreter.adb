@@ -988,12 +988,17 @@ package body SData.Interpreter is
    procedure Execute_Declarative (Stmt : Statement_Access) is
 
       --  Convert a DLM string (e.g. "," "\t" "TAB" "|") to a single Character.
-      function Dlm_To_Char (S : String) return Character is
+      function Dlm_To_Str (S : String) return String is
+         U : constant String := To_Upper (S);
       begin
-         if S'Length = 0           then return ','; end if;
-         if S = "\t" or else S = "TAB" then return Character'Val (9); end if;
-         return S (S'First);
-      end Dlm_To_Char;
+         if U'Length = 0                then return ","; end if;
+         if U = "\T" or else U = "TAB" then return "" & ASCII.HT; end if;
+         if U = "NEWLINE"              then return "" & ASCII.LF; end if;
+         if U = "PIPE"                 then return "|"; end if;
+         if U = "SPACE"                then return " "; end if;
+         if U = "COMMA"                then return ","; end if;
+         return S;
+      end Dlm_To_Str;
 
    begin
       case Stmt.Kind is
@@ -1004,10 +1009,11 @@ package body SData.Interpreter is
                File_Name  : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
                Expanded   : String (1 .. 1024);
                Exp_Len    : Natural := 0;
-               Eff_DLM    : constant Character :=
+               Eff_DLM     : constant String :=
                   (if Stmt.DLM_Len > 0
-                   then Dlm_To_Char (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                   else SData.Config.Runtime.Options_CSVDLM);
+                   then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
+                   else SData.Config.Runtime.Options_CSVDLM
+                           (1 .. SData.Config.Runtime.Options_CSVDLM_Len));
                Eff_Header  : constant Boolean :=
                   (if Stmt.Header_Specified
                    then Stmt.Header_Val
@@ -1049,10 +1055,17 @@ package body SData.Interpreter is
                   SData.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
                   SData.Config.Runtime.Save_Sheet_Name_Len := SLen;
                   SData.Config.Runtime.Save_File_Active := True;
-                  SData.Config.Runtime.Save_DLM :=
-                     (if Stmt.DLM_Len > 0
-                      then Dlm_To_Char (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                      else SData.Config.Runtime.Options_CSVDLM);
+                  declare
+                     Eff_DLM : constant String :=
+                        (if Stmt.DLM_Len > 0
+                         then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
+                         else SData.Config.Runtime.Options_CSVDLM
+                                 (1 .. SData.Config.Runtime.Options_CSVDLM_Len));
+                     EL : constant Natural := Eff_DLM'Length;
+                  begin
+                     SData.Config.Runtime.Save_DLM (1 .. EL) := Eff_DLM;
+                     SData.Config.Runtime.Save_DLM_Len := EL;
+                  end;
                   SData.Config.Runtime.Save_Header :=
                      (if Stmt.Header_Specified
                       then Stmt.Header_Val
@@ -1105,7 +1118,7 @@ package body SData.Interpreter is
                         (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"),
                          SData.Config.Runtime.Save_File_Fmt,
                          SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
-                         SData.Config.Runtime.Save_DLM,
+                         SData.Config.Runtime.Save_DLM (1 .. SData.Config.Runtime.Save_DLM_Len),
                          SData.Config.Runtime.Save_Header,
                          SData.Config.Runtime.Options_SAVEOVERWRT,
                          SData.Config.Runtime.Save_Charset
@@ -1183,7 +1196,14 @@ package body SData.Interpreter is
                elsif Key = "MAXTEMPMEM" then
                   SData.Config.Max_Temp_Vars := Natural'Value (Val);
                elsif Key = "CSVDLM" then
-                  SData.Config.Runtime.Options_CSVDLM := Dlm_To_Char (Val);
+                  declare
+                     DS : constant String := Dlm_To_Str (Val);
+                     DL : constant Natural := Natural'Min (DS'Length, 8);
+                  begin
+                     SData.Config.Runtime.Options_CSVDLM := (others => ' ');
+                     SData.Config.Runtime.Options_CSVDLM (1 .. DL) := DS (DS'First .. DS'First + DL - 1);
+                     SData.Config.Runtime.Options_CSVDLM_Len := DL;
+                  end;
                elsif Key = "HEADER" then
                   SData.Config.Runtime.Options_Header := (Val_Upper = "YES");
                elsif Key = "SAVEOVERWRT" then
@@ -1600,7 +1620,7 @@ package body SData.Interpreter is
                (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"),
                 SData.Config.Runtime.Save_File_Fmt,
                 SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
-                SData.Config.Runtime.Save_DLM,
+                SData.Config.Runtime.Save_DLM (1 .. SData.Config.Runtime.Save_DLM_Len),
                 SData.Config.Runtime.Save_Header,
                 SData.Config.Runtime.Options_SAVEOVERWRT,
                 SData.Config.Runtime.Save_Charset

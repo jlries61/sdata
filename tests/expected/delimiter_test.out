@@ -1,0 +1,23 @@
+Dataset opened: tests/data/pipe_delim.csv
+Alice 90.00000
+Bob 85.00000
+RUN complete. 2 records and 2 variables processed.
+Dataset opened: tests/data/tab_delim.csv
+Alice 90.00000
+Bob 85.00000
+RUN complete. 2 records and 2 variables processed.
+Dataset opened: tests/data/dblpipe_delim.csv
+Alice 90.00000
+Bob 85.00000
+RUN complete. 2 records and 2 variables processed.
+Dataset opened: tests/data/sample.csv
+Dataset saved: tests/data/output_pipe.csv
+RUN complete. 6 records and 4 variables processed.
+Dataset opened: tests/data/output_pipe.csv
+A 1.00000 2.00000 3.00000
+A 4.00000 5.00000 6.00000
+B 7.00000 8.00000 9.00000
+B 10.00000 11.00000 12.00000
+B 13.00000 14.00000 15.00000
+C 16.00000 17.00000 18.00000
+RUN complete. 6 records and 4 variables processed.
