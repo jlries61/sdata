@@ -15,7 +15,7 @@ RUN
 NEW
 USE "mock"
 IF MOD(ID, 2) = 1 THEN
-  PRINT "Writing ID=" ID "NAME=" NAME
+  PRINT "Writing ID=" ID "NAME=" NAME$
   WRITE
 END IF
 RUN

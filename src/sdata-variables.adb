@@ -389,6 +389,50 @@ package body SData.Variables is
          Define_Array (Name, Constituents.all);
       end if;
    end Define_Array_Access;
+
+   ----------------------------
+   -- Undefine_Virtual_Array --
+   ----------------------------
+   procedure Undefine_Virtual_Array (Name : String) is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if Array_Symbols.Contains (Upper_Name)
+         and then Array_Symbols.Element (Upper_Name).Kind = Virtual_Array
+      then
+         Array_Symbols.Delete (Upper_Name);
+      end if;
+   end Undefine_Virtual_Array;
+
+   -------------------------
+   -- List_Virtual_Arrays --
+   -------------------------
+   procedure List_Virtual_Arrays is
+      Cursor : Array_Table_Pkg.Cursor := Array_Symbols.First;
+      Found  : Boolean := False;
+   begin
+      while Array_Table_Pkg.Has_Element (Cursor) loop
+         declare
+            Arr_Def : constant Array_Definition_Type := Array_Table_Pkg.Element (Cursor);
+         begin
+            if Arr_Def.Kind = Virtual_Array then
+               Found := True;
+               declare
+                  Line : Unbounded_String :=
+                     To_Unbounded_String (Array_Table_Pkg.Key (Cursor) & ":");
+               begin
+                  for I in 1 .. Natural (Arr_Def.Constituents.Length) loop
+                     Append (Line, " " & To_String (Arr_Def.Constituents (I)));
+                  end loop;
+                  SData.IO.Put_Line (To_String (Line));
+               end;
+            end if;
+         end;
+         Array_Table_Pkg.Next (Cursor);
+      end loop;
+      if not Found then
+         SData.IO.Put_Line ("(no virtual arrays defined)");
+      end if;
+   end List_Virtual_Arrays;
    
    -------------------------
    -- Create_Real_Elements --

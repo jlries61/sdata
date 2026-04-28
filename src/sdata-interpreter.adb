@@ -281,6 +281,69 @@ package body SData.Interpreter is
       Clear_Pending_Mods;
    end Apply_Pending_Mods;
 
+   --  Splits Name into an alphabetic prefix and trailing integer suffix.
+   --  Returns True on success; Prefix and Num are set on success only.
+   function Split_Numeric_Suffix (Name   :     String;
+                                   Prefix : out Unbounded_String;
+                                   Num    : out Natural) return Boolean is
+      I : Integer := Name'Last;
+   begin
+      while I >= Name'First and then Name (I) in '0' .. '9' loop
+         I := I - 1;
+      end loop;
+      if I = Name'Last then
+         Prefix := Null_Unbounded_String; Num := 0; return False;
+      end if;
+      Prefix := To_Unbounded_String (Name (Name'First .. I));
+      Num    := Natural'Value (Name (I + 1 .. Name'Last));
+      return True;
+   end Split_Numeric_Suffix;
+
+   --  Expand a colon range (Start_Name:End_Name) into a numerically ordered
+   --  vector of names.  Returns an empty vector if either name lacks a
+   --  numeric suffix or the alphabetic prefixes differ.
+   --  When Create_Missing is True, variables not found in the current table
+   --  are added as missing-valued columns (used for ARRAY declarations).
+   function Expand_Colon_Names (Start_Name    : String;
+                                 End_Name      : String;
+                                 Create_Missing : Boolean := False)
+      return Name_Vectors.Vector
+   is
+      Result       : Name_Vectors.Vector;
+      Start_Prefix : Unbounded_String;
+      End_Prefix   : Unbounded_String;
+      Start_Num    : Natural;
+      End_Num      : Natural;
+      Lo, Hi       : Natural;
+   begin
+      if not Split_Numeric_Suffix (Start_Name, Start_Prefix, Start_Num) or else
+         not Split_Numeric_Suffix (End_Name,   End_Prefix,   End_Num)
+      then
+         return Result;  -- names lack numeric suffixes — silent no-op
+      end if;
+      if Start_Prefix /= End_Prefix then
+         return Result;  -- mismatched prefixes — silent no-op
+      end if;
+      Lo := Natural'Min (Start_Num, End_Num);
+      Hi := Natural'Max (Start_Num, End_Num);
+      declare
+         Pfx : constant String := To_String (Start_Prefix);
+      begin
+         for N in Lo .. Hi loop
+            declare
+               Var_Name : constant String :=
+                  Pfx & Ada.Strings.Fixed.Trim (Natural'Image (N), Ada.Strings.Both);
+            begin
+               if Create_Missing and then not Has_Column (Var_Name) then
+                  Add_Column (Var_Name, Col_Numeric);
+               end if;
+               Result.Append (To_Unbounded_String (Var_Name));
+            end;
+         end loop;
+      end;
+      return Result;
+   end Expand_Colon_Names;
+
    procedure Expand_Range (Kind : Column_Mod_Kind; Range_Spec : Variable_Range) is
       Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
       End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
@@ -288,6 +351,17 @@ package body SData.Interpreter is
    begin
       if not Range_Spec.Is_Range then
          Add_Pending_Mod (Kind, Start_Name);
+      elsif Range_Spec.Is_Colon_Range then
+         --  Colon range: numeric order; no creation for DROP, create for others.
+         declare
+            Names : constant Name_Vectors.Vector :=
+               Expand_Colon_Names (Start_Name, End_Name,
+                                   Create_Missing => (Kind /= Mod_Drop));
+         begin
+            for N of Names loop
+               Add_Pending_Mod (Kind, To_String (N));
+            end loop;
+         end;
       else
          for I in 1 .. Column_Count loop
             declare Name : constant String := Column_Name (I); begin
@@ -637,6 +711,13 @@ package body SData.Interpreter is
                      begin
                         if not Range_Spec.Is_Range then
                            Set_Hold (Start_Name, State);
+                        elsif Range_Spec.Is_Colon_Range then
+                           declare
+                              Names : constant Name_Vectors.Vector :=
+                                 Expand_Colon_Names (Start_Name, End_Name, Create_Missing => True);
+                           begin
+                              for N of Names loop Set_Hold (To_String (N), State); end loop;
+                           end;
                         else
                            for I in 1 .. Column_Count loop
                               declare Name : constant String := Column_Name (I); begin
@@ -675,51 +756,64 @@ package body SData.Interpreter is
                end loop;
             end;
          when Stmt_ARRAY =>
-            declare
-               V        : Name_Vectors.Vector;
-               Curr_Var : Variable_List := Stmt.Arr_Vars;
-               procedure Resolve_Range (Range_Spec : Variable_Range) is
-                  Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
-                  End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
-                  Start_Idx, End_Idx : Natural := 0;
-               begin
-                  if not Range_Spec.Is_Range then
-                     if Has_Array (Start_Name) then
-                        declare Lo, Hi : Integer;
+            if Stmt.Arr_Name_Len = 0 then
+               List_Virtual_Arrays;
+            elsif Stmt.Arr_Vars = null then
+               Undefine_Virtual_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len));
+            else
+               declare
+                  V        : Name_Vectors.Vector;
+                  Curr_Var : Variable_List := Stmt.Arr_Vars;
+                  procedure Resolve_Range (Range_Spec : Variable_Range) is
+                     Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                     End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                     Start_Idx, End_Idx : Natural := 0;
+                  begin
+                     if not Range_Spec.Is_Range then
+                        if Has_Array (Start_Name) then
+                           declare Lo, Hi : Integer;
+                           begin
+                              Get_Array_Bounds (Start_Name, Lo, Hi);
+                              for I in Lo .. Hi loop
+                                 V.Append (To_Unbounded_String (Start_Name & "(" & Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both) & ")"));
+                              end loop;
+                           end;
+                        else
+                           V.Append (To_Unbounded_String (Start_Name));
+                        end if;
+                     elsif Range_Spec.Is_Colon_Range then
+                        declare
+                           Names : constant Name_Vectors.Vector :=
+                              Expand_Colon_Names (Start_Name, End_Name, Create_Missing => True);
                         begin
-                           Get_Array_Bounds (Start_Name, Lo, Hi);
-                           for I in Lo .. Hi loop
-                              V.Append (To_Unbounded_String (Start_Name & "(" & Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both) & ")"));
-                           end loop;
+                           for N of Names loop V.Append (N); end loop;
                         end;
                      else
-                        V.Append (To_Unbounded_String (Start_Name));
-                     end if;
-                  else
-                     for I in 1 .. Column_Count loop
-                        declare Name : constant String := Column_Name (I); begin
-                           if Name = Start_Name then Start_Idx := I; end if;
-                           if Name = End_Name   then End_Idx   := I; end if;
-                        end;
-                     end loop;
-                     if Start_Idx > 0 and End_Idx > 0 then
-                        if Start_Idx > End_Idx then
-                           declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                        for I in 1 .. Column_Count loop
+                           declare Name : constant String := Column_Name (I); begin
+                              if Name = Start_Name then Start_Idx := I; end if;
+                              if Name = End_Name   then End_Idx   := I; end if;
+                           end;
+                        end loop;
+                        if Start_Idx > 0 and End_Idx > 0 then
+                           if Start_Idx > End_Idx then
+                              declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                           end if;
+                           for I in Start_Idx .. End_Idx loop V.Append (To_Unbounded_String (Column_Name (I))); end loop;
                         end if;
-                        for I in Start_Idx .. End_Idx loop V.Append (To_Unbounded_String (Column_Name (I))); end loop;
                      end if;
-                  end if;
-               end Resolve_Range;
-            begin
-               while Curr_Var /= null loop
-                  Resolve_Range (Curr_Var.Var);
-                  Curr_Var := Curr_Var.Next;
-               end loop;
-               Define_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len), V);
-            exception
-               when E : others =>
-                  raise Script_Error with "Error defining array " & Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
-            end;
+                  end Resolve_Range;
+               begin
+                  while Curr_Var /= null loop
+                     Resolve_Range (Curr_Var.Var);
+                     Curr_Var := Curr_Var.Next;
+                  end loop;
+                  Define_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len), V);
+               exception
+                  when E : others =>
+                     raise Script_Error with "Error defining array " & Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
+               end;
+            end if;
          when Stmt_DIM =>
             declare
                function Eval_Bound (Expr : Expression_Access; Label : String) return Integer is
@@ -790,6 +884,13 @@ package body SData.Interpreter is
                      begin
                         if not R.Is_Range then
                            V.Append (To_Unbounded_String (U_Start));
+                        elsif R.Is_Colon_Range then
+                           declare
+                              Names : constant Name_Vectors.Vector :=
+                                 Expand_Colon_Names (U_Start, U_End, Create_Missing => False);
+                           begin
+                              for N of Names loop V.Append (N); end loop;
+                           end;
                         else
                            for I in 1 .. Column_Count loop
                               declare Name : constant String := Column_Name (I); begin
@@ -929,25 +1030,30 @@ package body SData.Interpreter is
                Input_File_Columns.Include (Column_Name (I));
             end loop;
          when Stmt_SAVE =>
-            declare
-               Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
-               SLen  : constant Natural := Stmt.Sheet_Name_Len;
-            begin
-               SData.Config.Runtime.Save_File_Path (1 .. Full'Length) := Full;
-               SData.Config.Runtime.Save_File_Len := Full'Length;
-               SData.Config.Runtime.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
-               SData.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
-               SData.Config.Runtime.Save_Sheet_Name_Len := SLen;
-               SData.Config.Runtime.Save_File_Active := True;
-               SData.Config.Runtime.Save_DLM :=
-                  (if Stmt.DLM_Len > 0
-                   then Dlm_To_Char (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                   else SData.Config.Runtime.Options_CSVDLM);
-               SData.Config.Runtime.Save_Header :=
-                  (if Stmt.Header_Specified
-                   then Stmt.Header_Val
-                   else SData.Config.Runtime.Options_Header);
-            end;
+            if Stmt.File_Len = 0 then
+               SData.Config.Runtime.Save_File_Active := False;
+               SData.Config.Runtime.Save_File_Len := 0;
+            else
+               declare
+                  Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
+                  SLen  : constant Natural := Stmt.Sheet_Name_Len;
+               begin
+                  SData.Config.Runtime.Save_File_Path (1 .. Full'Length) := Full;
+                  SData.Config.Runtime.Save_File_Len := Full'Length;
+                  SData.Config.Runtime.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
+                  SData.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
+                  SData.Config.Runtime.Save_Sheet_Name_Len := SLen;
+                  SData.Config.Runtime.Save_File_Active := True;
+                  SData.Config.Runtime.Save_DLM :=
+                     (if Stmt.DLM_Len > 0
+                      then Dlm_To_Char (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
+                      else SData.Config.Runtime.Options_CSVDLM);
+                  SData.Config.Runtime.Save_Header :=
+                     (if Stmt.Header_Specified
+                      then Stmt.Header_Val
+                      else SData.Config.Runtime.Options_Header);
+               end;
+            end if;
          when Stmt_SORT =>
             declare
                Curr_Var : Variable_List := Stmt.Sort_Vars;
@@ -1425,7 +1531,7 @@ package body SData.Interpreter is
             when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
                | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT
                | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO
-               | Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM
+               | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
                | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                begin
                   Execute_Statement (Iter);
@@ -1642,7 +1748,7 @@ package body SData.Interpreter is
             and then Current.Kind /= Stmt_FOR     and then Current.Kind /= Stmt_WHILE
             and then Current.Kind /= Stmt_LOOP_REPEAT and then Current.Kind /= Stmt_SELECT
             and then Current.Kind /= Stmt_DELETE  and then Current.Kind /= Stmt_WRITE
-            and then Current.Kind /= Stmt_DIM     and then Current.Kind /= Stmt_ARRAY
+            and then Current.Kind /= Stmt_DIM
          then
             begin
                Execute_Statement (Current);

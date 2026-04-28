@@ -66,13 +66,14 @@ package SData.AST is
       end case;
    end record;
 
-   --  Represents a single variable or a range (e.g., VAR1-VAR10).
+   --  Represents a single variable or a range (e.g., VAR1-VAR10 or VAR1:VAR10).
    type Variable_Range is record
-      Start_Name : String (1 .. 32);
-      Start_Len  : Natural;
-      End_Name   : String (1 .. 32);
-      End_Len    : Natural;
-      Is_Range   : Boolean := False;
+      Start_Name     : String (1 .. 32);
+      Start_Len      : Natural;
+      End_Name       : String (1 .. 32);
+      End_Len        : Natural;
+      Is_Range       : Boolean := False;
+      Is_Colon_Range : Boolean := False;  -- True when separator was ':'
    end record;
 
    --  Linked list for variable lists in KEEP/DROP statements.

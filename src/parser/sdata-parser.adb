@@ -442,20 +442,25 @@ package body SData.Parser is
             Node.Var.Start_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
             Node.Var.Start_Len := Tok.Length;
             
-            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Minus or else Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon then
-               declare
-                  Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                  End_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               begin
-                  if End_Tok.Kind /= Token_Identifier then
-                     Put_Line_Error ("Error: Expected identifier after '" & Discard.Kind'Image & "' in range");
-                  else
-                     Node.Var.Is_Range := True;
-                     Node.Var.End_Name (1 .. End_Tok.Length) := End_Tok.Text (1 .. End_Tok.Length);
-                     Node.Var.End_Len := End_Tok.Length;
-                  end if;
-               end;
-            end if;
+            declare
+               P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if P.Kind = Token_Minus or else P.Kind = Token_Colon then
+                  declare
+                     Sep     : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     End_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if End_Tok.Kind /= Token_Identifier then
+                        Put_Line_Error ("Error: Expected identifier after '" & Sep.Kind'Image & "' in range");
+                     else
+                        Node.Var.Is_Range       := True;
+                        Node.Var.Is_Colon_Range := (Sep.Kind = Token_Colon);
+                        Node.Var.End_Name (1 .. End_Tok.Length) := End_Tok.Text (1 .. End_Tok.Length);
+                        Node.Var.End_Len := End_Tok.Length;
+                     end if;
+                  end;
+               end if;
+            end;
             
             if First = null then
                First := Node;
@@ -760,17 +765,31 @@ package body SData.Parser is
                New_Kind : constant Statement_Kind := (if Tok.Kind = Token_ARRAY then Stmt_ARRAY else Stmt_DIM);
             begin
                Stmt := new Statement (New_Kind);
-               declare
-                  Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               begin
-                  Stmt.Arr_Name_Len := Name_Tok.Length;
-                  Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
-                  
-                  if New_Kind = Stmt_ARRAY then
-                     -- ARRAY arrayname variable_list
-                     Stmt.Arr_Vars := Parse_Variable_List (Ctx);
-                  else
-                     -- DIM arrayname (lower TO upper) [/TEMP]
+               if New_Kind = Stmt_ARRAY then
+                  declare
+                     P_Arr : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if P_Arr.Kind = Token_Newline or else P_Arr.Kind = Token_Semicolon
+                        or else P_Arr.Kind = Token_EOF
+                     then
+                        null;  --  Bare ARRAY: list virtual arrays (Arr_Name_Len stays 0)
+                     else
+                        declare
+                           Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           Stmt.Arr_Name_Len := Name_Tok.Length;
+                           Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
+                           Stmt.Arr_Vars := Parse_Variable_List (Ctx);
+                        end;
+                     end if;
+                  end;
+               else
+                  --  DIM arrayname (lower TO upper) [/TEMP]
+                  declare
+                     Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     Stmt.Arr_Name_Len := Name_Tok.Length;
+                     Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
                      declare
                         Tok_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      begin
@@ -778,19 +797,17 @@ package body SData.Parser is
                            Put_Line_Error ("Error: Expected '(' after DIM array name");
                            return null;
                         end if;
-                        
-                        -- Parse first bound expression
+
                         Stmt.Arr_Start_Expr := Parse_Expression (Ctx);
                         if Stmt.Arr_Start_Expr = null then
                            Put_Line_Error ("Error: Expected bound expression in DIM");
                            return null;
                         end if;
-                        
+
                         declare
                            Tok_Next : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
                            if Tok_Next.Kind = Token_TO then
-                              -- DIM X(lower TO upper)
                               Stmt.Arr_End_Expr := Parse_Expression (Ctx);
                               if Stmt.Arr_End_Expr = null then
                                  Put_Line_Error ("Error: Expected upper bound expression after TO");
@@ -801,7 +818,6 @@ package body SData.Parser is
                                  return null;
                               end if;
                            elsif Tok_Next.Kind = Token_Right_Paren then
-                              -- Simple dimension: DIM X(n) means 1 to n
                               Stmt.Arr_End_Expr := Stmt.Arr_Start_Expr;
                               Stmt.Arr_Start_Expr := new Expression (Expr_Numeric_Literal);
                               Stmt.Arr_Start_Expr.Value      := 1.0;
@@ -813,12 +829,11 @@ package body SData.Parser is
                            end if;
                         end;
                      end;
-                     
-                     -- Check for /TEMP
+
                      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash then
                         declare
                            Discard_Slash : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                           Tok_Temp : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           Tok_Temp      : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
                            if Tok_Temp.Length >= 4 and then To_Upper (Tok_Temp.Text (1 .. 4)) = "TEMP" then
                               Stmt.Is_Temporary_Dim := True;
@@ -828,8 +843,8 @@ package body SData.Parser is
                            end if;
                         end;
                      end if;
-                  end if;
-               end;
+                  end;
+               end if;
             end;
 
          when Token_SELECT =>

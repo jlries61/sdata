@@ -63,6 +63,12 @@ package SData.Variables is
    procedure Define_Array (Name : String; Constituents : Name_Vectors.Vector); -- For internal use
    procedure Define_Array_Access (Name : String; Constituents : GNAT.Strings.String_List_Access);
 
+   -- Removes a virtual array definition by name (no effect on constituent variables or real arrays)
+   procedure Undefine_Virtual_Array (Name : String);
+
+   -- Prints all currently defined virtual arrays to console output
+   procedure List_Virtual_Arrays;
+
    -- Creates or resizes a real array (generates numbered variables)
    procedure Dim_Array (Name : String; Start_Idx, End_Idx : Integer; Is_Temp : Boolean);
 

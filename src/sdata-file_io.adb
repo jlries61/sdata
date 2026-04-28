@@ -186,14 +186,14 @@ package body SData.File_IO is
       U_Name  : constant String := To_Upper (File_Name);
    begin
       if U_Name = "MOCK" or U_Name = "MOCK_DATA" then
-         Clear; Add_Column ("ID", Col_Integer); Add_Column ("NAME", Col_String); Add_Column ("SALARY", Col_Numeric);
+         Clear; Add_Column ("ID", Col_Integer); Add_Column ("NAME$", Col_String); Add_Column ("SALARY", Col_Numeric);
          for I in 1 .. 3 loop
             Add_Row; Set_Value (I, "ID", (Kind => Val_Integer, Int_Val => I));
             Set_Value (I, "SALARY", (Kind => Val_Numeric, Num_Val => 50000.0 + Float(I - 1) * 10000.0));
          end loop;
-         Set_Value(1, "NAME", (Kind => Val_String, Str_Val => To_Unbounded_String ("Alice")));
-         Set_Value(2, "NAME", (Kind => Val_String, Str_Val => To_Unbounded_String ("Bob")));
-         Set_Value(3, "NAME", (Kind => Val_String, Str_Val => To_Unbounded_String ("Charlie")));
+         Set_Value(1, "NAME$", (Kind => Val_String, Str_Val => To_Unbounded_String ("Alice")));
+         Set_Value(2, "NAME$", (Kind => Val_String, Str_Val => To_Unbounded_String ("Bob")));
+         Set_Value(3, "NAME$", (Kind => Val_String, Str_Val => To_Unbounded_String ("Charlie")));
          if not SData.Config.Quiet_Mode then
             Put_Line ("Generating mock data...");
          end if;
@@ -340,8 +340,74 @@ package body SData.File_IO is
          return True;
       end Try_Fast_Float;
 
-      --  Process one CSV line in-place: finds delimiters and processes each
-      --  field as a slice of the line string — no per-field heap allocation.
+      --  Scan forward from Pos, honouring quote-enclosed fields.
+      --  Returns the position of the delimiter that ends the field, or 0 if
+      --  no delimiter was found (final field).  Quoted fields follow the
+      --  spec: same-type doubled quotes are treated as a literal quote;
+      --  the opposite quote type is taken literally inside a quoted field.
+      function CSV_Field_End (Line : String; From : Positive) return Natural is
+         I : Positive := From;
+         Q : Character;
+      begin
+         if I > Line'Last then return 0; end if;
+         if Line (I) = '"' or else Line (I) = ''' then
+            Q := Line (I);
+            I := I + 1;
+            while I <= Line'Last loop
+               if Line (I) = Q then
+                  if I < Line'Last and then Line (I + 1) = Q then
+                     I := I + 2;   --  doubled quote → literal
+                  else
+                     I := I + 1;   --  closing quote
+                     exit;
+                  end if;
+               else
+                  I := I + 1;
+               end if;
+            end loop;
+            --  After the closing quote, the next char must be the delimiter
+            if I <= Line'Last and then Line (I) = Delimiter then
+               return I;
+            end if;
+            return 0;
+         else
+            for K in From .. Line'Last loop
+               if Line (K) = Delimiter then return K; end if;
+            end loop;
+            return 0;
+         end if;
+      end CSV_Field_End;
+
+      --  Extract the unquoted, unescaped value from a raw CSV field slice.
+      --  For quoted fields: strips surrounding quotes and collapses doubled
+      --  same-type quotes.  For unquoted fields: returns Trim(Raw).
+      function CSV_Unquote (Raw : String) return String is
+         T : constant String := Trim (Raw, Ada.Strings.Both);
+         Q : Character;
+         R : Unbounded_String;
+         I : Positive;
+      begin
+         if T'Length >= 2
+            and then (T (T'First) = '"' or else T (T'First) = ''')
+            and then T (T'Last) = T (T'First)
+         then
+            Q := T (T'First);
+            I := T'First + 1;
+            while I <= T'Last - 1 loop
+               if T (I) = Q and then I < T'Last - 1 and then T (I + 1) = Q then
+                  Append (R, Q);
+                  I := I + 2;
+               else
+                  Append (R, T (I));
+                  I := I + 1;
+               end if;
+            end loop;
+            return To_String (R);
+         end if;
+         return T;
+      end CSV_Unquote;
+
+      --  Process one CSV line with RFC-4180-style quote handling.
       procedure Process_Line_Direct (Line : String; Names : String_List) is
          Start       : Integer := Line'First;
          Field_Count : Natural := 0;
@@ -349,18 +415,15 @@ package body SData.File_IO is
          Add_Row;
          loop
             declare
-               Comma : Natural := 0;
-               Val   : Value;
-               Num   : Float;
+               Delim_Pos : constant Natural := CSV_Field_End (Line, Start);
+               Val       : Value;
+               Num       : Float;
             begin
-               for K in Start .. Line'Last loop
-                  if Line (K) = Delimiter then Comma := K; exit; end if;
-               end loop;
                declare
                   Raw : constant String :=
-                     (if Comma > 0 then Line (Start .. Comma - 1)
-                      else            Line (Start .. Line'Last));
-                  F   : constant String := Trim (Raw, Ada.Strings.Both);
+                     (if Delim_Pos > 0 then Line (Start .. Delim_Pos - 1)
+                      else                  Line (Start .. Line'Last));
+                  F   : constant String := CSV_Unquote (Raw);
                begin
                   Field_Count := Field_Count + 1;
                   if Field_Count <= Names'Length then
@@ -375,8 +438,8 @@ package body SData.File_IO is
                      Set_Value_Upper (Row_Count, Names (Field_Count).all, Val);
                   end if;
                end;
-               exit when Comma = 0;
-               Start := Comma + 1;
+               exit when Delim_Pos = 0;
+               Start := Delim_Pos + 1;
             end;
          end loop;
       end Process_Line_Direct;
@@ -406,18 +469,15 @@ package body SData.File_IO is
          if Line'Length = 0 then return Res; end if;
          loop
             declare
-               Comma : Natural := 0;
+               Delim : constant Natural := CSV_Field_End (Line, Start);
             begin
-               for K in Start .. Line'Last loop
-                  if Line (K) = Delimiter then Comma := K; exit; end if;
-               end loop;
                Count := Count + 1;
                if Count <= Max_Fields then
                   Res (Count).S := Start;
-                  Res (Count).E := (if Comma > 0 then Comma - 1 else Line'Last);
+                  Res (Count).E := (if Delim > 0 then Delim - 1 else Line'Last);
                end if;
-               exit when Comma = 0;
-               Start := Comma + 1;
+               exit when Delim = 0;
+               Start := Delim + 1;
             end;
          end loop;
          N_Fields := Count;
@@ -445,6 +505,21 @@ package body SData.File_IO is
          Col_Determined : array (1 .. N_Hdr) of Boolean     := (others => False);
          Col_Types      : array (1 .. N_Hdr) of Column_Type := (others => Col_Numeric);
       begin
+         --  Per spec: a column whose header already ends in "$" is forced character.
+         if Names_From_Header then
+            for I in 1 .. N_Hdr loop
+               declare
+                  Raw : constant String :=
+                     Trim (H_Str (H_Idx (I).S .. H_Idx (I).E), Ada.Strings.Both);
+               begin
+                  if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
+                     Col_Types (I) := Col_String;
+                     Col_Determined (I) := True;
+                  end if;
+               end;
+            end loop;
+         end if;
+
          --  Detect column types from up to NSCAN scan rows.
          for R in 1 .. Scan_Count loop
             declare
@@ -456,8 +531,7 @@ package body SData.File_IO is
                   if not Col_Determined (I) and then I <= N_Fld then
                      declare
                         F : constant String :=
-                           Trim (D_Str (D_Idx (I).S .. D_Idx (I).E),
-                                 Ada.Strings.Both);
+                           CSV_Unquote (D_Str (D_Idx (I).S .. D_Idx (I).E));
                      begin
                         if F /= "" and then F /= "." then
                            Col_Types (I) :=
@@ -474,12 +548,18 @@ package body SData.File_IO is
          Clear;
          for I in 1 .. N_Hdr loop
             declare
-               Name : constant String :=
+               Base_Name : constant String :=
                   (if Names_From_Header
-                   then Safe_Name (Trim (H_Str (H_Idx (I).S .. H_Idx (I).E),
-                                         Ada.Strings.Both),
+                   then Safe_Name (CSV_Unquote (H_Str (H_Idx (I).S .. H_Idx (I).E)),
                                    "COL" & Trim (I'Img, Ada.Strings.Both))
                    else "COL" & Trim (I'Img, Ada.Strings.Both));
+               --  Per spec: append "$" to string column names that don't already end in "$"
+               Name : constant String :=
+                  (if Col_Types (I) = Col_String
+                      and then (Base_Name'Length = 0
+                                or else Base_Name (Base_Name'Last) /= '$')
+                   then Base_Name & "$"
+                   else Base_Name);
             begin
                Names (I) := new String'(Name);
                Add_Column (Name, Col_Types (I));
@@ -590,9 +670,8 @@ package body SData.File_IO is
                      String'Write (Strm, Trim (Val.Int_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_String then
                      String'Write (Strm, SData.Values.To_String (Val));
-                  else
-                     String'Write (Strm, ".");
                   end if;
+                  --  Missing values: write nothing (consecutive delimiters per spec)
                end;
                if C /= N then String'Write (Strm, D_Str); end if;
             end loop;
@@ -760,6 +839,16 @@ package body SData.File_IO is
                Data_Cells : Node_List;
                Col_Idx    : Natural := 0;
             begin
+               --  Per spec: column names already ending in "$" are forced character.
+               for I in 1 .. N loop
+                  declare
+                     Raw : constant String := To_String (Col_Name_Vec (I));
+                  begin
+                     if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
+                        Col_Types (I) := Col_String;
+                     end if;
+                  end;
+               end loop;
                if Length (Rows) > 1 then
                   Data_Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 1)), "table:table-cell");
                   for J in 0 .. Length (Data_Cells) - 1 loop
@@ -772,7 +861,17 @@ package body SData.File_IO is
                   Free (Data_Cells);
                end if;
                for I in 1 .. N loop
-                  Add_Column (To_String (Col_Name_Vec (I)), Col_Types (I));
+                  declare
+                     Raw_Name  : constant String := To_String (Col_Name_Vec (I));
+                     Final_Name : constant String :=
+                        (if Col_Types (I) = Col_String
+                            and then (Raw_Name'Length = 0
+                                      or else Raw_Name (Raw_Name'Last) /= '$')
+                         then Raw_Name & "$"
+                         else Raw_Name);
+                  begin
+                     Add_Column (Final_Name, Col_Types (I));
+                  end;
                end loop;
             end;
             Col_Count := Column_Count;
@@ -1113,6 +1212,16 @@ package body SData.File_IO is
                   Data_Cells : Node_List;
                   Col_Idx    : Natural := 0;
                begin
+                  --  Per spec: column names already ending in "$" are forced character.
+                  for I in 1 .. N loop
+                     declare
+                        Raw : constant String := To_String (Col_Name_Vec (I));
+                     begin
+                        if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
+                           Col_Types (I) := Col_String;
+                        end if;
+                     end;
+                  end loop;
                   if Length (Rows) > 1 then
                      Data_Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 1)), "c");
                      for J in 0 .. Length (Data_Cells) - 1 loop
@@ -1125,7 +1234,17 @@ package body SData.File_IO is
                      Free (Data_Cells);
                   end if;
                   for I in 1 .. N loop
-                     Add_Column (To_String (Col_Name_Vec (I)), Col_Types (I));
+                     declare
+                        Raw_Name  : constant String := To_String (Col_Name_Vec (I));
+                        Final_Name : constant String :=
+                           (if Col_Types (I) = Col_String
+                               and then (Raw_Name'Length = 0
+                                         or else Raw_Name (Raw_Name'Last) /= '$')
+                            then Raw_Name & "$"
+                            else Raw_Name);
+                     begin
+                        Add_Column (Final_Name, Col_Types (I));
+                     end;
                   end loop;
                end;
             end;

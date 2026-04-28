@@ -5,7 +5,7 @@ OPTIONS TXTFMT CRLF
 SAVE "tests/data/txtfmt_crlf.csv"
 RUN
 USE "tests/data/txtfmt_crlf.csv"
-PRINT NAME
+PRINT NAME$
 RUN
 -- Write LF, read back
 USE MOCK
@@ -13,7 +13,7 @@ OPTIONS TXTFMT LF
 SAVE "tests/data/txtfmt_lf.csv"
 RUN
 USE "tests/data/txtfmt_lf.csv"
-PRINT NAME
+PRINT NAME$
 RUN
 -- Reset to default
 OPTIONS TXTFMT AUTO
