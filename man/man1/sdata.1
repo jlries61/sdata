@@ -238,9 +238,18 @@ commands and executed once per record during the data step.
 .TP
 .B LET \fIvar\fR = \fIexpr\fR
 Assign a permanent (table) variable.
+Array element forms:
+.B LET \fIarr\fR(\fIi\fR) = \fIexpr\fR
+assigns a single element;
+.B LET \fIarr\fR(\fIlo\fR:\fIhi\fR) = \fIexpr\fR
+assigns a contiguous slice;
+.B LET \fIarr\fR(\fIi\fR,\fIj\fR,...) = \fIexpr\fR
+assigns a list of elements.
 .TP
 .B SET \fIvar\fR = \fIexpr\fR
 Assign a temporary variable (not written to the output table).
+Array element forms are the same as for
+.BR LET .
 .TP
 .B PRINT [\fIexpr\fR ...]
 Print values to the console.
@@ -289,9 +298,17 @@ Rename columns.
 .B ARRAY \fIname\fR \fIvar\fR [\fIvar\fR ...]
 Create a virtual array providing indexed access to existing variables.
 .TP
+.B DIM \fIname\fR (\fIn\fR) [/TEMP]
+.br
 .B DIM \fIname\fR (\fIlo\fR TO \fIhi\fR) [/TEMP]
-Create a numeric array with real storage.
+Create a numeric array with real storage (indices 1..\fIn\fR or \fIlo\fR..\fIhi\fR).
 Elements are initialised to missing.
+Use
+.B /TEMP
+to confine the array to the current data step.
+Array elements are read and written with parenthesis subscripts; see
+.B LET
+for slice and list assignment forms.
 .RE
 .SH FUNCTIONS
 Functions may appear anywhere in an expression.
