@@ -21,6 +21,10 @@ package SData.Config is
    --  If True, suppresses informational messages (e.g., "Dataset opened").
    Quiet_Mode    : Boolean := False;
 
+   --  Optional output dataset from command line (-s).
+   Output_Dataset_Path : String (1 .. 1024) := (others => ' ');
+   Output_Dataset_Len  : Natural := 0;
+
    --  Optional file to redirect console output (set via -o).
    Output_File     : String (1 .. 1024) := (others => ' ');
    Output_File_Len : Natural := 0;
