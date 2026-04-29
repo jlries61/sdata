@@ -575,9 +575,14 @@ package body SData.Evaluator is
 
    function Handle_Nmiss_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
-      R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+      Count : Integer := 0;
    begin
-      return (Kind => Val_Integer, Int_Val => R.NMISS_Count);
+      for V of Vals loop
+         if V.Kind = Val_Missing or else (V.Kind = Val_String and then Length (V.Str_Val) = 0) then
+            Count := Count + 1;
+         end if;
+      end loop;
+      return (Kind => Val_Integer, Int_Val => Count);
    end Handle_Nmiss_Fn;
 
    function Handle_Gmean (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1634,8 +1639,15 @@ package body SData.Evaluator is
       pragma Unreferenced (Name);
    begin
       if Integer (Vals.Length) < 1 then return (Kind => Val_Missing); end if;
-      return (Kind => Val_Integer,
-              Int_Val => (if Vals.Element (1).Kind = Val_Missing then 1 else 0));
+      declare
+         V : constant Value := Vals.Element (1);
+      begin
+         if V.Kind = Val_Missing or else (V.Kind = Val_String and then Length (V.Str_Val) = 0) then
+            return (Kind => Val_Integer, Int_Val => 1);
+         else
+            return (Kind => Val_Integer, Int_Val => 0);
+         end if;
+      end;
    end Handle_Missing;
 
    function Handle_False (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -2284,10 +2296,15 @@ package body SData.Evaluator is
                            return V;
                         end;
                      when Op_Eq  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val = R.Str_Val then 1 else 0));
-                     when others => return (Kind => Val_Missing);
+                     when Op_Ne  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val /= R.Str_Val then 1 else 0));
+                     when Op_Lt  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val < R.Str_Val then 1 else 0));
+                     when Op_Le  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val <= R.Str_Val then 1 else 0));
+                     when Op_Gt  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val > R.Str_Val then 1 else 0));
+                     when Op_Ge  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val >= R.Str_Val then 1 else 0));
+                     when others => raise SData.Script_Error with "Operator not supported for character values.";
                   end case;
                else
-                  return (Kind => Val_Missing);
+                  raise SData.Script_Error with "Type mismatch in expression (e.g., combining numeric and character values).";
                end if;
             end;
 
