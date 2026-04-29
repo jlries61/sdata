@@ -1,3 +1,9 @@
+sdata (0.6.4-1) unstable; urgency=medium
+
+  * Array slice/list assignment; range subscripts in aggregate functions and PRINT; LET/SET array element restrictions; NEW clears virtual arrays
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 29 Apr 2026 16:13:55 -0700
+
 sdata (0.6.3-1) unstable; urgency=medium
 
   * Bump to 0.6.3: SKIP/MAXROWS for USE; ZCF/ZDF/ZIF/ZRN optional mu/sigma;

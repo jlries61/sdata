@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.6.3
+Version:        0.6.4
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -52,6 +52,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Wed Apr 29 2026 John L. Ries <john@theyarnbard.com> - 0.6.4-1
+- Array slice/list assignment; range subscripts in aggregate functions and PRINT; LET/SET array element restrictions; NEW clears virtual arrays
+
 * Tue Apr 28 2026 John L. Ries <john@theyarnbard.com> - 0.6.3-1
 - Bump to 0.6.3: SKIP/MAXROWS for USE; ZCF/ZDF/ZIF/ZRN optional mu/sigma;
   URN/ZRN zero-arg defaults; undefined variable errors; expand no-paren
