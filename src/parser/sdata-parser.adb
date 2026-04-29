@@ -538,24 +538,65 @@ package body SData.Parser is
       case Tok.Kind is
          when Token_LET | Token_SET =>
             declare
-               Var_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Is_Arr  : Boolean := False;
-               A_Idx   : Expression_Access := null;
+               Var_Tok      : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+               Is_Arr       : Boolean         := False;
+               A_Idx        : Expression_Access := null;
+               A_Idx_List   : Expression_List := null;
+               A_Is_Slice   : Boolean         := False;
             begin
-               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren or else 
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren or else
                   Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
                   Is_Arr := True;
-                  declare 
-                     LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx); 
-                     Closing : constant Token_Kind := (if LP.Kind = Token_Left_Paren then Token_Right_Paren else Token_Right_Brace);
+                  declare
+                     LP      : constant Token      := Get_Next_Token (Ctx.Lex_Ctx);
+                     Closing : constant Token_Kind :=
+                        (if LP.Kind = Token_Left_Paren then Token_Right_Paren else Token_Right_Brace);
+                     First   : constant Expression_Access := Parse_Expression (Ctx);
+                     Peek    : constant Token_Kind := Peek_Next_Token (Ctx.Lex_Ctx).Kind;
                   begin
-                     A_Idx := Parse_Expression (Ctx);
+                     if Peek = Token_Colon then
+                        --  Range form: (lo : hi) — assign to every element lo..hi
+                        declare
+                           Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- consume ':'
+                           Second  : constant Expression_Access := Parse_Expression (Ctx);
+                           Lo_Node : constant Expression_List :=
+                              new Expression_List_Node'(Expr => First,  Next => null);
+                           Hi_Node : constant Expression_List :=
+                              new Expression_List_Node'(Expr => Second, Next => null);
+                        begin
+                           Lo_Node.Next := Hi_Node;
+                           A_Idx_List   := Lo_Node;
+                           A_Is_Slice   := True;
+                        end;
+                     elsif Peek = Token_Comma then
+                        --  List form: (i, j, k, ...) — assign to each listed index
+                        declare
+                           Head : constant Expression_List :=
+                              new Expression_List_Node'(Expr => First, Next => null);
+                           Last : Expression_List := Head;
+                        begin
+                           while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
+                              declare
+                                 Discard  : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- ','
+                                 New_Node : constant Expression_List :=
+                                    new Expression_List_Node'(Expr => Parse_Expression (Ctx), Next => null);
+                              begin
+                                 Last.Next := New_Node;
+                                 Last      := New_Node;
+                              end;
+                           end loop;
+                           A_Idx_List := Head;
+                        end;
+                     else
+                        --  Single-index form (existing behaviour)
+                        A_Idx := First;
+                     end if;
                      if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Closing then
                         Put_Line_Error ("Error: Expected matching closing parenthesis/brace in array assignment");
                      end if;
                   end;
                end if;
-               
+
                if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
                   Put_Line_Error ("Error: Expected '=' after variable name """ &
                      Var_Tok.Text (1 .. Var_Tok.Length) & """ in " &
@@ -563,11 +604,13 @@ package body SData.Parser is
                end if;
 
                Stmt := new Statement ((if Tok.Kind = Token_LET then Stmt_LET else Stmt_SET));
-               Stmt.Var_Len := Var_Tok.Length;
+               Stmt.Var_Len      := Var_Tok.Length;
                Stmt.Var_Name (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);
-               Stmt.Is_Array := Is_Arr;
-               Stmt.Arr_Idx := A_Idx;
-               Stmt.Expr := Parse_Expression (Ctx);
+               Stmt.Is_Array     := Is_Arr;
+               Stmt.Arr_Idx      := A_Idx;
+               Stmt.Arr_Idx_List := A_Idx_List;
+               Stmt.Arr_Is_Slice := A_Is_Slice;
+               Stmt.Expr         := Parse_Expression (Ctx);
             end;
 
          when Token_REPEAT =>

@@ -80,6 +80,7 @@ package body SData.AST is
       if Stmt = null then return; end if;
       --  Free common expression fields present on every statement kind.
       Free (Stmt.Arr_Idx);
+      Free (Stmt.Arr_Idx_List);
       Free (Stmt.Expr);
       --  Free discriminant-specific children.
       case Stmt.Kind is
