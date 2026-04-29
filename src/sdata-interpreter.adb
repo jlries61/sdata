@@ -497,6 +497,11 @@ package body SData.Interpreter is
    begin
       Result := Evaluate (Stmt.Expr);
       if Stmt.Is_Array then
+         --  Check if the array exists first.
+         if not Has_Array (Var_Name_Str) then
+            raise Script_Error with "Array """ & Var_Name_Str & """ is not defined";
+         end if;
+
          --  Enforce design rules for array modifications:
          --  "LET statement may not modify individual elements of temporary array."
          --  "SET statement may not modify individual elements of virtual or permanent array."

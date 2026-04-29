@@ -2169,6 +2169,9 @@ package body SData.Evaluator is
             end;
 
          when Expr_Array_Access =>
+            if Expr.Arr_Idx /= null and then (Expr.Arr_Idx.Next /= null or else Expr.Arr_Idx.Is_Range) then
+               raise Script_Error with "Array range or list not permitted in scalar expression context";
+            end if;
             declare
                Index_Val : constant Value :=
                   (if Expr.Arr_Idx /= null
@@ -2338,6 +2341,9 @@ package body SData.Evaluator is
                   To_Upper (Expr.Func_Name (1 .. Expr.Func_Len));
             begin
                if Has_Array (FName) then
+                  if Expr.Arguments /= null and then (Expr.Arguments.Next /= null or else Expr.Arguments.Is_Range) then
+                     raise Script_Error with "Array range or list not permitted in scalar expression context";
+                  end if;
                   declare
                      Index_Val : constant Value :=
                         (if Expr.Arguments /= null
