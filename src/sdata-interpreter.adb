@@ -1034,7 +1034,7 @@ package body SData.Interpreter is
                  (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format),
                  Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
                  Eff_DLM, Eff_Header, Eff_Charset,
-                 Stmt.Skip_Val, Stmt.Maxrows_Val);
+                 Stmt.Skip_Val, Stmt.Maxrows_Val, Stmt.NSCAN_Val);
             end;
             Input_File_Columns.Clear;
             Refresh_PDV_Names;
