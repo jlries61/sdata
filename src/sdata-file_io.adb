@@ -186,7 +186,8 @@ package body SData.File_IO is
                          Read_Header : Boolean := True;
                          Charset     : String  := "";
                          Skip_Rows   : Natural := 0;
-                         Max_Rows    : Natural := 0) is
+                         Max_Rows    : Natural := 0;
+                         Nscan_Rows  : Natural := 0) is
       Actual_Fmt : Format_Type := Fmt;
       Ext_Idx : Natural := 0;
       U_Name  : constant String := To_Upper (File_Name);
@@ -225,7 +226,7 @@ package body SData.File_IO is
 
       case Actual_Fmt is
          when CSV =>
-            Parse_CSV (File_Name, Delimiter, Read_Header, Charset, Skip_Rows, Max_Rows);
+            Parse_CSV (File_Name, Delimiter, Read_Header, Charset, Skip_Rows, Max_Rows, Nscan_Rows);
          when ODF =>
             Parse_ODF (File_Name, Sheet_Name, Skip_Rows, Max_Rows);
          when OOXML =>
@@ -286,7 +287,8 @@ package body SData.File_IO is
                         Read_Header : Boolean := True;
                         Charset     : String  := "";
                         Skip_Rows   : Natural := 0;
-                        Max_Rows    : Natural := 0) is
+                        Max_Rows    : Natural := 0;
+                        Nscan_Rows  : Natural := 0) is
       File : Ada.Text_IO.File_Type;
 
       --  Charset handling: buffered path for UTF-16, ASCII validation flag.
@@ -551,11 +553,12 @@ package body SData.File_IO is
       end Split_Indices;
 
       Has_File_Header : Boolean := False;
-      NSCAN       : constant := 20;
+      Max_NSCAN   : constant := 1000;
+      NSCAN       : constant Natural :=
+         (if Nscan_Rows > 0 then Natural'Min (Nscan_Rows, Max_NSCAN) else 20);
 
-      --  Store up to NSCAN scan lines as Unbounded_Strings for type detection.
-      --  Only 20 rows — the allocation cost is negligible.
-      type UB_Array is array (1 .. NSCAN) of Unbounded_String;
+      --  Store up to NSCAN scan lines for column-type detection.
+      type UB_Array is array (1 .. Max_NSCAN) of Unbounded_String;
       Scan_Lines  : UB_Array;
       Scan_Count  : Natural := 0;
       Header_Line : Unbounded_String;

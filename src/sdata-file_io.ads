@@ -22,7 +22,8 @@ package SData.File_IO is
                          Read_Header : Boolean := True;
                          Charset     : String  := "";
                          Skip_Rows   : Natural := 0;
-                         Max_Rows    : Natural := 0);
+                         Max_Rows    : Natural := 0;
+                         Nscan_Rows  : Natural := 0);
 
    --  Writes the current Data Table to a file.
    --  Sheet_Name sets the output sheet name in ODF/OOXML files (default: "Sheet1").
@@ -42,7 +43,8 @@ package SData.File_IO is
                           Read_Header : Boolean := True;
                           Charset     : String  := "";
                           Skip_Rows   : Natural := 0;
-                          Max_Rows    : Natural := 0);
+                          Max_Rows    : Natural := 0;
+                          Nscan_Rows  : Natural := 0);
    procedure Parse_ODF   (File_Name : String; Sheet_Name : String := "";
                           Skip_Rows : Natural := 0; Max_Rows : Natural := 0);
    procedure Parse_OOXML (File_Name : String; Sheet_Name : String := "";
