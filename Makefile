@@ -124,7 +124,7 @@ srpm: clean
 	   fi; \
 	   cp "$$TARBALL_DIR/$$tb" rpmbuild/SOURCES/; \
 	 done
-	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir %(pwd)/rpmbuild"
+	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir $(CURDIR)/rpmbuild"
 	@mv rpmbuild/SRPMS/sdata-$(VERSION)-1.src.rpm .
 	@rm -rf rpmbuild
 	@echo "SRPM created: sdata-$(VERSION)-1.src.rpm"
