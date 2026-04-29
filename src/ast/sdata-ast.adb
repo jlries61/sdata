@@ -25,6 +25,9 @@ package body SData.AST is
       while List /= null loop
          Next := List.Next;
          Free (List.Expr);
+         if List.Is_Range then
+            Free (List.Expr_End);
+         end if;
          Free_Expr_Node (List);
          List := Next;
       end loop;
@@ -137,8 +140,10 @@ package body SData.AST is
    function Copy_Expression_List (List : Expression_List) return Expression_List is
    begin
       if List = null then return null; end if;
-      return new Expression_List_Node'(Expr => Copy_Expression (List.Expr),
-                                       Next => Copy_Expression_List (List.Next));
+      return new Expression_List_Node'(Expr     => Copy_Expression (List.Expr),
+                                       Is_Range => List.Is_Range,
+                                       Expr_End => (if List.Is_Range then Copy_Expression (List.Expr_End) else null),
+                                       Next     => Copy_Expression_List (List.Next));
    end Copy_Expression_List;
 
    function Copy_Expression (Expr : Expression_Access) return Expression_Access is

@@ -148,16 +148,22 @@ package body SData.Variables is
             declare
                Arr_Def : constant Array_Definition_Type := Array_Table_Pkg.Element (Cursor);
             begin
-               if Arr_Def.Kind = Real_Array and then Arr_Def.Is_Temporary then
-                  for I in Arr_Def.Start_Index .. Arr_Def.End_Index loop
-                     declare
-                        Var_Name : constant String := Get_Real_Var_Name (To_String (Arr_Def.Constituents.First_Element), I);
-                     begin
-                        if Temp_Symbols.Contains (Var_Name) then
-                           Symbol_Table_Pkg.Delete (Temp_Symbols, Var_Name);
-                        end if;
-                     end;
-                  end loop;
+               --  NEW should clear all array definitions (Real Temporary and Virtual)
+               --  to ensure a fresh state for the next dataset/program.
+               if Arr_Def.Kind = Virtual_Array or else
+                  (Arr_Def.Kind = Real_Array and then Arr_Def.Is_Temporary)
+               then
+                  if Arr_Def.Kind = Real_Array then
+                     for I in Arr_Def.Start_Index .. Arr_Def.End_Index loop
+                        declare
+                           Var_Name : constant String := Get_Real_Var_Name (To_String (Arr_Def.Constituents.First_Element), I);
+                        begin
+                           if Temp_Symbols.Contains (Var_Name) then
+                              Symbol_Table_Pkg.Delete (Temp_Symbols, Var_Name);
+                           end if;
+                        end;
+                     end loop;
+                  end if;
                   Array_Table_Pkg.Delete (Array_Symbols, Cursor);
                   -- Note: Restart scan as map might have reordered due to deletion.
                   Cursor := Array_Symbols.First;
@@ -632,6 +638,19 @@ package body SData.Variables is
    begin
       return Array_Symbols.Contains (To_Upper (Name));
    end Has_Array;
+
+   ------------------------
+   -- Is_Temporary_Array --
+   ------------------------
+   function Is_Temporary_Array (Name : String) return Boolean is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if Array_Symbols.Contains (Upper_Name) then
+         return Array_Symbols.Element (Upper_Name).Is_Temporary;
+      else
+         return False;
+      end if;
+   end Is_Temporary_Array;
 
    ----------------------
    -- Get_Array_Bounds --

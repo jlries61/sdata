@@ -18,13 +18,12 @@ PRINT "Y(0)=" Y(0) " Y(1)=" Y(1) " Y(2)=" Y(2)
 
 -- 3. Temporary DIM
 DIM Z(2) /TEMP
-LET Z(1) = 5
-LET Z(2) = 15
+SET Z(1) = 5
+SET Z(2) = 15
 PRINT "Inside RUN 3: Z(1)=" Z(1) " Z(2)=" Z(2)
 RUN
--- This PRINT is part of the next implicit RUN (but there is no next RUN, so it's just queued?)
--- Wait, if it's queued, it will never execute.
+-- This PRINT is part of the next implicit RUN
 -- Let's add a RUN to see it.
-PRINT "Outside RUN 3 (should be missing): Z(1)=" Z(1)
+PRINT "Outside RUN 3 (should persist): Z(1)=" Z(1)
 RUN
 QUIT

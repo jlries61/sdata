@@ -2054,16 +2054,40 @@ package body SData.Evaluator is
             begin
                if Has_Array (AName) then
                   while Sub_List /= null loop
-                     declare
-                        Idx_Val : constant Value := Evaluate (Sub_List.Expr);
-                        Idx     : Integer;
-                     begin
-                        if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
-                        else Idx := Integer (Float'Floor (Convert_To_Float (Idx_Val))); end if;
-                        All_Vals.Append (Get_Array_Element (AName, Idx));
-                     exception
-                        when Constraint_Error => All_Vals.Append ((Kind => Val_Missing));
-                     end;
+                     if Sub_List.Is_Range then
+                        declare
+                           Lo_Val : constant Value := Evaluate (Sub_List.Expr);
+                           Hi_Val : constant Value := Evaluate (Sub_List.Expr_End);
+                           Lo, Hi : Integer;
+                        begin
+                           if Lo_Val.Kind = Val_Integer then Lo := Lo_Val.Int_Val;
+                           elsif Lo_Val.Kind = Val_Numeric then Lo := Integer (Float'Floor (Lo_Val.Num_Val));
+                           else raise Script_Error with "Array range lower bound must be numeric";
+                           end if;
+
+                           if Hi_Val.Kind = Val_Integer then Hi := Hi_Val.Int_Val;
+                           elsif Hi_Val.Kind = Val_Numeric then Hi := Integer (Float'Floor (Hi_Val.Num_Val));
+                           else raise Script_Error with "Array range upper bound must be numeric";
+                           end if;
+
+                           for I in Lo .. Hi loop
+                              All_Vals.Append (Get_Array_Element (AName, I));
+                           end loop;
+                        exception
+                           when Constraint_Error => All_Vals.Append ((Kind => Val_Missing));
+                        end;
+                     else
+                        declare
+                           Idx_Val : constant Value := Evaluate (Sub_List.Expr);
+                           Idx     : Integer;
+                        begin
+                           if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
+                           else Idx := Integer (Float'Floor (Convert_To_Float (Idx_Val))); end if;
+                           All_Vals.Append (Get_Array_Element (AName, Idx));
+                        exception
+                           when Constraint_Error => All_Vals.Append ((Kind => Val_Missing));
+                        end;
+                     end if;
                      Sub_List := Sub_List.Next;
                   end loop;
                else

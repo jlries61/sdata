@@ -167,9 +167,20 @@ package body SData.Parser is
 
       loop
          declare
-            Expr : constant Expression_Access := Parse_Expression (Ctx);
+            Expr     : constant Expression_Access := Parse_Expression (Ctx);
+            Is_Range : Boolean := False;
+            Expr_End : Expression_Access := null;
          begin
-            New_Node := new Expression_List_Node'(Expr => Expr, Next => null);
+            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon then
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               Is_Range := True;
+               Expr_End := Parse_Expression (Ctx);
+            end if;
+
+            New_Node := new Expression_List_Node'(Expr     => Expr,
+                                             Is_Range => Is_Range,
+                                             Expr_End => Expr_End,
+                                             Next     => null);
             if Head = null then
                Head := New_Node;
             else
@@ -298,12 +309,16 @@ package body SData.Parser is
                               Node.Arguments := Parse_Expression_List (Ctx, Closing);
                            end if;
 
-                           if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Closing then
-                              Put_Line_Error ("Error: Expected closing '" &
-                                 (if Closing = Token_Right_Paren then ")" else "]") &
-                                 "' after arguments of """ &
-                                 Actual_Tok.Text (1 .. Actual_Tok.Length) & """");
-                           end if;
+                           declare
+                              Next_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           begin
+                              if Next_Tok.Kind /= Closing then
+                                 Put_Line_Error ("Error: Expected closing '" &
+                                    (if Closing = Token_Right_Paren then ")" else "]") &
+                                    "' after arguments of """ &
+                                    Actual_Tok.Text (1 .. Actual_Tok.Length) & """");
+                              end if;
+                           end;
                         end;
                         return Node;
                      else
@@ -560,9 +575,9 @@ package body SData.Parser is
                            Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- consume ':'
                            Second  : constant Expression_Access := Parse_Expression (Ctx);
                            Lo_Node : constant Expression_List :=
-                              new Expression_List_Node'(Expr => First,  Next => null);
+                              new Expression_List_Node'(Expr => First,  Next => null, others => <>);
                            Hi_Node : constant Expression_List :=
-                              new Expression_List_Node'(Expr => Second, Next => null);
+                              new Expression_List_Node'(Expr => Second, Next => null, others => <>);
                         begin
                            Lo_Node.Next := Hi_Node;
                            A_Idx_List   := Lo_Node;
@@ -572,14 +587,14 @@ package body SData.Parser is
                         --  List form: (i, j, k, ...) — assign to each listed index
                         declare
                            Head : constant Expression_List :=
-                              new Expression_List_Node'(Expr => First, Next => null);
+                              new Expression_List_Node'(Expr => First, Next => null, others => <>);
                            Last : Expression_List := Head;
                         begin
                            while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
                               declare
                                  Discard  : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- ','
                                  New_Node : constant Expression_List :=
-                                    new Expression_List_Node'(Expr => Parse_Expression (Ctx), Next => null);
+                                    new Expression_List_Node'(Expr => Parse_Expression (Ctx), Next => null, others => <>);
                               begin
                                  Last.Next := New_Node;
                                  Last      := New_Node;
@@ -654,7 +669,7 @@ package body SData.Parser is
                   exit when Expr = null;
 
                   declare
-                     New_Arg : constant Expression_List := new Expression_List_Node'(Expr => Expr, Next => null);
+                     New_Arg : constant Expression_List := new Expression_List_Node'(Expr => Expr, Next => null, others => <>);
                   begin
                      if Stmt.Print_Args = null then Stmt.Print_Args := New_Arg;
                      else Last_Arg.Next := New_Arg; end if;
@@ -1013,7 +1028,7 @@ package body SData.Parser is
                               loop
                                  declare
                                     E : constant Expression_Access := Parse_Expression (Ctx);
-                                    L : constant Expression_List := new Expression_List_Node'(Expr => E, Next => null);
+                                    L : constant Expression_List := new Expression_List_Node'(Expr => E, Next => null, others => <>);
                                  begin
                                     if Branch.Conditions = null then Branch.Conditions := L; else Last_Cond.Next := L; end if;
                                     Last_Cond := L;

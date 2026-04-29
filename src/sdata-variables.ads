@@ -27,7 +27,7 @@ package SData.Variables is
    --  Removes a session variable.
    procedure Unset (Name : String);
 
-   --  Removes all temporary variables (called at the end of a RUN).
+   --  Removes all temporary variables (called by NEW).
    procedure Clear_Temporary;
 
    -- PDV Management (PDV stands for Program Data Vector)
@@ -79,6 +79,7 @@ package SData.Variables is
    function Get_Array_Element (Name : String; Index : Integer) return Value;
    procedure Set_Array_Element (Name : String; Index : Integer; Val : Value);
    function Has_Array (Name : String) return Boolean;
+   function Is_Temporary_Array (Name : String) return Boolean;
    
    -- Returns the bounds of an array if it exists.
    procedure Get_Array_Bounds (Name : String; Start_Idx, End_Idx : out Integer);
