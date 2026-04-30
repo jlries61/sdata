@@ -1,6 +1,6 @@
 # SData — Software Standards Report
 
-**Version reviewed:** 0.6.4 | **Date:** 2026-04-30 | **Tests:** 96 passing
+**Version reviewed:** 0.6.5 | **Date:** 2026-04-30 | **Tests:** 96 passing
 
 ---
 

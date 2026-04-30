@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.6.4
+Version:        0.6.5
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -52,6 +52,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Thu Apr 30 2026 John L. Ries <john@theyarnbard.com> - 0.6.5-1
+- Software standards review and Pi verification audit (Stages 1-5)
+
 * Wed Apr 29 2026 John L. Ries <john@theyarnbard.com> - 0.6.4-1
 - Array slice/list assignment; range subscripts in aggregate functions and PRINT; LET/SET array element restrictions; NEW clears virtual arrays
 

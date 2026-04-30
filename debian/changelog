@@ -1,3 +1,9 @@
+sdata (0.6.5-1) unstable; urgency=medium
+
+  * Software standards review and Pi verification audit (Stages 1-5)
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 30 Apr 2026 15:08:25 -0700
+
 sdata (0.6.4-1) unstable; urgency=medium
 
   * Array slice/list assignment; range subscripts in aggregate functions and PRINT; LET/SET array element restrictions; NEW clears virtual arrays
