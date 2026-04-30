@@ -1,7 +1,12 @@
 REM Test Normal Distribution
-PRINT NCF(0.0, 0.0, 1.0)
-PRINT NDF(0.0, 0.0, 1.0)
-PRINT NIF(0.5, 0.0, 1.0)
+PRINT ZCF(0.0, 0.0, 1.0)
+PRINT ZDF(0.0, 0.0, 1.0)
+PRINT ZIF(0.5, 0.0, 1.0)
+
+REM Test Binomial Distribution (NCF/NDF/NIF)
+PRINT NCF(5, 10, 0.5)
+PRINT NDF(5, 10, 0.5)
+PRINT NIF(0.5, 10, 0.5)
 
 REM Test Standard Normal (Z)
 PRINT ZCF(0.0)
@@ -44,7 +49,7 @@ PRINT FCF(1.0, 2.0, 2.0)
 PRINT FDF(1.0, 2.0, 2.0)
 
 REM Test Random Numbers (Verify they return numeric)
-LET X = NRN(0.0, 1.0)
+LET X = NRN(10, 0.5)
 PRINT "NRN OK"
 LET Y = ZRN()
 PRINT "ZRN OK"

@@ -12,7 +12,11 @@ PRINT "ZIF(0.975):"   ZIF(0.975)
 
 -- N(mu=0, sigma=1) CDF must match Z at x=1
 PRINT "ZCF(1.0):"          ZCF(1.0)
-PRINT "NCF(1.0,0.0,1.0):"  NCF(1.0, 0.0, 1.0)
+PRINT "ZCF(1.0,0,1):"      ZCF(1.0, 0.0, 1.0)
+
+-- Binomial(n=10, p=0.5) CDF at x=5
+-- Exact value: 0.62305
+PRINT "NCF(5,10,0.5):"     NCF(5.0, 10.0, 0.5)
 
 -- Beta(1,1) = Uniform(0,1): analytically exact values
 PRINT "BCF(0.25,1,1):"  BCF(0.25, 1.0, 1.0)

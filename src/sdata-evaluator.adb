@@ -857,31 +857,47 @@ package body SData.Evaluator is
       declare
          Needle   : constant Value := Vals.Element (1);
          Haystack : constant Value := Vals.Element (2);
+         Start_V  : constant Value := (if Has_Args (Vals, 3) then Vals.Element (3) else (Kind => Val_Integer, Int_Val => 1));
+         From     : constant Positive := Positive'Max (Integer (Convert_To_Float (Start_V)), 1);
       begin
          if Needle.Kind /= Val_String or else Haystack.Kind /= Val_String then
             return (Kind => Val_Missing);
          end if;
-         if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
+         if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => From); end if;
+         if From > Length (Haystack.Str_Val) then return (Kind => Val_Integer, Int_Val => 0); end if;
          return (Kind    => Val_Integer,
-                 Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
+                 Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle), From));
       end;
    end Handle_Pos;
 
-   --  INSTR(haystack, needle) — BW BASIC argument order (reversed from POS)
+   --  INSTR([start,] haystack, needle) — BW BASIC argument order (reversed from POS)
    function Handle_Instr (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
       declare
-         Haystack : constant Value := Vals.Element (1);
-         Needle   : constant Value := Vals.Element (2);
+         Start_Pos : Positive := 1;
+         H_Idx     : Positive := 1;
+         N_Idx     : Positive := 2;
       begin
-         if Needle.Kind /= Val_String or else Haystack.Kind /= Val_String then
-            return (Kind => Val_Missing);
+         if Has_Args (Vals, 3) then
+            Start_Pos := Positive'Max (Integer (Convert_To_Float (Vals.Element (1))), 1);
+            H_Idx := 2;
+            N_Idx := 3;
          end if;
-         if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
-         return (Kind    => Val_Integer,
-                 Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
+
+         declare
+            Haystack : constant Value := Vals.Element (H_Idx);
+            Needle   : constant Value := Vals.Element (N_Idx);
+         begin
+            if Needle.Kind /= Val_String or else Haystack.Kind /= Val_String then
+               return (Kind => Val_Missing);
+            end if;
+            if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => Start_Pos); end if;
+            if Start_Pos > Length (Haystack.Str_Val) then return (Kind => Val_Integer, Int_Val => 0); end if;
+            return (Kind    => Val_Integer,
+                    Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle), Start_Pos));
+         end;
       end;
    end Handle_Instr;
 
@@ -1152,9 +1168,9 @@ package body SData.Evaluator is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)),
-                                                      Convert_To_Float (Vals.Element (2)),
-                                                      Convert_To_Float (Vals.Element (3))));
+      return Num_Result (SData.Statistics.Binomial_PMF (Convert_To_Float (Vals.Element (1)),
+                                                        Convert_To_Float (Vals.Element (2)),
+                                                        Convert_To_Float (Vals.Element (3))));
    end Handle_NDF;
 
    function Handle_UDF (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1279,9 +1295,9 @@ package body SData.Evaluator is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)),
-                                                      Convert_To_Float (Vals.Element (2)),
-                                                      Convert_To_Float (Vals.Element (3))));
+      return Num_Result (SData.Statistics.Binomial_CDF (Convert_To_Float (Vals.Element (1)),
+                                                        Convert_To_Float (Vals.Element (2)),
+                                                        Convert_To_Float (Vals.Element (3))));
    end Handle_NCF;
 
    function Handle_UCF (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1400,9 +1416,9 @@ package body SData.Evaluator is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)),
-                                                      Convert_To_Float (Vals.Element (2)),
-                                                      Convert_To_Float (Vals.Element (3))));
+      return Num_Result (SData.Statistics.Binomial_IDF (Convert_To_Float (Vals.Element (1)),
+                                                        Convert_To_Float (Vals.Element (2)),
+                                                        Convert_To_Float (Vals.Element (3))));
    end Handle_NIF;
 
    function Handle_UIF (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1527,8 +1543,8 @@ package body SData.Evaluator is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
-                                                     Convert_To_Float (Vals.Element (2))));
+      return Num_Result (SData.Statistics.Binomial_RN (Convert_To_Float (Vals.Element (1)),
+                                                       Convert_To_Float (Vals.Element (2))));
    end Handle_NRN;
 
    function Handle_URN (Name : String; Vals : Value_Vectors.Vector) return Value is
