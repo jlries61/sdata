@@ -1233,6 +1233,9 @@ package body SData.Interpreter is
                end if;
             end;
          when Stmt_BY =>
+            if SData.Table.Column_Count = 0 and then not SData.Config.Runtime.Repeat_Active then
+               raise Script_Error with "BY statement requires an active dataset (use USE or REPEAT first).";
+            end if;
             Current_By_Vars.Clear;
             SData.Table.Clear_By_Vars;
             declare

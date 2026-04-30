@@ -998,9 +998,22 @@ package body SData.Parser is
                            Tok_Local.Kind = Token_OTHERWISE;
 
                if not Is_Block then
-                  -- Record filter form: SELECT <expr>
+                  -- Record filter form: SELECT <expr> [, <expr> ...]
                   Stmt := new Statement (Stmt_SELECT_FILTER);
                   Stmt.Expr := Saved_Expr;
+
+                  while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
+                     declare
+                        Discard  : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- ','
+                        Next_E   : constant Expression_Access := Parse_Expression (Ctx);
+                        Combined : constant Expression_Access := new Expression (Expr_Binary_Op);
+                     begin
+                        Combined.Op    := Op_And;
+                        Combined.Left  := Stmt.Expr;
+                        Combined.Right := Next_E;
+                        Stmt.Expr      := Combined;
+                     end;
+                  end loop;
                else
                   -- Control structure form: SELECT [<expr>] CASE...
                   Stmt := new Statement (Stmt_SELECT);
