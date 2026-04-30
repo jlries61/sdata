@@ -899,6 +899,48 @@ package body SData.File_IO is
          end if;
       end Write_String;
 
+      function CSV_Quote (S : String) return String is
+         Needs_Quote : Boolean := False;
+         Quote_Count : Natural := 0;
+      begin
+         for I in S'Range loop
+            if S (I) = '"' then
+               Needs_Quote := True;
+               Quote_Count := Quote_Count + 1;
+            elsif D_Str'Length > 0 and then
+                  I + D_Str'Length - 1 <= S'Last and then
+                  S (I .. I + D_Str'Length - 1) = D_Str
+            then
+               Needs_Quote := True;
+            elsif S (I) = ASCII.LF or else S (I) = ASCII.CR then
+               Needs_Quote := True;
+            end if;
+         end loop;
+
+         if not Needs_Quote then
+            return S;
+         end if;
+
+         declare
+            Res : String (1 .. S'Length + Quote_Count + 2);
+            J   : Positive := 2;
+         begin
+            Res (1) := '"';
+            for I in S'Range loop
+               if S (I) = '"' then
+                  Res (J) := '"';
+                  Res (J + 1) := '"';
+                  J := J + 2;
+               else
+                  Res (J) := S (I);
+                  J := J + 1;
+               end if;
+            end loop;
+            Res (Res'Last) := '"';
+            return Res;
+         end;
+      end CSV_Quote;
+
    begin
       if not Allow_Overwrite and then Exists (File_Name) then
          SData.IO.Put_Line_Error
@@ -914,7 +956,7 @@ package body SData.File_IO is
       if N > 0 then
          if Write_Header then
             for I in 1 .. N loop
-               Write_String (Column_Name (I));
+               Write_String (CSV_Quote (Column_Name (I)));
                if I /= N then Write_String (D_Str); end if;
             end loop;
             Write_String (EOL);
@@ -929,7 +971,7 @@ package body SData.File_IO is
                   elsif Val.Kind = Val_Integer then
                      Write_String (Trim (Val.Int_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_String then
-                     Write_String (SData.Values.To_String (Val));
+                     Write_String (CSV_Quote (SData.Values.To_String (Val)));
                   end if;
                   --  Missing values: write nothing (consecutive delimiters per spec)
                end;

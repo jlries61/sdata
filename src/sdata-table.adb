@@ -198,6 +198,23 @@ package body SData.Table is
       elsif Col_Typ = Col_String and then Val.Kind /= Val_String then
          raise Type_Mismatch_Error with "Expected String for column " & Col_Name;
       end if;
+
+      --  Enforce global string length limit (--clen) if set.
+      if Val.Kind = Val_String and then SData.Config.Max_String_Len > 0 then
+         declare
+            S : constant String := To_String (Val.Str_Val);
+         begin
+            if S'Length > SData.Config.Max_String_Len then
+               declare
+                  Res : Value (Val_String);
+               begin
+                  Res.Str_Val := To_Unbounded_String (S (S'First .. S'First + SData.Config.Max_String_Len - 1));
+                  return Res;
+               end;
+            end if;
+         end;
+      end if;
+
       return Val;
    end Coerce_Value;
 
