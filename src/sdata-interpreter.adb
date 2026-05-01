@@ -176,6 +176,27 @@ package body SData.Interpreter is
       SData.Table.Clear_By_Vars;
    end Clear_Active_Program;
 
+   procedure Debug_Trace (Msg : String) is
+   begin
+      if SData.Config.Debug_Mode then
+         Put_Line_Error ("[debug] " & Msg);
+      end if;
+   end Debug_Trace;
+
+   function Debug_Value (V : Value) return String is
+   begin
+      case V.Kind is
+         when Val_Numeric  =>
+            return Ada.Strings.Fixed.Trim (Float'Image (V.Num_Val), Ada.Strings.Both);
+         when Val_Integer  =>
+            return Ada.Strings.Fixed.Trim (Integer'Image (V.Int_Val), Ada.Strings.Both);
+         when Val_String   =>
+            return """" & To_String (V.Str_Val) & """";
+         when Val_Missing  =>
+            return "<missing>";
+      end case;
+   end Debug_Value;
+
    function Program_Buffer_Length return Natural is
      (Natural (Active_Program_Vec.Length));
 
@@ -1433,14 +1454,6 @@ package body SData.Interpreter is
 
    begin
       if Stmt = null then return; end if;
-      if SData.Config.Debug_Mode then
-         declare
-            Image : constant String := Stmt.Kind'Image;
-         begin
-            --  Strip the "STMT_" prefix (5 characters) for readability.
-            Put_Line_Error ("[debug] " & Image (Image'First + 5 .. Image'Last));
-         end;
-      end if;
       case Stmt.Kind is
          when Stmt_HELP =>
             SData.Help.Print_Help (Stmt.Var_Name (1 .. Stmt.Var_Len));
@@ -1639,11 +1652,6 @@ package body SData.Interpreter is
       Set_Current_Record_Index (Phys_I);
       SData.Table.Set_Logical_Record_Index (Logical_I);
 
-      if SData.Config.Debug_Mode then
-         Put_Line_Error ("[debug] -- record" & Logical_I'Image
-                         & " (physical" & Phys_I'Image & ")");
-      end if;
-
       Reset_PDV_Non_Held;
       Load_PDV_From_Table (Phys_I);
 
@@ -1665,6 +1673,8 @@ package body SData.Interpreter is
          Set_BOG (Logical_I = 1);
          Set_EOG (Logical_I = Logical_Count);
       end if;
+
+      Debug_Trace ("-- record" & Logical_I'Image & " (physical" & Phys_I'Image & ")");
 
       Iter := Start;
       Current_Record_Deleted := False;

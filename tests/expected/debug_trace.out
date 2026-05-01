@@ -1,0 +1,7 @@
+[debug] -- record 1 (physical 1)
+[debug] LET X = 1
+[debug] -- record 2 (physical 2)
+[debug] LET X = 2
+[debug] -- record 3 (physical 3)
+[debug] LET X = 3
+RUN complete. 3 records and 1 variables processed.
