@@ -1,19 +1,19 @@
 Generating mock data...
-Dataset saved: /tmp/sdata_opt_tab.csv
+Dataset saved: sdata_opt_tab.csv
 RUN complete. 3 records and 3 variables processed.
-Dataset opened: /tmp/sdata_opt_tab.csv
+Dataset opened: sdata_opt_tab.csv
 1.00000
 2.00000
 3.00000
 RUN complete. 3 records and 3 variables processed.
 Generating mock data...
-Dataset saved: /tmp/sdata_opt_nohdr.csv
+Dataset saved: sdata_opt_nohdr.csv
 RUN complete. 3 records and 3 variables processed.
-Dataset opened: /tmp/sdata_opt_nohdr.csv
+Dataset opened: sdata_opt_nohdr.csv
 1.00000
 2.00000
 3.00000
 RUN complete. 3 records and 3 variables processed.
 Generating mock data...
-Error: SAVE aborted — file already exists: /tmp/sdata_opt_nohdr.csv (use OPTIONS SAVEOVERWRT YES to allow overwriting)
+Error: SAVE aborted — file already exists: sdata_opt_nohdr.csv (use OPTIONS SAVEOVERWRT YES to allow overwriting)
 RUN complete. 3 records and 3 variables processed.
