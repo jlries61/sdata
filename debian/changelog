@@ -1,10 +1,16 @@
+sdata (0.6.4-1) unstable; urgency=medium
+
+  * Array slice/list assignment; range subscripts in aggregate functions and PRINT; LET/SET array element restrictions; NEW clears virtual arrays
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 29 Apr 2026 16:13:55 -0700
+
 sdata (0.6.3-1) unstable; urgency=medium
 
   * Bump to 0.6.3: SKIP/MAXROWS for USE; ZCF/ZDF/ZIF/ZRN optional mu/sigma;
     URN/ZRN zero-arg defaults; undefined variable errors; expand no-paren
     function whitelist; multi-char delimiters; CHARSET encoding for CSV
 
- -- John L. Ries <john@theyarnbard.com>  Mon, 28 Apr 2026 14:00:00 -0700
+ -- John L. Ries <john@theyarnbard.com>  Tue, 28 Apr 2026 14:00:00 -0700
 
 sdata (0.6.2-1) unstable; urgency=medium
 

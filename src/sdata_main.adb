@@ -238,7 +238,32 @@ begin
                   end if;
                end;
             end if;
-         elsif Arg = "-s" or Arg = "--outfmt" then
+         elsif Arg'Length > 8 and then Arg (1 .. 8) = "--infmt=" then
+            declare
+               Val : constant String := Arg (9 .. Arg'Last);
+            begin
+               if Val = "csv" then Input_Format := CSV;
+               elsif Val = "ods" or Val = "odf" then Input_Format := ODF;
+               elsif Val = "xlsx" or Val = "ooxml" then Input_Format := OOXML;
+               end if;
+            end;
+         elsif Arg = "-s" then
+            if Idx < Argument_Count then
+               Idx := Idx + 1;
+               declare
+                  Val : constant String := Argument (Idx);
+               begin
+                  if Val'Length > Output_Dataset_Path'Length then
+                     Put_Line_Error ("Error: argument to -s is too long (max"
+                                     & Output_Dataset_Path'Length'Image & " characters)");
+                     Set_Exit_Status (Failure);
+                     return;
+                  end if;
+                  Output_Dataset_Path (1 .. Val'Length) := Val;
+                  Output_Dataset_Len := Val'Length;
+               end;
+            end if;
+         elsif Arg = "--outfmt" then
             -- Set the global output format.
             if Idx < Argument_Count then
                Idx := Idx + 1;
@@ -251,6 +276,15 @@ begin
                   end if;
                end;
             end if;
+         elsif Arg'Length > 9 and then Arg (1 .. 9) = "--outfmt=" then
+            declare
+               Val : constant String := Arg (10 .. Arg'Last);
+            begin
+               if Val = "csv" then Output_Format := CSV;
+               elsif Val = "ods" or Val = "odf" then Output_Format := ODF;
+               elsif Val = "xlsx" or Val = "ooxml" then Output_Format := OOXML;
+               end if;
+            end;
          elsif Arg = "-m" then
             if Idx < Argument_Count then
                Idx := Idx + 1;
@@ -287,6 +321,15 @@ begin
                      return;
                end;
             end if;
+         elsif Arg'Length > 7 and then Arg (1 .. 7) = "--clen=" then
+            begin
+               Max_String_Len := Natural'Value (Arg (8 .. Arg'Last));
+            exception
+               when Constraint_Error =>
+                  Put_Line_Error ("Error: argument to --clen must be a non-negative integer");
+                  Set_Exit_Status (Failure);
+                  return;
+            end;
          elsif Arg = "-p" then
             if Idx < Argument_Count then
                Idx := Idx + 1;
@@ -373,6 +416,18 @@ begin
       begin
          Stmt.File_Path (1 .. Input_File_Len) := Input_File_Path (1 .. Input_File_Len);
          Stmt.File_Len := Input_File_Len;
+         SData.Interpreter.Execute (Stmt);
+         SData.AST.Free_Program (Stmt);
+      end;
+   end if;
+
+   --  Verify if an output dataset was provided via -s.
+   if Output_Dataset_Len > 0 then
+      declare
+         Stmt : Statement_Access := new Statement (Stmt_SAVE);
+      begin
+         Stmt.File_Path (1 .. Output_Dataset_Len) := Output_Dataset_Path (1 .. Output_Dataset_Len);
+         Stmt.File_Len := Output_Dataset_Len;
          SData.Interpreter.Execute (Stmt);
          SData.AST.Free_Program (Stmt);
       end;

@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-04-27" "sdata 0.6.2" "User Commands"
+.TH SDATA 1 "2026-04-29" "sdata 0.6.4" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -100,12 +100,24 @@ Statements fall into three categories:
 Execute immediately and configure state for the next data step.
 .RS
 .TP
-.B USE \fIfile\fR[\fB[\fIsheet\fB]\fR] [\fB/FMT=\fIformat\fR] [\fB/NSCAN=\fIn\fR]
+.B USE \fIfile\fR[\fB[\fIsheet\fB]\fR] [\fB/FMT=\fIformat\fR] [\fB/DLM=\fIdelim\fR] [\fB/HEADER=YES|NO\fR] [\fB/CHARSET=\fIenc\fR] [\fB/NSCAN=\fIn\fR] [\fB/SKIP=\fIn\fR] [\fB/MAXROWS=\fIn\fR]
 Load a dataset from a CSV, ODF, or OOXML file.
 For ODF and OOXML workbooks, an optional sheet name may be appended in
 brackets immediately after the filename (e.g.\&
 .BR """sales.xlsx[Q1]""" ).
 If omitted, the first sheet is used.
+.B /DLM=
+overrides the field delimiter for CSV files (default comma; multi-character delimiters are supported).
+.B /CHARSET=
+specifies the character encoding (e.g.\& UTF-8, UTF-16, ASCII).
+.B /NSCAN=\fIn\fR
+sets how many rows are scanned to infer column types (default 20; CSV only).
+.B /SKIP=\fIn\fR
+skips the first
+.I n
+data rows after the header before reading.
+.B /MAXROWS=\fIn\fR
+limits the number of data rows loaded.
 .TP
 .B SAVE \fIfile\fR[\fB[\fIsheet\fB]\fR] [\fB/FMT=\fIformat\fR] [\fB/HEADER=YES|NO\fR]
 Queue the current data table to be saved after the next
@@ -226,9 +238,18 @@ commands and executed once per record during the data step.
 .TP
 .B LET \fIvar\fR = \fIexpr\fR
 Assign a permanent (table) variable.
+Array element forms:
+.B LET \fIarr\fR(\fIi\fR) = \fIexpr\fR
+assigns a single element;
+.B LET \fIarr\fR(\fIlo\fR:\fIhi\fR) = \fIexpr\fR
+assigns a contiguous slice;
+.B LET \fIarr\fR(\fIi\fR,\fIj\fR,...) = \fIexpr\fR
+assigns a list of elements.
 .TP
 .B SET \fIvar\fR = \fIexpr\fR
 Assign a temporary variable (not written to the output table).
+Array element forms are the same as for
+.BR LET .
 .TP
 .B PRINT [\fIexpr\fR ...]
 Print values to the console.
@@ -277,9 +298,17 @@ Rename columns.
 .B ARRAY \fIname\fR \fIvar\fR [\fIvar\fR ...]
 Create a virtual array providing indexed access to existing variables.
 .TP
+.B DIM \fIname\fR (\fIn\fR) [/TEMP]
+.br
 .B DIM \fIname\fR (\fIlo\fR TO \fIhi\fR) [/TEMP]
-Create a numeric array with real storage.
+Create a numeric array with real storage (indices 1..\fIn\fR or \fIlo\fR..\fIhi\fR).
 Elements are initialised to missing.
+Use
+.B /TEMP
+to confine the array to the current data step.
+Array elements are read and written with parenthesis subscripts; see
+.B LET
+for slice and list assignment forms.
 .RE
 .SH FUNCTIONS
 Functions may appear anywhere in an expression.
@@ -469,9 +498,9 @@ tab(|);
 lb lb lb
 l l l.
 Prefix|Distribution|Parameters
-Z|Standard Normal|none (mu=0, sigma=1)
+Z|Standard Normal|[\fImu\fR, \fIsigma\fR] (default mu=0, sigma=1)
 N|Normal|\fImu\fR, \fIsigma\fR
-U|Uniform|\fIlo\fR, \fIhi\fR
+U|Uniform|[\fIlo\fR, \fIhi\fR] (default lo=0, hi=1; RN only)
 E|Exponential|\fIrate\fR
 B|Beta|\fIa\fR, \fIb\fR (shape)
 P|Poisson|\fIlambda\fR (discrete; k = integer)
@@ -501,11 +530,21 @@ for a complete listing.
 .SH FILE FORMATS
 .TP
 .B CSV
-Comma\-separated values (default delimiter comma).
-The delimiter can be changed with the
+Comma\-separated values.
+The default delimiter is a comma; it can be overridden per-file with
 .B /DLM=
-option on
-.BR USE .
+on
+.B USE
+or session-wide with
+.B "OPTIONS CSVDLM=\fIdelim\fR"
+(multi-character delimiters are supported).
+The character encoding can be set with
+.B /CHARSET=
+on
+.B USE
+or with
+.BR "OPTIONS CHARSET=\fIenc\fR" .
+Auto-detection handles UTF-8 and UTF-16 (BOM-detected).
 .TP
 .B ODF / ODS
 OpenDocument Spreadsheet (ISO/IEC 26300).

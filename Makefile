@@ -1,6 +1,6 @@
 # Makefile for SData
 
-VERSION          := 0.6.2
+VERSION          := 0.6.4
 ZIPADA_VERSION   := 61.0.0
 XMLADA_VERSION   := 26.0.0
 MATHPAQS_VERSION := 20260205.0.0
@@ -124,7 +124,7 @@ srpm: clean
 	   fi; \
 	   cp "$$TARBALL_DIR/$$tb" rpmbuild/SOURCES/; \
 	 done
-	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir %(pwd)/rpmbuild"
+	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir $(CURDIR)/rpmbuild"
 	@mv rpmbuild/SRPMS/sdata-$(VERSION)-1.src.rpm .
 	@rm -rf rpmbuild
 	@echo "SRPM created: sdata-$(VERSION)-1.src.rpm"

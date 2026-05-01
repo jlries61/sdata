@@ -31,8 +31,10 @@ package SData.AST is
    type Expression_List_Node;
    type Expression_List is access Expression_List_Node;
    type Expression_List_Node is record
-      Expr : Expression_Access;
-      Next : Expression_List;
+      Expr     : Expression_Access;
+      Is_Range : Boolean := False;    -- True for colon range lo:hi
+      Expr_End : Expression_Access := null; -- hi part of the range
+      Next     : Expression_List := null;
    end record;
 
    --  Variant record for all expression types.
@@ -156,9 +158,11 @@ package SData.AST is
       Next     : Statement_Access; -- Pointer to the next statement in sequence.
       Var_Name : String (1 .. 32);
       Var_Len  : Natural;
-      Is_Array : Boolean := False;
-      Arr_Idx  : Expression_Access;
-      Expr     : Expression_Access;
+      Is_Array     : Boolean         := False;
+      Arr_Idx      : Expression_Access;           -- single-subscript assignment
+      Arr_Idx_List : Expression_List  := null;    -- list or range subscripts
+      Arr_Is_Slice : Boolean         := False;    -- True when Arr_Idx_List is a lo:hi range
+      Expr         : Expression_Access;
       case Kind is
          when Stmt_PRINT =>
             Print_Args : Expression_List;

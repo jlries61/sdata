@@ -575,9 +575,14 @@ package body SData.Evaluator is
 
    function Handle_Nmiss_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
-      R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
+      Count : Integer := 0;
    begin
-      return (Kind => Val_Integer, Int_Val => R.NMISS_Count);
+      for V of Vals loop
+         if V.Kind = Val_Missing or else (V.Kind = Val_String and then Length (V.Str_Val) = 0) then
+            Count := Count + 1;
+         end if;
+      end loop;
+      return (Kind => Val_Integer, Int_Val => Count);
    end Handle_Nmiss_Fn;
 
    function Handle_Gmean (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -1634,8 +1639,15 @@ package body SData.Evaluator is
       pragma Unreferenced (Name);
    begin
       if Integer (Vals.Length) < 1 then return (Kind => Val_Missing); end if;
-      return (Kind => Val_Integer,
-              Int_Val => (if Vals.Element (1).Kind = Val_Missing then 1 else 0));
+      declare
+         V : constant Value := Vals.Element (1);
+      begin
+         if V.Kind = Val_Missing or else (V.Kind = Val_String and then Length (V.Str_Val) = 0) then
+            return (Kind => Val_Integer, Int_Val => 1);
+         else
+            return (Kind => Val_Integer, Int_Val => 0);
+         end if;
+      end;
    end Handle_Missing;
 
    function Handle_False (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -2042,16 +2054,40 @@ package body SData.Evaluator is
             begin
                if Has_Array (AName) then
                   while Sub_List /= null loop
-                     declare
-                        Idx_Val : constant Value := Evaluate (Sub_List.Expr);
-                        Idx     : Integer;
-                     begin
-                        if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
-                        else Idx := Integer (Float'Floor (Convert_To_Float (Idx_Val))); end if;
-                        All_Vals.Append (Get_Array_Element (AName, Idx));
-                     exception
-                        when Constraint_Error => All_Vals.Append ((Kind => Val_Missing));
-                     end;
+                     if Sub_List.Is_Range then
+                        declare
+                           Lo_Val : constant Value := Evaluate (Sub_List.Expr);
+                           Hi_Val : constant Value := Evaluate (Sub_List.Expr_End);
+                           Lo, Hi : Integer;
+                        begin
+                           if Lo_Val.Kind = Val_Integer then Lo := Lo_Val.Int_Val;
+                           elsif Lo_Val.Kind = Val_Numeric then Lo := Integer (Float'Floor (Lo_Val.Num_Val));
+                           else raise Script_Error with "Array range lower bound must be numeric";
+                           end if;
+
+                           if Hi_Val.Kind = Val_Integer then Hi := Hi_Val.Int_Val;
+                           elsif Hi_Val.Kind = Val_Numeric then Hi := Integer (Float'Floor (Hi_Val.Num_Val));
+                           else raise Script_Error with "Array range upper bound must be numeric";
+                           end if;
+
+                           for I in Lo .. Hi loop
+                              All_Vals.Append (Get_Array_Element (AName, I));
+                           end loop;
+                        exception
+                           when Constraint_Error => All_Vals.Append ((Kind => Val_Missing));
+                        end;
+                     else
+                        declare
+                           Idx_Val : constant Value := Evaluate (Sub_List.Expr);
+                           Idx     : Integer;
+                        begin
+                           if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
+                           else Idx := Integer (Float'Floor (Convert_To_Float (Idx_Val))); end if;
+                           All_Vals.Append (Get_Array_Element (AName, Idx));
+                        exception
+                           when Constraint_Error => All_Vals.Append ((Kind => Val_Missing));
+                        end;
+                     end if;
                      Sub_List := Sub_List.Next;
                   end loop;
                else
@@ -2133,6 +2169,9 @@ package body SData.Evaluator is
             end;
 
          when Expr_Array_Access =>
+            if Expr.Arr_Idx /= null and then (Expr.Arr_Idx.Next /= null or else Expr.Arr_Idx.Is_Range) then
+               raise Script_Error with "Array range or list not permitted in scalar expression context";
+            end if;
             declare
                Index_Val : constant Value :=
                   (if Expr.Arr_Idx /= null
@@ -2284,10 +2323,15 @@ package body SData.Evaluator is
                            return V;
                         end;
                      when Op_Eq  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val = R.Str_Val then 1 else 0));
-                     when others => return (Kind => Val_Missing);
+                     when Op_Ne  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val /= R.Str_Val then 1 else 0));
+                     when Op_Lt  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val < R.Str_Val then 1 else 0));
+                     when Op_Le  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val <= R.Str_Val then 1 else 0));
+                     when Op_Gt  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val > R.Str_Val then 1 else 0));
+                     when Op_Ge  => return (Kind => Val_Integer, Int_Val => (if L.Str_Val >= R.Str_Val then 1 else 0));
+                     when others => raise SData.Script_Error with "Operator not supported for character values.";
                   end case;
                else
-                  return (Kind => Val_Missing);
+                  raise SData.Script_Error with "Type mismatch in expression (e.g., combining numeric and character values).";
                end if;
             end;
 
@@ -2297,6 +2341,9 @@ package body SData.Evaluator is
                   To_Upper (Expr.Func_Name (1 .. Expr.Func_Len));
             begin
                if Has_Array (FName) then
+                  if Expr.Arguments /= null and then (Expr.Arguments.Next /= null or else Expr.Arguments.Is_Range) then
+                     raise Script_Error with "Array range or list not permitted in scalar expression context";
+                  end if;
                   declare
                      Index_Val : constant Value :=
                         (if Expr.Arguments /= null
