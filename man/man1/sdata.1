@@ -97,7 +97,7 @@ condition results,
 .B FOR
 loop iterations,
 .B SELECT
-filter decisions,
+filter decisions (a summary line also reports the total kept and dropped count),
 .B DELETE ,
 .BR USE ,
 .BR RUN ,
@@ -330,6 +330,10 @@ Pauses execution and enters the interactive debug inspection prompt (see
 .BR \-\-debug ).
 In non\-interactive contexts (batch mode, piped input) emits a message to
 standard error and continues automatically.
+When BREAK fires, the remaining statements in the current record are not
+executed for that record.
+Execution resumes from the first statement of the next record after
+.BR CONTINUE .
 Valid only inside a data step.
 .TP
 .B BREAK WHEN \fIexpr\fR

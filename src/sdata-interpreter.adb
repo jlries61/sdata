@@ -1889,13 +1889,28 @@ package body SData.Interpreter is
                      Ada.Strings.Unbounded.Append (Header, "  [" & Label & ":");
                      for V of Current_By_Vars loop
                         declare
-                           Name : constant String :=
+                           Name    : constant String :=
                               Ada.Strings.Unbounded.To_String (V);
-                           Val  : constant Value :=
+                           New_Val : constant Value :=
                               SData.Variables.Get (Name);
                         begin
-                           Ada.Strings.Unbounded.Append
-                              (Header, " " & Name & "=" & Debug_Value (Val));
+                           if Logical_I > 1 then
+                              --  CHANGE: show old → new
+                              declare
+                                 Prev_Phys : constant Positive :=
+                                    SData.Table.Logical_To_Physical (Logical_I - 1);
+                                 Old_Val : constant Value :=
+                                    SData.Table.Get_Value (Prev_Phys, Name);
+                              begin
+                                 Ada.Strings.Unbounded.Append
+                                    (Header, " " & Name & " " & Debug_Value (Old_Val)
+                                     & " → " & Debug_Value (New_Val));
+                              end;
+                           else
+                              --  START: show just the current value
+                              Ada.Strings.Unbounded.Append
+                                 (Header, " " & Name & "=" & Debug_Value (New_Val));
+                           end if;
                         end;
                      end loop;
                      Ada.Strings.Unbounded.Append (Header, "]");
