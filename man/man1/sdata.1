@@ -88,9 +88,53 @@ Accepted values:
 .BR CSV ", " ODF ", " OOXML .
 .TP
 .B \-\-debug
-Trace each statement and current record number to standard error as the
-interpreter executes them.
-Useful for debugging scripts.
+Enables debug mode.
+Emits trace output to standard error for each statement executed:
+.BR LET / SET
+assignments (scalar and array),
+.B IF
+condition results,
+.B FOR
+loop iterations,
+.B SELECT
+filter decisions,
+.B DELETE ,
+.BR USE ,
+.BR RUN ,
+and
+.B SUBMIT
+events.
+Each record is announced with a header line; BY\-group start and change
+transitions are annotated inline.
+.IP
+In interactive sessions, execution pauses before each record and presents
+an inspection prompt
+.RB ( [debug:record\ N]> ).
+At the prompt the following commands are available:
+.RS
+.TP
+.B PRINT \fIexpr\fR
+Evaluate and print any SData expression.
+.TP
+.B RECORD \fIN\fR
+Load record
+.I N
+into the current view (absolute).
+.TP
+.B RECORD +\fIN\fR / RECORD \-\fIN\fR
+Navigate
+.I N
+records forward or backward.
+.TP
+.B CONTINUE\fR (or \fBC\fR)
+Process the current record and pause again on the next.
+.TP
+.B STEP\fR (or \fBS\fR)
+Same as CONTINUE in record\-step mode.
+.TP
+.B RUN
+Process the current and all remaining records without further pausing.
+.RE
 .SH LANGUAGE OVERVIEW
 The
 .B sdata
@@ -280,6 +324,24 @@ See
 under
 .I "Immediate commands"
 for program\-buffer deletion.
+.TP
+.B BREAK
+Pauses execution and enters the interactive debug inspection prompt (see
+.BR \-\-debug ).
+In non\-interactive contexts (batch mode, piped input) emits a message to
+standard error and continues automatically.
+Valid only inside a data step.
+.TP
+.B BREAK WHEN \fIexpr\fR
+Like
+.BR BREAK ,
+but only pauses when the boolean expression
+.I expr
+is true.
+Examples:
+.B BREAK WHEN RECNO() = 50
+or
+.BR "BREAK WHEN SALARY > 100000" .
 .TP
 .B WRITE
 Explicitly write the current PDV to the output table.
