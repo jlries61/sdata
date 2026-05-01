@@ -2167,7 +2167,7 @@ package body SData.Interpreter is
             and then Current.Kind /= Stmt_FOR     and then Current.Kind /= Stmt_WHILE
             and then Current.Kind /= Stmt_LOOP_REPEAT and then Current.Kind /= Stmt_SELECT
             and then Current.Kind /= Stmt_DELETE  and then Current.Kind /= Stmt_WRITE
-            and then Current.Kind /= Stmt_DIM
+            and then Current.Kind /= Stmt_DIM     and then Current.Kind /= Stmt_BREAK
          then
             begin
                Execute_Statement (Current);
