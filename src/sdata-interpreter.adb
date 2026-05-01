@@ -187,9 +187,9 @@ package body SData.Interpreter is
    begin
       case V.Kind is
          when Val_Numeric  =>
-            return Ada.Strings.Fixed.Trim (Float'Image (V.Num_Val), Ada.Strings.Both);
+            return To_String_Formatted (V);
          when Val_Integer  =>
-            return Ada.Strings.Fixed.Trim (Integer'Image (V.Int_Val), Ada.Strings.Both);
+            return To_String_Formatted (V);
          when Val_String   =>
             return """" & To_String (V.Str_Val) & """";
          when Val_Missing  =>
@@ -551,6 +551,12 @@ package body SData.Interpreter is
                   for I in Lo .. Hi loop
                      Set_Array_Element (Var_Name_Str, I, Result);
                   end loop;
+                  Debug_Trace ((if Stmt.Kind = Stmt_LET then "LET " else "SET ")
+                               & Var_Name_Str & "("
+                               & Ada.Strings.Fixed.Trim (Integer'Image (Lo), Ada.Strings.Both)
+                               & ":"
+                               & Ada.Strings.Fixed.Trim (Integer'Image (Hi), Ada.Strings.Both)
+                               & ") = " & Debug_Value (Result));
                end;
             else
                --  List assignment: ARR(1,3,5) = value
@@ -568,6 +574,8 @@ package body SData.Interpreter is
                      Set_Array_Element (Var_Name_Str, Idx, Result);
                      Node := Node.Next;
                   end loop;
+                  Debug_Trace ((if Stmt.Kind = Stmt_LET then "LET " else "SET ")
+                               & Var_Name_Str & "(...) = " & Debug_Value (Result));
                end;
             end if;
          else
@@ -583,6 +591,10 @@ package body SData.Interpreter is
                      (if Idx_Val.Kind = Val_Missing then "missing" else "a string");
                end if;
                Set_Array_Element (Var_Name_Str, Idx, Result);
+               Debug_Trace ((if Stmt.Kind = Stmt_LET then "LET " else "SET ")
+                            & Var_Name_Str & "("
+                            & Ada.Strings.Fixed.Trim (Integer'Image (Idx), Ada.Strings.Both)
+                            & ") = " & Debug_Value (Result));
             end;
          end if;
       else
@@ -623,6 +635,8 @@ package body SData.Interpreter is
          else
             Set_Temporary (Var_Name_Str, Result);
          end if;
+         Debug_Trace ((if Stmt.Kind = Stmt_LET then "LET " else "SET ")
+                      & Var_Name_Str & " = " & Debug_Value (Result));
       end if;
    exception
       when E : SData.Table.Type_Mismatch_Error =>
@@ -735,8 +749,22 @@ package body SData.Interpreter is
    begin
       case Stmt.Kind is
          when Stmt_IF =>
-            if Is_True (Evaluate (Stmt.Condition)) then Execute_List (Stmt.Then_Branch);
-            elsif Stmt.Else_Branch /= null then Execute_List (Stmt.Else_Branch); end if;
+            declare
+               Cond_Val : constant Boolean := Is_True (Evaluate (Stmt.Condition));
+            begin
+               if Cond_Val then
+                  Debug_Trace ("IF → TRUE");
+                  Execute_List (Stmt.Then_Branch);
+               else
+                  if Stmt.Else_Branch /= null then
+                     Debug_Trace ("IF → FALSE");
+                     Debug_Trace ("ELSE → taken");
+                     Execute_List (Stmt.Else_Branch);
+                  else
+                     Debug_Trace ("IF → FALSE (skipping)");
+                  end if;
+               end if;
+            end;
          when Stmt_WHILE =>
             while Is_True (Evaluate (Stmt.While_Cond)) loop Execute_List (Stmt.While_Body); end loop;
          when Stmt_FOR =>
@@ -753,8 +781,14 @@ package body SData.Interpreter is
                begin
                   Current_I := S;
                   while (ST > 0.0 and then Current_I <= E) or else (ST < 0.0 and then Current_I >= E) loop
-                     Set_Permanent (Stmt.For_Var (1 .. Stmt.For_Var_Len), (Kind => Val_Numeric, Num_Val => Current_I));
-                     Execute_List (Stmt.For_Body);
+                     declare
+                        Loop_Val : constant Value := (Kind => Val_Numeric, Num_Val => Current_I);
+                        For_Var_Name : constant String := Stmt.For_Var (1 .. Stmt.For_Var_Len);
+                     begin
+                        Set_Permanent (For_Var_Name, Loop_Val);
+                        Debug_Trace ("FOR " & For_Var_Name & " = " & Debug_Value (Loop_Val));
+                        Execute_List (Stmt.For_Body);
+                     end;
                      Current_I := Current_I + ST;
                   end loop;
                end;
@@ -1163,6 +1197,13 @@ package body SData.Interpreter is
             for I in 1 .. Column_Count loop
                Input_File_Columns.Include (Column_Name (I));
             end loop;
+            Debug_Trace ("USE: opened "
+                         & Stmt.File_Path (1 .. Stmt.File_Len)
+                         & " ("
+                         & Ada.Strings.Fixed.Trim (Natural'Image (SData.Table.Row_Count), Ada.Strings.Both)
+                         & " records, "
+                         & Ada.Strings.Fixed.Trim (Natural'Image (SData.Table.Column_Count), Ada.Strings.Both)
+                         & " variables)");
          when Stmt_SAVE =>
             if Stmt.File_Len = 0 then
                SData.Config.Runtime.Save_File_Active := False;
@@ -1394,6 +1435,8 @@ package body SData.Interpreter is
                   begin
                      Initialize (Sub_Ctx, Contents.all);
                      Sub_Prog := Parse_Program (Sub_Ctx);
+                     Debug_Trace ("SUBMIT: entering "
+                                  & Stmt.File_Path (1 .. Stmt.File_Len));
                      Execute (Sub_Prog);
                      SData.AST.Free_Program (Sub_Prog);
                   end;
@@ -1463,6 +1506,7 @@ package body SData.Interpreter is
             null;  --  Handled by loop termination in Execute.
          when Stmt_DELETE =>
             Current_Record_Deleted := True;
+            Debug_Trace ("DELETE: record marked");
          when Stmt_BREAK =>
             null;  --  Full handler added in Task 6
          when Stmt_WRITE =>
@@ -1628,10 +1672,18 @@ package body SData.Interpreter is
                      if Is_True (Evaluate (Select_Filter_Expr)) then
                         Count := Count + 1;
                         Passing (Count) := R;
+                        Debug_Trace ("SELECT → KEPT");
+                     else
+                        Debug_Trace ("SELECT → DROPPED");
                      end if;
                   end loop;
                   SData.Table.Set_Current_Record_Index (Saved_Physical);
                   SData.Table.Set_Index_Map (Passing (1 .. Count));
+                  Debug_Trace ("SELECT → "
+                               & Ada.Strings.Fixed.Trim (Natural'Image (Count), Ada.Strings.Both)
+                               & " of "
+                               & Ada.Strings.Fixed.Trim (Natural'Image (Total), Ada.Strings.Both)
+                               & " records kept");
                end;
             end;
          end if;
@@ -1655,26 +1707,60 @@ package body SData.Interpreter is
       Reset_PDV_Non_Held;
       Load_PDV_From_Table (Phys_I);
 
-      if not Current_By_Vars.Is_Empty then
-         declare
-            BOG_Val : constant Boolean := Is_First_In_Group (Logical_I);
-            EOG_Val : constant Boolean := Is_Last_In_Group (Logical_I, Logical_Count);
-         begin
+      declare
+         BOG_Val : Boolean;
+      begin
+         if not Current_By_Vars.Is_Empty then
+            declare
+               EOG_Val : constant Boolean := Is_Last_In_Group (Logical_I, Logical_Count);
+            begin
+               BOG_Val := Is_First_In_Group (Logical_I);
+               Set_BOG (BOG_Val);
+               Set_EOG (EOG_Val);
+               for V of Current_By_Vars loop
+                  declare Name : constant String := To_String (V); begin
+                     Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if BOG_Val then 1 else 0)));
+                     Set_Temporary ("LAST."  & Name, (Kind => Val_Integer, Int_Val => (if EOG_Val then 1 else 0)));
+                  end;
+               end loop;
+            end;
+         else
+            BOG_Val := Logical_I = 1;
             Set_BOG (BOG_Val);
-            Set_EOG (EOG_Val);
-            for V of Current_By_Vars loop
-               declare Name : constant String := To_String (V); begin
-                  Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if BOG_Val then 1 else 0)));
-                  Set_Temporary ("LAST."  & Name, (Kind => Val_Integer, Int_Val => (if EOG_Val then 1 else 0)));
-               end;
-            end loop;
-         end;
-      else
-         Set_BOG (Logical_I = 1);
-         Set_EOG (Logical_I = Logical_Count);
-      end if;
+            Set_EOG (Logical_I = Logical_Count);
+         end if;
 
-      Debug_Trace ("-- record" & Logical_I'Image & " (physical" & Phys_I'Image & ")");
+         --  Emit record header with optional BY group annotation
+         if SData.Config.Debug_Mode then
+            declare
+               Header : Ada.Strings.Unbounded.Unbounded_String :=
+                  Ada.Strings.Unbounded.To_Unbounded_String
+                     ("-- record" & Logical_I'Image & " (physical" & Phys_I'Image & ")");
+            begin
+               if not Current_By_Vars.Is_Empty and then BOG_Val then
+                  declare
+                     Label : constant String :=
+                        (if Logical_I = 1 then "BY GROUP START" else "BY GROUP CHANGE");
+                  begin
+                     Ada.Strings.Unbounded.Append (Header, "  [" & Label & ":");
+                     for V of Current_By_Vars loop
+                        declare
+                           Name : constant String :=
+                              Ada.Strings.Unbounded.To_String (V);
+                           Val  : constant Value :=
+                              SData.Variables.Get (Name);
+                        begin
+                           Ada.Strings.Unbounded.Append
+                              (Header, " " & Name & "=" & Debug_Value (Val));
+                        end;
+                     end loop;
+                     Ada.Strings.Unbounded.Append (Header, "]");
+                  end;
+               end if;
+               Debug_Trace (Ada.Strings.Unbounded.To_String (Header));
+            end;
+         end if;
+      end;
 
       Iter := Start;
       Current_Record_Deleted := False;
@@ -1900,6 +1986,11 @@ package body SData.Interpreter is
                RC : constant String := Natural'Image (SData.Table.Row_Count);
                VC : constant String := Natural'Image (SData.Table.Column_Count);
             begin
+               Debug_Trace ("RUN complete: "
+                            & RC (RC'First + 1 .. RC'Last)
+                            & " records, "
+                            & VC (VC'First + 1 .. VC'Last)
+                            & " variables");
                Put_Line ("RUN complete. " &
                          RC (RC'First + 1 .. RC'Last) & " records and " &
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
