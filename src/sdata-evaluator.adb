@@ -14,6 +14,7 @@ with Ada.Numerics;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Strings.Fixed;
 with Ada.Strings.Hash;
+with Interfaces;
 
 --  SData.Evaluator — expression evaluator and built-in function dispatcher.
 --
@@ -2229,9 +2230,9 @@ package body SData.Evaluator is
                then
                   if L.Kind = Val_Integer and R.Kind = Val_Integer then
                      declare
-                        L64   : constant Long_Integer := Long_Integer (L.Int_Val);
-                        R64   : constant Long_Integer := Long_Integer (R.Int_Val);
-                        Res64 : Long_Integer;
+                        L64   : constant Interfaces.Integer_64 := Interfaces.Integer_64 (L.Int_Val);
+                        R64   : constant Interfaces.Integer_64 := Interfaces.Integer_64 (R.Int_Val);
+                        Res64 : Interfaces.Integer_64;
                      begin
                         case Expr.Op is
                            when Op_Add => Res64 := L64 + R64;
@@ -2257,8 +2258,8 @@ package body SData.Evaluator is
                            when Op_Xor => return (Kind => Val_Integer, Int_Val => (if (L.Int_Val /= 0) /= (R.Int_Val /= 0) then 1 else 0));
                         end case;
                         if Expr.Op in Op_Add .. Op_Mul then
-                           if Res64 < Long_Integer (Integer'First)
-                              or else Res64 > Long_Integer (Integer'Last)
+                           if Res64 < Interfaces.Integer_64 (Integer'First)
+                              or else Res64 > Interfaces.Integer_64 (Integer'Last)
                            then
                               raise Constraint_Error with "Integer overflow in " & Expr.Op'Image;
                            end if;
