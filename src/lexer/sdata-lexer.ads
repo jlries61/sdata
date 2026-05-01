@@ -22,7 +22,7 @@ package SData.Lexer is
       Token_BY, Token_SORT, Token_RENAME, Token_DELETE, Token_RSEED, Token_NOT, Token_AND, Token_OR, Token_XOR,
       Token_OPTIONS, Token_DIGITS, Token_FPATH, Token_HEADER, Token_ALL,
       Token_REM, Token_HELP, Token_END, Token_RUN, Token_QUIT, Token_NAMES, Token_LIST, Token_DISPLAY,
-      Token_TO, Token_STEP,
+      Token_TO, Token_STEP, Token_BREAK,
 
       -- Operators and Punctuation
       Token_Plus, Token_Minus, Token_Star, Token_Slash, Token_Caret, -- +, -, *, /, ^
