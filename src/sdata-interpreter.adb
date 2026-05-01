@@ -1450,6 +1450,8 @@ package body SData.Interpreter is
             null;  --  Handled by loop termination in Execute.
          when Stmt_DELETE =>
             Current_Record_Deleted := True;
+         when Stmt_BREAK =>
+            null;  --  Full handler added in Task 6
          when Stmt_WRITE =>
             SData.Variables.Flush_PDV_To_Output;
             SData.Table.Set_Record_Explicitly_Written (True);
@@ -1672,7 +1674,7 @@ package body SData.Interpreter is
          case Iter.Kind is
             when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
                | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT
-               | Stmt_DELETE | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO
+               | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO
                | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
                | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                begin
@@ -1823,6 +1825,8 @@ package body SData.Interpreter is
                Resolve_Stmt_List (S.Otherwise_Part, null);
             when Stmt_RSEED =>
                Resolve_Expr (S.Seed_Expr);
+            when Stmt_BREAK =>
+               Resolve_Expr (S.Expr);
             when others => null;
          end case;
       end Resolve_Stmt;

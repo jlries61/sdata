@@ -1125,6 +1125,23 @@ package body SData.Parser is
                   Stmt := new Statement (Stmt_DELETE);
                end if;
             end;
+         when Token_BREAK =>
+            declare
+               S : constant Statement_Access :=
+                  new Statement (Stmt_BREAK);
+            begin
+               S.Expr := null;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_WHEN then
+                  declare
+                     Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     pragma Unreferenced (Discard);
+                  begin
+                     S.Expr := Parse_Expression (Ctx);
+                  end;
+               end if;
+               Stmt := S;
+            end;
+
          when Token_WRITE =>
             Stmt := new Statement (Stmt_WRITE);
 

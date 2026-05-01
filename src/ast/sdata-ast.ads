@@ -141,6 +141,7 @@ package SData.AST is
       Stmt_SELECT, -- Multi-way branch
       Stmt_SELECT_FILTER, -- Record filter (declarative)
       Stmt_DELETE, -- Drop current record
+      Stmt_BREAK,  -- Pause execution for inspection (BREAK / BREAK WHEN <expr>)
       Stmt_WRITE,  -- Explicit record output (was Stmt_OUTPUT)
       Stmt_OUTPUT, -- Console output redirection
       Stmt_ECHO,   -- Console output control
