@@ -461,6 +461,10 @@ begin
    end if;
 
 exception
+   when SData.Parser.Incomplete_Statement =>
+      Put_Line_Error ("Error: incomplete block at end of script"
+                      & " (missing END SELECT, END IF, NEXT, or WEND?)");
+      Set_Exit_Status (Failure);
    when E : SData.Script_Error =>
       Put_Line_Error ("Error: " & Exception_Message (E));
       Set_Exit_Status (Failure);

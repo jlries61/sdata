@@ -993,8 +993,15 @@ package body SData.Parser is
                   declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                end loop;
 
-               Is_Block := Tok_Local.Kind = Token_CASE or else 
-                           Tok_Local.Kind = Token_WHEN or else 
+               --  EOF here means SELECT appeared at end of input with no CASE following.
+               --  In interactive mode the REPL catches this and waits for more input;
+               --  in batch mode it means an unterminated block.
+               if Tok_Local.Kind = Token_EOF then
+                  raise Incomplete_Statement;
+               end if;
+
+               Is_Block := Tok_Local.Kind = Token_CASE or else
+                           Tok_Local.Kind = Token_WHEN or else
                            Tok_Local.Kind = Token_OTHERWISE;
 
                if not Is_Block then
