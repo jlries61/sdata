@@ -196,7 +196,7 @@ package SData.AST is
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
             Vars         : Variable_List;
             Arr_Name     : String (1 .. 32);
-            Arr_Name_Len : Natural;
+            Arr_Name_Len : Natural := 0;
             Arr_Dim      : Positive; -- Number of elements (for simple arrays) - this will become derived for DIM
             Arr_Vars     : Variable_List;
             Arr_Start_Expr : Expression_Access;  -- For DIM array lower bound
