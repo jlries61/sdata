@@ -14,7 +14,7 @@ with Ada.Numerics;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Strings.Fixed;
 with Ada.Strings.Hash;
-with Interfaces;
+with Interfaces; use Interfaces;
 
 --  SData.Evaluator — expression evaluator and built-in function dispatcher.
 --
