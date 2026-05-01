@@ -81,7 +81,7 @@ check: build
 			rm -f tests/$$base.tmp; \
 			failures=$$((failures+1)); failed_list="$$failed_list $$f"; \
 		else \
-			diff -u "$$exp" tests/$$base.tmp > tests/$$base.diff; \
+			diff -wu "$$exp" tests/$$base.tmp > tests/$$base.diff; \
 			if [ $$? -eq 0 ]; then \
 				echo "PASSED"; \
 				rm -f tests/$$base.tmp tests/$$base.diff; \
