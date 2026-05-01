@@ -83,6 +83,8 @@ package body SData.Interpreter is
       SData.IO.Set_Interactive (Val);
    end Set_Interactive;
 
+   type Step_Action is (Action_Continue, Action_Step, Action_Run);
+
    --  Forward declarations for internal logic.
    procedure Execute_Statement    (Stmt : Statement_Access);
    procedure Execute_List         (List : Statement_Access; Boundary : Statement_Access := null);
@@ -100,7 +102,9 @@ package body SData.Interpreter is
                                     Logical_Count    : Natural;
                                     Start            : Statement_Access;
                                     Boundary         : Statement_Access;
-                                    Global_Has_Write : Boolean);
+                                    Global_Has_Write : Boolean;
+                                    Pause_After      : Boolean := False;
+                                    Action           : out Step_Action);
    procedure Commit_Step;
    procedure Run_One_Step         (Start, Boundary : Statement_Access);
 
@@ -198,7 +202,7 @@ package body SData.Interpreter is
       end case;
    end Debug_Value;
 
-   type Step_Action is (Action_Continue, Action_Step, Action_Run);
+   Break_Triggered : exception;
 
    procedure Inspect_PDV
      (Logical_I     :        Positive;
@@ -1644,7 +1648,9 @@ package body SData.Interpreter is
             Current_Record_Deleted := True;
             Debug_Trace ("DELETE: record marked");
          when Stmt_BREAK =>
-            null;  --  Full handler added in Task 6
+            if Stmt.Expr = null or else Is_True (Evaluate (Stmt.Expr)) then
+               raise Break_Triggered;
+            end if;
          when Stmt_WRITE =>
             SData.Variables.Flush_PDV_To_Output;
             SData.Table.Set_Record_Explicitly_Written (True);
@@ -1833,7 +1839,9 @@ package body SData.Interpreter is
                                   Logical_Count    : Natural;
                                   Start            : Statement_Access;
                                   Boundary         : Statement_Access;
-                                  Global_Has_Write : Boolean) is
+                                  Global_Has_Write : Boolean;
+                                  Pause_After      : Boolean := False;
+                                  Action           : out Step_Action) is
       Phys_I : constant Positive := SData.Table.Logical_To_Physical (Logical_I);
       Iter   : Statement_Access;
    begin
@@ -1902,34 +1910,47 @@ package body SData.Interpreter is
       Current_Record_Deleted := False;
       SData.Table.Set_Record_Explicitly_Written (False);
 
-      while Iter /= null and then Iter /= Boundary loop
-         case Iter.Kind is
-            when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
-               | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT
-               | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO
-               | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
-               | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
-               begin
-                  Execute_Statement (Iter);
-               exception
-                  when E : Script_Error =>
-                     if SData.Config.Continue_On_Error then
-                        Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                        SData.Config.Runtime.Last_Error_Code := 1;
-                        SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
-                     else raise; end if;
-                  when E : others =>
-                     if SData.Config.Continue_On_Error then
-                        Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                        SData.Config.Runtime.Last_Error_Code := 1;
-                        SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
-                     else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
-               end;
-            when others => null;
-         end case;
-         exit when Current_Record_Deleted;
-         Iter := Iter.Next;
-      end loop;
+      declare
+         Break_Fired : Boolean := False;
+         Act         : Step_Action := Action_Continue;
+      begin
+         while Iter /= null and then Iter /= Boundary loop
+            case Iter.Kind is
+               when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
+                  | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT
+                  | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO
+                  | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
+                  | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
+                  begin
+                     Execute_Statement (Iter);
+                  exception
+                     when Break_Triggered =>
+                        Inspect_PDV (Logical_I, Logical_Count, Act);
+                        Break_Fired := True;
+                     when E : Script_Error =>
+                        if SData.Config.Continue_On_Error then
+                           Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                           SData.Config.Runtime.Last_Error_Code := 1;
+                           SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
+                        else raise; end if;
+                     when E : others =>
+                        if SData.Config.Continue_On_Error then
+                           Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                           SData.Config.Runtime.Last_Error_Code := 1;
+                           SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
+                        else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
+                  end;
+               when others => null;
+            end case;
+            exit when Current_Record_Deleted or else Break_Fired;
+            Iter := Iter.Next;
+         end loop;
+
+         if not Break_Fired and then Pause_After then
+            Inspect_PDV (Logical_I, Logical_Count, Act);
+         end if;
+         Action := Act;
+      end;
 
       --  Automatic flush: if the step contains no explicit WRITE and the
       --  record was not deleted, write the final PDV state to the output table.
@@ -2084,6 +2105,9 @@ package body SData.Interpreter is
       Num_Records      : constant Natural :=
          (if SData.Config.Runtime.Repeat_Active then SData.Config.Runtime.Repeat_Count
           else (if Row_Count > 0 then Row_Count else 1));
+      Step_Mode : Boolean :=
+         SData.Config.Debug_Mode and then SData.IO.Is_Interactive;
+      Act       : Step_Action := Action_Continue;
    begin
       Initialize_PDV;
       Resolve_Expr_Indices (Start, Boundary);
@@ -2095,7 +2119,13 @@ package body SData.Interpreter is
              else Num_Records);
       begin
          for Logical_I in 1 .. Logical_Count loop
-            Process_One_Record (Logical_I, Logical_Count, Start, Boundary, Global_Has_Write);
+            Process_One_Record (Logical_I, Logical_Count, Start, Boundary,
+                                Global_Has_Write,
+                                Pause_After => Step_Mode,
+                                Action      => Act);
+            if Act = Action_Run then
+               Step_Mode := False;
+            end if;
          end loop;
       end;
       Commit_Step;
