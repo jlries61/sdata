@@ -15,11 +15,12 @@ package body SData.Help is
       Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, DISPLAY");
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
       Put_Line ("  Arrays:      ARRAY, DIM");
-      Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT");
+      Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK");
       Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, REPEAT");
       Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
       Put_Line ("  Files/paths: FPATH");
       Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
+      Put_Line ("  Debugger:    BREAK, BREAK WHEN  (see also: HELP DEBUGGER for --debug mode)");
       New_Line;
       Put_Line ("Available Functions:");
       Put_Line ("  Math:        ABS, SQRT/SQR, LOG/LN/LOGE, LOG2, LOG10/CLG/LGT, EXP,");
@@ -235,6 +236,62 @@ package body SData.Help is
       Put_Line ("                   Execution: Immediate -- takes effect at once.");
       Put_Line ("                   Only meaningful in interactive (REPL) mode.");
    end Help_DELETE;
+
+   procedure Help_BREAK is
+   begin
+      Put_Line ("Command: BREAK  |  BREAK WHEN <boolean-expr>");
+      Put_Line ("Pauses execution and enters the debug inspection prompt.");
+      Put_Line ("Valid only inside a data step (deferred context); ignored in immediate mode.");
+      Put_Line ("BREAK always pauses. BREAK WHEN <expr> pauses only when the condition is true.");
+      Put_Line ("Examples:");
+      Put_Line ("  BREAK                   -- pause on every record");
+      Put_Line ("  BREAK WHEN RECNO() = 5  -- pause on record 5 only");
+      Put_Line ("  BREAK WHEN SALARY > 100000");
+      New_Line;
+      Put_Line ("When paused, the inspection prompt accepts:");
+      Put_Line ("  PRINT <expr>   Evaluate and display any SData expression");
+      Put_Line ("  RECORD N       Load record N into the inspection view");
+      Put_Line ("  RECORD +N      Advance N records from current inspection position");
+      Put_Line ("  RECORD -N      Go back N records from current inspection position");
+      Put_Line ("  CONTINUE / C   Resume execution from the paused point");
+      Put_Line ("  STEP / S       Resume to the next record, then pause again");
+      Put_Line ("  RUN            Resume to completion with no further automatic pausing");
+      New_Line;
+      Put_Line ("In non-interactive mode (stdin not a TTY), BREAK emits a trace line to");
+      Put_Line ("stderr and continues automatically without waiting for input.");
+      Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
+   end Help_BREAK;
+
+   procedure Help_DEBUGGER is
+   begin
+      Put_Line ("Debug mode: --debug flag");
+      Put_Line ("Enables passive trace output to stderr and interactive step mode.");
+      New_Line;
+      Put_Line ("Passive trace events emitted to stderr:");
+      Put_Line ("  [debug] -- record N (physical N)");
+      Put_Line ("  [debug] LET X = 5.00000         each scalar or array assignment");
+      Put_Line ("  [debug] IF -> TRUE / FALSE       each IF condition outcome");
+      Put_Line ("  [debug] ELSE -> taken            ELSE branch entered");
+      Put_Line ("  [debug] SELECT -> KEPT/DROPPED   per-record filter result");
+      Put_Line ("  [debug] SELECT -> N of M records kept   summary after filtering");
+      Put_Line ("  [debug] FOR I = 3                each FOR iteration");
+      Put_Line ("  [debug] DELETE: record marked");
+      Put_Line ("  [debug] RUN complete: N records, M variables");
+      Put_Line ("  [debug] USE: opened file.csv (N records, M variables)");
+      Put_Line ("  [debug] SUBMIT: entering script.sdata");
+      New_Line;
+      Put_Line ("Step mode (--debug + interactive stdin):");
+      Put_Line ("  After each record header, execution pauses at the inspection prompt.");
+      Put_Line ("  CONTINUE/C processes the current record and advances to the next record.");
+      Put_Line ("  STEP/S is equivalent to CONTINUE in step mode.");
+      Put_Line ("  RUN at the prompt disables step mode and runs to completion.");
+      New_Line;
+      Put_Line ("The inspection prompt ([debug:record N]>) accepts the same commands as");
+      Put_Line ("BREAK: PRINT, RECORD, CONTINUE, STEP, RUN.  Record navigation at the");
+      Put_Line ("prompt does not affect which record is processed when execution resumes.");
+      New_Line;
+      Put_Line ("See also: HELP BREAK for the BREAK / BREAK WHEN deferred statement.");
+   end Help_DEBUGGER;
 
    procedure Help_HOLD is
    begin
@@ -462,7 +519,7 @@ package body SData.Help is
       Put_Line ("    record during the data step.");
       Put_Line ("    Commands: LET, SET, PRINT, IF, FOR, WHILE, REPEAT/UNTIL,");
       Put_Line ("              SELECT/CASE, DELETE, WRITE, HOLD, UNHOLD,");
-      Put_Line ("              ARRAY, DIM");
+      Put_Line ("              ARRAY, DIM, BREAK");
       New_Line;
       Put_Line ("Note: SELECT has two forms with different tiers:");
       Put_Line ("  SELECT <expr> / SELECT /ALL  -- Declarative (row filter)");
@@ -982,6 +1039,9 @@ package body SData.Help is
    K_END          : aliased constant String := "END";
    K_OPTIONS      : aliased constant String := "OPTIONS";
    K_EXECUTION    : aliased constant String := "EXECUTION";
+   K_BREAK        : aliased constant String := "BREAK";
+   K_DEBUGGER     : aliased constant String := "DEBUGGER";
+   K_DEBUG        : aliased constant String := "DEBUG";
    K_ABS          : aliased constant String := "ABS";
    K_SQRT         : aliased constant String := "SQRT";
    K_LOG          : aliased constant String := "LOG";
@@ -1166,6 +1226,7 @@ package body SData.Help is
       (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),
       (K_NAMES'Access,    Help_NAMES'Access,    C, N),
       (K_DELETE'Access,   Help_DELETE'Access,   C, N),
+      (K_BREAK'Access,    Help_BREAK'Access,    C, N),
       (K_HOLD'Access,     Help_HOLD'Access,     C, N),
       (K_UNHOLD'Access,   Help_UNHOLD'Access,   C, N),
       (K_KEEP'Access,     Help_KEEP'Access,     C, N),
@@ -1187,6 +1248,8 @@ package body SData.Help is
       (K_END'Access,      Help_QUIT'Access,     N, N),   --  alias
       (K_OPTIONS'Access,  Help_OPTIONS'Access,  C, N),
       (K_EXECUTION'Access, Help_EXECUTION'Access, C, N),
+      (K_DEBUGGER'Access, Help_DEBUGGER'Access,  C, N),
+      (K_DEBUG'Access,    Help_DEBUGGER'Access,  N, N),   --  alias
       --  Math functions
       (K_ABS'Access,      Help_ABS'Access,      N, F),
       (K_SQRT'Access,     Help_SQRT'Access,     N, F),
