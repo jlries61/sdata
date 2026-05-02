@@ -53,6 +53,12 @@ run: build
 	./bin/sdata $(FILE)
 
 check: build
+	@echo "Running unit tests..."
+	@$(TIMEOUT) 30 ./bin/csv_unit_test; \
+	 if [ $$? -ne 0 ]; then \
+	   echo "Unit tests FAILED"; exit 1; \
+	 fi
+	@echo ""
 	@echo "Running tests..."
 	@failures=0; failed_list=""; total=0; \
 	for f in tests/*.cmd; do \
