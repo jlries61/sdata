@@ -523,12 +523,10 @@ package body SData.Variables is
                   declare
                      Var_Name : constant String := Get_Real_Var_Name (To_String(Existing_Def.Constituents.First_Element), I);
                   begin
-                     if not Existing_Def.Is_Temporary and then SData.Table.Has_Column (Var_Name) then
-                        -- For permanent real array elements, we should remove column if it's outside new bounds
-                        -- but not if it's within the new bounds (to avoid data loss)
-                        -- For simplicity, let's just leave old columns for now if permanent.
-                        -- A separate garbage collection might be needed.
-                        null;
+                     if not Existing_Def.Is_Temporary and then SData.Table.Has_Column (Var_Name)
+                        and then (I < Start_Idx or else I > End_Idx)
+                     then
+                        SData.Table.Drop_Column (Var_Name);
                      end if;
                      -- For temporary elements, clear from Temp_Symbols
                      if Existing_Def.Is_Temporary and then Temp_Symbols.Contains (Var_Name) then
