@@ -200,4 +200,4 @@ install:
 
 clean:
 	@echo "Cleaning build artifacts..."
-	rm -rf obj bin tests/*.tmp tests/*.diff
+	rm -rf obj bin tests/*.tmp tests/*.diff sdata_opt_tab.csv sdata_opt_nohdr.csv
