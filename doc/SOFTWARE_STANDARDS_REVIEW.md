@@ -114,7 +114,7 @@ Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every f
 
 | Metric | Value |
 |---|---|
-| Test count | ~~96~~ 99 cmd + 33 compiled Ada unit tests **[v0.6.6]** |
+| Test count | ~~96~~ ~~99~~ 107 cmd + 33 compiled Ada unit tests **[v0.6.6]** |
 | Test mechanism | File-based diff (`.cmd` → expected `.out`) + standalone `csv_unit_test` executable |
 | Execution time | <30 seconds total (10s per-test ceiling, most <1s) |
 | Flaky tests | None observed |
@@ -123,7 +123,7 @@ Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every f
 
 **Coverage gaps:**
 
-1. `HELP` command — the entire help dispatcher is untested. Any regression there is invisible.
+1. ~~`HELP` command — the entire help dispatcher is untested. Any regression there is invisible.~~ **[Resolved v0.6.6]** 8 tests cover all four `Print_Help` code paths: index, `/ALL`, specific topic, unknown topic, plus case-insensitive lookup and alias dispatch.
 2. Interactive REPL — pager integration, multi-statement entry, signal handling: zero automated coverage.
 3. ~~`--debug` flag — defined in config, accepted by CLI, but never consulted in the interpreter. The flag does nothing.~~ **[Resolved v0.6.6]** `--debug` now emits per-statement and per-record trace to stderr; `BREAK`/`BREAK WHEN` deferred statements and interactive inspection REPL implemented. Tests: `debug_trace.cmd`, `break_basic.cmd`, `break_when.cmd`.
 4. BY group edge cases — empty groups, single-record groups, group key changes on first record.
@@ -148,11 +148,11 @@ Change blast radius is small and predictable. The parsing and execution pipeline
 |---|---|---|---|
 | ~~`Parse_CSV` monolith~~ | ~~`sdata-file_io.adb:285`~~ | ~~4–6 hours~~ | **Resolved v0.6.6** — extracted to `SData.CSV`; 33 unit tests |
 | ~~`--debug` flag silently inert~~ | ~~`sdata-config.ads:42`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
-| HELP dispatcher untested | `sdata-help.adb` | 2 hours | Stable |
+| ~~HELP dispatcher untested~~ | ~~`sdata-help.adb`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
 | `CONTRIBUTING.md` missing | (project root) | 1 hour | Stable |
 | Array resize TODO | `sdata-variables.adb:520` | 4 hours | Stable |
 
-**Total remediation estimate: ~7 hours** (debug and Parse_CSV items resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
+**Total remediation estimate: ~5 hours** (debug, Parse_CSV, and HELP coverage resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
 
 ---
 
@@ -258,12 +258,12 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | Architectural Integrity | 88/100 | Clean pipeline; minor Config split confusion |
 | Code Quality | ~~78/100~~ **83/100** | Good naming/comments; ~~`Parse_CSV` monolith is the outlier~~ Parse_CSV monolith resolved v0.6.6 |
 | Efficiency | 87/100 | No algorithmic flaws; `Column_Order` linear scan is latent |
-| Maintainability | ~~80/100~~ **84/100** | Strong tests + new Ada unit tests; HELP and REPL gaps remain; debug resolved v0.6.6 |
+| Maintainability | ~~80/100~~ **86/100** | Strong tests + Ada unit tests + HELP coverage; REPL gap remains; debug resolved v0.6.6 |
 | Error Handling | 87/100 | Consistent strategy; good messages; LibreOffice fallback is exemplary |
 | Security | 84/100 | Safe shell invocation; appropriate permissiveness for tool type |
 | Operational Readiness | ~~74/100~~ **80/100** | Build/package pipeline is excellent; CI live v0.6.6; observability is Text_IO only; debug resolved v0.6.6 |
 | Documentation | 86/100 | Strong across the board; missing CONTRIBUTING and ADRs |
-| **TOTAL** | ~~664~~ **679/800** | +15 from Code Quality, Maintainability, and Operational Readiness improvements in v0.6.6 |
+| **TOTAL** | ~~664~~ **681/800** | +17 from Code Quality, Maintainability, and Operational Readiness improvements in v0.6.6 |
 
 ---
 
