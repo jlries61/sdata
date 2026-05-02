@@ -86,6 +86,8 @@ begin
    Check ("ATD-2 no match",     At_Delimiter ("a,b", 1, ","),               False);
    Check ("ATD-3 tab match",
       At_Delimiter ("a" & ASCII.HT & "b", 2, "" & ASCII.HT),               True);
+   Check ("ATD-4 two-char match",    At_Delimiter ("a::b", 2, "::"), True);
+   Check ("ATD-5 two-char no-match", At_Delimiter ("a::b", 1, "::"), False);
 
    --  ── CSV_Field_End ─────────────────────────────────────────────────────
    Check_Nat ("CFE-1 first field",  CSV_Field_End ("a,b,c",     1, ","), 2);
@@ -100,13 +102,13 @@ begin
 
    --  ── Split_Indices ─────────────────────────────────────────────────────
    FA := Split_Indices ("a,b,c", ",", N);
-   Check_Nat ("SI-1 count",  N,        3);
-   Check_Nat ("SI-1 f1.S",   FA(1).S,  1);
-   Check_Nat ("SI-1 f1.E",   FA(1).E,  1);
-   Check_Nat ("SI-1 f2.S",   FA(2).S,  3);
-   Check_Nat ("SI-1 f2.E",   FA(2).E,  3);
-   Check_Nat ("SI-1 f3.S",   FA(3).S,  5);
-   Check_Nat ("SI-1 f3.E",   FA(3).E,  5);
+   Check_Nat ("SI-1-count",  N,        3);
+   Check_Nat ("SI-1-f1.S",   FA(1).S,  1);
+   Check_Nat ("SI-1-f1.E",   FA(1).E,  1);
+   Check_Nat ("SI-1-f2.S",   FA(2).S,  3);
+   Check_Nat ("SI-1-f2.E",   FA(2).E,  3);
+   Check_Nat ("SI-1-f3.S",   FA(3).S,  5);
+   Check_Nat ("SI-1-f3.E",   FA(3).E,  5);
 
    FA := Split_Indices ("", ",", N);
    Check_Nat ("SI-2 empty count", N, 0);

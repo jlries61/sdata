@@ -60,10 +60,8 @@ package body SData.CSV is
    function At_Delimiter (Line      : String;
                            Pos       : Positive;
                            Delimiter : String) return Boolean is
-      DLen : constant Positive :=
-         (if Delimiter'Length > 0 then Delimiter'Length else 1);
+      DLen : constant Positive := Delimiter'Length;
    begin
-      pragma Assert (Delimiter'Length > 0);
       if Pos + DLen - 1 > Line'Last then return False; end if;
       if DLen = 1 then return Line (Pos) = Delimiter (Delimiter'First); end if;
       return Line (Pos .. Pos + DLen - 1) = Delimiter;
@@ -134,8 +132,7 @@ package body SData.CSV is
       Res   : Field_Array;
       Start : Integer := Line'First;
       Count : Natural := 0;
-      DLen  : constant Positive :=
-         (if Delimiter'Length > 0 then Delimiter'Length else 1);
+      DLen : constant Positive := Delimiter'Length;
    begin
       N_Fields := 0;
       if Line'Length = 0 then return Res; end if;
