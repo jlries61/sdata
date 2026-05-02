@@ -1,6 +1,7 @@
 # SData — Software Standards Report
 
 **Version reviewed:** 0.6.5 | **Date:** 2026-04-30 | **Tests:** 96 passing
+**Annotation:** 2026-05-01 (v0.6.6, 99 tests) — debug system implemented; see annotated sections below.
 
 ---
 
@@ -72,7 +73,7 @@ The file I/O parsers are the only genuine design smell. `Parse_CSV` contains a 1
 |---|---|---|
 | Potentially stale "called by NEW" comment | `sdata-variables.adb` (corrected in v0.6.4 cycle) | Resolved |
 | TODO without date/owner | `sdata-variables.adb:520` | Low |
-| `--debug` flag defined but never consulted in interpreter | `sdata-config.ads:42` | Medium — silently inert |
+| `--debug` flag defined but never consulted in interpreter | `sdata-config.ads:42` | ~~Medium — silently inert~~ **[Resolved v0.6.6]** |
 
 **No commented-out code anywhere.** Comments in the codebase consistently explain *why* (e.g., the SQLite pragma block explains *why* `synchronous=OFF` is safe for a private temp file). This is correct discipline.
 
@@ -122,7 +123,7 @@ Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every f
 
 1. `HELP` command — the entire help dispatcher is untested. Any regression there is invisible.
 2. Interactive REPL — pager integration, multi-statement entry, signal handling: zero automated coverage.
-3. `--debug` flag — defined in config, accepted by CLI, but never consulted in the interpreter. The flag does nothing.
+3. ~~`--debug` flag — defined in config, accepted by CLI, but never consulted in the interpreter. The flag does nothing.~~ **[Resolved v0.6.6]** `--debug` now emits per-statement and per-record trace to stderr; `BREAK`/`BREAK WHEN` deferred statements and interactive inspection REPL implemented. Tests: `debug_trace.cmd`, `break_basic.cmd`, `break_when.cmd`.
 4. BY group edge cases — empty groups, single-record groups, group key changes on first record.
 5. Array resizing (`TODO` at `sdata-variables.adb:520`) — the optimization path isn't tested either way.
 
@@ -144,12 +145,12 @@ Change blast radius is small and predictable. The parsing and execution pipeline
 | Item | Location | Estimated Effort | Trajectory |
 |---|---|---|---|
 | `Parse_CSV` monolith | `sdata-file_io.adb:285` | 4–6 hours | Stable (not worsening) |
-| `--debug` flag silently inert | `sdata-config.ads:42` | 2 hours | Stable |
+| ~~`--debug` flag silently inert~~ | ~~`sdata-config.ads:42`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
 | HELP dispatcher untested | `sdata-help.adb` | 2 hours | Stable |
 | `CONTRIBUTING.md` missing | (project root) | 1 hour | Stable |
 | Array resize TODO | `sdata-variables.adb:520` | 4 hours | Stable |
 
-**Total remediation estimate: ~15 hours. Debt is acknowledged, bounded, and not compounding.**
+**Total remediation estimate: ~13 hours** (debug item resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
 
 ---
 
@@ -210,11 +211,11 @@ No hardcoded credentials, tokens, or passwords anywhere in the source. The only 
 |---|---|
 | Structured logging | ❌ None — `Ada.Text_IO.Put_Line` only |
 | Log levels | ❌ None — `--quiet` suppresses informational only |
-| `--debug` flag | ⚠️ Accepted by CLI, stored in `Config.Debug_Mode`, **never consulted** |
+| `--debug` flag | ✅ **[Resolved v0.6.6]** Emits `[debug]`-prefixed trace to stderr: statement kind + record number per deferred statement, record-load events, BREAK entry/exit. `BREAK`/`BREAK WHEN` pause execution and enter an interactive inspection REPL (PDV dump, variable query, step/continue/quit). Step mode (`s`) advances one record at a time when running interactively. |
 | Error output on stderr | ✅ `Put_Line_Error` routes to stderr consistently |
 | Quiet mode | ✅ `--quiet` suppresses dataset-open messages |
 
-The `--debug` flag is a minor embarrassment — it's documented in the man page and accepted at the CLI but does absolutely nothing. A new user who enables it expecting trace output will be confused.
+~~The `--debug` flag is a minor embarrassment — it's documented in the man page and accepted at the CLI but does absolutely nothing. A new user who enables it expecting trace output will be confused.~~ **[Resolved v0.6.6]** The flag now produces meaningful trace output; see the Observability table above.
 
 ### 7.2 Deployment & Build
 
@@ -255,10 +256,10 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | Architectural Integrity | 88/100 | Clean pipeline; minor Config split confusion |
 | Code Quality | 78/100 | Good naming/comments; `Parse_CSV` monolith is the outlier |
 | Efficiency | 87/100 | No algorithmic flaws; `Column_Order` linear scan is latent |
-| Maintainability | 80/100 | Strong tests; HELP and REPL gaps; debug flag is dead |
+| Maintainability | 80/100 | Strong tests; HELP and REPL gaps; ~~debug flag is dead~~ debug flag resolved v0.6.6 |
 | Error Handling | 87/100 | Consistent strategy; good messages; LibreOffice fallback is exemplary |
 | Security | 84/100 | Safe shell invocation; appropriate permissiveness for tool type |
-| Operational Readiness | 74/100 | Build/package pipeline is excellent; observability is Text_IO only |
+| Operational Readiness | 74/100 | Build/package pipeline is excellent; observability is Text_IO only; ~~debug inert~~ debug resolved v0.6.6 |
 | Documentation | 86/100 | Strong across the board; missing CONTRIBUTING and ADRs |
 | **TOTAL** | **664/800** | |
 
@@ -270,7 +271,7 @@ This is good software. Genuinely good — not "good for a one-person project," b
 
 **The thing that would embarrass you in front of a senior engineer is `Parse_CSV`.** It is 553 lines, it does five different jobs, and it is effectively untestable as a unit. You cannot write a test for "the charset detection path inside Parse_CSV" without firing the whole machine. This is the only part of the codebase where the seams are in the wrong places. The rest of the I/O parsers (OOXML, ODF) are long for the same structural reason — DOM traversal is verbose — but they have a better excuse. CSV has no such excuse.
 
-**The `--debug` flag is a lie to the user.** It is in the man page. It is accepted at the CLI. It stores a value in `Config.Debug_Mode`. And then nothing in the interpreter ever reads it. A user who enables it expecting trace output will silently get nothing different. Fix it or remove it.
+~~**The `--debug` flag is a lie to the user.**~~ **[Resolved v0.6.6]** `--debug` now delivers genuine observability: per-statement trace, per-record events, and an interactive `BREAK`/`BREAK WHEN` inspection REPL with step mode. The lie has been made true.
 
 **The codebase has no CI.** Every commit is validated by running `make check` by hand. This is sustainable for a single developer who is disciplined about it — and clearly this developer is — but it is one distracted afternoon away from a broken commit on `origin/main`. A GitHub Actions workflow running `alr build && make check` on push is a two-hour investment that eliminates an entire class of risk forever.
 
@@ -283,7 +284,7 @@ At 3 AM with a broken pipe in production? I'd trust this codebase. The error han
 | Finding | File:Line | Evidence |
 |---|---|---|
 | `Parse_CSV` monolith | `sdata-file_io.adb:285` | 553 lines; contains charset detection, type inference, quote parsing, field splitting, row emission |
-| `--debug` flag inert | `sdata-config.ads:42` | `Debug_Mode : Boolean := False` defined; zero reads of this flag in interpreter |
+| ~~`--debug` flag inert~~ | `sdata-interpreter.adb:186,1878,2124` | **[Resolved v0.6.6]** `Debug_Mode` now consulted in `Debug_Trace`, step-mode gate, and `BREAK` execution path; 3 tests cover trace and break behaviour |
 | HELP untested | `sdata-help.adb` | No `tests/help*.cmd` exists |
 | `Column_Order` linear scan | `sdata-table.adb:263–269` | Loop over Vector to find column name in `Rename_Column` |
 | LibreOffice graceful fallback | `sdata-file_io.adb:1058–1062` | Warning to stderr + `using cached values` on missing LibreOffice |
