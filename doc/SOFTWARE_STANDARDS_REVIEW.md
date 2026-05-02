@@ -1,7 +1,7 @@
 # SData — Software Standards Report
 
 **Version reviewed:** 0.6.5 | **Date:** 2026-04-30 | **Tests:** 96 passing
-**Annotation:** 2026-05-01 (v0.6.6, 99 tests) — debug system implemented; see annotated sections below.
+**Annotation:** 2026-05-01 (v0.6.6, 99 cmd + 33 unit tests) — debug system implemented; `Parse_CSV` monolith resolved; see annotated sections below.
 
 ---
 
@@ -18,7 +18,7 @@ The architecture is a classic recursive-descent pipeline: Lexer → Parser → A
 | Orphaned modules? | ✅ None |
 | Architecture astronaut syndrome? | ✅ None — no gratuitous abstractions |
 
-**Justification Quality: 9/10.** The only note: `SData.Config` vs `SData.Config.Runtime` is a subtle split (static constants vs mutable run state) that is not explained inline and takes a moment to understand.
+**Justification Quality: 9/10.** The only note: `SData.Config` vs `SData.Config.Runtime` is a subtle split (static constants vs mutable run state) that is not explained inline and takes a moment to understand. **[v0.6.6]** `SData.CSV` added as a new pure satellite package containing the six CSV string helpers extracted from `Parse_CSV`; zero dependencies on any other SData package.
 
 ### 1.2 Dependency Graph
 
@@ -53,17 +53,17 @@ One demerit: `S.Arr_Idx_List` / `Arr_Is_Slice` on the Statement record are abbre
 
 | Procedure | File:Line | Lines | Verdict |
 |---|---|---|---|
-| `Parse_CSV` | `sdata-file_io.adb:285` | ~553 | ⚠️ Too large; nested helpers mitigate but don't excuse |
+| `Parse_CSV` | `sdata-file_io.adb:285` | ~~553~~ ~377 | ~~⚠️ Too large; nested helpers mitigate but don't excuse~~ **[Resolved v0.6.6]** 6 pure helpers extracted to `SData.CSV`; orchestrator only |
 | `Parse_OOXML` | `sdata-file_io.adb:1264` | ~365 | ⚠️ Acceptable for DOM traversal but pushes the limit |
 | `Parse_ODF` | `sdata-file_io.adb:995` | ~264 | ⚠️ Same |
 | `Register_All_Functions` | `sdata-evaluator.adb:2392` | ~191 | ✅ Pure dispatch table; no branches; justified |
 | `Execute_Statement` | `sdata-interpreter.adb:86` | ~117 | ✅ Each case is a single call; justified |
 
-The file I/O parsers are the only genuine design smell. `Parse_CSV` contains a 1 MB heap-allocated line buffer, inline charset detection, column type inference, and multi-path field parsing — it does at least five distinct things. The inner helpers (defined as nested procedures) soften this but the procedure boundary is still too coarse.
+~~The file I/O parsers are the only genuine design smell. `Parse_CSV` contains a 1 MB heap-allocated line buffer, inline charset detection, column type inference, and multi-path field parsing — it does at least five distinct things. The inner helpers (defined as nested procedures) soften this but the procedure boundary is still too coarse.~~ **[Resolved v0.6.6]** `Parse_CSV` reduced from 553 to ~377 lines. The six pure string helpers (`Try_Fast_Float`, `Is_Numeric_Field`, `At_Delimiter`, `CSV_Field_End`, `CSV_Unquote`, `Split_Indices`) now live in `SData.CSV` and are covered by 33 compiled Ada unit tests. `Parse_CSV` is now a clean orchestrator; the helpers with legitimate closure dependencies on local state remain nested. `Parse_OOXML` and `Parse_ODF` remain large but have the DOM-traversal excuse.
 
 | Avg Function Length | Max Function Length | Single Responsibility |
 |---|---|---|
-| ~35 lines | 553 lines (`Parse_CSV`) | 7/10 |
+| ~35 lines | ~~553~~ ~365 lines (`Parse_OOXML`) | ~~7/10~~ **8/10** [v0.6.6] |
 
 ### 2.3 Comment Quality
 
@@ -114,10 +114,12 @@ Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every f
 
 | Metric | Value |
 |---|---|
-| Test count | 96 |
-| Test mechanism | File-based diff (`.cmd` → expected `.out`) |
+| Test count | ~~96~~ 99 cmd + 33 compiled Ada unit tests **[v0.6.6]** |
+| Test mechanism | File-based diff (`.cmd` → expected `.out`) + standalone `csv_unit_test` executable |
 | Execution time | <30 seconds total (10s per-test ceiling, most <1s) |
 | Flaky tests | None observed |
+
+**[v0.6.6]** `make check` now runs `./bin/csv_unit_test` before the `.cmd` suite. The 33 unit tests cover all six `SData.CSV` functions (`Try_Fast_Float`, `Is_Numeric_Field`, `At_Delimiter`, `CSV_Field_End`, `CSV_Unquote`, `Split_Indices`) and are compiled Ada — they catch type errors and contract violations that file-diff tests cannot.
 
 **Coverage gaps:**
 
@@ -144,13 +146,13 @@ Change blast radius is small and predictable. The parsing and execution pipeline
 
 | Item | Location | Estimated Effort | Trajectory |
 |---|---|---|---|
-| `Parse_CSV` monolith | `sdata-file_io.adb:285` | 4–6 hours | Stable (not worsening) |
+| ~~`Parse_CSV` monolith~~ | ~~`sdata-file_io.adb:285`~~ | ~~4–6 hours~~ | **Resolved v0.6.6** — extracted to `SData.CSV`; 33 unit tests |
 | ~~`--debug` flag silently inert~~ | ~~`sdata-config.ads:42`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
 | HELP dispatcher untested | `sdata-help.adb` | 2 hours | Stable |
 | `CONTRIBUTING.md` missing | (project root) | 1 hour | Stable |
 | Array resize TODO | `sdata-variables.adb:520` | 4 hours | Stable |
 
-**Total remediation estimate: ~13 hours** (debug item resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
+**Total remediation estimate: ~7 hours** (debug and Parse_CSV items resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
 
 ---
 
@@ -222,7 +224,7 @@ No hardcoded credentials, tokens, or passwords anywhere in the source. The only 
 | Capability | Status |
 |---|---|
 | Build | ✅ `make` / `alr build` |
-| Test | ✅ `make check` (96 tests, <30s) |
+| Test | ✅ `make check` (~~96~~ 99 cmd + 33 unit tests, <30s) **[v0.6.6]** |
 | Install | ✅ `make install` (binary + man page) |
 | Package (RPM) | ✅ `make srpm` |
 | Package (Debian) | ✅ `make dsc` |
@@ -254,14 +256,14 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | Category | Score | Notes |
 |---|---|---|
 | Architectural Integrity | 88/100 | Clean pipeline; minor Config split confusion |
-| Code Quality | 78/100 | Good naming/comments; `Parse_CSV` monolith is the outlier |
+| Code Quality | ~~78/100~~ **83/100** | Good naming/comments; ~~`Parse_CSV` monolith is the outlier~~ Parse_CSV monolith resolved v0.6.6 |
 | Efficiency | 87/100 | No algorithmic flaws; `Column_Order` linear scan is latent |
-| Maintainability | 80/100 | Strong tests; HELP and REPL gaps; ~~debug flag is dead~~ debug flag resolved v0.6.6 |
+| Maintainability | ~~80/100~~ **84/100** | Strong tests + new Ada unit tests; HELP and REPL gaps remain; debug resolved v0.6.6 |
 | Error Handling | 87/100 | Consistent strategy; good messages; LibreOffice fallback is exemplary |
 | Security | 84/100 | Safe shell invocation; appropriate permissiveness for tool type |
 | Operational Readiness | 74/100 | Build/package pipeline is excellent; observability is Text_IO only; ~~debug inert~~ debug resolved v0.6.6 |
 | Documentation | 86/100 | Strong across the board; missing CONTRIBUTING and ADRs |
-| **TOTAL** | **664/800** | |
+| **TOTAL** | ~~664~~ **673/800** | +9 from Code Quality and Maintainability improvements in v0.6.6 |
 
 ---
 
@@ -269,7 +271,7 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 
 This is good software. Genuinely good — not "good for a one-person project," but good by any measure. The architecture is clean, the tests are behaviorally correct, the error handling is disciplined, and the version management script is better than what most ten-person teams ship.
 
-**The thing that would embarrass you in front of a senior engineer is `Parse_CSV`.** It is 553 lines, it does five different jobs, and it is effectively untestable as a unit. You cannot write a test for "the charset detection path inside Parse_CSV" without firing the whole machine. This is the only part of the codebase where the seams are in the wrong places. The rest of the I/O parsers (OOXML, ODF) are long for the same structural reason — DOM traversal is verbose — but they have a better excuse. CSV has no such excuse.
+~~**The thing that would embarrass you in front of a senior engineer is `Parse_CSV`.** It is 553 lines, it does five different jobs, and it is effectively untestable as a unit. You cannot write a test for "the charset detection path inside Parse_CSV" without firing the whole machine. This is the only part of the codebase where the seams are in the wrong places. The rest of the I/O parsers (OOXML, ODF) are long for the same structural reason — DOM traversal is verbose — but they have a better excuse. CSV has no such excuse.~~ **[Resolved v0.6.6]** `Parse_CSV` is now a clean orchestrator (~377 lines). The six pure helpers live in `SData.CSV` with 33 compiled Ada unit tests. The seams are in the right places.
 
 ~~**The `--debug` flag is a lie to the user.**~~ **[Resolved v0.6.6]** `--debug` now delivers genuine observability: per-statement trace, per-record events, and an interactive `BREAK`/`BREAK WHEN` inspection REPL with step mode. The lie has been made true.
 
@@ -283,7 +285,7 @@ At 3 AM with a broken pipe in production? I'd trust this codebase. The error han
 
 | Finding | File:Line | Evidence |
 |---|---|---|
-| `Parse_CSV` monolith | `sdata-file_io.adb:285` | 553 lines; contains charset detection, type inference, quote parsing, field splitting, row emission |
+| ~~`Parse_CSV` monolith~~ | `sdata-file_io.adb:285` | ~~553 lines; contains charset detection, type inference, quote parsing, field splitting, row emission~~ **[Resolved v0.6.6]** ~377 lines; 6 helpers extracted to `src/sdata-csv.ads`/`sdata-csv.adb`; 33 unit tests in `tests/csv_unit_test.adb` |
 | ~~`--debug` flag inert~~ | `sdata-interpreter.adb:186,1878,2124` | **[Resolved v0.6.6]** `Debug_Mode` now consulted in `Debug_Trace`, step-mode gate, and `BREAK` execution path; 3 tests cover trace and break behaviour |
 | HELP untested | `sdata-help.adb` | No `tests/help*.cmd` exists |
 | `Column_Order` linear scan | `sdata-table.adb:263–269` | Loop over Vector to find column name in `Rename_Column` |
