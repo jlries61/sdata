@@ -4,6 +4,11 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 package body SData.CSV is
 
+   --  Fast decimal parser: handles integers and simple N.M decimals
+   --  without invoking the Ada runtime.  Scientific notation and other
+   --  edge cases fall through to Float'Value.
+   --  Returns True and sets Result for any valid floating-point value.
+   --  Returns False only if the string cannot represent a number.
    function Try_Fast_Float (S : String; Result : out Float) return Boolean is
       I         : Integer := S'First;
       Whole     : Float   := 0.0;
@@ -58,6 +63,7 @@ package body SData.CSV is
       DLen : constant Positive :=
          (if Delimiter'Length > 0 then Delimiter'Length else 1);
    begin
+      pragma Assert (Delimiter'Length > 0);
       if Pos + DLen - 1 > Line'Last then return False; end if;
       if DLen = 1 then return Line (Pos) = Delimiter (Delimiter'First); end if;
       return Line (Pos .. Pos + DLen - 1) = Delimiter;
@@ -76,15 +82,16 @@ package body SData.CSV is
          while I <= Line'Last loop
             if Line (I) = Q then
                if I < Line'Last and then Line (I + 1) = Q then
-                  I := I + 2;
+                  I := I + 2;   --  doubled quote → literal
                else
-                  I := I + 1;
+                  I := I + 1;   --  closing quote
                   exit;
                end if;
             else
                I := I + 1;
             end if;
          end loop;
+         --  After the closing quote, the next chars must be the delimiter.
          if At_Delimiter (Line, I, Delimiter) then return I; end if;
          return 0;
       else
