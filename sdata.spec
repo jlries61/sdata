@@ -52,7 +52,7 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
-* Thu May 01 2026 John L. Ries <john@theyarnbard.com> - 0.6.6-1
+* Fri May 01 2026 John L. Ries <john@theyarnbard.com> - 0.6.6-1
 - Debug system: passive trace, BREAK/BREAK WHEN statement, inspection REPL
 - Fix SELECT CASE parsing in interactive REPL (Incomplete_Statement on EOF)
 
