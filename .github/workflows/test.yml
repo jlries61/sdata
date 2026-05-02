@@ -22,8 +22,11 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
 
-      - name: Fetch dependencies and build
+      - name: Build
         run: alr build
+
+      - name: Verify binaries
+        run: test -x bin/sdata && test -x bin/csv_unit_test
 
       - name: Run test suite
         run: alr exec -- make check
