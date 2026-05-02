@@ -18,7 +18,7 @@ procedure CSV_Unit_Test is
       end if;
    end Check;
 
-   procedure Check_Nat (Name : String; Got, Expected : Natural) is
+   procedure Check (Name : String; Got, Expected : Natural) is
    begin
       if Got = Expected then
          Put_Line ("PASS: " & Name);
@@ -28,9 +28,9 @@ procedure CSV_Unit_Test is
             & "  got=" & Got'Image & "  expected=" & Expected'Image);
          Failed := Failed + 1;
       end if;
-   end Check_Nat;
+   end Check;
 
-   procedure Check_Str (Name : String; Got, Expected : String) is
+   procedure Check (Name : String; Got, Expected : String) is
    begin
       if Got = Expected then
          Put_Line ("PASS: " & Name);
@@ -40,7 +40,7 @@ procedure CSV_Unit_Test is
             & "  got=[" & Got & "]  expected=[" & Expected & "]");
          Failed := Failed + 1;
       end if;
-   end Check_Str;
+   end Check;
 
    procedure Check_Float (Name    : String;
                            Got_Ok  : Boolean; Got_Val  : Float;
@@ -90,38 +90,38 @@ begin
    Check ("ATD-5 two-char no-match", At_Delimiter ("a::b", 1, "::"), False);
 
    --  ── CSV_Field_End ─────────────────────────────────────────────────────
-   Check_Nat ("CFE-1 first field",  CSV_Field_End ("a,b,c",     1, ","), 2);
-   Check_Nat ("CFE-2 last field",   CSV_Field_End ("a,b,c",     5, ","), 0);
-   Check_Nat ("CFE-3 quoted field", CSV_Field_End ("""hi"",b",  1, ","), 5);
+   Check ("CFE-1 first field",  CSV_Field_End ("a,b,c",     1, ","), 2);
+   Check ("CFE-2 last field",   CSV_Field_End ("a,b,c",     5, ","), 0);
+   Check ("CFE-3 quoted field", CSV_Field_End ("""hi"",b",  1, ","), 5);
 
    --  ── CSV_Unquote ───────────────────────────────────────────────────────
-   Check_Str ("CUQ-1 double-quoted",  CSV_Unquote ("""hello"""),       "hello");
-   Check_Str ("CUQ-2 doubled-quote",  CSV_Unquote ("""he""""llo"""),   "he""llo");
-   Check_Str ("CUQ-3 untrimmed",      CSV_Unquote ("  hello  "),       "hello");
-   Check_Str ("CUQ-4 single-quoted",  CSV_Unquote ("'world'"),         "world");
+   Check ("CUQ-1 double-quoted",  CSV_Unquote ("""hello"""),       "hello");
+   Check ("CUQ-2 doubled-quote",  CSV_Unquote ("""he""""llo"""),   "he""llo");
+   Check ("CUQ-3 untrimmed",      CSV_Unquote ("  hello  "),       "hello");
+   Check ("CUQ-4 single-quoted",  CSV_Unquote ("'world'"),         "world");
 
    --  ── Split_Indices ─────────────────────────────────────────────────────
    FA := Split_Indices ("a,b,c", ",", N);
-   Check_Nat ("SI-1-count",  N,        3);
-   Check_Nat ("SI-1-f1.S",   FA(1).S,  1);
-   Check_Nat ("SI-1-f1.E",   FA(1).E,  1);
-   Check_Nat ("SI-1-f2.S",   FA(2).S,  3);
-   Check_Nat ("SI-1-f2.E",   FA(2).E,  3);
-   Check_Nat ("SI-1-f3.S",   FA(3).S,  5);
-   Check_Nat ("SI-1-f3.E",   FA(3).E,  5);
+   Check ("SI-1-count",  N,        3);
+   Check ("SI-1-f1.S",   FA(1).S,  1);
+   Check ("SI-1-f1.E",   FA(1).E,  1);
+   Check ("SI-1-f2.S",   FA(2).S,  3);
+   Check ("SI-1-f2.E",   FA(2).E,  3);
+   Check ("SI-1-f3.S",   FA(3).S,  5);
+   Check ("SI-1-f3.E",   FA(3).E,  5);
 
    FA := Split_Indices ("", ",", N);
-   Check_Nat ("SI-2 empty count", N, 0);
+   Check ("SI-2 empty count", N, 0);
 
    --  Input """a,b"",c""" is the Ada literal for the string: "a,b",c
    --  Positions: 1=" 2=a 3=, 4=b 5=" 6=, 7=c
    --  Field 1 = positions 1..5 (the quoted span); field 2 = position 7
    FA := Split_Indices ("""a,b"",c", ",", N);
-   Check_Nat ("SI-3 quoted count", N,       2);
-   Check_Nat ("SI-3 f1.S",         FA(1).S, 1);
-   Check_Nat ("SI-3 f1.E",         FA(1).E, 5);
-   Check_Nat ("SI-3 f2.S",         FA(2).S, 7);
-   Check_Nat ("SI-3 f2.E",         FA(2).E, 7);
+   Check ("SI-3 quoted count", N,       2);
+   Check ("SI-3 f1.S",         FA(1).S, 1);
+   Check ("SI-3 f1.E",         FA(1).E, 5);
+   Check ("SI-3 f2.S",         FA(2).S, 7);
+   Check ("SI-3 f2.E",         FA(2).E, 7);
 
    --  ── Summary ───────────────────────────────────────────────────────────
    New_Line;
