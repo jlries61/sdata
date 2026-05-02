@@ -16,6 +16,7 @@ with SData.Table;     use SData.Table;
 with SData.Values;    use SData.Values;
 with GNAT.Strings; use GNAT.Strings;
 with GNAT.OS_Lib;
+with SData.CSV;       use SData.CSV;
 with Zip;
 with UnZip;
 with Zip.Create;
@@ -218,14 +219,14 @@ package body SData.File_IO is
          declare
             Ext : constant String := File_Name (Ext_Idx + 1 .. File_Name'Last);
          begin
-            if Ext = "csv" then Actual_Fmt := CSV;
+            if Ext = "csv" then Actual_Fmt := SData.Config.CSV;
             elsif Ext = "ods" or Ext = "odf" then Actual_Fmt := ODF;
             elsif Ext = "xlsx" or Ext = "ooxml" then Actual_Fmt := OOXML; end if;
          end;
       end if;
 
       case Actual_Fmt is
-         when CSV =>
+         when SData.Config.CSV =>
             Parse_CSV (File_Name, Delimiter, Read_Header, Charset, Skip_Rows, Max_Rows, Nscan_Rows);
          when ODF =>
             Parse_ODF (File_Name, Sheet_Name, Skip_Rows, Max_Rows);
@@ -263,14 +264,14 @@ package body SData.File_IO is
          declare
             Ext : constant String := File_Name (Ext_Idx + 1 .. File_Name'Last);
          begin
-            if Ext = "csv" then Actual_Fmt := CSV;
+            if Ext = "csv" then Actual_Fmt := SData.Config.CSV;
             elsif Ext = "ods" or Ext = "odf" then Actual_Fmt := ODF;
             elsif Ext = "xlsx" or Ext = "ooxml" then Actual_Fmt := OOXML; end if;
          end;
       end if;
 
       case Actual_Fmt is
-         when CSV =>
+         when SData.Config.CSV =>
             Write_CSV (File_Name, Delimiter, Write_Header, Allow_Overwrite, Charset);
          when ODF =>
             Write_ODF (File_Name, Sname);
@@ -349,132 +350,10 @@ package body SData.File_IO is
       Line_Buf  : Line_Buf_Access := new Line_Buf_T;
       Line_Last : Natural := 0;
 
-      --  Fast decimal parser: handles integers and simple N.M decimals
-      --  without invoking the Ada runtime.  Scientific notation and other
-      --  edge cases fall through to Float'Value.
-      --  Returns True and sets Result for any valid floating-point value.
-      --  Returns False only if the string cannot represent a number.
-      function Try_Fast_Float (S : String; Result : out Float) return Boolean is
-         I         : Integer := S'First;
-         Whole     : Float   := 0.0;
-         Frac      : Float   := 0.0;
-         Denom     : Float   := 1.0;
-         Sign      : Float   := 1.0;
-         After_Dot : Boolean := False;
-         Has_Digit : Boolean := False;
-      begin
-         if I > S'Last then return False; end if;
-         if    S (I) = '-' then Sign := -1.0; I := I + 1;
-         elsif S (I) = '+' then               I := I + 1;
-         end if;
-         while I <= S'Last loop
-            case S (I) is
-               when '0' .. '9' =>
-                  Has_Digit := True;
-                  if After_Dot then
-                     Denom := Denom * 10.0;
-                     Frac  := Frac + Float (Character'Pos (S (I)) - 48) / Denom;
-                  else
-                     Whole := Whole * 10.0 + Float (Character'Pos (S (I)) - 48);
-                  end if;
-               when '.' =>
-                  if After_Dot then return False; end if;
-                  After_Dot := True;
-               when 'E' | 'e' | 'D' | 'd' =>
-                  --  Scientific notation: fall back to Ada runtime.
-                  begin
-                     Result := Float'Value (S);
-                     return True;
-                  exception
-                     when others => return False;
-                  end;
-               when others => return False;
-            end case;
-            I := I + 1;
-         end loop;
-         if not Has_Digit then return False; end if;
-         Result := Sign * (Whole + Frac);
-         return True;
-      end Try_Fast_Float;
-
-      --  Scan forward from Pos, honouring quote-enclosed fields.
-      --  Returns the position of the first byte of the delimiter that ends the
-      --  field, or 0 if no delimiter was found (final field).  Supports
-      --  multi-character delimiters.  Quoted fields follow the spec: same-type
-      --  doubled quotes are treated as a literal quote; the opposite quote type
-      --  is taken literally inside a quoted field.
-      DLen : constant Positive :=
-         (if Delimiter'Length > 0 then Delimiter'Length else 1);
-
-      function At_Delimiter (Line : String; Pos : Positive) return Boolean is
-      begin
-         if Pos + DLen - 1 > Line'Last then return False; end if;
-         if DLen = 1 then return Line (Pos) = Delimiter (Delimiter'First); end if;
-         return Line (Pos .. Pos + DLen - 1) = Delimiter;
-      end At_Delimiter;
-
-      function CSV_Field_End (Line : String; From : Positive) return Natural is
-         I : Positive := From;
-         Q : Character;
-      begin
-         if I > Line'Last then return 0; end if;
-         if Line (I) = '"' or else Line (I) = ''' then
-            Q := Line (I);
-            I := I + 1;
-            while I <= Line'Last loop
-               if Line (I) = Q then
-                  if I < Line'Last and then Line (I + 1) = Q then
-                     I := I + 2;   --  doubled quote → literal
-                  else
-                     I := I + 1;   --  closing quote
-                     exit;
-                  end if;
-               else
-                  I := I + 1;
-               end if;
-            end loop;
-            --  After the closing quote, the next chars must be the delimiter.
-            if At_Delimiter (Line, I) then return I; end if;
-            return 0;
-         else
-            for K in From .. Line'Last loop
-               if At_Delimiter (Line, K) then return K; end if;
-            end loop;
-            return 0;
-         end if;
-      end CSV_Field_End;
-
-      --  Extract the unquoted, unescaped value from a raw CSV field slice.
-      --  For quoted fields: strips surrounding quotes and collapses doubled
-      --  same-type quotes.  For unquoted fields: returns Trim(Raw).
-      function CSV_Unquote (Raw : String) return String is
-         T : constant String := Trim (Raw, Ada.Strings.Both);
-         Q : Character;
-         R : Unbounded_String;
-         I : Positive;
-      begin
-         if T'Length >= 2
-            and then (T (T'First) = '"' or else T (T'First) = ''')
-            and then T (T'Last) = T (T'First)
-         then
-            Q := T (T'First);
-            I := T'First + 1;
-            while I <= T'Last - 1 loop
-               if T (I) = Q and then I < T'Last - 1 and then T (I + 1) = Q then
-                  Append (R, Q);
-                  I := I + 2;
-               else
-                  Append (R, T (I));
-                  I := I + 1;
-               end if;
-            end loop;
-            return To_String (R);
-         end if;
-         return T;
-      end CSV_Unquote;
-
       --  Process one CSV line with RFC-4180-style quote handling.
       procedure Process_Line_Direct (Line : String; Names : String_List) is
+         DLen        : constant Positive :=
+            (if Delimiter'Length > 0 then Delimiter'Length else 1);
          Start       : Integer := Line'First;
          Field_Count : Natural := 0;
       begin
@@ -483,7 +362,7 @@ package body SData.File_IO is
          Add_Row;
          loop
             declare
-               Delim_Pos : constant Natural := CSV_Field_End (Line, Start);
+               Delim_Pos : constant Natural := CSV_Field_End (Line, Start, Delimiter);
                Val       : Value;
                Num       : Float;
             begin
@@ -512,46 +391,6 @@ package body SData.File_IO is
          end loop;
       end Process_Line_Direct;
 
-      --  Determine whether a field string is numeric (for NSCAN type detection).
-      function Is_Numeric_Field (F : String) return Boolean is
-         Dummy : Float;
-      begin
-         return Try_Fast_Float (F, Dummy);
-      end Is_Numeric_Field;
-
-      --  Parse a CSV line into up to Max_Fields field slices stored as
-      --  (start, end) index pairs into the Line string.  Used only during
-      --  the NSCAN type-detection phase (at most 20 rows).
-      Max_Fields : constant := 65536;
-      type Field_Pair is record S, E : Natural; end record;
-      type Field_Array is array (1 .. Max_Fields) of Field_Pair;
-
-      function Split_Indices (Line : String; N_Fields : out Natural)
-         return Field_Array
-      is
-         Res   : Field_Array;
-         Start : Integer := Line'First;
-         Count : Natural := 0;
-      begin
-         N_Fields := 0;
-         if Line'Length = 0 then return Res; end if;
-         loop
-            declare
-               Delim : constant Natural := CSV_Field_End (Line, Start);
-            begin
-               Count := Count + 1;
-               if Count <= Max_Fields then
-                  Res (Count).S := Start;
-                  Res (Count).E := (if Delim > 0 then Delim - 1 else Line'Last);
-               end if;
-               exit when Delim = 0;
-               Start := Delim + DLen;
-            end;
-         end loop;
-         N_Fields := Count;
-         return Res;
-      end Split_Indices;
-
       Has_File_Header : Boolean := False;
       Max_NSCAN   : constant := 1000;
       NSCAN       : constant Natural :=
@@ -569,7 +408,7 @@ package body SData.File_IO is
           Names_From_Header : Boolean)
       is
          N_Hdr : Natural;
-         H_Idx : constant Field_Array := Split_Indices (H_Str, N_Hdr);
+         H_Idx : constant Field_Array := Split_Indices (H_Str, Delimiter, N_Hdr);
          Names : String_List (1 .. N_Hdr);
          Col_Determined : array (1 .. N_Hdr) of Boolean     := (others => False);
          Col_Types      : array (1 .. N_Hdr) of Column_Type := (others => Col_Numeric);
@@ -594,7 +433,7 @@ package body SData.File_IO is
             declare
                D_Str : constant String := To_String (Scan_Lines (R));
                N_Fld : Natural;
-               D_Idx : constant Field_Array := Split_Indices (D_Str, N_Fld);
+               D_Idx : constant Field_Array := Split_Indices (D_Str, Delimiter, N_Fld);
             begin
                for I in 1 .. N_Hdr loop
                   if not Col_Determined (I) and then I <= N_Fld then
