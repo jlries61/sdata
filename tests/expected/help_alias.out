@@ -1,0 +1,29 @@
+Statistical distribution functions follow a uniform naming convention.
+
+Function suffix meanings:
+  DF   Probability density function (PDF) or probability mass (PMF)
+  CF   Cumulative distribution function: P(X <= x)
+  IF   Inverse CDF (quantile): value x such that P(X <= x) = p  (0 < p < 1)
+  RN   Generate a random variate from the distribution
+
+Common argument names:
+  x      Continuous variate value
+  k      Discrete variate value (non-negative integer)
+  p      Probability for inverse CDF  (0 < p < 1)
+
+Distribution prefixes:
+  Z  Standard Normal (fixed mu=0, sigma=1)
+  N  Normal with parameters mu, sigma
+  U  Uniform on [lo, hi]
+  E  Exponential with rate parameter
+  B  Beta  (shape parameters a, b)
+  P  Poisson  (mean lambda)
+  G  Gamma  (shape, rate)
+  X  Chi-square  (df degrees of freedom)
+  T  Student's t  (df degrees of freedom)
+  F  F distribution  (df1, df2 degrees of freedom)
+  M  Binomial  (n trials, prob success probability)
+  W  Weibull  (scale, shape)
+  L  Laplace / double-exponential  (loc, scale)
+
+Use HELP <prefix>DF for full details on each family.

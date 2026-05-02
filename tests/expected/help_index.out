@@ -1,0 +1,42 @@
+SData version 0.6.6
+Available Commands:
+  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, DISPLAY
+  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME
+  Arrays:      ARRAY, DIM
+  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK
+  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, REPEAT
+  Output:      PRINT, OUTPUT, ECHO, DIGITS
+  Files/paths: FPATH
+  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END
+  Debugger:    BREAK, BREAK WHEN  (see also: HELP DEBUGGER for --debug mode)
+
+Available Functions:
+  Math:        ABS, SQRT/SQR, LOG/LN/LOGE, LOG2, LOG10/CLG/LGT, EXP,
+               ROUND, CEIL, FLOOR, INT, FIX/IP, FP/FRAC, MOD, SGN,
+               TRUNCATE, PI, LTW
+  Trig (rad):  SIN, COS, TAN, ATN/ARCTAN, ATAN2, ARCSIN, ARCCOS,
+               COT, CSC, SEC, SINH/HSN, COSH/HCS, TANH/HTN, DEG/DEGREE,
+               RAD/RADIAN
+  Trig (deg):  SIND, COSD, TAND, ATND, ATAN2D
+  String:      LEN, LEFT$, RIGHT$, MID$, SEG$, TRIM$, LTRIM$, RTRIM$,
+               UCASE$/UPPER$, LCASE$/LOWER$, POS, INSTR, INDEX, MATCH,
+               CHR$, ASCII/ASC, STR$, VAL, NUM$, MAXLEN
+  Conversion:  NUM, HEX, HEX$, OCT$, BIN$
+  Arrays:      LBOUND, UBOUND
+  Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, NEXT, NEXTC$, OBS, OBSC$
+  Special:     MISSING, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,
+               FALSE, TRUE, ERR, ERL,
+               MAXINT, MININT, MAXNUM, MINNUM, MAXLVL
+  Aggregate:   SUM, MEAN, GMEAN, HMEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS
+  Stat PDF:    ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF,
+               MDF, WDF, LDF
+  Stat CDF:    ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF,
+               MCF, WCF, LCF
+  Stat IDF:    ZIF, NIF, UIF, EIF, BIF, GIF, XIF, TIF, FIF, WIF,
+               LIF, PIF
+  Stat RN:     ZRN, NRN, URN, ERN, PRN, GRN, MRN, XRN, TRN,
+               FRN, WRN, LRN, RAN, RANDOM
+  (Use HELP DISTRIBUTIONS for an overview of naming conventions.)
+
+Use HELP <name> for details.  Use HELP /ALL for the full reference.
+Use HELP EXECUTION for an explanation of the three execution tiers.

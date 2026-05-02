@@ -1,0 +1,19 @@
+Command: USE [MOCK | "filename[sheet]"] [/FMT=format] [/NSCAN=n]
+Loads a dataset from CSV, ODF, or OOXML files into the Data Table.
+USE MOCK generates synthetic test data.
+Sheet selection (ODF/OOXML only):
+  Append the sheet name in brackets inside the filename string.
+  The name is case-sensitive and must match the tab label exactly.
+  If omitted or not found, the first sheet is used.
+  Example:  USE "sales.xlsx[Q2]"
+Options:
+  /FMT=format  Specifies the file format (CSV, ODF, OOXML).
+               Default is auto-detected from file extension.
+  /NSCAN=n     Number of rows to scan for type detection (default: 20).
+Formula cells (ODF/OOXML):
+  sdata has no built-in formula evaluator.
+  If LibreOffice (soffice) is on PATH, it is invoked to recalculate
+  formulas before import.  Otherwise cached values from the last save
+  are used -- correct for normally-saved files, but potentially stale
+  for volatile functions (TODAY, NOW, RAND) or manual-recalc files.
+Execution: Immediate -- loads the dataset at once.

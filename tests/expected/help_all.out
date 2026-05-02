@@ -1,0 +1,712 @@
+=== COMMAND REFERENCE ===
+Command: USE [MOCK | "filename[sheet]"] [/FMT=format] [/NSCAN=n]
+Loads a dataset from CSV, ODF, or OOXML files into the Data Table.
+USE MOCK generates synthetic test data.
+Sheet selection (ODF/OOXML only):
+  Append the sheet name in brackets inside the filename string.
+  The name is case-sensitive and must match the tab label exactly.
+  If omitted or not found, the first sheet is used.
+  Example:  USE "sales.xlsx[Q2]"
+Options:
+  /FMT=format  Specifies the file format (CSV, ODF, OOXML).
+               Default is auto-detected from file extension.
+  /NSCAN=n     Number of rows to scan for type detection (default: 20).
+Formula cells (ODF/OOXML):
+  sdata has no built-in formula evaluator.
+  If LibreOffice (soffice) is on PATH, it is invoked to recalculate
+  formulas before import.  Otherwise cached values from the last save
+  are used -- correct for normally-saved files, but potentially stale
+  for volatile functions (TODAY, NOW, RAND) or manual-recalc files.
+Execution: Immediate -- loads the dataset at once.
+
+Command: SAVE "filename[sheet]" [/FMT=format] [/HEADER=YES|NO]
+Queues the current Data Table to be saved after the next RUN command.
+Sheet selection (ODF/OOXML only):
+  Append the sheet name in brackets inside the filename string.
+  Default sheet name: "Sheet1".
+  Example:  SAVE "results.xlsx[Summary]"
+Options:
+  /FMT=format  Specifies the output format (CSV, ODF, OOXML).
+               Default is auto-detected from file extension.
+  /HEADER=val  Whether to write a header row (YES or NO). Default: YES.
+Execution: Declarative -- the file is written at the end of the next RUN.
+
+Command: WRITE
+Explicitly writes the current PDV record to the output table.
+Suppresses the automatic end-of-step write for that record.
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: SUBMIT "filename"
+Executes commands from an external script file. Default extension: .CMD.
+Provides cycle detection to prevent recursive submission.
+Execution: Immediate -- the script is run at once.
+
+Command: SYSTEM "command"
+Executes an external shell command. Disabled by --noshell.
+Uses /bin/sh on POSIX systems to avoid profile script side-effects.
+Execution: Immediate -- the shell command is launched at once.
+
+Command: PRINT [expr [[,] | [;] expr] ...]
+Outputs values to the console, separated by spaces.
+No arguments: Prints all permanent variables for the current record.
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: RUN
+Triggers the execution of the Data Step and any deferred SAVE operations.
+Execution: Immediate -- triggers the data step at once.
+
+Command: LET variable = expression
+Creates a permanent column in the table or updates an existing one.
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: SET variable = expression
+Creates a temporary variable that persists only during the Data Step.
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: UNSET variable(s)
+Removes one or more session variables from memory.
+Execution: Immediate -- takes effect at once.
+
+Command: ARRAY array_name variable(s)
+Creates a virtual array providing indexed access to existing variables.
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: DIM <arrayname> (<lower> [TO <upper>]) [/TEMP]
+Creates a permanent or temporary array (real variables).
+Elements are initialized to missing. /TEMP makes it temporary.
+A DIM statement that references an existing variable or array shall fail.
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: BY variable(s)  |  BY
+Groups data by the named variables for the next RUN.
+Sets BOG/EOG indicators and makes BY-group boundaries visible to
+LAG, NEXT, and BOG/EOG functions.
+Bare BY (no variables) cancels the active grouping.
+Execution: Declarative -- grouping is active for all subsequent RUNs.
+
+Command: SORT variable(s)
+Reorders the Data Table based on the specified variables.
+Execution: Immediate -- re-orders the table at once.
+
+Command: NEW
+Clears the Data Table, all variables, and the queued program.
+Also resets the active SELECT record filter and BY grouping.
+Execution: Immediate -- takes effect at once.
+
+Command: LIST
+Execution: Immediate
+Displays the numbered contents of the program buffer (deferred statements
+queued for the next RUN).  If the buffer is empty, reports that fact.
+See also: DISPLAY to show Data Table records.
+          DELETE n[-m] to remove program buffer entries.
+
+Command: DISPLAY [variable(s)]
+Execution: Immediate
+Displays the current Data Table as a formatted table.
+  DISPLAY         -- show all columns.
+  DISPLAY varlist -- show only the named columns.
+Respects any active SELECT filter (only visible records are shown).
+Column ranges are supported:  DISPLAY A-Z
+
+Command: NAMES
+Lists currently defined permanent and temporary variables.
+Execution: Immediate -- takes effect at once.
+
+Command: DELETE
+Two forms:
+  DELETE           Discard the current record; no output is produced for it.
+                   Execution: Deferred -- executed per record in the data step.
+  DELETE n[-m]     Remove program buffer entries n through m (1-based).
+                   A single number removes one entry; n-m removes a range.
+                   Execution: Immediate -- takes effect at once.
+                   Only meaningful in interactive (REPL) mode.
+
+Command: BREAK  |  BREAK WHEN <boolean-expr>
+Pauses execution and enters the debug inspection prompt.
+Valid only inside a data step (deferred context); ignored in immediate mode.
+BREAK always pauses. BREAK WHEN <expr> pauses only when the condition is true.
+Examples:
+  BREAK                   -- pause on every record
+  BREAK WHEN RECNO() = 5  -- pause on record 5 only
+  BREAK WHEN SALARY > 100000
+
+When paused, the inspection prompt accepts:
+  PRINT <expr>   Evaluate and display any SData expression
+  RECORD N       Load record N into the inspection view
+  RECORD +N      Advance N records from current inspection position
+  RECORD -N      Go back N records from current inspection position
+  CONTINUE / C   Resume execution from the paused point
+  STEP / S       Resume to the next record, then pause again
+  RUN            Resume to completion with no further automatic pausing
+
+In non-interactive mode (stdin not a TTY), BREAK emits a trace line to
+stderr and continues automatically without waiting for input.
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: HOLD [variable(s)]
+Retains the listed permanent variables across records.
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: UNHOLD [variable(s)]
+Cancels a previous HOLD. No args = unhold all.
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: KEEP variable(s)
+Drops all permanent variables NOT listed after the next RUN.
+Execution: Declarative -- columns are removed at the end of the next RUN.
+
+Command: DROP variable(s)
+Drops the listed permanent variables after the next RUN.
+Execution: Declarative -- columns are removed at the end of the next RUN.
+
+Command: RENAME old=new [, old=new ...]
+Renames columns in the Data Table.
+Execution: Immediate -- takes effect at once.
+
+Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]
+Conditional execution. Supports single-line and multi-line block forms.
+Example:
+  IF AGE < 18 THEN
+    LET STATUS$ = "MINOR"
+  ELSEIF AGE < 65 THEN
+    LET STATUS$ = "ADULT"
+  ELSE
+    LET STATUS$ = "SENIOR"
+  END IF
+
+Also usable as a function: IF(condition, true_value, false_value)
+Returns true_value when condition is non-zero/non-empty, else false_value.
+Example: LET STATUS$ = IF(AGE < 18, "MINOR", "ADULT")
+Execution: Deferred -- executed once per record inside the data step.
+
+-- Record filter form ----------------------------------------
+Command: SELECT expression  |  SELECT /ALL
+Activates a virtual record filter for subsequent RUNs.
+Only records for which <expression> is true are visible;
+RECNO, BOF, EOF, BOG, EOG, LAG, and NEXT all operate within
+the filtered (logical) view.  The filter is rebuilt automatically
+at the start of every RUN against the current table.
+SELECT /ALL cancels the active filter and restores all records.
+The filter persists until SELECT /ALL or NEW is executed.
+Example:
+  select score > 70   -- keep only high scorers
+  run
+  select /all         -- cancel filter
+Execution: Declarative -- filter is active for all subsequent RUNs.
+
+-- Multi-way branch form --------------------------------------
+Command: SELECT [expression]
+  CASE value : statement
+  WHEN condition : statement
+  OTHERWISE : statement
+END SELECT
+Example:
+  SELECT GRADE$
+    CASE "A" : PRINT "EXCELLENT"
+    CASE "B" : PRINT "GOOD"
+    OTHERWISE : PRINT "SEE ME"
+  END SELECT
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: FOR var = start TO end [STEP s] ... NEXT
+Counter-controlled loop.
+Example:
+  FOR I = 1 TO 10 STEP 2
+    PRINT I
+  NEXT I
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: WHILE condition ... WEND
+Condition-controlled loop; executes while condition is true.
+Example:
+  SET I = 1
+  WHILE I <= 10
+    PRINT I
+    SET I = I + 1
+  WEND
+Execution: Deferred -- executed once per record inside the data step.
+
+Command (data step): REPEAT n  (creates n records)
+Execution: Declarative -- the n-record mode is active for the next RUN.
+
+Command (loop): REPEAT ... UNTIL condition
+Post-test loop; always executes the body at least once.
+Example:
+  SET I = 1
+  REPEAT
+    PRINT I
+    SET I = I + 1
+  UNTIL I > 10
+Execution: Deferred -- executed once per record inside the data step.
+
+Command: OUTPUT ["filename"] [/CHARSET=...] [/FMT=...]
+Redirects all console output to a file (written to file AND stdout).
+No arguments: Closes the current output file.
+Options:
+  /CHARSET=cs  Specifies the character set (e.g., UTF-8, ASCII).
+  /FMT=format  Specifies the file format (e.g., CSV, ODF).
+Execution: Immediate -- takes effect at once.
+
+Command: ECHO ON | OFF
+Enables or disables writing console output to stdout.
+Execution: Immediate -- takes effect at once.
+
+Command: DIGITS n
+Sets decimal places for floating-point output (default 5).
+Execution: Immediate -- takes effect at once.
+
+Command: FPATH [path] [/ USE | SAVE | SUBMIT | OUTPUT]
+Sets the default directory for the specified command(s).
+Execution: Declarative -- applies to all subsequent file commands.
+
+Command: RSEED n
+Seeds the random number generator with integer n.
+Execution: Immediate -- takes effect at once.
+
+Command: HELP [topic | /ALL]
+Displays help. HELP /ALL prints the full reference.
+Execution: Immediate -- takes effect at once.
+
+Command: QUIT | END
+Exits the interpreter.
+Execution: Immediate -- exits at once.
+
+Command: OPTIONS key value
+Sets a runtime option. Execution: Immediate -- takes effect at once.
+
+  OPTIONS MAXINTAB n         : Max rows in Data Table (0 = unlimited)
+  OPTIONS MAXTEMPMEM n       : Max temporary variables (0 = unlimited)
+  OPTIONS CSVDLM ","|"\t"|";"|"|"  : CSV field delimiter (default: comma)
+  OPTIONS HEADER YES|NO      : CSV files have a header row (default: YES)
+  OPTIONS SAVEOVERWRT YES|NO : Overwrite existing files on SAVE (default: YES)
+  OPTIONS TXTFMT AUTO|LF|CRLF|CR  : Line ending for CSV output (default: AUTO)
+  OPTIONS CHARSET name       : Character set label (stored, advisory only)
+
+CLI flags (set at startup, not runtime):
+  --noshell            : Disable SYSTEM/SHELL; also disables -p
+  --ignore-math-errors : Domain errors return MISSING
+  --clen <n>           : Set max character variable length
+  -m <n>               : Set max in-memory table rows
+  -t <n>               : Set max temporary variables
+  -k                   : Continue execution after statement error
+  -p <pager>           : External pager for interactive output
+  -q                   : Quiet mode (suppress console output)
+  -o <file>            : Redirect console output to file
+  -u <fmt>             : Default input format (CSV/ODF/OOXML)
+  -s <fmt>             : Default output format (CSV/ODF/OOXML)
+
+Execution Tiers
+sdata commands fall into three execution tiers:
+
+  Declarative -- configure state for the next RUN.
+    These commands take effect immediately but their primary
+    action occurs when RUN is executed.
+    Commands: USE, SAVE, BY, SELECT (filter), SELECT /ALL,
+              REPEAT n, KEEP, DROP, FPATH
+
+  Immediate -- execute at once, outside any data step.
+    Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET, RENAME,
+              SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,
+              DELETE n[-m], QUIT, END
+
+  Deferred -- queued between RUN markers; executed once per
+    record during the data step.
+    Commands: LET, SET, PRINT, IF, FOR, WHILE, REPEAT/UNTIL,
+              SELECT/CASE, DELETE, WRITE, HOLD, UNHOLD,
+              ARRAY, DIM, BREAK
+
+Note: SELECT has two forms with different tiers:
+  SELECT <expr> / SELECT /ALL  -- Declarative (row filter)
+  SELECT CASE ... END SELECT   -- Deferred (multi-way branch)
+
+The HELP entry for each command includes an "Execution:" line
+identifying which tier it belongs to.
+
+Debug mode: --debug flag
+Enables passive trace output to stderr and interactive step mode.
+
+Passive trace events emitted to stderr:
+  [debug] -- record N (physical N)
+  [debug] LET X = 5.00000         each scalar or array assignment
+  [debug] IF -> TRUE / FALSE       each IF condition outcome
+  [debug] ELSE -> taken            ELSE branch entered
+  [debug] SELECT -> KEPT/DROPPED   per-record filter result
+  [debug] SELECT -> N of M records kept   summary after filtering
+  [debug] FOR I = 3                each FOR iteration
+  [debug] DELETE: record marked
+  [debug] RUN complete: N records, M variables
+  [debug] USE: opened file.csv (N records, M variables)
+  [debug] SUBMIT: entering script.sdata
+
+Step mode (--debug + interactive stdin):
+  After each record header, execution pauses at the inspection prompt.
+  CONTINUE/C processes the current record and advances to the next record.
+  STEP/S is equivalent to CONTINUE in step mode.
+  RUN at the prompt disables step mode and runs to completion.
+
+The inspection prompt ([debug:record N]>) accepts the same commands as
+BREAK: PRINT, RECORD, CONTINUE, STEP, RUN.  Record navigation at the
+prompt does not affect which record is processed when execution resumes.
+
+See also: HELP BREAK for the BREAK / BREAK WHEN deferred statement.
+
+=== FUNCTION REFERENCE ===
+Function: ABS(x)  ->  |x|
+
+Function: SQRT(x) / SQR(x)  ->  square root of x (x >= 0)
+
+Function: SGN(x)  ->  sign of x: -1, 0, or 1
+
+Function: LOG(x)  ->  natural logarithm (x > 0)
+
+Function: LOG10(x)  ->  base-10 logarithm (x > 0)
+
+Function: EXP(x)  ->  e raised to the power x
+
+Function: ROUND(x [, n])  ->  x rounded to n decimal places (default 0)
+
+Function: CEIL(x)  ->  smallest integer >= x
+
+Function: FLOOR(x)  ->  largest integer <= x
+
+Function: INT(x)  ->  largest integer <= x (floor; rounds toward -infinity)
+
+Function: FIX(x) / IP(x)  ->  integer part, truncated toward zero
+
+Function: FP(x)  ->  fractional part: x - FIX(x)
+
+Function: LN(x) / LOGE(x)  ->  natural logarithm (aliases for LOG; x > 0)
+
+Function: LOG2(x)  ->  base-2 logarithm (x > 0)
+
+Function: CLG(x) / LGT(x)  ->  common (base-10) logarithm (aliases for LOG10; x > 0)
+
+Function: MOD(x, y)  ->  x mod y (floor division remainder)
+
+Function: SIN(x)  ->  sine of x (radians)
+
+Function: COS(x)  ->  cosine of x (radians)
+
+Function: TAN(x)  ->  tangent of x (radians)
+
+Function: ATN(x)  ->  arctangent of x (radians)
+
+Function: ATAN2(y, x)  ->  arctangent of y/x (radians)
+
+Function: ARCSIN(x)  ->  arcsine of x in radians (-1 <= x <= 1)
+
+Function: ARCCOS(x)  ->  arccosine of x in radians (-1 <= x <= 1)
+
+Function: ARCTAN(x) / ATN(x)  ->  arctangent of x in radians
+
+Function: COT(x)  ->  cotangent of x (radians); cos(x)/sin(x)
+
+Function: CSC(x)  ->  cosecant of x (radians); 1/sin(x)
+
+Function: SEC(x)  ->  secant of x (radians); 1/cos(x)
+
+Function: SINH(x) / HSN(x)  ->  hyperbolic sine
+
+Function: COSH(x) / HCS(x)  ->  hyperbolic cosine
+
+Function: TANH(x) / HTN(x)  ->  hyperbolic tangent
+
+Function: DEG(x) / DEGREE(x)  ->  convert x from radians to degrees
+
+Function: SIND(x)    ->  sine of x (degrees)
+
+Function: COSD(x)    ->  cosine of x (degrees)
+
+Function: TAND(x)    ->  tangent of x (degrees)
+
+Function: ATND(x)    ->  arctangent of x (degrees)
+
+Function: ATAN2D(y,x) ->  arctangent of y/x (degrees)
+
+Function: LEN(s$)  ->  length of string s$
+
+Function: LEFT$(s$, n)  ->  leftmost n characters
+
+Function: RIGHT$(s$, n)  ->  rightmost n characters
+
+Function: MID$(s$, start [, len])  ->  substring
+
+Function: SEG$(s$, start, len)  ->  substring (start 0=1; len > 0 required)
+
+Function: TRIM$(s$)  ->  strip leading and trailing spaces
+
+Function: LTRIM$(s$)  ->  strip leading spaces
+
+Function: RTRIM$(s$)  ->  strip trailing spaces
+
+Function: UCASE$(s$) / UPPER$(s$)  ->  convert to upper case
+
+Function: LCASE$(s$) / LOWER$(s$)  ->  convert to lower case
+
+Function: POS(needle$, haystack$)  ->  1-based position, 0=not found
+
+Function: INSTR(haystack$, needle$)  ->  1-based position, 0=not found (BW BASIC argument order)
+
+Function: CHR$(n)  ->  character with ASCII code n
+
+Function: ASCII(s$) / ASC(s$)  ->  ASCII code of first character of s$
+
+Function: STR$(x)  ->  numeric x formatted as string
+
+Function: VAL(s$)  ->  parse string s$ as a number
+
+Function: NUM$(x)  ->  numeric x formatted as string (alias for STR$)
+
+Function: NUM(x)  ->  convert string or integer x to float
+
+Function: HEX$(n)  ->  hexadecimal string for integer n
+
+Function: HEX(s$)  ->  integer value of hexadecimal string s$
+
+Function: OCT$(n)  ->  octal string for integer n
+
+Function: BIN$(n)  ->  binary string for integer n
+
+Function: RECNO()  ->  current logical record number (1-based)
+  When a SELECT filter is active, RECNO counts only visible records.
+
+Function: BOF()  ->  1 if this is the first visible record, else 0
+  Respects any active SELECT filter (logical first record).
+
+Function: EOF()  ->  1 if this is the last visible record, else 0
+  Respects any active SELECT filter (logical last record).
+
+Function: BOG()  ->  1 at the start of a BY group, else 0
+  Operates in logical space; filtered-out records are invisible.
+
+Function: EOG()  ->  1 at the end of a BY group, else 0
+  Operates in logical space; filtered-out records are invisible.
+
+Function: LAG("varname" [, n]) / LAGC$("varname" [, n])
+Returns the value of the named variable n records back (default n=1).
+Returns missing at the start of the dataset or at a BY-group boundary.
+When a SELECT filter is active, only visible (logical) records are counted;
+filtered-out rows are completely invisible to LAG.
+The variable name may be given unquoted: LAG(X) is equivalent to LAG("X").
+LAG returns a numeric value; LAGC$ returns a string value.
+
+Function: NEXT("varname" [, n]) / NEXTC$("varname" [, n])
+Returns the value of the named variable n records ahead (default n=1).
+Returns missing at the end of the dataset or at a BY-group boundary.
+When a SELECT filter is active, only visible (logical) records are counted;
+filtered-out rows are completely invisible to NEXT.
+The variable name may be given unquoted: NEXT(X) is equivalent to NEXT("X").
+NEXT returns a numeric value; NEXTC$ returns a string value.
+
+Function: OBS("varname", row) / OBSC$("varname", row)
+Returns the value of the named variable from the specified physical row.
+row: 1-based row index in the Data Table, counting all rows regardless of
+any active SELECT filter (i.e. OBS ignores the logical/filtered view).
+Returns missing if row < 1 or row > total row count.
+The variable name may be given unquoted: OBS(X, 3) is equivalent to OBS("X", 3).
+OBS returns a numeric value; OBSC$ returns a string value.
+
+Function: MISSING(x)  ->  1 if x is missing, else 0
+
+Function: RAN() / RANDOM() / RND()  ->  uniform random number in [0, 1)
+  Use RSEED n before calling to get a reproducible sequence.
+
+Function: DATE$()  ->  current date as "YYYY-MM-DD"
+
+Function: TIME$()  ->  current time as "HH:MM:SS"
+
+Function: SHELL("command")  ->  0 on success, 1 on failure
+  Disabled by --noshell flag.
+
+Function: FALSE  ->  0 (numeric false constant)
+
+Function: TRUE   ->  1 (numeric true constant)
+
+Function: ERR()  ->  last error code (0 = no error, 1 = error caught)
+  Set when an error is caught by -k (--continue-on-error).
+  Not set by --ignore-math-errors domain warnings.
+  Reset to 0 by the NEW command.
+
+Function: ERL()  ->  record number where the last caught error occurred
+  Returns 0 if no error has been caught in the current session.
+  Set alongside ERR() when -k catches a runtime error.
+  Reset to 0 by the NEW command.
+
+Function: SUM(v1 [, v2, ...])
+Returns the sum of non-missing values across the arguments.
+Missing values are skipped; SUM of all-missing arguments returns 0.
+Arguments may be individual values or array names (expanded automatically).
+
+Function: MEAN(v1 [, v2, ...])
+Returns the arithmetic mean of non-missing values across the arguments.
+Missing values are excluded; the divisor is the non-missing count.
+Arguments may be individual values or array names (expanded automatically).
+
+Function: GMEAN(v1 [, v2, ...])
+Returns the geometric mean of non-missing values across the arguments.
+Returns missing if any argument is <= 0 or all arguments are missing.
+Arguments may be individual values or array names (expanded automatically).
+
+Function: HMEAN(v1 [, v2, ...])
+Returns the harmonic mean of non-missing values across the arguments.
+Returns missing if any argument is zero or all arguments are missing.
+Arguments may be individual values or array names (expanded automatically).
+
+Function: STD(v1 [, v2, ...])
+Returns the sample standard deviation (n-1 denominator) of non-missing values.
+Returns missing when fewer than 2 non-missing values are supplied.
+Arguments may be individual values or array names (expanded automatically).
+
+Function: VAR(v1 [, v2, ...])
+Returns the sample variance (n-1 denominator) of non-missing values.
+Returns missing when fewer than 2 non-missing values are supplied.
+Arguments may be individual values or array names (expanded automatically).
+
+Function: MIN(v1 [, v2, ...])
+Returns the smallest non-missing value across the arguments.
+Returns missing if all arguments are missing.
+
+Function: MAX(v1 [, v2, ...])
+Returns the largest non-missing value across the arguments.
+Returns missing if all arguments are missing.
+
+Function: MEDIAN(v1 [, v2, ...])
+Returns the median of non-missing values across the arguments.
+Values are sorted internally; missing values are excluded.
+Returns missing if all arguments are missing.
+Arguments may be individual values or array names (expanded automatically).
+
+Function: N(v1 [, v2, ...])
+Returns the count of non-missing values across the supplied arguments.
+Arguments may be individual values or array names (expanded automatically).
+
+Function: NMISS(v1 [, v2, ...])
+Returns the count of missing values across the supplied arguments.
+Arguments may be individual values or array names (expanded automatically).
+
+Statistical distribution functions follow a uniform naming convention.
+
+Function suffix meanings:
+  DF   Probability density function (PDF) or probability mass (PMF)
+  CF   Cumulative distribution function: P(X <= x)
+  IF   Inverse CDF (quantile): value x such that P(X <= x) = p  (0 < p < 1)
+  RN   Generate a random variate from the distribution
+
+Common argument names:
+  x      Continuous variate value
+  k      Discrete variate value (non-negative integer)
+  p      Probability for inverse CDF  (0 < p < 1)
+
+Distribution prefixes:
+  Z  Standard Normal (fixed mu=0, sigma=1)
+  N  Normal with parameters mu, sigma
+  U  Uniform on [lo, hi]
+  E  Exponential with rate parameter
+  B  Beta  (shape parameters a, b)
+  P  Poisson  (mean lambda)
+  G  Gamma  (shape, rate)
+  X  Chi-square  (df degrees of freedom)
+  T  Student's t  (df degrees of freedom)
+  F  F distribution  (df1, df2 degrees of freedom)
+  M  Binomial  (n trials, prob success probability)
+  W  Weibull  (scale, shape)
+  L  Laplace / double-exponential  (loc, scale)
+
+Use HELP <prefix>DF for full details on each family.
+
+Normal distribution (mu and sigma are optional; default mu=0, sigma=1):
+  ZDF(x [, mu, sigma])   probability density at x
+  ZCF(x [, mu, sigma])   cumulative probability P(X <= x)
+  ZIF(p [, mu, sigma])   quantile: x such that P(X <= x) = p  (0 < p < 1)
+  ZRN([mu, sigma])       random variate
+See also: NDF/NCF/NIF/NRN (always require mu and sigma).
+
+Normal distribution:
+  NDF(x, mu, sigma)   probability density at x
+  NCF(x, mu, sigma)   cumulative probability P(X <= x)
+  NIF(p, mu, sigma)   quantile  (0 < p < 1)
+  NRN(mu, sigma)      random variate
+  mu: mean; sigma: standard deviation (sigma > 0)
+
+Uniform distribution on [lo, hi]:
+  UDF(x, lo, hi)   probability density (1/(hi-lo) for lo <= x <= hi)
+  UCF(x, lo, hi)   cumulative probability P(X <= x)
+  UIF(p, lo, hi)   quantile  (0 < p < 1)
+  URN(lo, hi)      random variate on [lo, hi]
+  URN()            random variate on [0, 1] (default bounds)
+  lo, hi: interval bounds (lo < hi)
+
+Exponential distribution:
+  EDF(x, rate)   probability density (rate*exp(-rate*x), x >= 0)
+  ECF(x, rate)   cumulative probability P(X <= x)
+  EIF(p, rate)   quantile  (0 < p < 1)
+  ERN(rate)      random variate
+  rate: rate parameter lambda (rate > 0); mean = 1/rate
+
+Beta distribution on [0, 1]:
+  BDF(x, a, b)   probability density
+  BCF(x, a, b)   cumulative probability P(X <= x)
+  BIF(p, a, b)   quantile  (0 < p < 1)
+  BRN(a, b)      random variate
+  a, b: shape parameters (both > 0)
+
+Poisson distribution (discrete):
+  PDF(k, lambda)   probability mass P(X = k)  (k non-negative integer)
+  PCF(k, lambda)   cumulative probability P(X <= k)
+  PIF(p, lambda)   quantile  (0 < p < 1)
+  PRN(lambda)      random variate
+  lambda: mean arrival rate (lambda > 0)
+
+Gamma distribution:
+  GDF(x, shape, rate)   probability density (x >= 0)
+  GCF(x, shape, rate)   cumulative probability P(X <= x)
+  GIF(p, shape, rate)   quantile  (0 < p < 1)
+  GRN(shape, rate)      random variate
+  shape: shape parameter k (> 0); rate: rate parameter (> 0)
+  mean = shape/rate;  variance = shape/rate^2
+
+Chi-square distribution:
+  XDF(x, df)   probability density (x >= 0)
+  XCF(x, df)   cumulative probability P(X <= x)
+  XIF(p, df)   quantile  (0 < p < 1)
+  XRN(df)      random variate
+  df: degrees of freedom (positive integer)
+  mean = df;  variance = 2*df
+
+Student's t distribution:
+  TDF(x, df)   probability density
+  TCF(x, df)   cumulative probability P(T <= x)
+  TIF(p, df)   quantile  (0 < p < 1)
+  TRN(df)      random variate
+  df: degrees of freedom (df > 0; need not be an integer)
+
+F distribution:
+  FDF(x, df1, df2)   probability density (x >= 0)
+  FCF(x, df1, df2)   cumulative probability P(F <= x)
+  FIF(p, df1, df2)   quantile  (0 < p < 1)
+  FRN(df1, df2)      random variate
+  df1: numerator degrees of freedom; df2: denominator degrees of freedom
+  (both > 0; need not be integers)
+
+Binomial distribution (discrete):
+  MDF(k, n, prob)   probability mass P(X = k)  (k = 0, 1, ..., n)
+  MCF(k, n, prob)   cumulative probability P(X <= k)
+  MIF(p, n, prob)   quantile  (0 < p < 1)
+  MRN(n, prob)      random variate
+  n: number of trials (positive integer)
+  prob: success probability per trial (0 <= prob <= 1)
+
+Weibull distribution:
+  WDF(x, scale, shape)   probability density (x >= 0)
+  WCF(x, scale, shape)   cumulative probability P(X <= x)
+  WIF(p, scale, shape)   quantile  (0 < p < 1)
+  WRN(scale, shape)      random variate
+  scale: scale parameter lambda (> 0); shape: shape parameter k (> 0)
+  Exponential is the special case shape = 1.
+
+Logistic distribution (standard, location=0, scale=1):
+  LDF(x)   probability density at x
+  LCF(x)   cumulative probability P(X <= x)
+  LIF(p)   quantile / inverse CDF  (0 < p < 1)
+  LRN      random variate
+
