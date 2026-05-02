@@ -1,7 +1,7 @@
 # SData — Software Standards Report
 
 **Version reviewed:** 0.6.5 | **Date:** 2026-04-30 | **Tests:** 96 passing
-**Annotation:** 2026-05-01 (v0.6.6, 99 cmd + 33 unit tests) — debug system implemented; `Parse_CSV` monolith resolved; see annotated sections below.
+**Annotation:** 2026-05-01/02 (v0.6.6, 99 cmd + 33 unit tests) — debug system implemented; `Parse_CSV` monolith resolved; CI workflow validated; see annotated sections below.
 
 ---
 
@@ -232,7 +232,7 @@ No hardcoded credentials, tokens, or passwords anywhere in the source. The only 
 | Package (macOS) | ✅ `make pkg` |
 | Version bump | ✅ `scripts/bump-version.sh` (atomic 9-file update) |
 | Rollback | ✅ Git history |
-| CI/CD | ❌ No automated CI (noted as deferred in `doc/CRITIQUE.md`) |
+| CI/CD | ✅ `.github/workflows/test.yml` — push + PR on `main`; `alr build` + binary existence guard + `make check` (33 unit + 99 cmd); ubuntu-latest **[v0.6.6]** |
 
 The `bump-version.sh` script is genuinely excellent — it validates format, detects old version strings, updates all locations atomically, and optionally builds, tests, commits, and tags. Most projects of this size don't have this.
 
@@ -261,9 +261,9 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | Maintainability | ~~80/100~~ **84/100** | Strong tests + new Ada unit tests; HELP and REPL gaps remain; debug resolved v0.6.6 |
 | Error Handling | 87/100 | Consistent strategy; good messages; LibreOffice fallback is exemplary |
 | Security | 84/100 | Safe shell invocation; appropriate permissiveness for tool type |
-| Operational Readiness | 74/100 | Build/package pipeline is excellent; observability is Text_IO only; ~~debug inert~~ debug resolved v0.6.6 |
+| Operational Readiness | ~~74/100~~ **80/100** | Build/package pipeline is excellent; CI live v0.6.6; observability is Text_IO only; debug resolved v0.6.6 |
 | Documentation | 86/100 | Strong across the board; missing CONTRIBUTING and ADRs |
-| **TOTAL** | ~~664~~ **673/800** | +9 from Code Quality and Maintainability improvements in v0.6.6 |
+| **TOTAL** | ~~664~~ **679/800** | +15 from Code Quality, Maintainability, and Operational Readiness improvements in v0.6.6 |
 
 ---
 
@@ -275,7 +275,7 @@ This is good software. Genuinely good — not "good for a one-person project," b
 
 ~~**The `--debug` flag is a lie to the user.**~~ **[Resolved v0.6.6]** `--debug` now delivers genuine observability: per-statement trace, per-record events, and an interactive `BREAK`/`BREAK WHEN` inspection REPL with step mode. The lie has been made true.
 
-**The codebase has no CI.** Every commit is validated by running `make check` by hand. This is sustainable for a single developer who is disciplined about it — and clearly this developer is — but it is one distracted afternoon away from a broken commit on `origin/main`. A GitHub Actions workflow running `alr build && make check` on push is a two-hour investment that eliminates an entire class of risk forever.
+~~**The codebase has no CI.**~~ **[Resolved v0.6.6]** `.github/workflows/test.yml` runs on every push and PR to `main`: `alr build` → binary existence guard → `make check` (33 unit + 99 cmd tests). The class of "broken commit lands on main undetected" risk is now closed.
 
 At 3 AM with a broken pipe in production? I'd trust this codebase. The error handling is solid, the fallbacks are real, and the test suite would have caught most regressions before they shipped. But I'd sleep better if `Parse_CSV` had been split apart three months ago.
 
