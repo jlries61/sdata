@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WiX source for the SData Windows installer.
+
+  Build with:
+    candle -nologo -arch x64 -dVersion=<x.y.z> -out wix/sdata.wixobj wix/sdata.wxs
+    light  -nologo -out sdata-<x.y.z>-x64.msi wix/sdata.wixobj
+
+  Or via the Makefile: make msi
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+  <Product Id="*"
+           Name="SData $(var.Version)"
+           Language="1033"
+           Version="$(var.Version)"
+           Manufacturer="John L. Ries"
+           UpgradeCode="e99c250d-858b-4f17-9b4f-f9f1bcea4c1c">
+
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Description="SData data command interpreter"
+             Manufacturer="John L. Ries" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of SData is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="ProductFeature" Title="SData" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="PathEnv" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLDIR" Name="sdata" />
+      </Directory>
+    </Directory>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLDIR">
+      <Component Id="SdataExe" Guid="*">
+        <File Id="SdataExe" Source="bin/sdata.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="LicenseFile" Guid="*">
+        <File Id="LicenseFile" Name="LICENSE.txt" Source="LICENSE" KeyPath="yes" />
+      </Component>
+      <Component Id="ReadmeFile" Guid="*">
+        <File Id="ReadmeFile" Source="README.md" KeyPath="yes" />
+      </Component>
+      <Component Id="ManHtml" Guid="*">
+        <File Id="ManHtml" Source="sdata.html" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!--
+      System PATH update. Stable GUID required because this Component has
+      no file KeyPath; MSI uses the GUID to track the registered PATH entry
+      across upgrades and uninstalls.
+    -->
+    <Component Id="PathEnv"
+               Directory="INSTALLDIR"
+               Guid="b3f3c3d2-5755-4f64-a260-2a83f82620e0">
+      <CreateFolder />
+      <Environment Id="UpdatePath"
+                   Name="PATH"
+                   Value="[INSTALLDIR]"
+                   Permanent="no"
+                   Part="last"
+                   Action="set"
+                   System="yes" />
+    </Component>
+
+  </Product>
+</Wix>

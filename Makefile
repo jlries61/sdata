@@ -37,7 +37,7 @@ MANDIR  = $(PREFIX)/share/man
 INSTALL_DIR  = $(DESTDIR)$(BINDIR)
 MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 
-.PHONY: all build clean run check install srpm pkg
+.PHONY: all build clean run check install srpm pkg msi
 
 all: build
 
@@ -198,6 +198,25 @@ install:
 	install -m 644 man/man1/sdata.1 $(MAN1_DIR)/sdata.1
 	gzip -9 -f $(MAN1_DIR)/sdata.1
 
+# Convert the Unix man page to a self-contained HTML file, used by
+# the Windows installer in place of the man page.
+sdata.html: man/man1/sdata.1
+	@command -v groff >/dev/null 2>&1 || { echo "Error: groff not found"; exit 1; }
+	groff -man -Thtml $< > $@
+
+# Build a Windows MSI installer using the WiX Toolset (v3).
+# Requires: bin/sdata.exe (run 'make' under MinGW/MSYS first), candle.exe,
+# light.exe, and groff on PATH. Produces sdata-$(VERSION)-x64.msi.
+msi: build sdata.html
+	@command -v candle >/dev/null 2>&1 || { echo "Error: candle not found (install WiX Toolset v3)"; exit 1; }
+	@command -v light  >/dev/null 2>&1 || { echo "Error: light not found (install WiX Toolset v3)"; exit 1; }
+	@test -x bin/sdata.exe || { echo "Error: bin/sdata.exe not found. Build under Windows first."; exit 1; }
+	@echo "Building MSI installer..."
+	candle -nologo -arch x64 -dVersion=$(VERSION) -out wix/sdata.wixobj wix/sdata.wxs
+	light  -nologo -out sdata-$(VERSION)-x64.msi wix/sdata.wixobj
+	@echo "MSI created: sdata-$(VERSION)-x64.msi"
+
 clean:
 	@echo "Cleaning build artifacts..."
-	rm -rf obj bin tests/*.tmp tests/*.diff sdata_opt_tab.csv sdata_opt_nohdr.csv
+	rm -rf obj bin tests/*.tmp tests/*.diff sdata_opt_tab.csv sdata_opt_nohdr.csv \
+	       sdata.html wix/*.wixobj *.wixpdb sdata-*-x64.msi
