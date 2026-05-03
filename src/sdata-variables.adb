@@ -516,8 +516,7 @@ package body SData.Variables is
                   raise Program_Error with "Cannot change temporary status of existing real array '" & Upper_Name & "'.";
                end if;
                
-               -- Resizing - For now, clear all old elements, then recreate new.
-               -- TODO: Optimize for expansion/contraction to preserve values
+               -- Drop orphaned columns (outside new range); kept columns and their data are preserved.
                for I in Existing_Def.Start_Index .. Existing_Def.End_Index loop
                   -- Delete variable from system if it was part of this real array
                   declare
