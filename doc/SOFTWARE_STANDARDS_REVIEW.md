@@ -114,7 +114,7 @@ Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every f
 
 | Metric | Value |
 |---|---|
-| Test count | ~~96~~ ~~99~~ ~~107~~ 108 cmd + 33 compiled Ada unit tests **[v0.6.6]** |
+| Test count | ~~96~~ ~~99~~ ~~107~~ ~~108~~ 110 cmd + 33 compiled Ada unit tests **[v0.6.6]** |
 | Test mechanism | File-based diff (`.cmd` → expected `.out`) + standalone `csv_unit_test` executable |
 | Execution time | <30 seconds total (10s per-test ceiling, most <1s) |
 | Flaky tests | None observed |
@@ -127,7 +127,7 @@ Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every f
 2. Interactive REPL — pager integration, multi-statement entry, signal handling: zero automated coverage.
 3. ~~`--debug` flag — defined in config, accepted by CLI, but never consulted in the interpreter. The flag does nothing.~~ **[Resolved v0.6.6]** `--debug` now emits per-statement and per-record trace to stderr; `BREAK`/`BREAK WHEN` deferred statements and interactive inspection REPL implemented. Tests: `debug_trace.cmd`, `break_basic.cmd`, `break_when.cmd`.
 4. BY group edge cases — empty groups, single-record groups, group key changes on first record.
-5. ~~Array resizing dangling-column bug — when `DIM A(1 TO 5)` is followed by `DIM A(1 TO 3)`, orphaned columns `A(4)` and `A(5)` were silently left in the table.~~ **[Resolved v0.6.6]** `Drop_Column` is now called for out-of-range columns in the resize loop; `dim_array_resize.cmd` regression test added. Remaining: the value-preservation optimization (`TODO` at `sdata-variables.adb:520`) — data in overlapping columns is already preserved by the current implementation; the TODO refers to a separate future enhancement.
+5. ~~Array resizing dangling-column bug — when `DIM A(1 TO 5)` is followed by `DIM A(1 TO 3)`, orphaned columns `A(4)` and `A(5)` were silently left in the table.~~ **[Resolved v0.6.6]** `Drop_Column` is now called for out-of-range columns in the resize loop; `dim_array_resize.cmd` (shrink), `dim_array_expand.cmd` (expand), and `dim_array_shift.cmd` (shift) cover all three resize scenarios. The stale TODO comment at `sdata-variables.adb:520` was removed — value preservation in the overlapping range already works correctly.
 
 **Test quality is high** — tests are behavioral (input script → expected output), not unit tests of implementation details. They survive refactoring. The `make check` harness is clean and produces an unambiguous pass/fail count.
 
@@ -151,9 +151,7 @@ Change blast radius is small and predictable. The parsing and execution pipeline
 | ~~HELP dispatcher untested~~ | ~~`sdata-help.adb`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
 | `CONTRIBUTING.md` missing | (project root) | 1 hour | Stable |
 | ~~Array resize dangling-column bug~~ | ~~`sdata-variables.adb:526-532`~~ | ~~1 hour~~ | **Resolved v0.6.6** |
-| Array resize value-preservation optimization | `sdata-variables.adb:520` | 3 hours | Stable |
-
-**Total remediation estimate: ~4 hours** (debug, Parse_CSV, HELP coverage, and DIM dangling-column bug resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
+**Total remediation estimate: ~1 hour** (debug, Parse_CSV, HELP coverage, DIM dangling-column bug, and array resize TODO resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
 
 ---
 
@@ -225,7 +223,7 @@ No hardcoded credentials, tokens, or passwords anywhere in the source. The only 
 | Capability | Status |
 |---|---|
 | Build | ✅ `make` / `alr build` |
-| Test | ✅ `make check` (~~96~~ ~~99~~ 108 cmd + 33 unit tests, <30s) **[v0.6.6]** |
+| Test | ✅ `make check` (~~96~~ ~~99~~ 110 cmd + 33 unit tests, <30s) **[v0.6.6]** |
 | Install | ✅ `make install` (binary + man page) |
 | Package (RPM) | ✅ `make srpm` |
 | Package (Debian) | ✅ `make dsc` |
@@ -233,7 +231,7 @@ No hardcoded credentials, tokens, or passwords anywhere in the source. The only 
 | Package (macOS) | ✅ `make pkg` |
 | Version bump | ✅ `scripts/bump-version.sh` (atomic 9-file update) |
 | Rollback | ✅ Git history |
-| CI/CD | ✅ `.github/workflows/test.yml` — push + PR on `main`; `alr build` + binary existence guard + `make check` (33 unit + 108 cmd); ubuntu-latest **[v0.6.6]** |
+| CI/CD | ✅ `.github/workflows/test.yml` — push + PR on `main`; `alr build` + binary existence guard + `make check` (33 unit + 110 cmd); ubuntu-latest **[v0.6.6]** |
 
 The `bump-version.sh` script is genuinely excellent — it validates format, detects old version strings, updates all locations atomically, and optionally builds, tests, commits, and tags. Most projects of this size don't have this.
 
@@ -259,12 +257,12 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | Architectural Integrity | 88/100 | Clean pipeline; minor Config split confusion |
 | Code Quality | ~~78/100~~ **83/100** | Good naming/comments; ~~`Parse_CSV` monolith is the outlier~~ Parse_CSV monolith resolved v0.6.6 |
 | Efficiency | 87/100 | No algorithmic flaws; `Column_Order` linear scan is latent |
-| Maintainability | ~~80/100~~ **87/100** | Strong tests + Ada unit tests + HELP coverage + DIM resize fix; REPL gap remains; debug resolved v0.6.6 |
+| Maintainability | ~~80/100~~ **88/100** | Strong tests + Ada unit tests + HELP coverage + all DIM resize scenarios covered; REPL gap remains; debug resolved v0.6.6 |
 | Error Handling | 87/100 | Consistent strategy; good messages; LibreOffice fallback is exemplary |
 | Security | 84/100 | Safe shell invocation; appropriate permissiveness for tool type |
 | Operational Readiness | ~~74/100~~ **80/100** | Build/package pipeline is excellent; CI live v0.6.6; observability is Text_IO only; debug resolved v0.6.6 |
 | Documentation | 86/100 | Strong across the board; missing CONTRIBUTING and ADRs |
-| **TOTAL** | ~~664~~ **682/800** | +18 from Code Quality, Maintainability, and Operational Readiness improvements in v0.6.6 |
+| **TOTAL** | ~~664~~ **683/800** | +19 from Code Quality, Maintainability, and Operational Readiness improvements in v0.6.6 |
 
 ---
 
