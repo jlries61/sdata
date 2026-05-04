@@ -204,16 +204,16 @@ sdata.html: man/man1/sdata.1
 	@command -v groff >/dev/null 2>&1 || { echo "Error: groff not found"; exit 1; }
 	groff -man -Thtml $< > $@
 
-# Build a Windows MSI installer using the WiX Toolset (v3).
-# Requires: bin/sdata.exe (run 'make' under MinGW/MSYS first), candle.exe,
-# light.exe, and groff on PATH. Produces sdata-$(VERSION)-x64.msi.
+# Build a Windows MSI installer using the WiX Toolset (v4 or later;
+# v7 recommended). Requires: bin/sdata.exe (run 'make' under MinGW/MSYS
+# first), the 'wix' .NET tool, and groff on PATH. Install WiX with:
+#   dotnet tool install --global wix
+# Produces sdata-$(VERSION)-x64.msi.
 msi: build sdata.html
-	@command -v candle >/dev/null 2>&1 || { echo "Error: candle not found (install WiX Toolset v3)"; exit 1; }
-	@command -v light  >/dev/null 2>&1 || { echo "Error: light not found (install WiX Toolset v3)"; exit 1; }
+	@command -v wix >/dev/null 2>&1 || { echo "Error: wix not found (install with: dotnet tool install --global wix)"; exit 1; }
 	@test -x bin/sdata.exe || { echo "Error: bin/sdata.exe not found. Build under Windows first."; exit 1; }
 	@echo "Building MSI installer..."
-	candle -nologo -arch x64 -dVersion=$(VERSION) -out wix/sdata.wixobj wix/sdata.wxs
-	light  -nologo -out sdata-$(VERSION)-x64.msi wix/sdata.wixobj
+	wix build -arch x64 -d Version=$(VERSION) -out sdata-$(VERSION)-x64.msi wix/sdata.wxs
 	@echo "MSI created: sdata-$(VERSION)-x64.msi"
 
 clean:
