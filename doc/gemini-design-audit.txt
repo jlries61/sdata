@@ -1,0 +1,64 @@
+ ### SData Design Implementation Audit: Progress Report                         
+                                                                                
+ Current Status: Stages 1 and 2 are Complete.                                   
+ Next Step: Stage 3 (Dataset Management & File I/O).                            
+                                                                                
+ ────────────────────────────────────────────────────────────────────────────── 
+                                                                                
+ #### Stage 1: Command-Line Interface & Execution Control (COMPLETE)            
+                                                                                
+ - Description: Verify all command-line flags (-m, -t, --clen, --noshell, -u,   
+ -s, etc.), argument parsing (manual loop vs GNAT), and initial system          
+ configuration.                                                                 
+ - Actions Taken:                                                               
+     - Fixed -s <filename> bug: The -s flag was previously aliased to --outfmt  
+ and ignored the filename. It now correctly triggers a declarative SAVE         
+ statement.                                                                     
+     - POSIX Flag Support: Updated the parser in sdata_main.adb to accept both  
+ space-delimited and equals-delimited arguments (e.g., --clen 256 and           
+ --clen=256).                                                                   
+     - Memory Constraints: Verified that -m (Max Table Rows) and -t (Max Temp   
+ Memory) are correctly passed to the runtime configuration.                     
+                                                                                
+ #### Stage 2: Lexer, Parser, and Core Syntax (COMPLETE)                        
+                                                                                
+ - Description: Verify lexical rules, variable scoping (LET vs SET), array      
+ types (Permanent, Temporary, Virtual), subscripting logic, operators, and      
+ expression evaluation.                                                         
+ - Actions Taken:                                                               
+     - Array Slice Assignments: Integrated Claude Code's work and my own to     
+ support LET ARR(1:5) = val and LET ARR(1,3,5) = val in both the parser and     
+ interpreter.                                                                   
+     - Expression Range Expansion: Updated Evaluate_Function and Execute_Print  
+ to dynamically expand ranges (e.g., SUM(A(1:3)) now sums three elements).      
+     - Strict Access Rules: Enforced design rules: LET cannot modify temporary  
+ arrays; SET cannot modify permanent or virtual arrays.                         
+     - String Operations: Added missing relational operators (<, >, <=, >=) for 
+ strings and fixed MISSING() to correctly treat "" as a missing value.          
+     - Variable Persistence: Verified that session variables persist across RUN 
+  statements as required, and fixed NEW to properly clear virtual array         
+ definitions.                                                                   
+                                                                                
+ ────────────────────────────────────────────────────────────────────────────── 
+                                                                                
+ #### Remaining Stages                                                          
+                                                                                
+ Stage 3: Dataset Management & File I/O (PENDING)                               
+ - Focus: Verify internal table storage logic (sdata-table.adb), row/column     
+ limits, and format-specific drivers in sdata-file_io.adb (CSV,                 
+ ODF/LibreOffice, OOXML/Excel). Check charset handling and sheet selection.     
+                                                                                
+ Stage 4: Commands and Statements (PENDING)                                     
+ - Focus: Verify all language constructs like BY (group processing), FILTER,    
+ ECHO, IF/ELSE, FOR/NEXT, REPEAT/UNTIL, and SUBMIT (recursive scripts). Check   
+ logic for HOLD/UNHOLD.                                                         
+                                                                                
+ Stage 5: Built-in Functions (PENDING)                                          
+ - Focus: Exhaustive check of the standard library in sdata-evaluator.adb and   
+ sdata-statistics.adb. Verify all probability distributions (Normal, Poisson,   
+ Weibull, etc.), string functions, and math aliases.                            
+                                                                                
+ ────────────────────────────────────────────────────────────────────────────── 
+                                                                                
+ Everything is built and all 95 tests are passing. Ready to start Stage 3 in    
+ the next session!                                                              
