@@ -2,6 +2,7 @@
 
 **Version reviewed:** 0.6.5 | **Date:** 2026-04-30 | **Tests:** 96 passing
 **Annotation:** 2026-05-01/02 (v0.6.6, 108 cmd + 33 unit tests) — debug system implemented; `Parse_CSV` monolith resolved; CI workflow validated; HELP dispatcher covered; DIM array resize dangling-column bug fixed; see annotated sections below.
+**Annotation:** 2026-05-04 (v0.6.7, 110 cmd + 33 unit tests) — stale array resize TODO removed; expand/shift resize regression tests added; ADR spreadsheet added (`doc/adrs.ods`, 30 decisions); CONTRIBUTING.md explicitly deferred; Documentation score 86→89, total 683→686.
 
 ---
 
@@ -72,7 +73,7 @@ One demerit: `S.Arr_Idx_List` / `Arr_Is_Slice` on the Statement record are abbre
 | Sin Type | Location | Severity |
 |---|---|---|
 | Potentially stale "called by NEW" comment | `sdata-variables.adb` (corrected in v0.6.4 cycle) | Resolved |
-| TODO without date/owner | `sdata-variables.adb:520` | Low |
+| ~~TODO without date/owner~~ | ~~`sdata-variables.adb:520`~~ | ~~Low~~ **[Resolved v0.6.7]** Stale comment removed; overlap range already preserves values after dangling-column fix |
 | `--debug` flag defined but never consulted in interpreter | `sdata-config.ads:42` | ~~Medium — silently inert~~ **[Resolved v0.6.6]** |
 
 **No commented-out code anywhere.** Comments in the codebase consistently explain *why* (e.g., the SQLite pragma block explains *why* `synchronous=OFF` is safe for a private temp file). This is correct discipline.
@@ -149,7 +150,7 @@ Change blast radius is small and predictable. The parsing and execution pipeline
 | ~~`Parse_CSV` monolith~~ | ~~`sdata-file_io.adb:285`~~ | ~~4–6 hours~~ | **Resolved v0.6.6** — extracted to `SData.CSV`; 33 unit tests |
 | ~~`--debug` flag silently inert~~ | ~~`sdata-config.ads:42`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
 | ~~HELP dispatcher untested~~ | ~~`sdata-help.adb`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
-| `CONTRIBUTING.md` missing | (project root) | 1 hour | Stable |
+| `CONTRIBUTING.md` missing | (project root) | 1 hour | **Deferred** — intentionally withheld until the project is ready to receive external contributions |
 | ~~Array resize dangling-column bug~~ | ~~`sdata-variables.adb:526-532`~~ | ~~1 hour~~ | **Resolved v0.6.6** |
 **Total remediation estimate: ~1 hour** (debug, Parse_CSV, HELP coverage, DIM dangling-column bug, and array resize TODO resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
 
@@ -245,8 +246,8 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | `man/man1/sdata.1` | 9/10 | Comprehensive command and function reference; accurately reflects 0.6.4 |
 | `doc/architecture.md` | 8/10 | Package map, execution tiers, data step flow — solid contributor doc |
 | `doc/CRITIQUE.md` | 9/10 | Self-aware, dated, tracks fix status — rare and valuable |
-| `CONTRIBUTING.md` | ❌ Missing | Noted in CRITIQUE; deferred |
-| ADRs (Architecture Decision Records) | ❌ None | Design rationale lives in `design.odt` and commit messages only |
+| `CONTRIBUTING.md` | ⏸ Deferred | Intentionally withheld until the project is ready to receive external contributions |
+| ADRs (Architecture Decision Records) | ✅ **[Added v0.6.7]** | `doc/adrs.ods` — 30 decisions (ADR-001 through ADR-030) covering language choice, execution model, table design, CLI design, test strategy, and in-session architectural choices |
 
 ---
 
@@ -261,8 +262,8 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | Error Handling | 87/100 | Consistent strategy; good messages; LibreOffice fallback is exemplary |
 | Security | 84/100 | Safe shell invocation; appropriate permissiveness for tool type |
 | Operational Readiness | ~~74/100~~ **80/100** | Build/package pipeline is excellent; CI live v0.6.6; observability is Text_IO only; debug resolved v0.6.6 |
-| Documentation | 86/100 | Strong across the board; missing CONTRIBUTING and ADRs |
-| **TOTAL** | ~~664~~ **683/800** | +19 from Code Quality, Maintainability, and Operational Readiness improvements in v0.6.6 |
+| Documentation | ~~86/100~~ **89/100** | Strong across the board; ADRs added v0.6.7; CONTRIBUTING intentionally deferred |
+| **TOTAL** | ~~664~~ ~~683~~ **686/800** | +19 from v0.6.6 improvements; +3 from ADR addition and CONTRIBUTING clarification in v0.6.7 |
 
 ---
 
@@ -294,5 +295,5 @@ At 3 AM with a broken pipe in production? I'd trust this codebase. The error han
 | `SYSTEM` uses Spawn correctly | `sdata-system.adb:23` | `GNAT.OS_Lib.Spawn (Exec, Args, Success)` — not `system()` string concat |
 | Signal cleanup registered | `sdata-table.adb:733` | `SData.Signals.Register_Cleanup_Path` called on SQLite temp file creation |
 | Merge sort used | `sdata-table.adb:403–421` | `Merge_Sort` nested procedure; O(n log n) |
-| One TODO in codebase | `sdata-variables.adb:520` | `-- TODO: Optimize for expansion/contraction to preserve values` |
+| ~~One TODO in codebase~~ | ~~`sdata-variables.adb:520`~~ | **[Resolved v0.6.7]** Stale TODO removed; overlap range already preserves values correctly after the dangling-column fix in v0.6.6 |
 | `bump-version.sh` atomic update | `scripts/bump-version.sh` | Updates 9 files; validates format; optional build/test/commit/tag |
