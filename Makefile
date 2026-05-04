@@ -53,6 +53,7 @@ run: build
 	./bin/sdata $(FILE)
 
 check: build
+	@[ -x bin/csv_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
 	@echo "Running unit tests..."
 	@$(TIMEOUT) 30 ./bin/csv_unit_test; \
 	 if [ $$? -ne 0 ]; then \
