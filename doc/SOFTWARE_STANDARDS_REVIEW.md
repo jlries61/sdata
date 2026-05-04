@@ -94,7 +94,7 @@ One demerit: `S.Arr_Idx_List` / `Arr_Is_Slice` on the Statement record are abbre
 
 **No O(n²) patterns detected.** The data step loop is O(records × statements), which is the minimum necessary; statements are not data.
 
-**One observation:** `Column_Order` in `sdata-table.adb` is a `Vector` and some operations scan it linearly to find a name by position (`Rename_Column`, `Drop_Column`). This is O(columns), which is negligible at typical widths — but if the design ever anticipates very wide tables (thousands of columns), this would be the first bottleneck.
+**Won't fix:** `Column_Order` in `sdata-table.adb` is a `Vector` and some operations scan it linearly to find a name by position (`Rename_Column`, `Drop_Column`). This is O(columns) per schema operation, not per record — the scan never runs inside the data step loop, so record count is irrelevant. The fix (a name→index hash map alongside the vector) would add two-way synchronisation overhead on every column add/delete/rename for a benefit that only materialises if schema operations number in the hundreds on a table with hundreds of columns. That combination is not a realistic use case.
 
 ### 3.2 Resource Management
 
