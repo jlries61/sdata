@@ -3,6 +3,7 @@
 **Version reviewed:** 0.6.5 | **Date:** 2026-04-30 | **Tests:** 96 passing
 **Annotation:** 2026-05-01/02 (v0.6.6, 108 cmd + 33 unit tests) — debug system implemented; `Parse_CSV` monolith resolved; CI workflow validated; HELP dispatcher covered; DIM array resize dangling-column bug fixed; see annotated sections below.
 **Annotation:** 2026-05-04 (v0.6.7, 110 cmd + 33 unit tests) — stale array resize TODO removed; expand/shift resize regression tests added; ADR spreadsheet added (`doc/adrs.ods`, 30 decisions); CONTRIBUTING.md explicitly deferred; Documentation score 86→89, total 683→686.
+**Annotation:** 2026-05-04 (v0.6.7, 114 cmd + 33 unit tests) — `Set_Index_Map` zero-match SELECT bug fixed; BY group edge-case tests added (regression + single-group + all-singletons + compound key); Interactive REPL coverage gap explicitly deferred; Maintainability 88→89, total 686→687.
 
 ---
 
@@ -115,7 +116,7 @@ Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every f
 
 | Metric | Value |
 |---|---|
-| Test count | ~~96~~ ~~99~~ ~~107~~ ~~108~~ 110 cmd + 33 compiled Ada unit tests **[v0.6.6]** |
+| Test count | ~~96~~ ~~99~~ ~~107~~ ~~108~~ ~~110~~ 114 cmd + 33 compiled Ada unit tests **[v0.6.7]** |
 | Test mechanism | File-based diff (`.cmd` → expected `.out`) + standalone `csv_unit_test` executable |
 | Execution time | <30 seconds total (10s per-test ceiling, most <1s) |
 | Flaky tests | None observed |
@@ -125,9 +126,9 @@ Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every f
 **Coverage gaps:**
 
 1. ~~`HELP` command — the entire help dispatcher is untested. Any regression there is invisible.~~ **[Resolved v0.6.6]** 8 tests cover all four `Print_Help` code paths: index, `/ALL`, specific topic, unknown topic, plus case-insensitive lookup and alias dispatch.
-2. Interactive REPL — pager integration, multi-statement entry, signal handling: zero automated coverage.
+2. **Deferred — infrastructure cost exceeds risk:** Interactive REPL — pager integration, multi-statement entry, signal handling. Automating these requires a PTY harness and an `expect`-style dependency; tests would be timing-sensitive and fragile. The REPL-specific code paths (prompt rendering, pager activation, SIGINT cleanup) are either cosmetic or already protected by the signal handler. Most logic is shared with script mode, which is well covered. Revisit if a REPL-specific regression appears in practice.
 3. ~~`--debug` flag — defined in config, accepted by CLI, but never consulted in the interpreter. The flag does nothing.~~ **[Resolved v0.6.6]** `--debug` now emits per-statement and per-record trace to stderr; `BREAK`/`BREAK WHEN` deferred statements and interactive inspection REPL implemented. Tests: `debug_trace.cmd`, `break_basic.cmd`, `break_when.cmd`.
-4. BY group edge cases — empty groups, single-record groups, group key changes on first record.
+4. ~~BY group edge cases — empty groups, single-record groups, group key changes on first record.~~ **[Resolved v0.6.7]** Fixed silent bug in `Set_Index_Map` (zero-match SELECT processed all rows); added `by_select_empty.cmd` (regression), `by_single_group.cmd`, `by_all_singletons.cmd`, `by_compound.cmd`.
 5. ~~Array resizing dangling-column bug — when `DIM A(1 TO 5)` is followed by `DIM A(1 TO 3)`, orphaned columns `A(4)` and `A(5)` were silently left in the table.~~ **[Resolved v0.6.6]** `Drop_Column` is now called for out-of-range columns in the resize loop; `dim_array_resize.cmd` (shrink), `dim_array_expand.cmd` (expand), and `dim_array_shift.cmd` (shift) cover all three resize scenarios. The stale TODO comment at `sdata-variables.adb:520` was removed — value preservation in the overlapping range already works correctly.
 
 **Test quality is high** — tests are behavioral (input script → expected output), not unit tests of implementation details. They survive refactoring. The `make check` harness is clean and produces an unambiguous pass/fail count.
@@ -258,12 +259,12 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | Architectural Integrity | 88/100 | Clean pipeline; minor Config split confusion |
 | Code Quality | ~~78/100~~ **83/100** | Good naming/comments; ~~`Parse_CSV` monolith is the outlier~~ Parse_CSV monolith resolved v0.6.6 |
 | Efficiency | 87/100 | No algorithmic flaws; `Column_Order` linear scan is latent |
-| Maintainability | ~~80/100~~ **88/100** | Strong tests + Ada unit tests + HELP coverage + all DIM resize scenarios covered; REPL gap remains; debug resolved v0.6.6 |
+| Maintainability | ~~80/100~~ ~~88/100~~ **89/100** | Strong tests + Ada unit tests + HELP/BY coverage + all DIM resize scenarios covered; REPL gap deliberately deferred; debug resolved v0.6.6 |
 | Error Handling | 87/100 | Consistent strategy; good messages; LibreOffice fallback is exemplary |
 | Security | 84/100 | Safe shell invocation; appropriate permissiveness for tool type |
 | Operational Readiness | ~~74/100~~ **80/100** | Build/package pipeline is excellent; CI live v0.6.6; observability is Text_IO only; debug resolved v0.6.6 |
 | Documentation | ~~86/100~~ **89/100** | Strong across the board; ADRs added v0.6.7; CONTRIBUTING intentionally deferred |
-| **TOTAL** | ~~664~~ ~~683~~ **686/800** | +19 from v0.6.6 improvements; +3 from ADR addition and CONTRIBUTING clarification in v0.6.7 |
+| **TOTAL** | ~~664~~ ~~683~~ ~~686~~ **687/800** | +19 from v0.6.6 improvements; +3 from ADR/CONTRIBUTING in v0.6.7; +1 from BY bug fix and test coverage |
 
 ---
 
