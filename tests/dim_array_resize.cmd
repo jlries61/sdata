@@ -1,0 +1,16 @@
+REPEAT 1
+DIM A(1 TO 5)
+LET A(1) = 1
+LET A(2) = 2
+LET A(3) = 3
+LET A(4) = 4
+LET A(5) = 5
+RUN
+NAMES
+REPEAT 1
+DIM A(1 TO 3)
+LET A(1) = 10
+LET A(2) = 20
+LET A(3) = 30
+RUN
+NAMES

@@ -493,9 +493,7 @@ package body SData.Table is
    procedure Set_Index_Map (Map : Index_Array) is
    begin
       Clear_Index_Map;
-      if Map'Length > 0 then
-         Filter_Map := new Index_Array'(Map);
-      end if;
+      Filter_Map := new Index_Array'(Map);
    end Set_Index_Map;
 
    ---------------------

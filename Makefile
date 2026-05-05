@@ -1,6 +1,6 @@
 # Makefile for SData
 
-VERSION          := 0.6.6
+VERSION          := 0.6.7
 ZIPADA_VERSION   := 61.0.0
 XMLADA_VERSION   := 26.0.0
 MATHPAQS_VERSION := 20260205.0.0
@@ -53,6 +53,13 @@ run: build
 	./bin/sdata $(FILE)
 
 check: build
+	@[ -x bin/csv_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
+	@echo "Running unit tests..."
+	@$(TIMEOUT) 30 ./bin/csv_unit_test; \
+	 if [ $$? -ne 0 ]; then \
+	   echo "Unit tests FAILED"; exit 1; \
+	 fi
+	@echo ""
 	@echo "Running tests..."
 	@failures=0; failed_list=""; total=0; \
 	for f in tests/*.cmd; do \

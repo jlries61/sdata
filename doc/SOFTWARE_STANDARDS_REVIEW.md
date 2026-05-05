@@ -1,6 +1,9 @@
 # SData — Software Standards Report
 
 **Version reviewed:** 0.6.5 | **Date:** 2026-04-30 | **Tests:** 96 passing
+**Annotation:** 2026-05-01/02 (v0.6.6, 108 cmd + 33 unit tests) — debug system implemented; `Parse_CSV` monolith resolved; CI workflow validated; HELP dispatcher covered; DIM array resize dangling-column bug fixed; see annotated sections below.
+**Annotation:** 2026-05-04 (v0.6.7, 110 cmd + 33 unit tests) — stale array resize TODO removed; expand/shift resize regression tests added; ADR spreadsheet added (`doc/adrs.ods`, 30 decisions); CONTRIBUTING.md explicitly deferred; Documentation score 86→89, total 683→686.
+**Annotation:** 2026-05-04 (v0.6.7, 114 cmd + 33 unit tests) — `Set_Index_Map` zero-match SELECT bug fixed; BY group edge-case tests added (regression + single-group + all-singletons + compound key); Interactive REPL coverage gap explicitly deferred; Maintainability 88→89, total 686→687.
 
 ---
 
@@ -17,7 +20,7 @@ The architecture is a classic recursive-descent pipeline: Lexer → Parser → A
 | Orphaned modules? | ✅ None |
 | Architecture astronaut syndrome? | ✅ None — no gratuitous abstractions |
 
-**Justification Quality: 9/10.** The only note: `SData.Config` vs `SData.Config.Runtime` is a subtle split (static constants vs mutable run state) that is not explained inline and takes a moment to understand.
+**Justification Quality: 9/10.** The only note: `SData.Config` vs `SData.Config.Runtime` is a subtle split (static constants vs mutable run state) that is not explained inline and takes a moment to understand. **[v0.6.6]** `SData.CSV` added as a new pure satellite package containing the six CSV string helpers extracted from `Parse_CSV`; zero dependencies on any other SData package.
 
 ### 1.2 Dependency Graph
 
@@ -52,17 +55,17 @@ One demerit: `S.Arr_Idx_List` / `Arr_Is_Slice` on the Statement record are abbre
 
 | Procedure | File:Line | Lines | Verdict |
 |---|---|---|---|
-| `Parse_CSV` | `sdata-file_io.adb:285` | ~553 | ⚠️ Too large; nested helpers mitigate but don't excuse |
+| `Parse_CSV` | `sdata-file_io.adb:285` | ~~553~~ ~377 | ~~⚠️ Too large; nested helpers mitigate but don't excuse~~ **[Resolved v0.6.6]** 6 pure helpers extracted to `SData.CSV`; orchestrator only |
 | `Parse_OOXML` | `sdata-file_io.adb:1264` | ~365 | ⚠️ Acceptable for DOM traversal but pushes the limit |
 | `Parse_ODF` | `sdata-file_io.adb:995` | ~264 | ⚠️ Same |
 | `Register_All_Functions` | `sdata-evaluator.adb:2392` | ~191 | ✅ Pure dispatch table; no branches; justified |
 | `Execute_Statement` | `sdata-interpreter.adb:86` | ~117 | ✅ Each case is a single call; justified |
 
-The file I/O parsers are the only genuine design smell. `Parse_CSV` contains a 1 MB heap-allocated line buffer, inline charset detection, column type inference, and multi-path field parsing — it does at least five distinct things. The inner helpers (defined as nested procedures) soften this but the procedure boundary is still too coarse.
+~~The file I/O parsers are the only genuine design smell. `Parse_CSV` contains a 1 MB heap-allocated line buffer, inline charset detection, column type inference, and multi-path field parsing — it does at least five distinct things. The inner helpers (defined as nested procedures) soften this but the procedure boundary is still too coarse.~~ **[Resolved v0.6.6]** `Parse_CSV` reduced from 553 to ~377 lines. The six pure string helpers (`Try_Fast_Float`, `Is_Numeric_Field`, `At_Delimiter`, `CSV_Field_End`, `CSV_Unquote`, `Split_Indices`) now live in `SData.CSV` and are covered by 33 compiled Ada unit tests. `Parse_CSV` is now a clean orchestrator; the helpers with legitimate closure dependencies on local state remain nested. `Parse_OOXML` and `Parse_ODF` remain large but have the DOM-traversal excuse.
 
 | Avg Function Length | Max Function Length | Single Responsibility |
 |---|---|---|
-| ~35 lines | 553 lines (`Parse_CSV`) | 7/10 |
+| ~35 lines | ~~553~~ ~365 lines (`Parse_OOXML`) | ~~7/10~~ **8/10** [v0.6.6] |
 
 ### 2.3 Comment Quality
 
@@ -71,8 +74,8 @@ The file I/O parsers are the only genuine design smell. `Parse_CSV` contains a 1
 | Sin Type | Location | Severity |
 |---|---|---|
 | Potentially stale "called by NEW" comment | `sdata-variables.adb` (corrected in v0.6.4 cycle) | Resolved |
-| TODO without date/owner | `sdata-variables.adb:520` | Low |
-| `--debug` flag defined but never consulted in interpreter | `sdata-config.ads:42` | Medium — silently inert |
+| ~~TODO without date/owner~~ | ~~`sdata-variables.adb:520`~~ | ~~Low~~ **[Resolved v0.6.7]** Stale comment removed; overlap range already preserves values after dangling-column fix |
+| `--debug` flag defined but never consulted in interpreter | `sdata-config.ads:42` | ~~Medium — silently inert~~ **[Resolved v0.6.6]** |
 
 **No commented-out code anywhere.** Comments in the codebase consistently explain *why* (e.g., the SQLite pragma block explains *why* `synchronous=OFF` is safe for a private temp file). This is correct discipline.
 
@@ -92,7 +95,7 @@ The file I/O parsers are the only genuine design smell. `Parse_CSV` contains a 1
 
 **No O(n²) patterns detected.** The data step loop is O(records × statements), which is the minimum necessary; statements are not data.
 
-**One observation:** `Column_Order` in `sdata-table.adb` is a `Vector` and some operations scan it linearly to find a name by position (`Rename_Column`, `Drop_Column`). This is O(columns), which is negligible at typical widths — but if the design ever anticipates very wide tables (thousands of columns), this would be the first bottleneck.
+**Won't fix:** `Column_Order` in `sdata-table.adb` is a `Vector` and some operations scan it linearly to find a name by position (`Rename_Column`, `Drop_Column`). This is O(columns) per schema operation, not per record — the scan never runs inside the data step loop, so record count is irrelevant. The fix (a name→index hash map alongside the vector) would add two-way synchronisation overhead on every column add/delete/rename for a benefit that only materialises if schema operations number in the hundreds on a table with hundreds of columns. That combination is not a realistic use case.
 
 ### 3.2 Resource Management
 
@@ -113,18 +116,20 @@ Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every f
 
 | Metric | Value |
 |---|---|
-| Test count | 96 |
-| Test mechanism | File-based diff (`.cmd` → expected `.out`) |
+| Test count | ~~96~~ ~~99~~ ~~107~~ ~~108~~ ~~110~~ 114 cmd + 33 compiled Ada unit tests **[v0.6.7]** |
+| Test mechanism | File-based diff (`.cmd` → expected `.out`) + standalone `csv_unit_test` executable |
 | Execution time | <30 seconds total (10s per-test ceiling, most <1s) |
 | Flaky tests | None observed |
 
+**[v0.6.6]** `make check` now runs `./bin/csv_unit_test` before the `.cmd` suite. The 33 unit tests cover all six `SData.CSV` functions (`Try_Fast_Float`, `Is_Numeric_Field`, `At_Delimiter`, `CSV_Field_End`, `CSV_Unquote`, `Split_Indices`) and are compiled Ada — they catch type errors and contract violations that file-diff tests cannot.
+
 **Coverage gaps:**
 
-1. `HELP` command — the entire help dispatcher is untested. Any regression there is invisible.
-2. Interactive REPL — pager integration, multi-statement entry, signal handling: zero automated coverage.
-3. `--debug` flag — defined in config, accepted by CLI, but never consulted in the interpreter. The flag does nothing.
-4. BY group edge cases — empty groups, single-record groups, group key changes on first record.
-5. Array resizing (`TODO` at `sdata-variables.adb:520`) — the optimization path isn't tested either way.
+1. ~~`HELP` command — the entire help dispatcher is untested. Any regression there is invisible.~~ **[Resolved v0.6.6]** 8 tests cover all four `Print_Help` code paths: index, `/ALL`, specific topic, unknown topic, plus case-insensitive lookup and alias dispatch.
+2. **Deferred — infrastructure cost exceeds risk:** Interactive REPL — pager integration, multi-statement entry, signal handling. Automating these requires a PTY harness and an `expect`-style dependency; tests would be timing-sensitive and fragile. The REPL-specific code paths (prompt rendering, pager activation, SIGINT cleanup) are either cosmetic or already protected by the signal handler. Most logic is shared with script mode, which is well covered. Revisit if a REPL-specific regression appears in practice.
+3. ~~`--debug` flag — defined in config, accepted by CLI, but never consulted in the interpreter. The flag does nothing.~~ **[Resolved v0.6.6]** `--debug` now emits per-statement and per-record trace to stderr; `BREAK`/`BREAK WHEN` deferred statements and interactive inspection REPL implemented. Tests: `debug_trace.cmd`, `break_basic.cmd`, `break_when.cmd`.
+4. ~~BY group edge cases — empty groups, single-record groups, group key changes on first record.~~ **[Resolved v0.6.7]** Fixed silent bug in `Set_Index_Map` (zero-match SELECT processed all rows); added `by_select_empty.cmd` (regression), `by_single_group.cmd`, `by_all_singletons.cmd`, `by_compound.cmd`.
+5. ~~Array resizing dangling-column bug — when `DIM A(1 TO 5)` is followed by `DIM A(1 TO 3)`, orphaned columns `A(4)` and `A(5)` were silently left in the table.~~ **[Resolved v0.6.6]** `Drop_Column` is now called for out-of-range columns in the resize loop; `dim_array_resize.cmd` (shrink), `dim_array_expand.cmd` (expand), and `dim_array_shift.cmd` (shift) cover all three resize scenarios. The stale TODO comment at `sdata-variables.adb:520` was removed — value preservation in the overlapping range already works correctly.
 
 **Test quality is high** — tests are behavioral (input script → expected output), not unit tests of implementation details. They survive refactoring. The `make check` harness is clean and produces an unambiguous pass/fail count.
 
@@ -143,13 +148,12 @@ Change blast radius is small and predictable. The parsing and execution pipeline
 
 | Item | Location | Estimated Effort | Trajectory |
 |---|---|---|---|
-| `Parse_CSV` monolith | `sdata-file_io.adb:285` | 4–6 hours | Stable (not worsening) |
-| `--debug` flag silently inert | `sdata-config.ads:42` | 2 hours | Stable |
-| HELP dispatcher untested | `sdata-help.adb` | 2 hours | Stable |
-| `CONTRIBUTING.md` missing | (project root) | 1 hour | Stable |
-| Array resize TODO | `sdata-variables.adb:520` | 4 hours | Stable |
-
-**Total remediation estimate: ~15 hours. Debt is acknowledged, bounded, and not compounding.**
+| ~~`Parse_CSV` monolith~~ | ~~`sdata-file_io.adb:285`~~ | ~~4–6 hours~~ | **Resolved v0.6.6** — extracted to `SData.CSV`; 33 unit tests |
+| ~~`--debug` flag silently inert~~ | ~~`sdata-config.ads:42`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
+| ~~HELP dispatcher untested~~ | ~~`sdata-help.adb`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
+| `CONTRIBUTING.md` missing | (project root) | 1 hour | **Deferred** — intentionally withheld until the project is ready to receive external contributions |
+| ~~Array resize dangling-column bug~~ | ~~`sdata-variables.adb:526-532`~~ | ~~1 hour~~ | **Resolved v0.6.6** |
+**Total remediation estimate: ~1 hour** (debug, Parse_CSV, HELP coverage, DIM dangling-column bug, and array resize TODO resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
 
 ---
 
@@ -210,18 +214,18 @@ No hardcoded credentials, tokens, or passwords anywhere in the source. The only 
 |---|---|
 | Structured logging | ❌ None — `Ada.Text_IO.Put_Line` only |
 | Log levels | ❌ None — `--quiet` suppresses informational only |
-| `--debug` flag | ⚠️ Accepted by CLI, stored in `Config.Debug_Mode`, **never consulted** |
+| `--debug` flag | ✅ **[Resolved v0.6.6]** Emits `[debug]`-prefixed trace to stderr: statement kind + record number per deferred statement, record-load events, BREAK entry/exit. `BREAK`/`BREAK WHEN` pause execution and enter an interactive inspection REPL (PDV dump, variable query, step/continue/quit). Step mode (`s`) advances one record at a time when running interactively. |
 | Error output on stderr | ✅ `Put_Line_Error` routes to stderr consistently |
 | Quiet mode | ✅ `--quiet` suppresses dataset-open messages |
 
-The `--debug` flag is a minor embarrassment — it's documented in the man page and accepted at the CLI but does absolutely nothing. A new user who enables it expecting trace output will be confused.
+~~The `--debug` flag is a minor embarrassment — it's documented in the man page and accepted at the CLI but does absolutely nothing. A new user who enables it expecting trace output will be confused.~~ **[Resolved v0.6.6]** The flag now produces meaningful trace output; see the Observability table above.
 
 ### 7.2 Deployment & Build
 
 | Capability | Status |
 |---|---|
 | Build | ✅ `make` / `alr build` |
-| Test | ✅ `make check` (96 tests, <30s) |
+| Test | ✅ `make check` (~~96~~ ~~99~~ 110 cmd + 33 unit tests, <30s) **[v0.6.6]** |
 | Install | ✅ `make install` (binary + man page) |
 | Package (RPM) | ✅ `make srpm` |
 | Package (Debian) | ✅ `make dsc` |
@@ -229,7 +233,7 @@ The `--debug` flag is a minor embarrassment — it's documented in the man page 
 | Package (macOS) | ✅ `make pkg` |
 | Version bump | ✅ `scripts/bump-version.sh` (atomic 9-file update) |
 | Rollback | ✅ Git history |
-| CI/CD | ❌ No automated CI (noted as deferred in `doc/CRITIQUE.md`) |
+| CI/CD | ✅ `.github/workflows/test.yml` — push + PR on `main`; `alr build` + binary existence guard + `make check` (33 unit + 110 cmd); ubuntu-latest **[v0.6.6]** |
 
 The `bump-version.sh` script is genuinely excellent — it validates format, detects old version strings, updates all locations atomically, and optionally builds, tests, commits, and tags. Most projects of this size don't have this.
 
@@ -243,8 +247,8 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | `man/man1/sdata.1` | 9/10 | Comprehensive command and function reference; accurately reflects 0.6.4 |
 | `doc/architecture.md` | 8/10 | Package map, execution tiers, data step flow — solid contributor doc |
 | `doc/CRITIQUE.md` | 9/10 | Self-aware, dated, tracks fix status — rare and valuable |
-| `CONTRIBUTING.md` | ❌ Missing | Noted in CRITIQUE; deferred |
-| ADRs (Architecture Decision Records) | ❌ None | Design rationale lives in `design.odt` and commit messages only |
+| `CONTRIBUTING.md` | ⏸ Deferred | Intentionally withheld until the project is ready to receive external contributions |
+| ADRs (Architecture Decision Records) | ✅ **[Added v0.6.7]** | `doc/adrs.ods` — 30 decisions (ADR-001 through ADR-030) covering language choice, execution model, table design, CLI design, test strategy, and in-session architectural choices |
 
 ---
 
@@ -253,14 +257,14 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 | Category | Score | Notes |
 |---|---|---|
 | Architectural Integrity | 88/100 | Clean pipeline; minor Config split confusion |
-| Code Quality | 78/100 | Good naming/comments; `Parse_CSV` monolith is the outlier |
+| Code Quality | ~~78/100~~ **83/100** | Good naming/comments; ~~`Parse_CSV` monolith is the outlier~~ Parse_CSV monolith resolved v0.6.6 |
 | Efficiency | 87/100 | No algorithmic flaws; `Column_Order` linear scan is latent |
-| Maintainability | 80/100 | Strong tests; HELP and REPL gaps; debug flag is dead |
+| Maintainability | ~~80/100~~ ~~88/100~~ **89/100** | Strong tests + Ada unit tests + HELP/BY coverage + all DIM resize scenarios covered; REPL gap deliberately deferred; debug resolved v0.6.6 |
 | Error Handling | 87/100 | Consistent strategy; good messages; LibreOffice fallback is exemplary |
 | Security | 84/100 | Safe shell invocation; appropriate permissiveness for tool type |
-| Operational Readiness | 74/100 | Build/package pipeline is excellent; observability is Text_IO only |
-| Documentation | 86/100 | Strong across the board; missing CONTRIBUTING and ADRs |
-| **TOTAL** | **664/800** | |
+| Operational Readiness | ~~74/100~~ **80/100** | Build/package pipeline is excellent; CI live v0.6.6; observability is Text_IO only; debug resolved v0.6.6 |
+| Documentation | ~~86/100~~ **89/100** | Strong across the board; ADRs added v0.6.7; CONTRIBUTING intentionally deferred |
+| **TOTAL** | ~~664~~ ~~683~~ ~~686~~ **687/800** | +19 from v0.6.6 improvements; +3 from ADR/CONTRIBUTING in v0.6.7; +1 from BY bug fix and test coverage |
 
 ---
 
@@ -268,11 +272,13 @@ The `bump-version.sh` script is genuinely excellent — it validates format, det
 
 This is good software. Genuinely good — not "good for a one-person project," but good by any measure. The architecture is clean, the tests are behaviorally correct, the error handling is disciplined, and the version management script is better than what most ten-person teams ship.
 
-**The thing that would embarrass you in front of a senior engineer is `Parse_CSV`.** It is 553 lines, it does five different jobs, and it is effectively untestable as a unit. You cannot write a test for "the charset detection path inside Parse_CSV" without firing the whole machine. This is the only part of the codebase where the seams are in the wrong places. The rest of the I/O parsers (OOXML, ODF) are long for the same structural reason — DOM traversal is verbose — but they have a better excuse. CSV has no such excuse.
+~~**The thing that would embarrass you in front of a senior engineer is `Parse_CSV`.** It is 553 lines, it does five different jobs, and it is effectively untestable as a unit. You cannot write a test for "the charset detection path inside Parse_CSV" without firing the whole machine. This is the only part of the codebase where the seams are in the wrong places. The rest of the I/O parsers (OOXML, ODF) are long for the same structural reason — DOM traversal is verbose — but they have a better excuse. CSV has no such excuse.~~ **[Resolved v0.6.6]** `Parse_CSV` is now a clean orchestrator (~377 lines). The six pure helpers live in `SData.CSV` with 33 compiled Ada unit tests. The seams are in the right places.
 
-**The `--debug` flag is a lie to the user.** It is in the man page. It is accepted at the CLI. It stores a value in `Config.Debug_Mode`. And then nothing in the interpreter ever reads it. A user who enables it expecting trace output will silently get nothing different. Fix it or remove it.
+~~**The `--debug` flag is a lie to the user.**~~ **[Resolved v0.6.6]** `--debug` now delivers genuine observability: per-statement trace, per-record events, and an interactive `BREAK`/`BREAK WHEN` inspection REPL with step mode. The lie has been made true.
 
-**The codebase has no CI.** Every commit is validated by running `make check` by hand. This is sustainable for a single developer who is disciplined about it — and clearly this developer is — but it is one distracted afternoon away from a broken commit on `origin/main`. A GitHub Actions workflow running `alr build && make check` on push is a two-hour investment that eliminates an entire class of risk forever.
+~~**The codebase has no CI.**~~ **[Resolved v0.6.6]** `.github/workflows/test.yml` runs on every push and PR to `main`: `alr build` → binary existence guard → `make check` (33 unit + 108 cmd tests). The class of "broken commit lands on main undetected" risk is now closed.
+
+**[Resolved v0.6.6]** The DIM array resize dangling-column bug (`Dim_Array` silently leaving orphaned permanent columns in the table after shrinking an array range) is fixed. The fix is 3 operative lines: a `Drop_Column` call guarded by `(I < Start_Idx or else I > End_Idx)`. The regression test confirms 5 columns → 3 columns after re-DIM.
 
 At 3 AM with a broken pipe in production? I'd trust this codebase. The error handling is solid, the fallbacks are real, and the test suite would have caught most regressions before they shipped. But I'd sleep better if `Parse_CSV` had been split apart three months ago.
 
@@ -282,13 +288,13 @@ At 3 AM with a broken pipe in production? I'd trust this codebase. The error han
 
 | Finding | File:Line | Evidence |
 |---|---|---|
-| `Parse_CSV` monolith | `sdata-file_io.adb:285` | 553 lines; contains charset detection, type inference, quote parsing, field splitting, row emission |
-| `--debug` flag inert | `sdata-config.ads:42` | `Debug_Mode : Boolean := False` defined; zero reads of this flag in interpreter |
+| ~~`Parse_CSV` monolith~~ | `sdata-file_io.adb:285` | ~~553 lines; contains charset detection, type inference, quote parsing, field splitting, row emission~~ **[Resolved v0.6.6]** ~377 lines; 6 helpers extracted to `src/sdata-csv.ads`/`sdata-csv.adb`; 33 unit tests in `tests/csv_unit_test.adb` |
+| ~~`--debug` flag inert~~ | `sdata-interpreter.adb:186,1878,2124` | **[Resolved v0.6.6]** `Debug_Mode` now consulted in `Debug_Trace`, step-mode gate, and `BREAK` execution path; 3 tests cover trace and break behaviour |
 | HELP untested | `sdata-help.adb` | No `tests/help*.cmd` exists |
 | `Column_Order` linear scan | `sdata-table.adb:263–269` | Loop over Vector to find column name in `Rename_Column` |
 | LibreOffice graceful fallback | `sdata-file_io.adb:1058–1062` | Warning to stderr + `using cached values` on missing LibreOffice |
 | `SYSTEM` uses Spawn correctly | `sdata-system.adb:23` | `GNAT.OS_Lib.Spawn (Exec, Args, Success)` — not `system()` string concat |
 | Signal cleanup registered | `sdata-table.adb:733` | `SData.Signals.Register_Cleanup_Path` called on SQLite temp file creation |
 | Merge sort used | `sdata-table.adb:403–421` | `Merge_Sort` nested procedure; O(n log n) |
-| One TODO in codebase | `sdata-variables.adb:520` | `-- TODO: Optimize for expansion/contraction to preserve values` |
+| ~~One TODO in codebase~~ | ~~`sdata-variables.adb:520`~~ | **[Resolved v0.6.7]** Stale TODO removed; overlap range already preserves values correctly after the dangling-column fix in v0.6.6 |
 | `bump-version.sh` atomic update | `scripts/bump-version.sh` | Updates 9 files; validates format; optional build/test/commit/tag |

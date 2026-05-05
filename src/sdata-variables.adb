@@ -516,19 +516,16 @@ package body SData.Variables is
                   raise Program_Error with "Cannot change temporary status of existing real array '" & Upper_Name & "'.";
                end if;
                
-               -- Resizing - For now, clear all old elements, then recreate new.
-               -- TODO: Optimize for expansion/contraction to preserve values
+               -- Drop orphaned columns (outside new range); kept columns and their data are preserved.
                for I in Existing_Def.Start_Index .. Existing_Def.End_Index loop
                   -- Delete variable from system if it was part of this real array
                   declare
                      Var_Name : constant String := Get_Real_Var_Name (To_String(Existing_Def.Constituents.First_Element), I);
                   begin
-                     if not Existing_Def.Is_Temporary and then SData.Table.Has_Column (Var_Name) then
-                        -- For permanent real array elements, we should remove column if it's outside new bounds
-                        -- but not if it's within the new bounds (to avoid data loss)
-                        -- For simplicity, let's just leave old columns for now if permanent.
-                        -- A separate garbage collection might be needed.
-                        null;
+                     if not Existing_Def.Is_Temporary and then SData.Table.Has_Column (Var_Name)
+                        and then (I < Start_Idx or else I > End_Idx)
+                     then
+                        SData.Table.Drop_Column (Var_Name);
                      end if;
                      -- For temporary elements, clear from Temp_Symbols
                      if Existing_Def.Is_Temporary and then Temp_Symbols.Contains (Var_Name) then
