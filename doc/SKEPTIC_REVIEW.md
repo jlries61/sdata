@@ -1,6 +1,6 @@
 # Codebase Review: `SData Statistical Data Interpreter`
 
-**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit 33ec301)
+**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit d2d40bc)
 **Scope:** Full source repository — all Ada source files, Makefile, test suite, packaging scripts
 **Domain:** Single-process batch/interactive interpreter for tabular statistical data processing, inspired by the Systat BASIC data step model
 **Stack:** Ada 2012, GNAT/GPRbuild, Zip-Ada / XML-Ada / MathPaqs / ada_sqlite3, SQLite3 backing store for large tables
@@ -182,7 +182,7 @@ Remove the linked list entirely — replace `Active_Program_Head/Tail` and `Stmt
 
 ### Highest-Leverage Intervention
 
-**Introduce `Interpreter_Context` and thread it through `Run_One_Step`.** The type carries BOG/EOG flags, the BY variable list, the filter expression, and the per-record deletion flag. The data step loop creates a context, populates it, and passes it down to `Process_One_Record`, `Is_First_In_Group`, and transitively to `Evaluate`. Package-level globals become initialization values for this context, not the canonical store during execution. This one change surfaces the invisible contracts that the current code enforces by convention, enables unit tests for `Is_First_In_Group` and BOG/EOG logic, eliminates the BY-variable duplication, removes the reversed evaluator dependency, and eliminates the partial-reset hazard — all at once, without rewriting the execution model.
+**Introduce `Interpreter_Context` and thread it through `Run_One_Step`.** The type carries BOG/EOG flags, the BY variable list, the filter expression, and the per-record deletion flag. The data step loop creates a context, populates it, and passes it down to `Process_One_Record`, `Is_First_In_Group`, and transitively to `Evaluate`. Package-level globals become initialization values for this context, not the canonical store during execution. This one change surfaces the invisible contracts that the current code enforces by convention, enables unit tests for `Is_First_In_Group` and BOG/EOG logic, eliminates the BY-variable duplication, removes the reversed evaluator dependency, and eliminates the partial-reset hazard — all at once, without rewriting the execution model. ✅ *Partially resolved d2d40bc — `Step_Context` (By_Vars, Deleted, BOG, EOG) threaded through `Run_One_Step` → `Process_One_Record` → `Execute_Statement` → `Execute_List` → `Execute_Control_Flow`. `Current_Record_Deleted` global eliminated. `BOG_Flag`/`EOG_Flag` in the evaluator are still updated from context via `Set_BOG`/`Set_EOG`; changing `Evaluate`'s signature to eliminate those globals remains future work.*
 
 ### Where the Voices Disagree
 
@@ -197,7 +197,7 @@ Beck and Feathers both say "add tests first," but disagree on feasibility. Beck 
 | ~~2~~ | ~~Replace linked list with vector in program buffer; remove `Stmt.Next`~~ | Wozniak | — | ✅ *Done 9804705 — `Active_Program_Head/Tail` removed; `Run_Active_Program` chains vector entries transiently; `Stmt.Next` retained for nested sub-lists* |
 | ~~1~~ | ~~Add `statistics_unit_test` with reference values for distribution functions~~ | Beck | — | ✅ *Done 33ec301 — `distrib_test`: 27 values across Normal/t/χ²/F/Exponential/Poisson using symmetry identities, closed-form constants (e⁻¹, e⁻², etc.), and CDF/IDF roundtrips* |
 | 3 | Declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with caller contract | Uncle Bob | S | Low — invisible coupling accretes silently |
-| 4 | Introduce `Interpreter_Context`; thread through data step chain | Fowler, Feathers | L | High — each new stateful feature deepens the global state problem |
+| ~~4~~ | ~~Introduce `Interpreter_Context`; thread through data step chain~~ | Fowler, Feathers | — | ✅ *Done d2d40bc — `Step_Context` (By_Vars, Deleted, BOG, EOG) threaded through entire data step chain; `Current_Record_Deleted` global eliminated; evaluator globals remain but are now derivatives of context* |
 | 5 | Extract evaluator function families into child packages | Uncle Bob | M | Med — file grows with each new function; navigation cost compounds |
 | 6 | Add `CONCEPTS` help topic explaining PDV, LET/SET, BY-group model | Jobs | S | Low — but user confusion accumulates without a conceptual entry point |
 
