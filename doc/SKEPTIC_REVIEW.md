@@ -1,6 +1,6 @@
 # Codebase Review: `SData Statistical Data Interpreter`
 
-**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit fae2d2d)
+**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit a975a63)
 **Scope:** Full source repository — all Ada source files, Makefile, test suite, packaging scripts
 **Domain:** Single-process batch/interactive interpreter for tabular statistical data processing, inspired by the Systat BASIC data step model
 **Stack:** Ada 2012, GNAT/GPRbuild, Zip-Ada / XML-Ada / MathPaqs / ada_sqlite3, SQLite3 backing store for large tables
@@ -100,28 +100,28 @@ Add a `statistics_unit_test` binary that calls the evaluator's function handlers
 
 ### Findings
 
-**💀 Structural Risk — No seam to test any interpreter behavior in isolation**
+**💀 Structural Risk — No seam to test any interpreter behavior in isolation** *(partially addressed a975a63)*
 `src/sdata-interpreter.adb` (entire package body)
 
-Every piece of interpreter state — the active program list, BY variables, filter expression, record deletion flag, submit chain, column modification queue — lives as package-level variables in the interpreter body. To test any single behavior (e.g., "does `Is_First_In_Group` return True for the first record of a new BY group?"), you must initialize the entire interpreter stack, feed it a data step, and observe console output. There is no way to call `Is_First_In_Group` with two rows and a BY variable list without first having run a `BY` command. This is the definition of a codebase where the blast radius of any change in the interpreter is bounded only by the integration test suite — which has structural gaps around silent code paths.
+Every piece of interpreter state — the active program list, BY variables, filter expression, record deletion flag, submit chain, column modification queue — lives as package-level variables in the interpreter body. To test any single behavior (e.g., "does BY-group detection return True for the first record of a new group?"), you must initialize the entire interpreter stack, feed it a data step, and observe console output. This is the definition of a codebase where the blast radius of any change in the interpreter is bounded only by the integration test suite — which has structural gaps around silent code paths. *Partial fix: `Group_Flags` function sprouted (see Feathers finding below); the broader seam problem remains.*
 
 **⚠ Concern — `NEW` command partial-reset invariant is untested**
 `src/sdata-interpreter.adb: Clear_Active_Program`
 
 `Clear_Active_Program` resets the program buffer, SELECT filter, BY vars, and index map. The `NEW` command also resets `Config.Runtime`. But state such as `Input_File_Columns`, `Submit_Chain`, and `Pending_Mods` appears in the interpreter body; their reset status under `NEW` is not obvious from reading. No test verifies that the sequence `USE "file1.csv" / LET X = 1 / RUN / NEW / USE "file2.csv" / RUN` leaves the interpreter in a clean state. The correctness of multi-step interactive sessions depends on which variables `NEW` resets — a contract that exists only in the implementation, not in any test.
 
-### Feathers's Recommendation
+### Feathers's Recommendation ✅ *Implemented a975a63*
 
-Apply the Sprout Function technique to `Is_First_In_Group` and `Is_Last_In_Group` first. Extract a pure function:
+`Is_First_In_Group` and `Is_Last_In_Group` (both reading `Current_By_Vars` global state) were replaced with:
 
 ```ada
-function Group_Flags
-  (Logical_I     : Positive;
-   Logical_Count : Natural;
-   By_Vars       : By_Group_Names.Vector) return (BOG, EOG : Boolean);
+function Group_Flags (Logical_I     : Positive;
+                      Logical_Count : Natural;
+                      By_Vars       : By_Group_Names.Vector)
+                      return Group_Flags_Result;
 ```
 
-This function takes its inputs as parameters and returns its outputs as values with no global state access. Route the data step loop through it. This single seam gives Beck a testable entry point for BY-group logic and gives Feathers a safe place to change it without a full integration test run after every edit.
+`Group_Flags_Result` is a record `(BOG, EOG : Boolean)`. The function reads no global interpreter state; its result is fully determined by its arguments and the current table contents. `Process_One_Record` now calls it once and uses `Flags.BOG`/`Flags.EOG` throughout, eliminating the if/else dispatch between the BY-active and no-BY code paths. The seam for BY-group logic is now explicit and well-bounded. Next step when ready: expose `Group_Flags` in the interpreter's public spec and add a dedicated unit test.
 
 ---
 
@@ -194,12 +194,13 @@ Beck and Feathers both say "add tests first," but disagree on feasibility. Beck 
 |---|---|---|---|---|
 | 1 | Add `statistics_unit_test` with reference values for distribution functions | Beck | S | Med — numerical regressions catch silently |
 | ~~2~~ | ~~Introduce `Max_Name_Len` constant; reference from all three struct definitions~~ | Wozniak | — | ✅ *Done fae2d2d — six constants, 13 files, name limit corrected to 64* |
+| ~~4~~ | ~~Sprout `Group_Flags` pure function from `Is_First_In_Group`/`Is_Last_In_Group`~~ | Feathers | — | ✅ *Done a975a63 — `Group_Flags(I, Count, By_Vars)` replaces both; Process_One_Record simplified* |
+| 1 | Add `statistics_unit_test` with reference values for distribution functions | Beck | S | Med — numerical regressions catch silently |
 | 2 | Replace linked list with vector in program buffer; remove `Stmt.Next` | Wozniak | S | Med — sync hazard grows with each new program manipulation feature |
 | 3 | Declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with caller contract | Uncle Bob | S | Low — invisible coupling accretes silently |
-| 4 | Sprout `Group_Flags` pure function from `Is_First_In_Group`/`Is_Last_In_Group` | Feathers | S | High — BY-group logic has no test seam; next BY bug will repeat the pattern |
-| 5 | Introduce `Interpreter_Context`; thread through data step chain | Fowler, Feathers | L | High — each new stateful feature deepens the global state problem |
-| 6 | Extract evaluator function families into child packages | Uncle Bob | M | Med — file grows with each new function; navigation cost compounds |
-| 7 | Add `CONCEPTS` help topic explaining PDV, LET/SET, BY-group model | Jobs | S | Low — but user confusion accumulates without a conceptual entry point |
+| 4 | Introduce `Interpreter_Context`; thread through data step chain | Fowler, Feathers | L | High — each new stateful feature deepens the global state problem |
+| 5 | Extract evaluator function families into child packages | Uncle Bob | M | Med — file grows with each new function; navigation cost compounds |
+| 6 | Add `CONCEPTS` help topic explaining PDV, LET/SET, BY-group model | Jobs | S | Low — but user confusion accumulates without a conceptual entry point |
 
 ---
 
