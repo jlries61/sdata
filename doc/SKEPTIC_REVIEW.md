@@ -1,6 +1,6 @@
 # Codebase Review: `SData Statistical Data Interpreter`
 
-**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit a975a63)
+**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit 9804705)
 **Scope:** Full source repository — all Ada source files, Makefile, test suite, packaging scripts
 **Domain:** Single-process batch/interactive interpreter for tabular statistical data processing, inspired by the Systat BASIC data step model
 **Stack:** Ada 2012, GNAT/GPRbuild, Zip-Ada / XML-Ada / MathPaqs / ada_sqlite3, SQLite3 backing store for large tables
@@ -168,9 +168,9 @@ Add a `CONCEPTS` or `INTRO` help topic accessible from the interpreter (`HELP CO
 
 Three struct definitions independently hard-coded `String(1..32)` for name storage, with additional enforcement points scattered across the parser, interpreter body, table body, and file I/O. *Fix: all bare literals replaced with named constants from the `SData` root package; `Max_Name_Len` corrected to 64 per the design specification.*
 
-### Wozniak's Recommendation
+### Wozniak's Recommendation ✅ *Implemented 9804705*
 
-Remove the linked list entirely — replace `Active_Program_Head/Tail` and `Stmt.Next` traversal with direct vector iteration. This reduces the statement node type, simplifies `Add_To_Active_Program` to a single `Append`, and eliminates the sync hazard. The named-constant finding is resolved; the linked list remains.
+Remove the linked list entirely — replace `Active_Program_Head/Tail` and `Stmt.Next` traversal with direct vector iteration. This reduces the statement node type, simplifies `Add_To_Active_Program` to a single `Append`, and eliminates the sync hazard. *The named-constant finding is resolved; the linked list is now also resolved. `Active_Program_Head/Tail` removed; `Add_To_Active_Program` reduced to a single `Vec.Append`; `Run_Active_Program` chains vector entries transiently at call time and unlinks afterward. `Stmt.Next` is retained in the AST node — it is still required for nested control-flow sub-lists (IF branches, FOR bodies) — but the permanent top-level linked list is gone.*
 
 ---
 
@@ -192,11 +192,10 @@ Beck and Feathers both say "add tests first," but disagree on feasibility. Beck 
 
 | Priority | Action | Voice(s) | Effort | Risk if Deferred |
 |---|---|---|---|---|
-| 1 | Add `statistics_unit_test` with reference values for distribution functions | Beck | S | Med — numerical regressions catch silently |
 | ~~2~~ | ~~Introduce `Max_Name_Len` constant; reference from all three struct definitions~~ | Wozniak | — | ✅ *Done fae2d2d — six constants, 13 files, name limit corrected to 64* |
 | ~~4~~ | ~~Sprout `Group_Flags` pure function from `Is_First_In_Group`/`Is_Last_In_Group`~~ | Feathers | — | ✅ *Done a975a63 — `Group_Flags(I, Count, By_Vars)` replaces both; Process_One_Record simplified* |
+| ~~2~~ | ~~Replace linked list with vector in program buffer; remove `Stmt.Next`~~ | Wozniak | — | ✅ *Done 9804705 — `Active_Program_Head/Tail` removed; `Run_Active_Program` chains vector entries transiently; `Stmt.Next` retained for nested sub-lists* |
 | 1 | Add `statistics_unit_test` with reference values for distribution functions | Beck | S | Med — numerical regressions catch silently |
-| 2 | Replace linked list with vector in program buffer; remove `Stmt.Next` | Wozniak | S | Med — sync hazard grows with each new program manipulation feature |
 | 3 | Declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with caller contract | Uncle Bob | S | Low — invisible coupling accretes silently |
 | 4 | Introduce `Interpreter_Context`; thread through data step chain | Fowler, Feathers | L | High — each new stateful feature deepens the global state problem |
 | 5 | Extract evaluator function families into child packages | Uncle Bob | M | Med — file grows with each new function; navigation cost compounds |
