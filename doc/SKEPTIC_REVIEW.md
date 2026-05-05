@@ -1,6 +1,6 @@
 # Codebase Review: `SData Statistical Data Interpreter`
 
-**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit 6bdecf1)
+**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit fc2ec48)
 **Scope:** Full source repository — all Ada source files, Makefile, test suite, packaging scripts
 **Domain:** Single-process batch/interactive interpreter for tabular statistical data processing, inspired by the Systat BASIC data step model
 **Stack:** Ada 2012, GNAT/GPRbuild, Zip-Ada / XML-Ada / MathPaqs / ada_sqlite3, SQLite3 backing store for large tables
@@ -131,19 +131,19 @@ function Group_Flags (Logical_I     : Positive;
 
 ### Findings
 
-**⚠ Concern — LET vs. SET asymmetry is load-bearing but underexplained**
+**⚠ Concern — LET vs. SET asymmetry is load-bearing but underexplained** ✅ *Resolved fc2ec48*
 `man/man1/sdata.1`
 
-The language has both `LET` and `SET`. `LET` assigns to a data step variable (reset by `NEW`); `SET` assigns to a permanent variable (persists across `NEW`). This is a meaningful and intentional distinction. But arriving at the right choice requires understanding the PDV, the permanent/temporary variable distinction, and the data step execution model — none of which are explained before the command reference. A first-time user will use `LET` everywhere and be surprised when an accumulator resets between data steps, or will use `SET` everywhere and be surprised when a column disappears after the step. The asymmetry is correct; the path to understanding it is not visible from the interface.
+The language has both `LET` and `SET`. `LET` assigns to a data step variable (reset by `NEW`); `SET` assigns to a permanent variable (persists across `NEW`). This is a meaningful and intentional distinction. But arriving at the right choice requires understanding the PDV, the permanent/temporary variable distinction, and the data step execution model — none of which are explained before the command reference. A first-time user will use `LET` everywhere and be surprised when an accumulator resets between data steps, or will use `SET` everywhere and be surprised when a column disappears after the step. The asymmetry is correct; the path to understanding it is not visible from the interface. *Fix: `HELP CONCEPTS` added — covers the PDV lifetime, the LET (permanent column) vs SET (temporary variable) contract, and BY-group boundary detection with a worked DEPT$/SALARY subtotal example. The HELP index footer now advertises the topic.*
 
 **⚠ Concern — CLI flag surface lacks grouping and visual structure**
 `src/sdata_main.adb` (option parsing), `--help` output
 
 The flags fall into three natural groups: sizing (`-m`, `-t`, `--clen`), behavior (`--noshell`, `--ignore-math-errors`, `-k`), and I/O (`-p`, `-o`, `-q`). The `-h` output lists them flat. `--noshell` silently disables `-p` — a non-obvious interaction buried in the `-p` description. The man page is well-organized; the inline help is not. For a developer-facing tool this is minor, but coherence between `-h` output and the man page structure costs one afternoon.
 
-### Jobs's Recommendation
+### Jobs's Recommendation ✅ *Partially implemented fc2ec48*
 
-Add a `CONCEPTS` or `INTRO` help topic accessible from the interpreter (`HELP CONCEPTS`) that explains the PDV, the LET vs. SET contract, and the BY-group model in two pages before the user reads any command reference. The interface is correct; the explanation is missing. For the CLI flags, group them in `-h` output with headers (Sizing, Behavior, Output) to match the man page structure.
+Add a `CONCEPTS` or `INTRO` help topic accessible from the interpreter (`HELP CONCEPTS`) that explains the PDV, the LET vs. SET contract, and the BY-group model in two pages before the user reads any command reference. The interface is correct; the explanation is missing. For the CLI flags, group them in `-h` output with headers (Sizing, Behavior, Output) to match the man page structure. *`HELP CONCEPTS` implemented. CLI flag grouping in `-h` output remains open.*
 
 ---
 
@@ -199,7 +199,7 @@ Beck and Feathers both say "add tests first," but disagree on feasibility. Beck 
 | ~~3~~ | ~~Declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with caller contract~~ | Uncle Bob | — | ✅ *Done c361a28 — merged into `Set_Group_Boundary(BOG, EOG)` with full caller contract at the declaration; removed dead public `Is_BOG`/`Is_EOG`* |
 | ~~4~~ | ~~Introduce `Interpreter_Context`; thread through data step chain~~ | Fowler, Feathers | — | ✅ *Done d2d40bc — `Step_Context` (By_Vars, Deleted, BOG, EOG) threaded through entire data step chain; `Current_Record_Deleted` global eliminated; evaluator globals remain but are now derivatives of context* |
 | ~~5~~ | ~~Extract evaluator function families into child packages~~ | Uncle Bob | — | ✅ *Done 6bdecf1 — six private child packages; parent body 2,589 → 320 lines; `Dispatch_Table` moved to spec private part for cycle-free self-registration* |
-| 6 | Add `CONCEPTS` help topic explaining PDV, LET/SET, BY-group model | Jobs | S | Low — but user confusion accumulates without a conceptual entry point |
+| ~~6~~ | ~~Add `CONCEPTS` help topic explaining PDV, LET/SET, BY-group model~~ | Jobs | — | ✅ *Done fc2ec48 — `HELP CONCEPTS` covers PDV lifetime, LET/SET contract, BY-group BOG/EOG with worked example; index footer updated* |
 
 ---
 
