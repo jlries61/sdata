@@ -152,6 +152,54 @@ make pkg
 This creates `sdata-0.6.7.pkg`. The `sdata` binary must already be built
 (`make` first). Requires the `pkgbuild` tool (included with Xcode).
 
+### Windows
+
+#### Building
+
+The recommended toolchain is [Alire](https://alire.ada.dev/) inside an MSYS2
+MinGW64 shell. Install Alire from the MSYS2 package or from the upstream
+release, then:
+
+```sh
+alr build
+```
+
+Or, equivalently:
+
+```sh
+alr exec -- make
+```
+
+The build produces `bin\sdata.exe`. Cygwin works too — Alire and a recent GNAT
+toolchain on PATH are the only hard requirements.
+
+#### MSI Installer
+
+Build a Windows MSI installer:
+
+```sh
+alr exec -- make msi
+```
+
+This creates `sdata-0.6.7-x64.msi`, a per-machine x64 installer that places
+`sdata.exe`, `LICENSE.txt`, `README.md`, and an HTML rendering of the man page
+under `C:\Program Files\sdata\` and appends that directory to the system
+`PATH`. Requirements:
+
+- **WiX Toolset v4 or later** (v7 recommended) via the .NET tool:
+  ```sh
+  dotnet tool install --global wix
+  ```
+  Verify with `wix --version`. WiX requires the .NET 8 (or later) SDK.
+
+- **pandoc** — converts the man page to HTML for inclusion in the installer.
+  In MSYS2: `pacman -S mingw-w64-x86_64-pandoc`. In Cygwin: install the
+  `pandoc` package via setup.
+
+Install the resulting MSI with `msiexec /i sdata-0.6.7-x64.msi`, or by
+double-clicking it. After install, `sdata` is available from any new CMD or
+PowerShell window.
+
 ## Release Management
 
 The `scripts/bump-version.sh` script updates the version string in all nine
