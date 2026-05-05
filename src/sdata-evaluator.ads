@@ -4,6 +4,9 @@
 
 with SData.AST;    use SData.AST;
 with SData.Values; use SData.Values;
+private with Ada.Containers.Vectors;
+private with Ada.Containers.Indefinite_Hashed_Maps;
+private with Ada.Strings.Hash;
 
 package SData.Evaluator is
 
@@ -12,8 +15,8 @@ package SData.Evaluator is
 
    --  Converts any numeric value kind to Float for calculation.
    function Convert_To_Float (V : Value) return Float;
-   
-   -- Returns the expected kind of value based on name suffix
+
+   --  Returns the expected kind of value based on name suffix
    function Get_Expected_Kind (Name : String) return Value_Kind;
 
    --  Returns True for functions whose first argument is passed as a variable
@@ -34,5 +37,40 @@ package SData.Evaluator is
    --  during Evaluate; behaviour is undefined if they are read before the first
    --  call in a data step.
    procedure Set_Group_Boundary (BOG, EOG : Boolean);
+
+private
+
+   --  Type infrastructure shared by the parent body and all private child
+   --  packages that implement handler families.
+
+   package Value_Vectors is new Ada.Containers.Vectors
+      (Index_Type   => Positive,
+       Element_Type => Value,
+       "="          => SData.Values."=");
+
+   use type Ada.Containers.Count_Type;
+
+   type Fn_Handler is access function
+      (Name : String; Vals : Value_Vectors.Vector) return Value;
+
+   package Fn_Maps is new Ada.Containers.Indefinite_Hashed_Maps
+      (Key_Type        => String,
+       Element_Type    => Fn_Handler,
+       Hash            => Ada.Strings.Hash,
+       Equivalent_Keys => "=");
+
+   --  Per-record BY-group boundary indicators.  Written exclusively by
+   --  Set_Group_Boundary; read by the BOG/EOG handler families.
+   BOG_Flag : Boolean := False;
+   EOG_Flag : Boolean := False;
+
+   --  Global dispatch table — populated during elaboration by each handler
+   --  family's private child package.
+   Dispatch_Table : Fn_Maps.Map;
+
+   --  Helpers used by every handler family.
+   function Has_Args (Vals : Value_Vectors.Vector; N : Positive) return Boolean;
+   function Num_Result (V : Float) return Value;
+   function Handle_Domain_Error (Msg : String) return Value;
 
 end SData.Evaluator;
