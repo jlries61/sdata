@@ -58,8 +58,8 @@ package body SData.Interpreter is
    --  grouping is active.  Populated by Stmt_BY; cleared by bare BY or NEW.
    Current_By_Vars : By_Group_Names.Vector;
 
-   --  Program buffer vector — mirrors Active_Program_Head/Tail linked list
-   --  but provides indexed access for LIST and DELETE n[-m].
+   --  Program buffer vector — canonical program store; provides both indexed
+   --  access (LIST, DELETE) and traversal order for RUN.
    type Program_Entry is record
       Stmt   : Statement_Access;
       Source : Unbounded_String;
@@ -160,29 +160,18 @@ package body SData.Interpreter is
 
 
 
-   -- Global program for REPL mode.
-   Active_Program_Head : Statement_Access := null;
-   Active_Program_Tail : Statement_Access := null;
-
    procedure Add_To_Active_Program (Stmt : Statement_Access; Source : String := "") is
    begin
       if Stmt = null then return; end if;
-      Stmt.Next := null;
-      if Active_Program_Head = null then
-         Active_Program_Head := Stmt;
-         Active_Program_Tail := Stmt;
-      else
-         Active_Program_Tail.Next := Stmt;
-         Active_Program_Tail := Stmt;
-      end if;
       Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
    end Add_To_Active_Program;
 
    procedure Clear_Active_Program is
    begin
       SData.AST.Free_Expression (Select_Filter_Expr);
-      SData.AST.Free_Program (Active_Program_Head);
-      Active_Program_Tail := null;
+      for E of Active_Program_Vec loop
+         SData.AST.Free_Program (E.Stmt);
+      end loop;
       Active_Program_Vec.Clear;
       SData.Table.Clear_Index_Map;
       Current_By_Vars.Clear;
@@ -350,29 +339,28 @@ package body SData.Interpreter is
 
    procedure Run_Active_Program is
    begin
-      if Active_Program_Head /= null then
+      if Active_Program_Vec.Is_Empty then
+         Execute (null);
+      else
          declare
-            Prog    : constant Statement_Access := Active_Program_Head;
-            Tail    : Statement_Access := Prog;
+            Last    : constant Positive := Natural (Active_Program_Vec.Length);
             Run_Cap : Statement_Access := new Statement (Stmt_RUN);
          begin
-            --  Cap the chain with a synthetic Stmt_RUN so that Execute's
-            --  outer loop calls Run_One_Step on the queued deferred
-            --  statements.  The program is NOT cleared - it persists so
-            --  that subsequent RUN commands re-execute the same program.
-            --  Only NEW, USE, or REPEAT should replace the program.
-            while Tail.Next /= null loop
-               Tail := Tail.Next;
+            --  Transiently chain vector entries and cap with a synthetic
+            --  Stmt_RUN so Execute's outer loop triggers deferred processing.
+            --  The program persists across RUN; only NEW/USE/REPEAT replaces it.
+            for I in 1 .. Last - 1 loop
+               Active_Program_Vec (I).Stmt.Next :=
+                  Active_Program_Vec (I + 1).Stmt;
             end loop;
-            Tail.Next := Run_Cap;
-            Execute (Prog);
-            --  Remove and free the synthetic cap.
-            Tail.Next := null;
+            Active_Program_Vec (Last).Stmt.Next := Run_Cap;
+            Execute (Active_Program_Vec (1).Stmt);
+            --  Unchain: restore all Next pointers to null, then free the cap.
+            for I in 1 .. Last loop
+               Active_Program_Vec (I).Stmt.Next := null;
+            end loop;
             SData.AST.Free_Program (Run_Cap);
          end;
-      else
-         -- No program queued: execute an empty step (e.g. bare RUN in REPL).
-         Execute (null);
       end if;
    end Run_Active_Program;
 
@@ -1246,7 +1234,7 @@ package body SData.Interpreter is
    end Execute_Metadata;
 
    --  Execute_Program_Delete — removes entries From..To (1-based) from the
-   --  program buffer and rebuilds the linked list.
+   --  program buffer vector.
    procedure Execute_Program_Delete (Stmt : Statement_Access) is
       From : constant Positive := Stmt.Delete_From;
       To   : constant Positive := Stmt.Delete_To;
@@ -1272,19 +1260,6 @@ package body SData.Interpreter is
       --  Remove from vector (iterate backwards to preserve indices).
       for I in reverse From .. To loop
          Active_Program_Vec.Delete (I);
-      end loop;
-      --  Rebuild linked list from remaining vector entries.
-      Active_Program_Head := null;
-      Active_Program_Tail := null;
-      for E of Active_Program_Vec loop
-         E.Stmt.Next := null;
-         if Active_Program_Head = null then
-            Active_Program_Head := E.Stmt;
-            Active_Program_Tail := E.Stmt;
-         else
-            Active_Program_Tail.Next := E.Stmt;
-            Active_Program_Tail := E.Stmt;
-         end if;
       end loop;
    end Execute_Program_Delete;
 
