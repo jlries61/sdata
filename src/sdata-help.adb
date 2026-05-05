@@ -52,6 +52,7 @@ package body SData.Help is
       New_Line;
       Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
       Put_Line ("Use HELP EXECUTION for an explanation of the three execution tiers.");
+      Put_Line ("Use HELP CONCEPTS for an introduction to the PDV, LET/SET, and BY groups.");
    end Help_Index;
 
    -- ==========================================================================
@@ -528,6 +529,59 @@ package body SData.Help is
       Put_Line ("The HELP entry for each command includes an ""Execution:"" line");
       Put_Line ("identifying which tier it belongs to.");
    end Help_EXECUTION;
+
+   procedure Help_CONCEPTS is
+   begin
+      Put_Line ("Concepts: PDV, LET vs SET, and BY Groups");
+      New_Line;
+      Put_Line ("--- Program Data Vector (PDV) ---");
+      Put_Line ("A data step processes the table one record at a time.  For each record");
+      Put_Line ("sdata loads the source row into the PDV (Program Data Vector), executes");
+      Put_Line ("all deferred statements (LET, SET, IF, PRINT, ...), then writes the");
+      Put_Line ("result to the output table.");
+      New_Line;
+      Put_Line ("Each permanent variable (LET column) is reset to MISSING at the start of");
+      Put_Line ("every record before the source row is loaded.  HOLD retains a value");
+      Put_Line ("across records:");
+      Put_Line ("  HOLD RUNNING_TOT   -- carry RUNNING_TOT forward from the previous record");
+      New_Line;
+      Put_Line ("--- LET vs SET ---");
+      Put_Line ("Both assign values inside the data step, but their persistence differs:");
+      New_Line;
+      Put_Line ("  LET var = expr   Permanent column.  Written to the output table;");
+      Put_Line ("                   visible after RUN in DISPLAY, NAMES, and SAVE.");
+      Put_Line ("                   Reset to MISSING at the start of each record");
+      Put_Line ("                   unless retained by HOLD.");
+      New_Line;
+      Put_Line ("  SET var = expr   Temporary variable.  Exists only during the data step;");
+      Put_Line ("                   never written to the output table; discarded after RUN.");
+      Put_Line ("                   Use SET for loop counters and intermediate values.");
+      New_Line;
+      Put_Line ("A common mistake: using LET for a counter that should not appear as an");
+      Put_Line ("output column.  Use SET instead.");
+      New_Line;
+      Put_Line ("--- BY Groups ---");
+      Put_Line ("BY variable(s) partitions records into groups whose members share the same");
+      Put_Line ("values for the listed variables.  Records must already be in group order;");
+      Put_Line ("use SORT first if needed.  Bare BY (no variables) cancels grouping.");
+      New_Line;
+      Put_Line ("  BOG()   1 at the first record of each group, 0 otherwise");
+      Put_Line ("  EOG()   1 at the last record of each group, 0 otherwise");
+      New_Line;
+      Put_Line ("LAG and NEXT respect group boundaries: they return MISSING rather than");
+      Put_Line ("reading into an adjacent group.");
+      New_Line;
+      Put_Line ("Example -- subtotal SALARY by DEPT:");
+      Put_Line ("  SORT DEPT$");
+      Put_Line ("  BY DEPT$");
+      Put_Line ("  HOLD DEPT_TOT");
+      Put_Line ("  IF BOG() THEN SET DEPT_TOT = 0");
+      Put_Line ("  SET DEPT_TOT = DEPT_TOT + SALARY");
+      Put_Line ("  IF EOG() THEN PRINT DEPT$, DEPT_TOT");
+      Put_Line ("  RUN");
+      New_Line;
+      Put_Line ("See also: HELP LET  HELP SET  HELP BY  HELP HOLD  HELP EXECUTION");
+   end Help_CONCEPTS;
 
    -- ==========================================================================
    --  Math functions
@@ -1039,6 +1093,7 @@ package body SData.Help is
    K_END          : aliased constant String := "END";
    K_OPTIONS      : aliased constant String := "OPTIONS";
    K_EXECUTION    : aliased constant String := "EXECUTION";
+   K_CONCEPTS     : aliased constant String := "CONCEPTS";
    K_BREAK        : aliased constant String := "BREAK";
    K_DEBUGGER     : aliased constant String := "DEBUGGER";
    K_DEBUG        : aliased constant String := "DEBUG";
@@ -1248,6 +1303,7 @@ package body SData.Help is
       (K_END'Access,      Help_QUIT'Access,     N, N),   --  alias
       (K_OPTIONS'Access,  Help_OPTIONS'Access,  C, N),
       (K_EXECUTION'Access, Help_EXECUTION'Access, C, N),
+      (K_CONCEPTS'Access,  Help_CONCEPTS'Access,  C, N),
       (K_DEBUGGER'Access, Help_DEBUGGER'Access,  C, N),
       (K_DEBUG'Access,    Help_DEBUGGER'Access,  N, N),   --  alias
       --  Math functions

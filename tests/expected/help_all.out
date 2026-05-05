@@ -322,6 +322,56 @@ Note: SELECT has two forms with different tiers:
 The HELP entry for each command includes an "Execution:" line
 identifying which tier it belongs to.
 
+Concepts: PDV, LET vs SET, and BY Groups
+
+--- Program Data Vector (PDV) ---
+A data step processes the table one record at a time.  For each record
+sdata loads the source row into the PDV (Program Data Vector), executes
+all deferred statements (LET, SET, IF, PRINT, ...), then writes the
+result to the output table.
+
+Each permanent variable (LET column) is reset to MISSING at the start of
+every record before the source row is loaded.  HOLD retains a value
+across records:
+  HOLD RUNNING_TOT   -- carry RUNNING_TOT forward from the previous record
+
+--- LET vs SET ---
+Both assign values inside the data step, but their persistence differs:
+
+  LET var = expr   Permanent column.  Written to the output table;
+                   visible after RUN in DISPLAY, NAMES, and SAVE.
+                   Reset to MISSING at the start of each record
+                   unless retained by HOLD.
+
+  SET var = expr   Temporary variable.  Exists only during the data step;
+                   never written to the output table; discarded after RUN.
+                   Use SET for loop counters and intermediate values.
+
+A common mistake: using LET for a counter that should not appear as an
+output column.  Use SET instead.
+
+--- BY Groups ---
+BY variable(s) partitions records into groups whose members share the same
+values for the listed variables.  Records must already be in group order;
+use SORT first if needed.  Bare BY (no variables) cancels grouping.
+
+  BOG()   1 at the first record of each group, 0 otherwise
+  EOG()   1 at the last record of each group, 0 otherwise
+
+LAG and NEXT respect group boundaries: they return MISSING rather than
+reading into an adjacent group.
+
+Example -- subtotal SALARY by DEPT:
+  SORT DEPT$
+  BY DEPT$
+  HOLD DEPT_TOT
+  IF BOG() THEN SET DEPT_TOT = 0
+  SET DEPT_TOT = DEPT_TOT + SALARY
+  IF EOG() THEN PRINT DEPT$, DEPT_TOT
+  RUN
+
+See also: HELP LET  HELP SET  HELP BY  HELP HOLD  HELP EXECUTION
+
 Debug mode: --debug flag
 Enables passive trace output to stderr and interactive step mode.
 
