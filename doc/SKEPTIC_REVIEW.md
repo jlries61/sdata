@@ -1,6 +1,6 @@
 # Codebase Review: `SData Statistical Data Interpreter`
 
-**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit 9804705)
+**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit 33ec301)
 **Scope:** Full source repository — all Ada source files, Makefile, test suite, packaging scripts
 **Domain:** Single-process batch/interactive interpreter for tabular statistical data processing, inspired by the Systat BASIC data step model
 **Stack:** Ada 2012, GNAT/GPRbuild, Zip-Ada / XML-Ada / MathPaqs / ada_sqlite3, SQLite3 backing store for large tables
@@ -195,7 +195,7 @@ Beck and Feathers both say "add tests first," but disagree on feasibility. Beck 
 | ~~2~~ | ~~Introduce `Max_Name_Len` constant; reference from all three struct definitions~~ | Wozniak | — | ✅ *Done fae2d2d — six constants, 13 files, name limit corrected to 64* |
 | ~~4~~ | ~~Sprout `Group_Flags` pure function from `Is_First_In_Group`/`Is_Last_In_Group`~~ | Feathers | — | ✅ *Done a975a63 — `Group_Flags(I, Count, By_Vars)` replaces both; Process_One_Record simplified* |
 | ~~2~~ | ~~Replace linked list with vector in program buffer; remove `Stmt.Next`~~ | Wozniak | — | ✅ *Done 9804705 — `Active_Program_Head/Tail` removed; `Run_Active_Program` chains vector entries transiently; `Stmt.Next` retained for nested sub-lists* |
-| 1 | Add `statistics_unit_test` with reference values for distribution functions | Beck | S | Med — numerical regressions catch silently |
+| ~~1~~ | ~~Add `statistics_unit_test` with reference values for distribution functions~~ | Beck | — | ✅ *Done 33ec301 — `distrib_test`: 27 values across Normal/t/χ²/F/Exponential/Poisson using symmetry identities, closed-form constants (e⁻¹, e⁻², etc.), and CDF/IDF roundtrips* |
 | 3 | Declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with caller contract | Uncle Bob | S | Low — invisible coupling accretes silently |
 | 4 | Introduce `Interpreter_Context`; thread through data step chain | Fowler, Feathers | L | High — each new stateful feature deepens the global state problem |
 | 5 | Extract evaluator function families into child packages | Uncle Bob | M | Med — file grows with each new function; navigation cost compounds |
