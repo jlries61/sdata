@@ -193,8 +193,9 @@ under `C:\Program Files\sdata\` and appends that directory to the system
   Verify with `wix --version`. WiX requires the .NET 8 (or later) SDK.
 
 - **pandoc** — converts the man page to HTML for inclusion in the installer.
-  In MSYS2: `pacman -S mingw-w64-x86_64-pandoc`. In Cygwin: install the
-  `pandoc` package via setup.
+  In MSYS2: `pacman -S mingw-w64-x86_64-pandoc`. Alternately, Pandoc can be
+  installed via [Chocolatey](https://chocolatey.org/) or downloaded directly
+  from the [Pandoc website](https://pandoc.org/installing.html).
 
 Install the resulting MSI with `msiexec /i sdata-0.6.7-x64.msi`, or by
 double-clicking it. After install, `sdata` is available from any new CMD or
