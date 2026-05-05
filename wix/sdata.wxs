@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WiX source for the SData Windows installer.
+
+  Build with:
+    wix build -arch x64 -d Version=<x.y.z> -out sdata-<x.y.z>-x64.msi wix/sdata.wxs
+
+  Or via the Makefile: make msi
+
+  Requires WiX Toolset v4 or later (v7 recommended). Install with:
+    dotnet tool install \-\-global wix
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Package Name="SData $(var.Version)"
+           Manufacturer="John L. Ries"
+           Version="$(var.Version)"
+           UpgradeCode="e99c250d-858b-4f17-9b4f-f9f1bcea4c1c"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of SData is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="Main" Title="SData">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="PathEnv" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="sdata" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component>
+        <File Source="bin/sdata.exe" />
+      </Component>
+      <Component>
+        <File Name="LICENSE.txt" Source="LICENSE" />
+      </Component>
+      <Component>
+        <File Source="README.md" />
+      </Component>
+      <Component>
+        <File Source="sdata.html" />
+      </Component>
+    </ComponentGroup>
+
+    <!--
+      System PATH update. Stable GUID required because this Component has
+      no file KeyPath; MSI uses the GUID to track the registered PATH entry
+      across upgrades and uninstalls.
+    -->
+    <Component Id="PathEnv"
+               Directory="INSTALLFOLDER"
+               Guid="b3f3c3d2-5755-4f64-a260-2a83f82620e0">
+      <CreateFolder />
+      <Environment Id="UpdatePath"
+                   Name="PATH"
+                   Value="[INSTALLFOLDER]"
+                   Permanent="no"
+                   Part="last"
+                   Action="set"
+                   System="yes" />
+    </Component>
+
+  </Package>
+</Wix>
