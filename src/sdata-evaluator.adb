@@ -46,9 +46,6 @@ use type Interfaces.Integer_64;
 
 package body SData.Evaluator is
 
-   --  BOG_Flag / EOG_Flag: per-record beginning-of-group / end-of-group
-   --  indicators.  Set by the interpreter's data step loop before each
-   --  record's program body executes; read by BOG() and EOG() functions.
    function Is_True (V : Value) return Boolean is
    begin
       case V.Kind is
@@ -59,6 +56,8 @@ package body SData.Evaluator is
       end case;
    end Is_True;
 
+   --  Per-record BY-group boundary indicators.  Written exclusively by
+   --  Set_Group_Boundary; read by the BOG() and EOG() expression handlers.
    BOG_Flag : Boolean := False;
    EOG_Flag : Boolean := False;
 
@@ -86,9 +85,6 @@ package body SData.Evaluator is
    --  Package-level helpers shared by Evaluate_Function and all handlers
    ---------------------------------------------------------------------------
 
-   function Is_BOG return Boolean is (BOG_Flag);
-   function Is_EOG return Boolean is (EOG_Flag);
-
    function Handle_Domain_Error (Msg : String) return Value is
    begin
       if SData.Config.Ignore_Math_Errors then
@@ -99,15 +95,11 @@ package body SData.Evaluator is
       end if;
    end Handle_Domain_Error;
 
-   procedure Set_BOG (Val : Boolean) is
+   procedure Set_Group_Boundary (BOG, EOG : Boolean) is
    begin
-      BOG_Flag := Val;
-   end Set_BOG;
-
-   procedure Set_EOG (Val : Boolean) is
-   begin
-      EOG_Flag := Val;
-   end Set_EOG;
+      BOG_Flag := BOG;
+      EOG_Flag := EOG;
+   end Set_Group_Boundary;
 
    function Convert_To_Float (V : Value) return Float is
    begin

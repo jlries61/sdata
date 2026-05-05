@@ -1867,8 +1867,7 @@ package body SData.Interpreter is
       begin
          Ctx.BOG := Flags.BOG;
          Ctx.EOG := Flags.EOG;
-         Set_BOG (Ctx.BOG);
-         Set_EOG (Ctx.EOG);
+         Set_Group_Boundary (BOG => Ctx.BOG, EOG => Ctx.EOG);
          for V of Ctx.By_Vars loop
             declare Name : constant String := To_String (V); begin
                Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if Flags.BOG then 1 else 0)));

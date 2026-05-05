@@ -22,11 +22,17 @@ package SData.Evaluator is
    --  that walks the expression AST.
    function Is_Identifier_Ref_Function (N : String) return Boolean;
 
-   -- Indicators for BY group boundaries
-   function Is_BOG return Boolean;
-   function Is_EOG return Boolean;
-
-   procedure Set_BOG (Val : Boolean);
-   procedure Set_EOG (Val : Boolean);
+   --  Set_Group_Boundary — update the BOG/EOG indicators before each record.
+   --
+   --  Caller: SData.Interpreter.Process_One_Record, called exactly once per
+   --  record at the start of the deferred program body, after Group_Flags
+   --  determines the boundary values from the physical row sequence and the
+   --  active BY-variable list.
+   --
+   --  Both flags are set atomically; the evaluator makes no assertion about
+   --  their values.  The BOG() and EOG() expression functions read these flags
+   --  during Evaluate; behaviour is undefined if they are read before the first
+   --  call in a data step.
+   procedure Set_Group_Boundary (BOG, EOG : Boolean);
 
 end SData.Evaluator;
