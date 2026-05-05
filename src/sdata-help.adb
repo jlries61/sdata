@@ -146,7 +146,9 @@ package body SData.Help is
    procedure Help_SET is
    begin
       Put_Line ("Command: SET variable = expression");
-      Put_Line ("Creates a temporary variable that persists only during the Data Step.");
+      Put_Line ("Creates a session variable not written to the output table.");
+      Put_Line ("SET variables are not reset between records and persist across RUN calls.");
+      Put_Line ("They are removed by UNSET or NEW, or when the session ends.");
       Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
    end Help_SET;
 
@@ -553,9 +555,11 @@ package body SData.Help is
       Put_Line ("                   Reset to MISSING at the start of each record");
       Put_Line ("                   unless retained by HOLD.");
       New_Line;
-      Put_Line ("  SET var = expr   Temporary variable.  Exists only during the data step;");
-      Put_Line ("                   never written to the output table; discarded after RUN.");
-      Put_Line ("                   Use SET for loop counters and intermediate values.");
+      Put_Line ("  SET var = expr   Session variable.  NOT written to the output table.");
+      Put_Line ("                   NOT reset between records or between RUN calls.");
+      Put_Line ("                   Persists until UNSET, NEW, or the session ends.");
+      Put_Line ("                   Use SET for counters and values that should not");
+      Put_Line ("                   appear as output columns.");
       New_Line;
       Put_Line ("A common mistake: using LET for a counter that should not appear as an");
       Put_Line ("output column.  Use SET instead.");

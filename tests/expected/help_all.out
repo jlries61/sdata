@@ -60,7 +60,9 @@ Creates a permanent column in the table or updates an existing one.
 Execution: Deferred -- executed once per record inside the data step.
 
 Command: SET variable = expression
-Creates a temporary variable that persists only during the Data Step.
+Creates a session variable not written to the output table.
+SET variables are not reset between records and persist across RUN calls.
+They are removed by UNSET or NEW, or when the session ends.
 Execution: Deferred -- executed once per record inside the data step.
 
 Command: UNSET variable(s)
@@ -343,9 +345,11 @@ Both assign values inside the data step, but their persistence differs:
                    Reset to MISSING at the start of each record
                    unless retained by HOLD.
 
-  SET var = expr   Temporary variable.  Exists only during the data step;
-                   never written to the output table; discarded after RUN.
-                   Use SET for loop counters and intermediate values.
+  SET var = expr   Session variable.  NOT written to the output table.
+                   NOT reset between records or between RUN calls.
+                   Persists until UNSET, NEW, or the session ends.
+                   Use SET for counters and values that should not
+                   appear as output columns.
 
 A common mistake: using LET for a counter that should not appear as an
 output column.  Use SET instead.
