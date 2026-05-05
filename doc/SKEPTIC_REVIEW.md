@@ -1,20 +1,20 @@
-# Codebase Review: `SData — Statistical Data Interpreter`
+# Codebase Review: `SData Statistical Data Interpreter`
 
-**Reviewed:** 2026-04-17
-**Scope:** Full repository — all 29 Ada source files, test suite, CI configuration, build system, packaging
-**Domain:** Systat BASIC-style statistical data language interpreter; reads/writes CSV, ODS, XLSX; processes tabular data through a PDV-based data step
-**Stack:** Ada 2012, GPRBuild/Alire, GNU Make; dependencies: Zip-Ada, XML/Ada, MathPaqs, SQLite (via GNATColl)
-**Voices Activated:** Fowler, Uncle Bob, Beck, Feathers, Kleppmann, Jobs
+**Reviewed:** 2026-05-04
+**Scope:** Full source repository — all Ada source files, Makefile, test suite, packaging scripts
+**Domain:** Single-process batch/interactive interpreter for tabular statistical data processing, inspired by the Systat BASIC data step model
+**Stack:** Ada 2012, GNAT/GPRbuild, Zip-Ada / XML-Ada / MathPaqs / ada_sqlite3, SQLite3 backing store for large tables
+**Voices Activated:** Fowler, Uncle Bob, Beck, Feathers, Jobs, Wozniak
 
 ---
 
 ## Overall Posture
 
 ```
-▲  Recovering — three structural items resolved; residual concerns are operational, deferred, or rejected
+⚠  Drifting — coherent intent undermined by accumulating decisions
 ```
 
-**In one sentence:** The evaluator→interpreter cycle is broken, the dispatch table is complete, and Config/Runtime are separated; the open structural concern is temp-file cleanup on abnormal termination.
+**In one sentence:** The three-tier execution model is sound and well-documented, but global mutable state has become load-bearing infrastructure, making every core subsystem untestable in isolation and each new feature a tightrope walk over invisible contracts.
 
 ---
 
@@ -24,31 +24,24 @@
 
 ### Findings
 
-**🔴 Problem — The evaluator depends on the interpreter** ✅ Fixed 2026-04-17
-`src/sdata-evaluator.adb`, line 1
-> `In_Same_Group` moved to `SData.Table`; `with SData.Interpreter` removed from evaluator; BY-var state mirrored via `Clear_By_Vars`/`Add_By_Var`.
+**⚠ Concern — Global package state as the integration bus**
+`src/sdata-interpreter.adb:56–172, src/sdata-evaluator.adb:62–63, src/sdata-table.ads:135–154`
 
-```ada
-with SData.Interpreter;
-```
+The interpreter, evaluator, and table communicate entirely through package-level mutable state rather than explicit parameter passing. `BOG_Flag`/`EOG_Flag` live in `sdata-evaluator.adb` and are set by the interpreter's data step loop before each record — a dependency the evaluator's package spec does not declare. The BY variable list is duplicated: `Current_By_Vars` in the interpreter (line 59) and `Table_By_Vars` in the table, populated together on every `BY` statement but owned cleanly by neither. `Select_Filter_Expr` persists as a package-level variable in the interpreter between RUNs. This pattern removes all explicit seams between the three major subsystems; any cross-subsystem interaction becomes an implicit contract maintained by convention rather than type.
 
-The intended dependency direction is `Interpreter → Evaluator`: the interpreter drives the data step, calls the evaluator to compute expressions, and owns BY-group state. Instead, the evaluator reaches back into `SData.Interpreter` to call `In_Same_Group` (lines 801, 834) when computing `LAG` and `NEXT` across group boundaries. This is a cycle at the body level: the evaluator cannot be compiled, loaded, or tested without the interpreter, and the interpreter cannot be tested without the evaluator. Any future change to `In_Same_Group`'s contract requires understanding both packages simultaneously. This is the most structurally consequential problem in the codebase.
+**🔴 Problem — Dual program buffer: two representations of the same data kept in sync**
+`src/sdata-interpreter.adb:56–171`
 
-**⚠ Concern — The dispatch table refactoring is half-complete** ✅ Fixed 2026-04-17
-`src/sdata-evaluator.adb`, lines 39–43 (comment), `Handle_Math`, `Handle_Trig`
-> All four shared family handlers dissolved; 53 per-function subprograms registered individually. Dispatch table is now the sole dispatch layer.
+`Active_Program_Head/Tail` (a linked list) and `Active_Program_Vec` (an `Ada.Containers.Vectors` vector) are both maintained in parallel. The linked list is used for execution traversal; the vector for indexed access (LIST, DELETE n[-m]). `Add_To_Active_Program` appends to both (lines 159–171). This is two authoritative representations of one data structure. Any future code path that appends to only one produces silent corruption. A single indexed vector supports both O(1) index access and in-order iteration — the linked list is redundant.
 
-The comment documents the current state honestly: "Math, trig, aggregate, and misc families share a handler and use Name to discriminate among members." String, navigation, and statistics functions each have a dedicated Ada subprogram registered individually in the dispatch table. But `Handle_Math`, `Handle_Trig`, and the aggregate/misc handlers are shared functions with internal if-elsif chains. The per-function dispatch table pattern is already in the codebase — finishing the migration for the math and trig families is mechanical work, not design work.
+**⚠ Concern — `Run_One_Step` conflates six distinct concerns**
+`src/sdata-interpreter.adb:~1800+`
 
-**⚠ Concern — `Config` bundles three distinct responsibilities** ✅ Fixed 2026-04-17
-`src/sdata-config.ads`
-> Runtime state extracted to `SData.Config.Runtime` child package with its own `Reset` procedure. `SData.Config` is now spec-only (CLI startup configuration only). Version constants remain in `SData.Config`; separation to `SData.Version` deferred.
-
-The Config package holds: (1) static CLI configuration (Input_Format, Output_Format, file paths, constraint limits, mode flags), (2) runtime interpreter state in `Runtime_State_Record` (Save pending, REPEAT mode, FPATH directories), and (3) version metadata (Version_Major/Minor/Patch). The introduction of `Runtime_State_Record` is a real improvement — runtime state is now explicitly grouped and `Reset_Runtime_State` has a clear scope. But all three responsibilities still live in one package, so any package that needs only version info must `with` the same package that owns mutable runtime state.
+The data step's core loop combines filter rebuilding, logical row count determination, BOG/EOG computation, per-record body execution, output flushing, and table commit — all in one procedure acting entirely through global state. The three-tier model documented at the top of the file is correct; its implementation makes each tier invisible from the outside and impossible to test independently.
 
 ### Fowler's Recommendation
 
-Break the evaluator→interpreter cycle first. `In_Same_Group` compares BY-group membership for two physical row indices — this is a function of BY-variable state, not of the interpreter. Moving it to `SData.Table` (which already owns row/column structures) removes the back-dependency entirely and costs nothing in behavior. Complete the dispatch table migration for `Handle_Math` and `Handle_Trig`: each function in those families is already handled identically in structure to the string/navigation functions. Separate version constants into `SData.Version` (a pure constants package with no mutable state) as a first step toward splitting Config.
+Introduce an explicit `Interpreter_Context` record carrying BOG/EOG flags, the BY variable list, the filter expression, and the per-record deletion flag. Pass it as an `in out` parameter through the data step chain rather than relying on package-level globals. This is the *Replace Global State with Context Object* refactoring. It does not require changing the execution model at all, but it creates explicit seams where tests can inject state and components can be understood — and changed — in isolation.
 
 ---
 
@@ -58,21 +51,24 @@ Break the evaluator→interpreter cycle first. `In_Same_Group` compares BY-group
 
 ### Findings
 
-**🔴 Problem — Circular dependency inverts the evaluator's intended role** ✅ Fixed 2026-04-17
-`src/sdata-evaluator.adb`, line 1; `src/sdata-interpreter.ads`, line 28
-> See Fowler finding above.
+**🔴 Problem — SRP violation: `sdata-evaluator.adb` is a God Object**
+`src/sdata-evaluator.adb` (2,589 lines)
 
-The evaluator exists to serve the interpreter. In no layered architecture should the evaluator depend on the interpreter. The current cycle means that `In_Same_Group` — a query about BY-group membership — is declared on the interpreter's public interface even though it is only called by the evaluator. This pollutes the interpreter's API surface with an obligation that belongs elsewhere, and it makes it impossible to satisfy the Dependency Inversion Principle: there is no abstraction the evaluator can depend on that the interpreter also satisfies without the cycle.
+The evaluator implements expression tree traversal, ~100 built-in functions (mathematical, string, statistical, date/time, table navigation), and the dispatch table that routes function calls. The dispatch table pattern (`Dispatch_Table : Fn_Maps.Map`) is the right call for extensibility — but all handler bodies are co-located in the same 2,589-line compilation unit. Statistical distribution functions (Normal CDF, Student's t, F-distribution) and string manipulation functions (SUBSTR, TRIM, PAD) have no architectural reason to share a file with the expression tree evaluator. When a function has a bug, diagnosing it means navigating ~2,000 lines of unrelated context.
 
-**⚠ Concern — Config SRP: three responsibilities, one package** ✅ Fixed 2026-04-17
-`src/sdata-config.ads`
-> See Fowler finding above.
+**⚠ Concern — Reversed dependency direction: interpreter drives evaluator's internal state**
+`src/sdata-evaluator.adb:62–63, src/sdata-evaluator.ads`
 
-The `Runtime_State_Record` grouping is a step in the right direction — runtime state can now be reset atomically via `Reset_Runtime_State`. But `SData.Config` is still both the package a CLI argument parser writes to and the package the interpreter reads runtime state from. A package that is simultaneously a startup-configuration store and a per-run mutable state store cannot have its invariants reasoned about independently.
+`BOG_Flag` and `EOG_Flag` are private to `sdata-evaluator.adb`, set by the interpreter calling `Set_BOG`/`Set_EOG`. The evaluator's package spec advertises `Evaluate` and function dispatch; the caller side-effects the evaluator's private state before calling `Evaluate`. A reader of the evaluator package spec sees no indication that it has externally-driven state. This dependency runs backwards and is invisible from both call sites and the callee's interface.
+
+**⚠ Concern — Magic constant 32 for name lengths scattered across types**
+`src/sdata-table.ads:122, src/sdata-table.ads:66, src/sdata-interpreter.adb:133`
+
+`String(1..32)` appears in `Column.Name`, `Sort_Criteria.Name`, and `Column_Mod_Node.Name` — three separate struct definitions with no named constant tying them together. The limit of 32 characters for column names is a hidden contract. A user with a 33-character column name from a wide spreadsheet will hit a Constraint_Error at a surprising location. If the limit needs to change, there is no compile-time guarantee that all three definitions were updated.
 
 ### Uncle Bob's Recommendation
 
-Move `In_Same_Group` to `SData.Table` and remove the `with SData.Interpreter` clause from `sdata-evaluator.adb` — this is the minimal change that breaks the cycle. For Config: extract `SData.Config.Runtime` as a child package (or a top-level `SData.Runtime` package) that holds `Runtime_State_Record` and `Reset_Runtime_State`. This gives the interpreter a clean target to `with` without pulling in CLI-level configuration concerns.
+Extract function families into child packages: `SData.Evaluator.Math`, `SData.Evaluator.Strings`, `SData.Evaluator.Statistics`, `SData.Evaluator.Table_Navigation`. The dispatch table registration remains in the parent; handler bodies move to their natural home. For the BOG/EOG coupling, declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with a comment stating the caller's obligation — the coupling stays but becomes a visible contract rather than a hidden side effect. For the 32 constant, introduce `Max_Name_Len : constant Positive := 32` in the root `SData` package and reference it from all three struct definitions.
 
 ---
 
@@ -82,14 +78,19 @@ Move `In_Same_Group` to `SData.Table` and remove the `with SData.Interpreter` cl
 
 ### Findings
 
-**⚠ Concern — Output comparison tests at the suite boundary, nothing below it**
-`tests/`
+**🔴 Problem — Integration-only coverage: critical paths have no unit test harness**
+`tests/*.cmd, src/csv_unit_test.adb`
 
-All 77 tests exercise the full pipeline: parse → interpret → evaluate → render output → diff. There are no unit tests for `SData.Statistics` (are the distribution implementations correct?), `SData.Table` (does the filter index rebuild correctly after column modification?), or `SData.Evaluator` (does `ROUND(1.5)` round correctly?). The regression suite catches regressions in observed output but gives no signal when an internal invariant breaks silently. A bug that produces wrong numbers but the same number of lines will pass.
+There are 114 integration tests. There is one unit test binary (`csv_unit_test`) covering CSV parsing. There are zero unit tests for expression evaluation, parser correctness, table operations, BY-group detection, filter index map logic, or interpreter state management. The `Set_Index_Map` zero-match bug (fixed 2026-05-04) was latent because the only way to exercise "SELECT that matches nothing" was to write an integration test for it explicitly. Integration tests find bugs that produce wrong output. They do not find bugs in code paths that produce *no output* — deleted records, zero-match filters, empty groups — except by deliberately crafting coverage for each silent path.
+
+**⚠ Concern — Statistical functions have no numerical regression tests**
+`src/sdata-evaluator.adb` (statistical function handlers)
+
+The distribution functions (`NORMINV`, `TINV`, `FINV`, `CHIINV`, and their CDF counterparts) implement non-trivial numerical algorithms. They are tested only insofar as integration tests happen to call them. Known-value tests (`NORMINV(0.975) ≈ 1.96`, `TINV(0.025, 30) ≈ −2.042`) do not exist. A ported or modified algorithm with a small coefficient error would pass the current test suite as long as the output rounds to the same number of displayed decimal places.
 
 ### Beck's Recommendation
 
-Break the evaluator→interpreter cycle first — that is what creates the seam needed to write evaluator unit tests. Once the seam exists, add at minimum: (a) evaluator tests for boundary cases in `ROUND`, `MOD`, `LOG(0)`, and `IF` with a failing branch; (b) statistics tests for known CDF values against published tables. These do not need to be elaborate — even five tests per module would reduce the blast radius of a future refactor to something diagnosable.
+Add a `statistics_unit_test` binary that calls the evaluator's function handlers with reference values from published statistical tables. This is a two-hour task for the highest-risk unprotected code in the project. The evaluator's package interface is already the right abstraction — `Evaluate` takes an expression tree and returns a `Value`; a test can construct literal-value trees without running the interpreter at all. Start here, because this test requires no architectural change and directly protects the most failure-prone subsystem.
 
 ---
 
@@ -99,31 +100,28 @@ Break the evaluator→interpreter cycle first — that is what creates the seam 
 
 ### Findings
 
-**⚠ Concern — No test seam for the evaluator** ✅ Cycle broken 2026-04-17 — unit tests deferred to Phase 6
-`src/sdata-evaluator.adb`, line 1
+**💀 Structural Risk — No seam to test any interpreter behavior in isolation**
+`src/sdata-interpreter.adb` (entire package body)
 
-The evaluator→interpreter circular dependency means the evaluator has no visible seam. Any change to expression evaluation — a domain error fix, a rounding edge case, a missing-value propagation rule — can only be characterized through the full pipeline. If something breaks silently, the regression suite will not catch it if the output format is unchanged. This is the specific form in which the circular dependency inflicts ongoing cost: not as a compile error, but as a permanently coarse feedback loop for the package doing the most computational work.
+Every piece of interpreter state — the active program list, BY variables, filter expression, record deletion flag, submit chain, column modification queue — lives as package-level variables in the interpreter body. To test any single behavior (e.g., "does `Is_First_In_Group` return True for the first record of a new BY group?"), you must initialize the entire interpreter stack, feed it a data step, and observe console output. There is no way to call `Is_First_In_Group` with two rows and a BY variable list without first having run a `BY` command. This is the definition of a codebase where the blast radius of any change in the interpreter is bounded only by the integration test suite — which has structural gaps around silent code paths.
+
+**⚠ Concern — `NEW` command partial-reset invariant is untested**
+`src/sdata-interpreter.adb: Clear_Active_Program`
+
+`Clear_Active_Program` resets the program buffer, SELECT filter, BY vars, and index map. The `NEW` command also resets `Config.Runtime`. But state such as `Input_File_Columns`, `Submit_Chain`, and `Pending_Mods` appears in the interpreter body; their reset status under `NEW` is not obvious from reading. No test verifies that the sequence `USE "file1.csv" / LET X = 1 / RUN / NEW / USE "file2.csv" / RUN` leaves the interpreter in a clean state. The correctness of multi-step interactive sessions depends on which variables `NEW` resets — a contract that exists only in the implementation, not in any test.
 
 ### Feathers's Recommendation
 
-Sprout technique for the evaluator refactor: do not attempt to unit-test the existing `Evaluate_Function` before breaking the cycle — the cycle prevents it. Instead, break the cycle (move `In_Same_Group`), then write a minimal test harness that calls `SData.Evaluator.Evaluate_Function` directly. The regression suite provides adequate coverage for the cycle-breaking step itself, since that is a mechanical move of one 15-line function with no behavior change.
+Apply the Sprout Function technique to `Is_First_In_Group` and `Is_Last_In_Group` first. Extract a pure function:
 
----
+```ada
+function Group_Flags
+  (Logical_I     : Positive;
+   Logical_Count : Natural;
+   By_Vars       : By_Group_Names.Vector) return (BOG, EOG : Boolean);
+```
 
-## Kleppmann — Data Integrity & Persistence
-
-> *Durability, consistency, failure modes, data pipeline correctness*
-
-### Findings
-
-**⚠ Concern — Temp file cleanup is best-effort under abnormal termination**
-`src/sdata-table.adb`, `Backing_Store.Finalize`
-
-The `Backing_Store` type's `Finalize` method deletes the SQLite temp file on normal exit and on unhandled exception unwind. This correctly handles the common cases. It does not run when the process is terminated by `SIGKILL`, a segfault, or the OOM killer. A batch job processing a 500 MB dataset spills to a 500 MB SQLite temp file; if killed by the OOM killer mid-run, the temp file is never deleted. This is a known limitation of the controlled-type cleanup pattern in Ada, not a defect in the implementation. But for a tool that may process large datasets on resource-constrained machines, accumulating orphan temp files in `/tmp` is a realistic operational problem.
-
-### Kleppmann's Recommendation
-
-Register a POSIX signal handler at startup (via `Ada.Interrupts` or `GNAT.Signal_Stack`) that records the temp file path and deletes it on `SIGTERM`/`SIGINT`/`SIGSEGV`. `SIGKILL` cannot be caught — that is a kernel-level constraint — but the OOM killer sends `SIGTERM` before escalating, and a user pressing Ctrl+C sends `SIGINT`. Catching those two covers the majority of abnormal-termination cases that leave orphan files.
+This function takes its inputs as parameters and returns its outputs as values with no global state access. Route the data step loop through it. This single seam gives Beck a testable entry point for BY-group logic and gives Feathers a safe place to change it without a full integration test run after every edit.
 
 ---
 
@@ -133,14 +131,46 @@ Register a POSIX signal handler at startup (via `Ada.Interrupts` or `GNAT.Signal
 
 ### Findings
 
-**⚠ Concern — The configuration surface conflates two distinct user models**
-`src/sdata_main.adb`, CLI argument handling
+**⚠ Concern — LET vs. SET asymmetry is load-bearing but underexplained**
+`man/man1/sdata.1`
 
-The CLI has two usage modes: batch processor and interactive REPL. The flags `--infmt` and `--outfmt` override format detection — they address edge cases that normal users never encounter. A user who knows about `filename[sheet]` syntax for multi-sheet files does not need `--infmt`; a user who doesn't know about it won't understand what `--infmt` does. These flags add four lines to the help output and create a source of confusion: users who set `--infmt CSV` and then `USE file.xlsx` inside the script will get surprising results.
+The language has both `LET` and `SET`. `LET` assigns to a data step variable (reset by `NEW`); `SET` assigns to a permanent variable (persists across `NEW`). This is a meaningful and intentional distinction. But arriving at the right choice requires understanding the PDV, the permanent/temporary variable distinction, and the data step execution model — none of which are explained before the command reference. A first-time user will use `LET` everywhere and be surprised when an accumulator resets between data steps, or will use `SET` everywhere and be surprised when a column disappears after the step. The asymmetry is correct; the path to understanding it is not visible from the interface.
+
+**⚠ Concern — CLI flag surface lacks grouping and visual structure**
+`src/sdata_main.adb` (option parsing), `--help` output
+
+The flags fall into three natural groups: sizing (`-m`, `-t`, `--clen`), behavior (`--noshell`, `--ignore-math-errors`, `-k`), and I/O (`-p`, `-o`, `-q`). The `-h` output lists them flat. `--noshell` silently disables `-p` — a non-obvious interaction buried in the `-p` description. The man page is well-organized; the inline help is not. For a developer-facing tool this is minor, but coherence between `-h` output and the man page structure costs one afternoon.
 
 ### Jobs's Recommendation
 
-Audit whether `--infmt` and `--outfmt` are exercised by any test that couldn't be replaced by the `filename[sheet]` syntax or by extension-based detection. If not, deprecate them in the next minor release with a visible deprecation warning. The help output should describe what a first-time user needs, not every flag the parser can accept.
+Add a `CONCEPTS` or `INTRO` help topic accessible from the interpreter (`HELP CONCEPTS`) that explains the PDV, the LET vs. SET contract, and the BY-group model in two pages before the user reads any command reference. The interface is correct; the explanation is missing. For the CLI flags, group them in `-h` output with headers (Sizing, Behavior, Output) to match the man page structure.
+
+---
+
+## Wozniak — Engineering Economy & Elegance
+
+> *Unnecessary complexity, algorithmic waste, abstraction tax, genuine ingenuity*
+
+### Findings
+
+**🔴 Problem — Linked list + vector: the simplest data structure pays a maintenance tax**
+`src/sdata-interpreter.adb:56–171`
+
+`Active_Program_Head/Tail` (linked list) and `Active_Program_Vec` (vector) maintain the same ordered sequence of program statements. Ada's `Ada.Containers.Vectors` supports O(1) indexed access (`Vec(I)`) and forward iteration — it subsumes the linked list entirely. The linked list fields (`Head`, `Tail`, `Stmt.Next`) add state to every statement node; `Add_To_Active_Program` spends six lines keeping them in sync. The entire linked list exists as a historical artifact. Its removal is a safe mechanical refactoring with a directly verifiable outcome.
+
+**⚠ Concern — BY variable list duplicated between interpreter and table**
+`src/sdata-interpreter.adb:59, src/sdata-table.adb:513–544`
+
+`Current_By_Vars` in the interpreter and `Table_By_Vars` in the table are both ordered vectors of active BY variable names. When a `BY` statement executes, both are populated. `Is_First_In_Group`/`Is_Last_In_Group` in the interpreter use `Current_By_Vars`; `In_Same_Group` in the table uses `Table_By_Vars`. Both implement "are these two records in the same BY group?" with different interfaces and independently maintained state. There is one concept in two places kept in sync by a caller. The canonical copy should live in one location; the other should query it.
+
+**⚠ Concern — Magic constant 32 is a hidden system limit with no compile-time alarm**
+`src/sdata-table.ads:122, :66, src/sdata-interpreter.adb:133`
+
+Three struct definitions independently hard-code `String(1..32)` for name storage. Any change to the name length limit requires finding all three by grep, with no compile-time assurance they were all updated. The fix is trivial: one named constant in the root package, three references. This is the definition of a change that costs five minutes now or an hour finding the third struct at 2 AM later.
+
+### Wozniak's Recommendation
+
+Remove the linked list entirely — replace `Active_Program_Head/Tail` and `Stmt.Next` traversal with direct vector iteration. This reduces the statement node type, simplifies `Add_To_Active_Program` to a single `Append`, and eliminates the sync hazard. For the 32 constant: introduce `Max_Name_Len : constant Positive := 32` in `sdata.ads` or `sdata-values.ads` and reference it from every struct. Both changes are purely mechanical with no behavioral effect; both can be verified by running `make check`.
 
 ---
 
@@ -148,30 +178,34 @@ Audit whether `--infmt` and `--outfmt` are exercised by any test that couldn't b
 
 ### Dominant Failure Mode
 
-~~**The evaluator→interpreter circular dependency**~~ ✅ Resolved 2026-04-17. The cycle is broken, the dispatch table is complete, and `SData.Config.Runtime` is a separate child package. The seam needed for evaluator unit tests now exists; writing those tests is deferred to Phase 6.
-
-**The remaining open concern** is operational: abnormal process termination (SIGTERM, SIGINT, OOM kill) can leave orphaned SQLite temp files when the backing store is active. This is addressed by priority 5.
+**Global mutable state as the integration bus.** Every major subsystem communicates through package-level variables set externally and read implicitly. This is not a stylistic preference. It means every function that reads `BOG_Flag`, `Filter_Map`, or `Current_By_Vars` has an invisible pre-condition that another package set that state correctly before the call. The `Set_Index_Map` zero-match bug is a direct consequence: the contract "null = no filter / non-null = filter active" was implicit, the zero-length case was not enumerated, and no test could isolate the sentinel logic without running a full data step. As new features land — particularly any that extend BY-group processing, selective execution, or multi-step data operations — this pattern will produce more subtle bugs of exactly the same character.
 
 ### Highest-Leverage Intervention
 
-~~**Break the evaluator→interpreter circular dependency.**~~ Done. The current highest-leverage remaining action is registering SIGTERM/SIGINT cleanup handlers (priority 5) to address the operational temp-file concern.
+**Introduce `Interpreter_Context` and thread it through `Run_One_Step`.** The type carries BOG/EOG flags, the BY variable list, the filter expression, and the per-record deletion flag. The data step loop creates a context, populates it, and passes it down to `Process_One_Record`, `Is_First_In_Group`, and transitively to `Evaluate`. Package-level globals become initialization values for this context, not the canonical store during execution. This one change surfaces the invisible contracts that the current code enforces by convention, enables unit tests for `Is_First_In_Group` and BOG/EOG logic, eliminates the BY-variable duplication, removes the reversed evaluator dependency, and eliminates the partial-reset hazard — all at once, without rewriting the execution model.
+
+### Where the Voices Disagree
+
+Beck and Feathers both say "add tests first," but disagree on feasibility. Beck can add statistical unit tests today with no architectural change — those functions have deterministic inputs and outputs and do not touch global state. Start there. For the interpreter's core logic, Feathers is right that no unit test seam exists without the context-object refactoring first. The resolution is Beck's two-hour statistics test first (immediate value, no risk), then Feathers's Sprout Function for `Is_First_In_Group` (small safe seam), then the broader context-object refactoring when confidence in the seam pattern is established.
 
 ### Prioritized Remediation Order
 
-| Priority | Action | Voice(s) | Effort | Risk if Deferred | Status |
-|---|---|---|---|---|---|
-| 1 | Break evaluator→interpreter cycle: move `In_Same_Group` to `SData.Table` | Fowler, Uncle Bob, Beck, Feathers | S | High — structural; blocks unit testing and safe dispatch-table refactor | ✅ Fixed 2026-04-17 |
-| 2 | Complete dispatch table: per-function handlers for `Handle_Math` and `Handle_Trig` | Fowler | M | Med — deferring makes it harder as math family grows | ✅ Fixed 2026-04-17 |
-| 3 | Extract `SData.Config.Runtime` (or `SData.Runtime`) from `SData.Config` | Uncle Bob, Fowler | M | Low now; Med as feature count grows | ✅ Fixed 2026-04-17 |
-| 4 | Add evaluator and statistics unit tests (enabled by item 1) | Beck | M | Med — silent internal breakage goes undetected | ⏸ Deferred to Phase 6 |
-| 5 | Register SIGTERM/SIGINT handler for temp file cleanup | Kleppmann | S | Low — operational nuisance; SIGKILL cannot be caught regardless | ✅ Fixed 2026-04-17 |
-| 6 | Audit and deprecate `--infmt`/`--outfmt` if redundant | Jobs | S | Low — cosmetic but reduces help-text confusion | ❌ Rejected |
+| Priority | Action | Voice(s) | Effort | Risk if Deferred |
+|---|---|---|---|---|
+| 1 | Add `statistics_unit_test` with reference values for distribution functions | Beck | S | Med — numerical regressions catch silently |
+| 2 | Introduce `Max_Name_Len` constant; reference from all three struct definitions | Wozniak | S | Low (until a name exceeds 32 chars) |
+| 3 | Replace linked list with vector in program buffer; remove `Stmt.Next` | Wozniak | S | Med — sync hazard grows with each new program manipulation feature |
+| 4 | Declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with caller contract | Uncle Bob | S | Low — invisible coupling accretes silently |
+| 5 | Sprout `Group_Flags` pure function from `Is_First_In_Group`/`Is_Last_In_Group` | Feathers | S | High — BY-group logic has no test seam; next BY bug will repeat the pattern |
+| 6 | Introduce `Interpreter_Context`; thread through data step chain | Fowler, Feathers | L | High — each new stateful feature deepens the global state problem |
+| 7 | Extract evaluator function families into child packages | Uncle Bob | M | Med — file grows with each new function; navigation cost compounds |
+| 8 | Add `CONCEPTS` help topic explaining PDV, LET/SET, BY-group model | Jobs | S | Low — but user confusion accumulates without a conceptual entry point |
 
 ---
 
 ## Caveats & Scope Limitations
 
-The deployment pipeline (packaging scripts for RPM, DEB, SlackBuild, macOS) was not exercised — findings are based on CI configuration and Makefile inspection only. The mathematical correctness of the statistical distributions in `SData.Statistics` was not independently verified against published tables; the implementation uses standard numerical methods but was not validated against reference values. The ODF/OOXML parsing paths in `SData.File_IO` were reviewed structurally but not traced through the XML/Ada library behavior under malformed input.
+The lexer, parser, and AST subsystems (`src/lexer/`, `src/parser/`, `src/ast/`) were not reviewed in depth — findings reflect the interpreter and evaluator only. The file I/O subsystem (`sdata-file_io.adb`, 1,646 lines) was not examined for ODF/OOXML parsing paths; the global state findings apply there but were not specifically evidenced. Packaging scripts (RPM spec, Debian control, SlackBuild) were not evaluated for correctness.
 
 ---
 
