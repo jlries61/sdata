@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.6.7
+Version:        0.6.8
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -52,6 +52,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Tue May 05 2026 John L. Ries <john@theyarnbard.com> - 0.6.8-1
+- Refactor evaluator into child packages; add HELP CONCEPTS; correct SET variable description.
+
 * Sat May 02 2026 John L. Ries <john@theyarnbard.com> - 0.6.7-1
 - HELP coverage (8 tests); CI binary guard; DIM resize fix + expand/shift tests (110 total)
 

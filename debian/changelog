@@ -1,3 +1,9 @@
+sdata (0.6.8-1) unstable; urgency=medium
+
+  * Refactor evaluator into child packages; add HELP CONCEPTS; correct SET variable description.
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 05 May 2026 16:13:20 -0700
+
 sdata (0.6.7-1) unstable; urgency=medium
 
   * HELP coverage (8 tests); CI binary guard; DIM resize fix + expand/shift tests (110 total)
