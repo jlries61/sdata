@@ -85,6 +85,12 @@ package body SData.Interpreter is
 
    type Step_Action is (Action_Continue, Action_Step, Action_Run);
 
+   --  Result type for the Group_Flags pure function.
+   type Group_Flags_Result is record
+      BOG : Boolean;
+      EOG : Boolean;
+   end record;
+
    --  Forward declarations for internal logic.
    procedure Execute_Statement    (Stmt : Statement_Access);
    procedure Execute_List         (List : Statement_Access; Boundary : Statement_Access := null);
@@ -95,8 +101,10 @@ package body SData.Interpreter is
    procedure Execute_Program_Delete  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
-   function  Is_First_In_Group    (Logical_Idx : Positive) return Boolean;
-   function  Is_Last_In_Group     (Logical_Idx : Positive; Logical_Count : Natural) return Boolean;
+   function  Group_Flags (Logical_I     : Positive;
+                          Logical_Count : Natural;
+                          By_Vars       : By_Group_Names.Vector)
+                          return Group_Flags_Result;
    procedure Rebuild_Filter_Map;
    procedure Process_One_Record   (Logical_I        : Positive;
                                     Logical_Count    : Natural;
@@ -1744,39 +1752,56 @@ package body SData.Interpreter is
    --  Logical_Idx is a 1-based position into the filtered view, and
    --  Logical_To_Physical maps it to the actual table row for value comparisons.
    --  When unfiltered, logical == physical.
-   function Is_First_In_Group (Logical_Idx : Positive) return Boolean is
-      Phys_Curr  : constant Positive := SData.Table.Logical_To_Physical (Logical_Idx);
-      Phys_Prev  : Positive;
-      Curr_Value : Value;
-      Prev_Value : Value;
+   --  Group_Flags — compute BOG and EOG for one logical row.
+   --
+   --  Accepts the BY variable list as an explicit parameter so the function
+   --  reads no global interpreter state; its result is fully determined by
+   --  its arguments and the current table contents.  This is the seam that
+   --  makes BY-group logic independently inspectable and testable.
+   function Group_Flags (Logical_I     : Positive;
+                         Logical_Count : Natural;
+                         By_Vars       : By_Group_Names.Vector)
+                         return Group_Flags_Result
+   is
+      Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Logical_I);
+      BOG, EOG  : Boolean;
    begin
-      if Logical_Idx = 1 then return True; end if;
-      if Current_By_Vars.Is_Empty then return False; end if;
-      Phys_Prev := SData.Table.Logical_To_Physical (Logical_Idx - 1);
-      for V of Current_By_Vars loop
-         Prev_Value := Get_Value (Phys_Prev, To_String (V));
-         Curr_Value := Get_Value (Phys_Curr, To_String (V));
-         if not (Curr_Value = Prev_Value) then return True; end if;
-      end loop;
-      return False;
-   end Is_First_In_Group;
+      if By_Vars.Is_Empty then
+         return (BOG => Logical_I = 1, EOG => Logical_I = Logical_Count);
+      end if;
 
-   function Is_Last_In_Group (Logical_Idx : Positive; Logical_Count : Natural) return Boolean is
-      Phys_Curr  : constant Positive := SData.Table.Logical_To_Physical (Logical_Idx);
-      Phys_Next  : Positive;
-      Curr_Value : Value;
-      Next_Value : Value;
-   begin
-      if Logical_Idx = Logical_Count then return True; end if;
-      if Current_By_Vars.Is_Empty then return False; end if;
-      Phys_Next := SData.Table.Logical_To_Physical (Logical_Idx + 1);
-      for V of Current_By_Vars loop
-         Curr_Value := Get_Value (Phys_Curr, To_String (V));
-         Next_Value := Get_Value (Phys_Next, To_String (V));
-         if not (Curr_Value = Next_Value) then return True; end if;
-      end loop;
-      return False;
-   end Is_Last_In_Group;
+      BOG := Logical_I = 1;
+      if not BOG then
+         declare
+            Phys_Prev : constant Positive := SData.Table.Logical_To_Physical (Logical_I - 1);
+         begin
+            for V of By_Vars loop
+               if not (Get_Value (Phys_Curr, To_String (V)) =
+                       Get_Value (Phys_Prev, To_String (V))) then
+                  BOG := True;
+                  exit;
+               end if;
+            end loop;
+         end;
+      end if;
+
+      EOG := Logical_I = Logical_Count;
+      if not EOG then
+         declare
+            Phys_Next : constant Positive := SData.Table.Logical_To_Physical (Logical_I + 1);
+         begin
+            for V of By_Vars loop
+               if not (Get_Value (Phys_Curr, To_String (V)) =
+                       Get_Value (Phys_Next, To_String (V))) then
+                  EOG := True;
+                  exit;
+               end if;
+            end loop;
+         end;
+      end if;
+
+      return (BOG => BOG, EOG => EOG);
+   end Group_Flags;
 
    --  Rebuild_Filter_Map — re-evaluates the SELECT filter against the current
    --  table and installs the resulting logical index map.  Called once at the
@@ -1852,27 +1877,17 @@ package body SData.Interpreter is
       Load_PDV_From_Table (Phys_I);
 
       declare
-         BOG_Val : Boolean;
+         Flags : constant Group_Flags_Result :=
+            Group_Flags (Logical_I, Logical_Count, Current_By_Vars);
       begin
-         if not Current_By_Vars.Is_Empty then
-            declare
-               EOG_Val : constant Boolean := Is_Last_In_Group (Logical_I, Logical_Count);
-            begin
-               BOG_Val := Is_First_In_Group (Logical_I);
-               Set_BOG (BOG_Val);
-               Set_EOG (EOG_Val);
-               for V of Current_By_Vars loop
-                  declare Name : constant String := To_String (V); begin
-                     Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if BOG_Val then 1 else 0)));
-                     Set_Temporary ("LAST."  & Name, (Kind => Val_Integer, Int_Val => (if EOG_Val then 1 else 0)));
-                  end;
-               end loop;
+         Set_BOG (Flags.BOG);
+         Set_EOG (Flags.EOG);
+         for V of Current_By_Vars loop
+            declare Name : constant String := To_String (V); begin
+               Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if Flags.BOG then 1 else 0)));
+               Set_Temporary ("LAST."  & Name, (Kind => Val_Integer, Int_Val => (if Flags.EOG then 1 else 0)));
             end;
-         else
-            BOG_Val := Logical_I = 1;
-            Set_BOG (BOG_Val);
-            Set_EOG (Logical_I = Logical_Count);
-         end if;
+         end loop;
 
          --  Emit record header with optional BY group annotation
          if SData.Config.Debug_Mode then
@@ -1881,7 +1896,7 @@ package body SData.Interpreter is
                   Ada.Strings.Unbounded.To_Unbounded_String
                      ("-- record" & Logical_I'Image & " (physical" & Phys_I'Image & ")");
             begin
-               if not Current_By_Vars.Is_Empty and then BOG_Val then
+               if not Current_By_Vars.Is_Empty and then Flags.BOG then
                   declare
                      Label : constant String :=
                         (if Logical_I = 1 then "BY GROUP START" else "BY GROUP CHANGE");
