@@ -1,6 +1,6 @@
 # Codebase Review: `SData Statistical Data Interpreter`
 
-**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit c361a28)
+**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit 6bdecf1)
 **Scope:** Full source repository — all Ada source files, Makefile, test suite, packaging scripts
 **Domain:** Single-process batch/interactive interpreter for tabular statistical data processing, inspired by the Systat BASIC data step model
 **Stack:** Ada 2012, GNAT/GPRbuild, Zip-Ada / XML-Ada / MathPaqs / ada_sqlite3, SQLite3 backing store for large tables
@@ -51,10 +51,10 @@ Introduce an explicit `Interpreter_Context` record carrying BOG/EOG flags, the B
 
 ### Findings
 
-**🔴 Problem — SRP violation: `sdata-evaluator.adb` is a God Object**
-`src/sdata-evaluator.adb` (2,589 lines)
+**🔴 Problem — SRP violation: `sdata-evaluator.adb` is a God Object** ✅ *Resolved 6bdecf1*
+`src/sdata-evaluator.adb` (2,589 lines → 320 lines)
 
-The evaluator implements expression tree traversal, ~100 built-in functions (mathematical, string, statistical, date/time, table navigation), and the dispatch table that routes function calls. The dispatch table pattern (`Dispatch_Table : Fn_Maps.Map`) is the right call for extensibility — but all handler bodies are co-located in the same 2,589-line compilation unit. Statistical distribution functions (Normal CDF, Student's t, F-distribution) and string manipulation functions (SUBSTR, TRIM, PAD) have no architectural reason to share a file with the expression tree evaluator. When a function has a bug, diagnosing it means navigating ~2,000 lines of unrelated context.
+The evaluator implements expression tree traversal, ~100 built-in functions (mathematical, string, statistical, date/time, table navigation), and the dispatch table that routes function calls. The dispatch table pattern (`Dispatch_Table : Fn_Maps.Map`) is the right call for extensibility — but all handler bodies are co-located in the same 2,589-line compilation unit. Statistical distribution functions (Normal CDF, Student's t, F-distribution) and string manipulation functions (SUBSTR, TRIM, PAD) have no architectural reason to share a file with the expression tree evaluator. When a function has a bug, diagnosing it means navigating ~2,000 lines of unrelated context. *Fix: six private child packages extract the handler families — `Numeric_Fns`, `Aggregate_Fns`, `String_Fns`, `Nav_Fns`, `Distrib_Fns`, `Misc_Fns`. `Dispatch_Table` moved to the parent spec's private part so child bodies self-register during elaboration via `Dispatch_Table.Insert` with no elaboration cycle. Parent body reduced to ~320 lines (pure expression tree evaluation). All 115 tests pass.*
 
 **⚠ Concern — Reversed dependency direction: interpreter drives evaluator's internal state**
 `src/sdata-evaluator.adb:62–63, src/sdata-evaluator.ads`
@@ -66,9 +66,9 @@ The evaluator implements expression tree traversal, ~100 built-in functions (mat
 
 `String(1..32)` appeared in `Column.Name`, `Sort_Criteria.Name`, and `Column_Mod_Node.Name` — three separate struct definitions with no named constant tying them together. The limit of 32 characters for column names was also incorrect per the design specification (64 is the documented maximum). Additional enforcement points existed in the parser, interpreter, file I/O, and table body. *Fix: six capacity constants introduced in `SData` root package (`Max_Name_Len`, `Max_Path_Len`, `Max_Sheet_Name_Len`, `Max_Delimiter_Len`, `Max_Charset_Len`, `Max_Options_Val_Len`); `Max_Name_Len` corrected to 64; all 13 affected source files updated.*
 
-### Uncle Bob's Recommendation
+### Uncle Bob's Recommendation ✅ *Implemented 6bdecf1*
 
-Extract function families into child packages: `SData.Evaluator.Math`, `SData.Evaluator.Strings`, `SData.Evaluator.Statistics`, `SData.Evaluator.Table_Navigation`. The dispatch table registration remains in the parent; handler bodies move to their natural home. For the BOG/EOG coupling, declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with a comment stating the caller's obligation — the coupling stays but becomes a visible contract rather than a hidden side effect. The magic-constant finding is resolved.
+Extract function families into child packages: `SData.Evaluator.Math`, `SData.Evaluator.Strings`, `SData.Evaluator.Statistics`, `SData.Evaluator.Table_Navigation`. The dispatch table registration remains in the parent; handler bodies move to their natural home. For the BOG/EOG coupling, declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with a comment stating the caller's obligation — the coupling stays but becomes a visible contract rather than a hidden side effect. The magic-constant finding is resolved. *Six child packages created under the names `Numeric_Fns`, `Aggregate_Fns`, `String_Fns`, `Nav_Fns`, `Distrib_Fns`, `Misc_Fns`. The BOG/EOG coupling was already resolved as `Set_Group_Boundary` in c361a28. The magic-constant finding was resolved in fae2d2d.*
 
 ---
 
@@ -198,7 +198,7 @@ Beck and Feathers both say "add tests first," but disagree on feasibility. Beck 
 | ~~1~~ | ~~Add `statistics_unit_test` with reference values for distribution functions~~ | Beck | — | ✅ *Done 33ec301 — `distrib_test`: 27 values across Normal/t/χ²/F/Exponential/Poisson using symmetry identities, closed-form constants (e⁻¹, e⁻², etc.), and CDF/IDF roundtrips* |
 | ~~3~~ | ~~Declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with caller contract~~ | Uncle Bob | — | ✅ *Done c361a28 — merged into `Set_Group_Boundary(BOG, EOG)` with full caller contract at the declaration; removed dead public `Is_BOG`/`Is_EOG`* |
 | ~~4~~ | ~~Introduce `Interpreter_Context`; thread through data step chain~~ | Fowler, Feathers | — | ✅ *Done d2d40bc — `Step_Context` (By_Vars, Deleted, BOG, EOG) threaded through entire data step chain; `Current_Record_Deleted` global eliminated; evaluator globals remain but are now derivatives of context* |
-| 5 | Extract evaluator function families into child packages | Uncle Bob | M | Med — file grows with each new function; navigation cost compounds |
+| ~~5~~ | ~~Extract evaluator function families into child packages~~ | Uncle Bob | — | ✅ *Done 6bdecf1 — six private child packages; parent body 2,589 → 320 lines; `Dispatch_Table` moved to spec private part for cycle-free self-registration* |
 | 6 | Add `CONCEPTS` help topic explaining PDV, LET/SET, BY-group model | Jobs | S | Low — but user confusion accumulates without a conceptual entry point |
 
 ---
