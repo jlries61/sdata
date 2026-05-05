@@ -208,12 +208,12 @@ install:
 # Convert the Unix man page to a self-contained HTML file, used by
 # the Windows installer in place of the man page.
 sdata.html: man/man1/sdata.1
-	@command -v groff >/dev/null 2>&1 || { echo "Error: groff not found"; exit 1; }
-	groff -man -Thtml $< > $@
+	@command -v pandoc >/dev/null 2>&1 || { echo "Error: pandoc not found"; exit 1; }
+	pandoc -s -f man -t html $< -o $@
 
 # Build a Windows MSI installer using the WiX Toolset (v4 or later;
 # v7 recommended). Requires: bin/sdata.exe (run 'make' under MinGW/MSYS
-# first), the 'wix' .NET tool, and groff on PATH. Install WiX with:
+# first), the 'wix' .NET tool, and pandoc on PATH. Install WiX with:
 #   dotnet tool install --global wix
 # Produces sdata-$(VERSION)-x64.msi.
 msi: build sdata.html
