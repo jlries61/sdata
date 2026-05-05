@@ -58,6 +58,16 @@ package body SData.Interpreter is
    --  grouping is active.  Populated by Stmt_BY; cleared by bare BY or NEW.
    Current_By_Vars : By_Group_Names.Vector;
 
+   --  Per-record execution context, created once per data step and threaded
+   --  through the entire execution chain.  Eliminates the Global_Record_Deleted
+   --  package variable and makes per-record state visible in signatures.
+   type Step_Context is record
+      By_Vars : By_Group_Names.Vector;
+      Deleted : Boolean := False;
+      BOG     : Boolean := False;
+      EOG     : Boolean := False;
+   end record;
+
    --  Program buffer vector — canonical program store; provides both indexed
    --  access (LIST, DELETE) and traversal order for RUN.
    type Program_Entry is record
@@ -92,11 +102,11 @@ package body SData.Interpreter is
    end record;
 
    --  Forward declarations for internal logic.
-   procedure Execute_Statement    (Stmt : Statement_Access);
-   procedure Execute_List         (List : Statement_Access; Boundary : Statement_Access := null);
+   procedure Execute_Statement    (Stmt : Statement_Access; Ctx : in out Step_Context);
+   procedure Execute_List         (List : Statement_Access; Ctx : in out Step_Context; Boundary : Statement_Access := null);
    procedure Execute_Assignment   (Stmt : Statement_Access);
    procedure Execute_Print        (Stmt : Statement_Access);
-   procedure Execute_Control_Flow (Stmt : Statement_Access);
+   procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context);
    procedure Execute_Metadata        (Stmt : Statement_Access);
    procedure Execute_Program_Delete  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
@@ -111,6 +121,7 @@ package body SData.Interpreter is
                                     Start            : Statement_Access;
                                     Boundary         : Statement_Access;
                                     Global_Has_Write : Boolean;
+                                    Ctx              : in out Step_Context;
                                     Pause_After      : Boolean := False;
                                     Action           : out Step_Action);
    procedure Commit_Step;
@@ -149,9 +160,6 @@ package body SData.Interpreter is
 
    Pending_Mods      : Column_Mod_List := null;
    Pending_Mods_Tail : Column_Mod_List := null;
-
-   --  State for Data Step record processing.
-   Current_Record_Deleted : Boolean := False;
 
    --  Persistent SELECT filter expression.  Set by Stmt_SELECT_FILTER and
    --  cleared by NEW.  The filter map is rebuilt from this expression at the
@@ -304,13 +312,14 @@ package body SData.Interpreter is
                         Put_Line_Error ("Usage: PRINT <expr>");
                      else
                         declare
-                           Ctx    : Parser_Context;
-                           Prog   : Statement_Access;
+                           Parse_Ctx : Parser_Context;
+                           Prog      : Statement_Access;
+                           Exec_Ctx  : Step_Context;
                         begin
-                           Initialize (Ctx, "PRINT " & Expr_Str);
-                           Prog := Parse_Program (Ctx);
+                           Initialize (Parse_Ctx, "PRINT " & Expr_Str);
+                           Prog := Parse_Program (Parse_Ctx);
                            if Prog /= null then
-                              Execute_Statement (Prog);
+                              Execute_Statement (Prog, Exec_Ctx);
                               SData.AST.Free_Program (Prog);
                            end if;
                         exception
@@ -881,7 +890,7 @@ package body SData.Interpreter is
    end Execute_Print;
 
    --  IF / WHILE / FOR / LOOP_REPEAT / SELECT — all control flow constructs.
-   procedure Execute_Control_Flow (Stmt : Statement_Access) is
+   procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context) is
    begin
       case Stmt.Kind is
          when Stmt_IF =>
@@ -890,19 +899,19 @@ package body SData.Interpreter is
             begin
                if Cond_Val then
                   Debug_Trace ("IF → TRUE");
-                  Execute_List (Stmt.Then_Branch);
+                  Execute_List (Stmt.Then_Branch, Ctx);
                else
                   if Stmt.Else_Branch /= null then
                      Debug_Trace ("IF → FALSE");
                      Debug_Trace ("ELSE → taken");
-                     Execute_List (Stmt.Else_Branch);
+                     Execute_List (Stmt.Else_Branch, Ctx);
                   else
                      Debug_Trace ("IF → FALSE (skipping)");
                   end if;
                end if;
             end;
          when Stmt_WHILE =>
-            while Is_True (Evaluate (Stmt.While_Cond)) loop Execute_List (Stmt.While_Body); end loop;
+            while Is_True (Evaluate (Stmt.While_Cond)) loop Execute_List (Stmt.While_Body, Ctx); end loop;
          when Stmt_FOR =>
             declare Start_Val : constant Value := Evaluate (Stmt.For_Start);
                     End_Val   : constant Value := Evaluate (Stmt.For_End);
@@ -923,7 +932,7 @@ package body SData.Interpreter is
                      begin
                         Set_Permanent (For_Var_Name, Loop_Val);
                         Debug_Trace ("FOR " & For_Var_Name & " = " & Debug_Value (Loop_Val));
-                        Execute_List (Stmt.For_Body);
+                        Execute_List (Stmt.For_Body, Ctx);
                      end;
                      Current_I := Current_I + ST;
                   end loop;
@@ -931,7 +940,7 @@ package body SData.Interpreter is
             end;
          when Stmt_LOOP_REPEAT =>
             loop
-               Execute_List (Stmt.Repeat_Body);
+               Execute_List (Stmt.Repeat_Body, Ctx);
                exit when Is_True (Evaluate (Stmt.Until_Cond));
             end loop;
          when Stmt_SELECT =>
@@ -946,7 +955,7 @@ package body SData.Interpreter is
                      begin
                         while Cond /= null loop
                            if Is_True (Evaluate (Cond.Expr)) then
-                              Execute_List (Branch.Branch_Body); Matched := True; exit;
+                              Execute_List (Branch.Branch_Body, Ctx); Matched := True; exit;
                            end if;
                            Cond := Cond.Next;
                         end loop;
@@ -956,7 +965,7 @@ package body SData.Interpreter is
                      begin
                         while Cond /= null loop
                            if Evaluate (Cond.Expr) = Val then
-                              Execute_List (Branch.Branch_Body); Matched := True; exit;
+                              Execute_List (Branch.Branch_Body, Ctx); Matched := True; exit;
                            end if;
                            Cond := Cond.Next;
                         end loop;
@@ -966,7 +975,7 @@ package body SData.Interpreter is
                   Branch := Branch.Next;
                end loop;
                if not Matched and then Stmt.Otherwise_Part /= null then
-                  Execute_List (Stmt.Otherwise_Part);
+                  Execute_List (Stmt.Otherwise_Part, Ctx);
                end if;
             end;
          when others => null;
@@ -1616,7 +1625,7 @@ package body SData.Interpreter is
       end case;
    end Execute_IO;
 
-   procedure Execute_Statement (Stmt : Statement_Access) is
+   procedure Execute_Statement (Stmt : Statement_Access; Ctx : in out Step_Context) is
 
    begin
       if Stmt = null then return; end if;
@@ -1628,7 +1637,7 @@ package body SData.Interpreter is
          when Stmt_QUIT | Stmt_END =>
             null;  --  Handled by loop termination in Execute.
          when Stmt_DELETE =>
-            Current_Record_Deleted := True;
+            Ctx.Deleted := True;
             Debug_Trace ("DELETE: record marked");
          when Stmt_BREAK =>
             if Stmt.Expr = null or else Is_True (Evaluate (Stmt.Expr)) then
@@ -1644,7 +1653,7 @@ package body SData.Interpreter is
          when Stmt_PRINT =>
             Execute_Print (Stmt);
          when Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT =>
-            Execute_Control_Flow (Stmt);
+            Execute_Control_Flow (Stmt, Ctx);
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET
             | Stmt_RENAME | Stmt_ARRAY | Stmt_DIM | Stmt_NAMES | Stmt_LIST | Stmt_DISPLAY =>
             Execute_Metadata (Stmt);
@@ -1662,13 +1671,13 @@ package body SData.Interpreter is
       end case;
    end Execute_Statement;
 
-   procedure Execute_List (List : Statement_Access; Boundary : Statement_Access := null) is
+   procedure Execute_List (List : Statement_Access; Ctx : in out Step_Context; Boundary : Statement_Access := null) is
       Curr : Statement_Access := List;
    begin
       if List = null then return; end if;
       while Curr /= null and then Curr /= Boundary loop
-         Execute_Statement (Curr);
-         exit when Current_Record_Deleted;
+         Execute_Statement (Curr, Ctx);
+         exit when Ctx.Deleted;
          Curr := Curr.Next;
       end loop;
    end Execute_List;
@@ -1840,6 +1849,7 @@ package body SData.Interpreter is
                                   Start            : Statement_Access;
                                   Boundary         : Statement_Access;
                                   Global_Has_Write : Boolean;
+                                  Ctx              : in out Step_Context;
                                   Pause_After      : Boolean := False;
                                   Action           : out Step_Action) is
       Phys_I : constant Positive := SData.Table.Logical_To_Physical (Logical_I);
@@ -1853,11 +1863,13 @@ package body SData.Interpreter is
 
       declare
          Flags : constant Group_Flags_Result :=
-            Group_Flags (Logical_I, Logical_Count, Current_By_Vars);
+            Group_Flags (Logical_I, Logical_Count, Ctx.By_Vars);
       begin
-         Set_BOG (Flags.BOG);
-         Set_EOG (Flags.EOG);
-         for V of Current_By_Vars loop
+         Ctx.BOG := Flags.BOG;
+         Ctx.EOG := Flags.EOG;
+         Set_BOG (Ctx.BOG);
+         Set_EOG (Ctx.EOG);
+         for V of Ctx.By_Vars loop
             declare Name : constant String := To_String (V); begin
                Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if Flags.BOG then 1 else 0)));
                Set_Temporary ("LAST."  & Name, (Kind => Val_Integer, Int_Val => (if Flags.EOG then 1 else 0)));
@@ -1871,13 +1883,13 @@ package body SData.Interpreter is
                   Ada.Strings.Unbounded.To_Unbounded_String
                      ("-- record" & Logical_I'Image & " (physical" & Phys_I'Image & ")");
             begin
-               if not Current_By_Vars.Is_Empty and then Flags.BOG then
+               if not Ctx.By_Vars.Is_Empty and then Flags.BOG then
                   declare
                      Label : constant String :=
                         (if Logical_I = 1 then "BY GROUP START" else "BY GROUP CHANGE");
                   begin
                      Ada.Strings.Unbounded.Append (Header, "  [" & Label & ":");
-                     for V of Current_By_Vars loop
+                     for V of Ctx.By_Vars loop
                         declare
                            Name    : constant String :=
                               Ada.Strings.Unbounded.To_String (V);
@@ -1912,7 +1924,7 @@ package body SData.Interpreter is
       end;
 
       Iter := Start;
-      Current_Record_Deleted := False;
+      Ctx.Deleted := False;
       SData.Table.Set_Record_Explicitly_Written (False);
 
       declare
@@ -1927,7 +1939,7 @@ package body SData.Interpreter is
                   | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
                   | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                   begin
-                     Execute_Statement (Iter);
+                     Execute_Statement (Iter, Ctx);
                   exception
                      when Break_Triggered =>
                         Inspect_PDV (Logical_I, Logical_Count, Act);
@@ -1947,7 +1959,7 @@ package body SData.Interpreter is
                   end;
                when others => null;
             end case;
-            exit when Current_Record_Deleted or else Break_Fired;
+            exit when Ctx.Deleted or else Break_Fired;
             Iter := Iter.Next;
          end loop;
 
@@ -1959,7 +1971,7 @@ package body SData.Interpreter is
 
       --  Automatic flush: if the step contains no explicit WRITE and the
       --  record was not deleted, write the final PDV state to the output table.
-      if not Current_Record_Deleted and then not Global_Has_Write then
+      if not Ctx.Deleted and then not Global_Has_Write then
          SData.Variables.Flush_PDV_To_Output;
       end if;
    end Process_One_Record;
@@ -2113,7 +2125,9 @@ package body SData.Interpreter is
       Step_Mode : Boolean :=
          SData.Config.Debug_Mode and then SData.IO.Is_Interactive;
       Act       : Step_Action := Action_Continue;
+      Ctx       : Step_Context;
    begin
+      Ctx.By_Vars := Current_By_Vars;
       Initialize_PDV;
       Resolve_Expr_Indices (Start, Boundary);
       SData.Table.Initialize_Output_Table;
@@ -2125,7 +2139,7 @@ package body SData.Interpreter is
       begin
          for Logical_I in 1 .. Logical_Count loop
             Process_One_Record (Logical_I, Logical_Count, Start, Boundary,
-                                Global_Has_Write,
+                                Global_Has_Write, Ctx,
                                 Pause_After => Step_Mode,
                                 Action      => Act);
             if Act = Action_Run then
@@ -2174,8 +2188,10 @@ package body SData.Interpreter is
             and then Current.Kind /= Stmt_DELETE  and then Current.Kind /= Stmt_WRITE
             and then Current.Kind /= Stmt_DIM     and then Current.Kind /= Stmt_BREAK
          then
+            declare
+               Outer_Ctx : Step_Context;
             begin
-               Execute_Statement (Current);
+               Execute_Statement (Current, Outer_Ctx);
             exception
                when E : Script_Error =>
                   if SData.Config.Continue_On_Error then
