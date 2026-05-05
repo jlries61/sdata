@@ -8,7 +8,7 @@
   Or via the Makefile: make msi
 
   Requires WiX Toolset v4 or later (v7 recommended). Install with:
-    dotnet tool install --global wix
+    dotnet tool install \-\-global wix
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
 
