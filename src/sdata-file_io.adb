@@ -54,7 +54,7 @@ package body SData.File_IO is
       T : constant String := Trim (S, Ada.Strings.Both);
    begin
       if T = "" then return Default; end if;
-      if T'Length > 32 then return T (T'First .. T'First + 31); end if;
+      if T'Length > Max_Name_Len then return T (T'First .. T'First + Max_Name_Len - 1); end if;
       return T;
    end Safe_Name;
 

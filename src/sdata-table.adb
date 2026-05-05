@@ -248,8 +248,8 @@ package body SData.Table is
             Col : Column := Data_Table.Element (Upper_Old);
          begin
             Col.Name := (others => ' ');
-            if Upper_New'Length > 32 then
-               Col.Name := Upper_New (Upper_New'First .. Upper_New'First + 31);
+            if Upper_New'Length > Max_Name_Len then
+               Col.Name := Upper_New (Upper_New'First .. Upper_New'First + Max_Name_Len - 1);
             else
                Col.Name (1 .. Upper_New'Length) := Upper_New;
             end if;

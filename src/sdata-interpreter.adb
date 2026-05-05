@@ -132,7 +132,7 @@ package body SData.Interpreter is
    type Column_Mod_List is access Column_Mod_Node;
    type Column_Mod_Node is record
       Kind : Column_Mod_Kind;
-      Name : String (1 .. 32);
+      Name : String (1 .. Max_Name_Len);
       Len  : Natural;
       Next : Column_Mod_List;
    end record;
@@ -506,8 +506,8 @@ package body SData.Interpreter is
    end Expand_Colon_Names;
 
    procedure Expand_Range (Kind : Column_Mod_Kind; Range_Spec : Variable_Range) is
-      Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
-      End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+      Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+      End_Name   : constant String := (if Range_Spec.End_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
       Start_Idx, End_Idx : Natural := 0;
    begin
       if not Range_Spec.Is_Range then
@@ -1001,8 +1001,8 @@ package body SData.Interpreter is
                   declare
                      State : constant Boolean := (Stmt.Kind = Stmt_HOLD);
                      procedure Set_Hold_For_Range (Range_Spec : Variable_Range) is
-                        Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
-                        End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                        Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                        End_Name   : constant String := (if Range_Spec.End_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
                         Start_Idx, End_Idx : Natural := 0;
                      begin
                         if not Range_Spec.Is_Range then
@@ -1061,8 +1061,8 @@ package body SData.Interpreter is
                   V        : Name_Vectors.Vector;
                   Curr_Var : Variable_List := Stmt.Arr_Vars;
                   procedure Resolve_Range (Range_Spec : Variable_Range) is
-                     Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. 32 then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
-                     End_Name   : constant String := (if Range_Spec.End_Len in 1 .. 32 then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
+                     Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
+                     End_Name   : constant String := (if Range_Spec.End_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
                      Start_Idx, End_Idx : Natural := 0;
                   begin
                      if not Range_Spec.Is_Range then
@@ -1303,7 +1303,7 @@ package body SData.Interpreter is
             SData.Config.Runtime.Repeat_Count := 0;
             declare
                File_Name  : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
-               Expanded   : String (1 .. 1024);
+               Expanded   : String (1 .. Max_Path_Len);
                Exp_Len    : Natural := 0;
                Eff_DLM     : constant String :=
                   (if Stmt.DLM_Len > 0

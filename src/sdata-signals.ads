@@ -31,7 +31,7 @@ private
       procedure On_SIGTERM;
       pragma Attach_Handler (On_SIGTERM, Ada.Interrupts.Names.SIGTERM);
    private
-      Temp_Path     : String (1 .. 1024) := (others => ' ');
+      Temp_Path     : String (1 .. Max_Path_Len) := (others => ' ');
       Temp_Path_Len : Natural            := 0;
    end Signal_Trap;
 

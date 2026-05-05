@@ -1283,7 +1283,7 @@ package body SData.Parser is
                   To_Upper (Key_Tok.Text (1 .. Key_Tok.Length));
                Val_Str : constant String := Val_Tok.Text (1 .. Val_Tok.Length);
                K_Len   : constant Natural :=
-                  Natural'Min (Key_Tok.Length, 32);
+                  Natural'Min (Key_Tok.Length, Max_Name_Len);
                V_Len   : constant Natural :=
                   Natural'Min (Val_Tok.Length, 256);
             begin
@@ -1368,7 +1368,7 @@ package body SData.Parser is
                         declare
                            Arg_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
-                           Stmt.Var_Len := (if Arg_Tok.Length > 32 then 32 else Arg_Tok.Length);
+                           Stmt.Var_Len := (if Arg_Tok.Length > Max_Name_Len then Max_Name_Len else Arg_Tok.Length);
                            Stmt.Var_Name (1 .. Stmt.Var_Len) := Arg_Tok.Text (1 .. Stmt.Var_Len);
                         end;
                      else

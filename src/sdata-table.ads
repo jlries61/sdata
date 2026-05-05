@@ -60,7 +60,7 @@ package SData.Table is
    --  Sorting support
    type Sort_Direction is (Ascending, Descending);
    type Sort_Criteria is record
-      Name : String (1 .. 32);
+      Name : String (1 .. Max_Name_Len);
       Len  : Natural;
       Dir  : Sort_Direction;
    end record;
@@ -119,7 +119,7 @@ private
 
    --  The internal representation of a column.
    type Column is record
-      Name : String (1 .. 32); -- Padded name
+      Name : String (1 .. Max_Name_Len); -- Padded name
       Typ  : Column_Type;      -- Enforced type
       Data : Value_Vectors.Vector; -- List of values (one per row)
    end record;

@@ -11,7 +11,8 @@ package body SData.IO is
    Interactive_Mode : Boolean := False;
 
    --  Internal pager state (used when no external pager is configured).
-   Lines_On_Page : constant := 24;
+   Lines_On_Page  : constant := 24;
+   Max_Shell_Args : constant := 16; -- max words in a shell or pager command string
    Lines_Printed : Natural  := 0;
 
    --  External pager state.
@@ -85,7 +86,7 @@ package body SData.IO is
    end Set_Local_Echo;
 
    procedure Set_Pager (Cmd : String) is
-      Words    : GNAT.OS_Lib.Argument_List (1 .. 16);
+      Words    : GNAT.OS_Lib.Argument_List (1 .. Max_Shell_Args);
       Count    : Natural;
       Exe_Path : GNAT.OS_Lib.String_Access;
    begin
@@ -107,7 +108,7 @@ package body SData.IO is
    end Set_Pager;
 
    procedure Flush_Pager_Buffer is
-      Words    : GNAT.OS_Lib.Argument_List (1 .. 16);
+      Words    : GNAT.OS_Lib.Argument_List (1 .. Max_Shell_Args);
       N_Words  : Natural;
       FD       : GNAT.OS_Lib.File_Descriptor;
       TN_Acc   : GNAT.OS_Lib.String_Access;

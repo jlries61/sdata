@@ -34,11 +34,16 @@ package SData.Lexer is
       Token_Range_Dash       -- Used in variable ranges: NAME1-NAME5
    );
 
+   --  Maximum length of any single token's raw text (identifiers, string
+   --  literals, numeric literals).  Enforced implicitly by slice assignment
+   --  in the lexer; tokens longer than this raise Constraint_Error.
+   Max_Token_Len : constant := 1024;
+
    --  Represents a single lexical unit.
    type Token is record
       Kind   : Token_Kind;
-      Text   : String (1 .. 1024); -- Raw text content of the token
-      Length : Natural := 0;       -- Length of text in the buffer
+      Text   : String (1 .. Max_Token_Len); -- Raw text content of the token
+      Length : Natural := 0;                -- Length of text in the buffer
       Line   : Positive;           -- Source line where token starts
       Column : Positive;           -- Source column where token starts
    end record;

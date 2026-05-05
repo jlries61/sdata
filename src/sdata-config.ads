@@ -15,18 +15,18 @@ package SData.Config is
    Output_Format : Format_Type := CSV;
 
    --  Optional input file from command line (-u).
-   Input_File_Path : String (1 .. 1024) := (others => ' ');
+   Input_File_Path : String (1 .. Max_Path_Len) := (others => ' ');
    Input_File_Len  : Natural := 0;
 
    --  If True, suppresses informational messages (e.g., "Dataset opened").
    Quiet_Mode    : Boolean := False;
 
    --  Optional output dataset from command line (-s).
-   Output_Dataset_Path : String (1 .. 1024) := (others => ' ');
+   Output_Dataset_Path : String (1 .. Max_Path_Len) := (others => ' ');
    Output_Dataset_Len  : Natural := 0;
 
    --  Optional file to redirect console output (set via -o).
-   Output_File     : String (1 .. 1024) := (others => ' ');
+   Output_File     : String (1 .. Max_Path_Len) := (others => ' ');
    Output_File_Len : Natural := 0;
 
    --  DIGITS state (controlling float precision in output).

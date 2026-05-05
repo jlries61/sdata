@@ -20,7 +20,7 @@ package SData.AST is
 
    --  Arithmetic and logical binary operators.
    type Binary_Op is (Op_Add, Op_Sub, Op_Mul, Op_Div, Op_Pow, Op_Eq, Op_Ne, Op_Lt, Op_Le, Op_Gt, Op_Ge, Op_And, Op_Or, Op_Xor);
-   
+
    --  Unary operators.
    type Unary_Op is (Op_Neg, Op_Not);
 
@@ -47,7 +47,7 @@ package SData.AST is
          when Expr_String_Literal =>
             Str_Value : Ada.Strings.Unbounded.Unbounded_String;
          when Expr_Variable =>
-            Var_Name  : String (1 .. 32);
+            Var_Name  : String (1 .. Max_Name_Len);
             Var_Len   : Natural;
             Var_Index : Natural := 0;  -- 0 = unresolved; positive = 1-based PDV_Vec slot
          when Expr_Binary_Op =>
@@ -58,11 +58,11 @@ package SData.AST is
             Operand : Expression_Access;
             UOp     : Unary_Op;
          when Expr_Function_Call =>
-            Func_Name : String (1 .. 32);
+            Func_Name : String (1 .. Max_Name_Len);
             Func_Len  : Natural;
             Arguments : Expression_List;
          when Expr_Array_Access =>
-            Arr_Name : String (1 .. 32);
+            Arr_Name : String (1 .. Max_Name_Len);
             Arr_Len  : Natural;
             Arr_Idx  : Expression_List; -- Supports multiple subscripts: X(1, 3, 5)
       end case;
@@ -70,9 +70,9 @@ package SData.AST is
 
    --  Represents a single variable or a range (e.g., VAR1-VAR10 or VAR1:VAR10).
    type Variable_Range is record
-      Start_Name     : String (1 .. 32);
+      Start_Name     : String (1 .. Max_Name_Len);
       Start_Len      : Natural;
-      End_Name       : String (1 .. 32);
+      End_Name       : String (1 .. Max_Name_Len);
       End_Len        : Natural;
       Is_Range       : Boolean := False;
       Is_Colon_Range : Boolean := False;  -- True when separator was ':'
@@ -90,9 +90,9 @@ package SData.AST is
    type Rename_Pair_Node;
    type Rename_List is access Rename_Pair_Node;
    type Rename_Pair_Node is record
-      Old_Name : String (1 .. 32);
+      Old_Name : String (1 .. Max_Name_Len);
       Old_Len  : Natural;
-      New_Name : String (1 .. 32);
+      New_Name : String (1 .. Max_Name_Len);
       New_Len  : Natural;
       Next     : Rename_List;
    end record;
@@ -157,7 +157,7 @@ package SData.AST is
 
    type Statement (Kind : Statement_Kind) is record
       Next     : Statement_Access; -- Pointer to the next statement in sequence.
-      Var_Name : String (1 .. 32);
+      Var_Name : String (1 .. Max_Name_Len);
       Var_Len  : Natural;
       Is_Array     : Boolean         := False;
       Arr_Idx      : Expression_Access;           -- single-subscript assignment
@@ -168,14 +168,14 @@ package SData.AST is
          when Stmt_PRINT =>
             Print_Args : Expression_List;
          when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_SYSTEM | Stmt_HELP | Stmt_OUTPUT | Stmt_FPATH =>
-            File_Path : String (1 .. 1024);
+            File_Path : String (1 .. Max_Path_Len);
             File_Len  : Natural;
             Is_Mock     : Boolean := False; -- For USE MOCK
             Use_Flag    : Boolean := False; -- For FPATH
             Save_Flag   : Boolean := False; -- For FPATH
             Submit_Flag : Boolean := False; -- For FPATH
             Output_Flag : Boolean := False; -- For FPATH
-            
+
             -- Command-specific overrides (/FMT, /NSCAN, /DLM, /HEADER, /SHEET, /SKIP, /MAXROWS)
             Format_Specified : Boolean := False;
             Fmt_Override     : SData.Config.Format_Type := SData.Config.CSV;
@@ -184,19 +184,19 @@ package SData.AST is
             Maxrows_Val      : Natural := 0;
             Header_Specified : Boolean := False;
             Header_Val       : Boolean := True;
-            DLM_Path         : String (1 .. 32) := (others => ' ');
+            DLM_Path         : String (1 .. Max_Delimiter_Len)  := (others => ' ');
             DLM_Len          : Natural := 0;
-            Sheet_Name         : String (1 .. 64) := (others => ' ');
+            Sheet_Name         : String (1 .. Max_Sheet_Name_Len) := (others => ' ');
             Sheet_Name_Len     : Natural := 0;
-            Output_FMT_Val     : String (1 .. 8)  := (others => ' ');
+            Output_FMT_Val     : String (1 .. Max_Delimiter_Len)  := (others => ' ');
             Output_FMT_Len     : Natural := 0;
-            Output_CHARSET_Val : String (1 .. 64) := (others => ' ');
+            Output_CHARSET_Val : String (1 .. Max_Charset_Len)    := (others => ' ');
             Output_CHARSET_Len : Natural := 0;
          when Stmt_REPEAT =>
             Count : Natural;
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
             Vars         : Variable_List;
-            Arr_Name     : String (1 .. 32);
+            Arr_Name     : String (1 .. Max_Name_Len);
             Arr_Name_Len : Natural := 0;
             Arr_Dim      : Positive; -- Number of elements (for simple arrays) - this will become derived for DIM
             Arr_Vars     : Variable_List;
@@ -211,7 +211,7 @@ package SData.AST is
             Then_Branch  : Statement_Access;
             Else_Branch  : Statement_Access;
          when Stmt_FOR =>
-            For_Var      : String (1 .. 32);
+            For_Var      : String (1 .. Max_Name_Len);
             For_Var_Len  : Natural;
             For_Start    : Expression_Access;
             For_End      : Expression_Access;
@@ -239,9 +239,9 @@ package SData.AST is
             Delete_From : Positive := 1;
             Delete_To   : Positive := 1;
          when Stmt_OPTIONS =>
-            Options_Key     : String (1 .. 32);
+            Options_Key     : String (1 .. Max_Name_Len);
             Options_Key_Len : Natural;
-            Options_Val     : String (1 .. 256);
+            Options_Val     : String (1 .. Max_Options_Val_Len);
             Options_Val_Len : Natural;
          when others =>
             null;

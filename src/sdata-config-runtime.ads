@@ -10,37 +10,37 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 package SData.Config.Runtime is
 
-   Save_File_Path      : String (1 .. 1024) := (others => ' ');
-   Save_File_Len       : Natural            := 0;
-   Save_File_Active    : Boolean            := False;
-   Save_File_Fmt       : Format_Type        := CSV;
-   Save_Sheet_Name     : String (1 .. 64)   := (others => ' ');
-   Save_Sheet_Name_Len : Natural            := 0;
-   FPath_Use           : Unbounded_String   := Null_Unbounded_String;
-   FPath_Save          : Unbounded_String   := Null_Unbounded_String;
-   FPath_Submit        : Unbounded_String   := Null_Unbounded_String;
-   FPath_Output        : Unbounded_String   := Null_Unbounded_String;
-   Repeat_Count        : Natural            := 0;
-   Repeat_Active       : Boolean            := False;
-   Last_Error_Code     : Natural            := 0;
-   Last_Error_Line     : Natural            := 0;
+   Save_File_Path      : String (1 .. Max_Path_Len)       := (others => ' ');
+   Save_File_Len       : Natural                           := 0;
+   Save_File_Active    : Boolean                           := False;
+   Save_File_Fmt       : Format_Type                       := CSV;
+   Save_Sheet_Name     : String (1 .. Max_Sheet_Name_Len)  := (others => ' ');
+   Save_Sheet_Name_Len : Natural                           := 0;
+   FPath_Use           : Unbounded_String                  := Null_Unbounded_String;
+   FPath_Save          : Unbounded_String                  := Null_Unbounded_String;
+   FPath_Submit        : Unbounded_String                  := Null_Unbounded_String;
+   FPath_Output        : Unbounded_String                  := Null_Unbounded_String;
+   Repeat_Count        : Natural                           := 0;
+   Repeat_Active       : Boolean                           := False;
+   Last_Error_Code     : Natural                           := 0;
+   Last_Error_Line     : Natural                           := 0;
 
    --  OPTIONS command runtime state
-   Options_CSVDLM      : String (1 .. 8)  := (',' , others => ' ');
-   Options_CSVDLM_Len  : Natural          := 1;
-   Options_Header      : Boolean          := True;
-   Options_SAVEOVERWRT : Boolean          := True;
-   Options_TXTFMT      : String (1 .. 8)  := "AUTO    ";
-   Options_TXTFMT_Len  : Natural          := 4;
-   Options_CHARSET     : String (1 .. 64) := (others => ' ');
-   Options_CHARSET_Len : Natural          := 0;
+   Options_CSVDLM      : String (1 .. Max_Delimiter_Len)  := (',' , others => ' ');
+   Options_CSVDLM_Len  : Natural                          := 1;
+   Options_Header      : Boolean                          := True;
+   Options_SAVEOVERWRT : Boolean                          := True;
+   Options_TXTFMT      : String (1 .. Max_Delimiter_Len)  := "AUTO    ";
+   Options_TXTFMT_Len  : Natural                          := 4;
+   Options_CHARSET     : String (1 .. Max_Charset_Len)    := (others => ' ');
+   Options_CHARSET_Len : Natural                          := 0;
 
    --  Effective delimiter/header/charset saved at SAVE-statement time for use at write time
-   Save_DLM         : String (1 .. 8)  := (',' , others => ' ');
-   Save_DLM_Len     : Natural          := 1;
-   Save_Header      : Boolean          := True;
-   Save_Charset     : String (1 .. 64) := (others => ' ');
-   Save_Charset_Len : Natural          := 0;
+   Save_DLM         : String (1 .. Max_Delimiter_Len)  := (',' , others => ' ');
+   Save_DLM_Len     : Natural                          := 1;
+   Save_Header      : Boolean                          := True;
+   Save_Charset     : String (1 .. Max_Charset_Len)    := (others => ' ');
+   Save_Charset_Len : Natural                          := 0;
 
    procedure Reset;
 

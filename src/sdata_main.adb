@@ -168,7 +168,7 @@ procedure SData_Main is
 
    Ctx          : Parser_Context;
    Prog         : Statement_Access;
-   Filename     : String (1 .. 1024);
+   Filename     : String (1 .. SData.Max_Path_Len);
    Filename_Len : Natural := 0;
    Idx          : Positive := 1;
    Pager_Cmd    : Unbounded_String := Null_Unbounded_String;
