@@ -1,6 +1,6 @@
 # Codebase Review: `SData Statistical Data Interpreter`
 
-**Reviewed:** 2026-05-04
+**Reviewed:** 2026-05-04 | **Last updated:** 2026-05-05 (commit fae2d2d)
 **Scope:** Full source repository — all Ada source files, Makefile, test suite, packaging scripts
 **Domain:** Single-process batch/interactive interpreter for tabular statistical data processing, inspired by the Systat BASIC data step model
 **Stack:** Ada 2012, GNAT/GPRbuild, Zip-Ada / XML-Ada / MathPaqs / ada_sqlite3, SQLite3 backing store for large tables
@@ -61,14 +61,14 @@ The evaluator implements expression tree traversal, ~100 built-in functions (mat
 
 `BOG_Flag` and `EOG_Flag` are private to `sdata-evaluator.adb`, set by the interpreter calling `Set_BOG`/`Set_EOG`. The evaluator's package spec advertises `Evaluate` and function dispatch; the caller side-effects the evaluator's private state before calling `Evaluate`. A reader of the evaluator package spec sees no indication that it has externally-driven state. This dependency runs backwards and is invisible from both call sites and the callee's interface.
 
-**⚠ Concern — Magic constant 32 for name lengths scattered across types**
+**⚠ Concern — Magic constant 32 for name lengths scattered across types** ✅ *Resolved fae2d2d*
 `src/sdata-table.ads:122, src/sdata-table.ads:66, src/sdata-interpreter.adb:133`
 
-`String(1..32)` appears in `Column.Name`, `Sort_Criteria.Name`, and `Column_Mod_Node.Name` — three separate struct definitions with no named constant tying them together. The limit of 32 characters for column names is a hidden contract. A user with a 33-character column name from a wide spreadsheet will hit a Constraint_Error at a surprising location. If the limit needs to change, there is no compile-time guarantee that all three definitions were updated.
+`String(1..32)` appeared in `Column.Name`, `Sort_Criteria.Name`, and `Column_Mod_Node.Name` — three separate struct definitions with no named constant tying them together. The limit of 32 characters for column names was also incorrect per the design specification (64 is the documented maximum). Additional enforcement points existed in the parser, interpreter, file I/O, and table body. *Fix: six capacity constants introduced in `SData` root package (`Max_Name_Len`, `Max_Path_Len`, `Max_Sheet_Name_Len`, `Max_Delimiter_Len`, `Max_Charset_Len`, `Max_Options_Val_Len`); `Max_Name_Len` corrected to 64; all 13 affected source files updated.*
 
 ### Uncle Bob's Recommendation
 
-Extract function families into child packages: `SData.Evaluator.Math`, `SData.Evaluator.Strings`, `SData.Evaluator.Statistics`, `SData.Evaluator.Table_Navigation`. The dispatch table registration remains in the parent; handler bodies move to their natural home. For the BOG/EOG coupling, declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with a comment stating the caller's obligation — the coupling stays but becomes a visible contract rather than a hidden side effect. For the 32 constant, introduce `Max_Name_Len : constant Positive := 32` in the root `SData` package and reference it from all three struct definitions.
+Extract function families into child packages: `SData.Evaluator.Math`, `SData.Evaluator.Strings`, `SData.Evaluator.Statistics`, `SData.Evaluator.Table_Navigation`. The dispatch table registration remains in the parent; handler bodies move to their natural home. For the BOG/EOG coupling, declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with a comment stating the caller's obligation — the coupling stays but becomes a visible contract rather than a hidden side effect. The magic-constant finding is resolved.
 
 ---
 
@@ -163,14 +163,14 @@ Add a `CONCEPTS` or `INTRO` help topic accessible from the interpreter (`HELP CO
 
 `Current_By_Vars` in the interpreter and `Table_By_Vars` in the table are both ordered vectors of active BY variable names. When a `BY` statement executes, both are populated. `Is_First_In_Group`/`Is_Last_In_Group` in the interpreter use `Current_By_Vars`; `In_Same_Group` in the table uses `Table_By_Vars`. Both implement "are these two records in the same BY group?" with different interfaces and independently maintained state. There is one concept in two places kept in sync by a caller. The canonical copy should live in one location; the other should query it.
 
-**⚠ Concern — Magic constant 32 is a hidden system limit with no compile-time alarm**
+**⚠ Concern — Magic constant 32 is a hidden system limit with no compile-time alarm** ✅ *Resolved fae2d2d*
 `src/sdata-table.ads:122, :66, src/sdata-interpreter.adb:133`
 
-Three struct definitions independently hard-code `String(1..32)` for name storage. Any change to the name length limit requires finding all three by grep, with no compile-time assurance they were all updated. The fix is trivial: one named constant in the root package, three references. This is the definition of a change that costs five minutes now or an hour finding the third struct at 2 AM later.
+Three struct definitions independently hard-coded `String(1..32)` for name storage, with additional enforcement points scattered across the parser, interpreter body, table body, and file I/O. *Fix: all bare literals replaced with named constants from the `SData` root package; `Max_Name_Len` corrected to 64 per the design specification.*
 
 ### Wozniak's Recommendation
 
-Remove the linked list entirely — replace `Active_Program_Head/Tail` and `Stmt.Next` traversal with direct vector iteration. This reduces the statement node type, simplifies `Add_To_Active_Program` to a single `Append`, and eliminates the sync hazard. For the 32 constant: introduce `Max_Name_Len : constant Positive := 32` in `sdata.ads` or `sdata-values.ads` and reference it from every struct. Both changes are purely mechanical with no behavioral effect; both can be verified by running `make check`.
+Remove the linked list entirely — replace `Active_Program_Head/Tail` and `Stmt.Next` traversal with direct vector iteration. This reduces the statement node type, simplifies `Add_To_Active_Program` to a single `Append`, and eliminates the sync hazard. The named-constant finding is resolved; the linked list remains.
 
 ---
 
@@ -193,13 +193,13 @@ Beck and Feathers both say "add tests first," but disagree on feasibility. Beck 
 | Priority | Action | Voice(s) | Effort | Risk if Deferred |
 |---|---|---|---|---|
 | 1 | Add `statistics_unit_test` with reference values for distribution functions | Beck | S | Med — numerical regressions catch silently |
-| 2 | Introduce `Max_Name_Len` constant; reference from all three struct definitions | Wozniak | S | Low (until a name exceeds 32 chars) |
-| 3 | Replace linked list with vector in program buffer; remove `Stmt.Next` | Wozniak | S | Med — sync hazard grows with each new program manipulation feature |
-| 4 | Declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with caller contract | Uncle Bob | S | Low — invisible coupling accretes silently |
-| 5 | Sprout `Group_Flags` pure function from `Is_First_In_Group`/`Is_Last_In_Group` | Feathers | S | High — BY-group logic has no test seam; next BY bug will repeat the pattern |
-| 6 | Introduce `Interpreter_Context`; thread through data step chain | Fowler, Feathers | L | High — each new stateful feature deepens the global state problem |
-| 7 | Extract evaluator function families into child packages | Uncle Bob | M | Med — file grows with each new function; navigation cost compounds |
-| 8 | Add `CONCEPTS` help topic explaining PDV, LET/SET, BY-group model | Jobs | S | Low — but user confusion accumulates without a conceptual entry point |
+| ~~2~~ | ~~Introduce `Max_Name_Len` constant; reference from all three struct definitions~~ | Wozniak | — | ✅ *Done fae2d2d — six constants, 13 files, name limit corrected to 64* |
+| 2 | Replace linked list with vector in program buffer; remove `Stmt.Next` | Wozniak | S | Med — sync hazard grows with each new program manipulation feature |
+| 3 | Declare `Set_BOG`/`Set_EOG` explicitly in `evaluator.ads` with caller contract | Uncle Bob | S | Low — invisible coupling accretes silently |
+| 4 | Sprout `Group_Flags` pure function from `Is_First_In_Group`/`Is_Last_In_Group` | Feathers | S | High — BY-group logic has no test seam; next BY bug will repeat the pattern |
+| 5 | Introduce `Interpreter_Context`; thread through data step chain | Fowler, Feathers | L | High — each new stateful feature deepens the global state problem |
+| 6 | Extract evaluator function families into child packages | Uncle Bob | M | Med — file grows with each new function; navigation cost compounds |
+| 7 | Add `CONCEPTS` help topic explaining PDV, LET/SET, BY-group model | Jobs | S | Low — but user confusion accumulates without a conceptual entry point |
 
 ---
 
