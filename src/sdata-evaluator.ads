@@ -72,5 +72,6 @@ private
    function Has_Args (Vals : Value_Vectors.Vector; N : Positive) return Boolean;
    function Num_Result (V : Float) return Value;
    function Handle_Domain_Error (Msg : String) return Value;
+   function Numeric_Result_Checked (V : Float) return Value;
 
 end SData.Evaluator;

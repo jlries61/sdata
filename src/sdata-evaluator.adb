@@ -102,6 +102,19 @@ package body SData.Evaluator is
       end if;
    end Handle_Domain_Error;
 
+   function Is_NaN (F : Float) return Boolean is
+   begin
+      return F /= F;
+   end Is_NaN;
+
+   function Numeric_Result_Checked (V : Float) return Value is
+   begin
+      if Is_NaN (V) then
+         return Handle_Domain_Error ("Result is not a number (NaN).");
+      end if;
+      return (Kind => Val_Numeric, Num_Val => V);
+   end Numeric_Result_Checked;
+
    ---------------------------------------------------------------------------
 
    function Is_Identifier_Ref_Function (N : String) return Boolean is
@@ -416,15 +429,15 @@ package body SData.Evaluator is
                         FR : constant Float := Convert_To_Float (R);
                      begin
                         case Expr.Op is
-                           when Op_Add => return (Kind => Val_Numeric, Num_Val => FL + FR);
-                           when Op_Sub => return (Kind => Val_Numeric, Num_Val => FL - FR);
-                           when Op_Mul => return (Kind => Val_Numeric, Num_Val => FL * FR);
+                           when Op_Add => return Numeric_Result_Checked (FL + FR);
+                           when Op_Sub => return Numeric_Result_Checked (FL - FR);
+                           when Op_Mul => return Numeric_Result_Checked (FL * FR);
                            when Op_Div =>
                               if FR = 0.0 then
                                  raise SData.Script_Error with "Division by zero.";
                               end if;
-                              return (Kind => Val_Numeric, Num_Val => FL / FR);
-                           when Op_Pow => return (Kind => Val_Numeric, Num_Val => FL ** FR);
+                              return Numeric_Result_Checked (FL / FR);
+                           when Op_Pow => return Numeric_Result_Checked (FL ** FR);
                            when Op_Eq  => return (Kind => Val_Integer, Int_Val => (if FL = FR  then 1 else 0));
                            when Op_Ne  => return (Kind => Val_Integer, Int_Val => (if FL /= FR then 1 else 0));
                            when Op_Lt  => return (Kind => Val_Integer, Int_Val => (if FL < FR  then 1 else 0));
