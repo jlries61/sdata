@@ -42,6 +42,7 @@ that might relitigate a settled question.
 | ADR-030 | Use relative paths in options_test for cross-platform portability | 2026-05-01 | Accepted |
 | ADR-031 | Keep SYSTEM/SHELL enabled by default; mark sandboxing/allowlist/escaping as won't-fix | 2026-05-06 | Accepted |
 | ADR-032 | Add --nosubmit flag to disable SUBMIT command | 2026-05-06 | Accepted |
+| ADR-033 | Use a C stub for privilege detection rather than florist_blady | 2026-05-06 | Accepted |
 
 ---
 
@@ -385,6 +386,17 @@ that might relitigate a settled question.
 **Decision:** Classify SYSTEM/SHELL risk as Low-Medium. Mark sandboxing, allowlisting, and metacharacter escaping as won't-fix. Sandboxing adds platform-specific complexity without a realistic threat to defend against at this deployment scope; an allowlist cannot be defined generically without breaking legitimate use; escaping metacharacters would silently neuter the feature (pipes and redirects are intentional). The --noshell flag remains the documented mitigation for untrusted-script contexts.
 
 **Consequences:** The security posture is "trust the script author," consistent with every comparable scripting tool. Pipeline operators who need containment must explicitly pass --noshell. This decision places responsibility on the operator, not the tool.
+
+---
+
+### ADR-033: Use a C stub for privilege detection rather than florist_blady
+**Date:** 2026-05-06 | **Status:** Accepted
+
+**Context:** Enforcing --noshell and --nosubmit when running as root or Windows SYSTEM required calling `getuid()` on POSIX and `GetUserNameA()` on Windows. The Alire crate `florist_blady` provides Ada POSIX bindings including `POSIX.Process_Identification.Get_Real_User_ID`, which would cover `getuid()` in pure Ada. However, `florist_blady` is explicitly `Available when: Windows => False`, meaning it cannot be declared as an unconditional dependency. A conditional Alire dependency would still require a separate Ada path for Windows, and the crate requires its own `configure` + `make gen` post-fetch build steps.
+
+**Decision:** Implement privilege detection as an 18-line C stub (`src/sdata_privilege.c`) using `#ifdef _WIN32` to branch between `GetUserNameA` (Windows) and `getuid()` (POSIX). The stub is wrapped by a single Ada function `SData.System.Running_As_System_Account` via `pragma Import`. The GPR project gains `for Languages use ("Ada", "C")` to compile the stub.
+
+**Consequences:** The project gains a minimal, intentional C dependency for one specific purpose. This is acceptable given that the project already links a C library (Ada_Sqlite3 via its SQLite3 amalgamation) and the stub is self-contained with no further C code planned. `florist_blady` was explicitly evaluated and rejected: its Windows exclusion makes it less portable than the C stub it would replace.
 
 ---
 

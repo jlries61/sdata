@@ -180,6 +180,6 @@ Script file / REPL input
 
 Significant design choices — language selection, execution model, table storage strategy,
 CLI conventions, test approach, and per-session architectural calls — are recorded in
-`doc/adrs.md` (32 decisions, ADR-001 through ADR-032). Each entry captures the context,
+`doc/adrs.md` (33 decisions, ADR-001 through ADR-033). Each entry captures the context,
 the decision, the alternatives considered, and the rationale. Consult it before proposing
 a structural change that might relitigate a settled question.
