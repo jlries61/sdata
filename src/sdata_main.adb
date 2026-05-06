@@ -71,6 +71,7 @@ procedure SData_Main is
       Put_Line ("  -t <count>    Set max temporary variables");
       Put_Line ("  --clen <len>  Set max character variable length");
       Put_Line ("  --noshell                Disable SHELL command and function");
+      Put_Line ("  --nosubmit               Disable SUBMIT command");
       Put_Line ("  -k, --continue-on-error  Continue executing after a statement error");
       Put_Line ("  --ignore-math-errors     Math domain errors return MISSING instead of halting");
       Put_Line ("  -u, --infmt              Input dataset and format");
@@ -341,6 +342,8 @@ begin
             end if;
          elsif Arg = "--noshell" then
             Disable_Shell := True;
+         elsif Arg = "--nosubmit" then
+            Disable_Submit := True;
          elsif Arg = "--ignore-math-errors" then
             Ignore_Math_Errors := True;
          elsif Arg = "--debug" then

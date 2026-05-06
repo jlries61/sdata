@@ -37,6 +37,7 @@ package SData.Config is
    Max_String_Len  : Natural := 0;      -- 0 means no limit
    Max_Temp_Vars   : Natural := 0;      -- 0 means no limit
    Disable_Shell      : Boolean := False;
+   Disable_Submit     : Boolean := False;
    Continue_On_Error  : Boolean := False;
    Ignore_Math_Errors : Boolean := False; -- If True, domain errors return Val_Missing instead of halting.
    Debug_Mode         : Boolean := False; -- If True, trace each statement and record to stderr.

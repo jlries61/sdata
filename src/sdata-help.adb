@@ -110,6 +110,7 @@ package body SData.Help is
       Put_Line ("Command: SUBMIT ""filename""");
       Put_Line ("Executes commands from an external script file. Default extension: .CMD.");
       Put_Line ("Provides cycle detection to prevent recursive submission.");
+      Put_Line ("Disabled by --nosubmit flag.");
       Put_Line ("Execution: Immediate -- the script is run at once.");
    end Help_SUBMIT;
 
@@ -490,6 +491,7 @@ package body SData.Help is
       Put_Line ("");
       Put_Line ("CLI flags (set at startup, not runtime):");
       Put_Line ("  --noshell            : Disable SYSTEM/SHELL; also disables -p");
+      Put_Line ("  --nosubmit           : Disable SUBMIT");
       Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
       Put_Line ("  --clen <n>           : Set max character variable length");
       Put_Line ("  -m <n>               : Set max in-memory table rows");

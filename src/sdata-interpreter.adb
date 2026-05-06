@@ -1542,6 +1542,9 @@ package body SData.Interpreter is
    begin
       case Stmt.Kind is
          when Stmt_SUBMIT =>
+            if SData.Config.Disable_Submit then
+               Put_Line_Error ("Error: SUBMIT command is disabled.");
+            else
             declare
                Final : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SUBMIT");
             begin
@@ -1585,6 +1588,7 @@ package body SData.Interpreter is
                end;
                Submit_Chain.Delete (Final);
             end;
+            end if;
          when Stmt_SYSTEM =>
             if SData.Config.Disable_Shell then
                Put_Line_Error ("Error: SYSTEM command is disabled.");
