@@ -97,7 +97,9 @@ INF(x)
 - Returns `1` if `x` is +Inf or -Inf; `0` otherwise.
 - Returns `0` for `Val_Missing` (Missing is not Inf).
 - Returns `0` for finite numeric values and strings.
-- To distinguish +Inf from -Inf, compare against zero: `x > 0` is true for +Inf.
+- To test specifically for +Inf or -Inf, combine `INF()` with a sign comparison:
+  - `INF(x) AND x > 0` — true only for +Inf
+  - `INF(x) AND x < 0` — true only for -Inf
 - `NOT INF(x)` serves the role of `FINITE()` for non-missing values.
 
 ---
