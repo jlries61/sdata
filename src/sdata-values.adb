@@ -5,6 +5,14 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 package body SData.Values is
 
+   --------------
+   -- Is_Inf --
+   --------------
+   function Is_Inf (F : Float) return Boolean is
+   begin
+      return F > Float'Last or else F < Float'First;
+   end Is_Inf;
+
    ------------------
    -- To_String --
    ------------------
@@ -12,6 +20,9 @@ package body SData.Values is
    begin
       case V.Kind is
          when Val_Numeric =>
+            if Is_Inf (V.Num_Val) then
+               return (if V.Num_Val > 0.0 then "Inf" else "-Inf");
+            end if;
             declare
                Img : constant String := Float'Image (V.Num_Val);
             begin
@@ -37,12 +48,15 @@ package body SData.Values is
    begin
       case V.Kind is
          when Val_Numeric =>
+            if Is_Inf (V.Num_Val) then
+               return (if V.Num_Val > 0.0 then "Inf" else "-Inf");
+            end if;
             declare
                package Float_IO is new Ada.Text_IO.Float_IO (Float);
                Img : String (1 .. 100);
                Aft_Count : constant Natural := SData.Config.Print_Digits;
             begin
-               if V.Num_Val = 0.0 then 
+               if V.Num_Val = 0.0 then
                   declare
                      Zero_Img : String (1 .. Aft_Count + 2);
                   begin
