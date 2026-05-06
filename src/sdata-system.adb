@@ -1,9 +1,18 @@
 with Ada.Environment_Variables;
 with GNAT.OS_Lib; use GNAT.OS_Lib;
+with Interfaces.C; use type Interfaces.C.int;
 
 package body SData.System is
 
    Is_Windows : constant Boolean := GNAT.OS_Lib.Directory_Separator = '\';
+
+   function C_Is_System_Account return Interfaces.C.int;
+   pragma Import (C, C_Is_System_Account, "sdata_is_system_account");
+
+   function Running_As_System_Account return Boolean is
+   begin
+      return C_Is_System_Account /= 0;
+   end Running_As_System_Account;
 
    --  Resolve the shell to use for SYSTEM/SHELL invocations.
    --  Posix is True when the resolved shell takes "-c" (POSIX shells),
