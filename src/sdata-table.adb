@@ -22,6 +22,21 @@ package body SData.Table is
    procedure Spill_Output_To_Disk;
    procedure Spill_Table_To_Disk (T : aliased in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive);
 
+   function Sql_Id (Name : String) return String is
+      Buf : String (1 .. Name'Length * 2);
+      Len : Natural := 0;
+   begin
+      for C of Name loop
+         Len := Len + 1;
+         Buf (Len) := C;
+         if C = ']' then
+            Len := Len + 1;
+            Buf (Len) := ']';
+         end if;
+      end loop;
+      return "[" & Buf (1 .. Len) & "]";
+   end Sql_Id;
+
    --------------
    -- Finalize --
    --------------
@@ -345,8 +360,8 @@ package body SData.Table is
                                               elsif Typ = Col_Integer then "INTEGER"
                                               else "TEXT");
                begin
-                  Ada.Strings.Unbounded.Append (Cols_CSV, "[" & Name & "]");
-                  Ada.Strings.Unbounded.Append (Col_Def,  "[" & Name & "] " & SQL_T);
+                  Ada.Strings.Unbounded.Append (Cols_CSV, Sql_Id (Name));
+                  Ada.Strings.Unbounded.Append (Col_Def,  Sql_Id (Name) & " " & SQL_T);
                   if I < N then
                      Ada.Strings.Unbounded.Append (Cols_CSV, ", ");
                      Ada.Strings.Unbounded.Append (Col_Def,  ", ");
@@ -355,7 +370,7 @@ package body SData.Table is
             end loop;
 
             for I in Criteria'Range loop
-               Ada.Strings.Unbounded.Append (OrderBy, "[" & Ada.Characters.Handling.To_Upper (Criteria (I).Name (1 .. Criteria (I).Len)) & "]");
+               Ada.Strings.Unbounded.Append (OrderBy, Sql_Id (Ada.Characters.Handling.To_Upper (Criteria (I).Name (1 .. Criteria (I).Len))));
                if Criteria (I).Dir = Descending then Ada.Strings.Unbounded.Append (OrderBy, " DESC"); end if;
                if I < Criteria'Last then Ada.Strings.Unbounded.Append (OrderBy, ", "); end if;
             end loop;
@@ -766,14 +781,14 @@ package body SData.Table is
                                         elsif Ref.Element.all.Typ = Col_Integer then "INTEGER"
                                         else "TEXT");
          begin
-            Ada.Strings.Unbounded.Append (SQL, ", [" & Ada.Strings.Unbounded.To_String (Col_Names.Element (C)) & "] " & SQL_T);
+            Ada.Strings.Unbounded.Append (SQL, ", " & Sql_Id (Ada.Strings.Unbounded.To_String (Col_Names.Element (C))) & " " & SQL_T);
          end;
       end loop;
       Ada.Strings.Unbounded.Append (SQL, ")");
       Store.DB.Execute (Ada.Strings.Unbounded.To_String (SQL));
 
       SQL := Ada.Strings.Unbounded.To_Unbounded_String ("INSERT OR REPLACE INTO [" & Table_Name & "] (record_id");
-      for Name of Col_Names loop Ada.Strings.Unbounded.Append (SQL, ", [" & Ada.Strings.Unbounded.To_String (Name) & "]"); end loop;
+      for Name of Col_Names loop Ada.Strings.Unbounded.Append (SQL, ", " & Sql_Id (Ada.Strings.Unbounded.To_String (Name))); end loop;
       Ada.Strings.Unbounded.Append (SQL, ") VALUES (?");
       for I in 1 .. Natural (Col_Names.Length) loop Ada.Strings.Unbounded.Append (SQL, ", ?"); end loop;
       Ada.Strings.Unbounded.Append (SQL, ")");
