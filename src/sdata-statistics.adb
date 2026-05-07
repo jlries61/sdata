@@ -4,6 +4,26 @@ with Beta_function;
 with Gamma_function;
 with Generic_Random_Functions;
 
+--  Algorithm references used in this package:
+--
+--  [A&S]  Abramowitz, M. and Stegun, I.A., "Handbook of Mathematical
+--         Functions", Dover, 1972.
+--
+--  [NR]   Press, W.H. et al., "Numerical Recipes in C", 2nd ed.,
+--         Cambridge University Press, 1992.  Section references below.
+--
+--  [MT00] Marsaglia, G. and Tsang, W.W., "A Simple Method for Generating
+--         Gamma Variables", ACM Trans. Math. Softw. 26(3):363-372, 2000.
+--
+--  [BM58] Box, G.E.P. and Muller, M.E., "A Note on the Generation of Random
+--         Normal Deviates", Ann. Math. Stat. 29(2):610-611, 1958.
+--
+--  [DLMF] NIST Digital Library of Mathematical Functions, https://dlmf.nist.gov/
+--
+--  MathPaqs library (Phi_function, Beta_function, Gamma_function,
+--  Generic_Random_Functions) implements standard algorithms internally;
+--  see the MathPaqs source tree for per-function references.
+
 package body SData.Statistics is
 
    package REF is new Ada.Numerics.Generic_Elementary_Functions (Long_Float);
@@ -40,7 +60,11 @@ package body SData.Statistics is
    ----------------------
    -- Incomplete_Gamma --
    ----------------------
-   --  Regularized lower incomplete gamma function P(a, x)
+   --  Regularized lower incomplete gamma function P(a, x).
+   --  Algorithm: series expansion (G_Series) for x < a+1; Lentz modified
+   --  continued-fraction (G_CF) for x >= a+1 (upper tail subtracted).
+   --  [NR] §6.2 (gammp / gser / gcf).  Convergence constants ITMAX, EPS,
+   --  FPMIN are taken directly from that source.
    function Incomplete_Gamma_P (A, X : Long_Float) return Long_Float is
       ITMAX : constant := 100;
       EPS   : constant := 3.0e-14;
@@ -105,6 +129,8 @@ package body SData.Statistics is
    -----------
    -- Z_CDF --
    -----------
+   --  Standard normal CDF Φ(z).  Delegated to MathPaqs Phi_function.Phi,
+   --  which uses the rational approximation from [A&S] 26.2.17.
    function Z_CDF (Z : Float) return Float is
    begin
       return Float (Long_Phi.Phi (Long_Float (Z)));
@@ -113,6 +139,8 @@ package body SData.Statistics is
    -----------
    -- Z_IDF --
    -----------
+   --  Probit function Φ⁻¹(p).  Delegated to MathPaqs Phi_function.Inverse_Phi,
+   --  which uses a rational approximation (Beasley-Springer-Moro or equivalent).
    function Z_IDF (P : Float) return Float is
    begin
       if P <= 0.0 or P >= 1.0 then raise Constraint_Error with "Probability must be in (0,1)"; end if;
@@ -149,6 +177,9 @@ package body SData.Statistics is
    ---------------
    -- Normal_RN --
    ---------------
+   --  Box-Muller transform: generates standard normal variates from two
+   --  independent uniform(0,1) draws.  [BM58].  Delegated to MathPaqs
+   --  Generic_Random_Functions.Box_Muller; only one of the two outputs is used.
    function Normal_RN (Mean, Std_Dev : Float) return Float is
       N1, N2 : Long_Float;
    begin
@@ -323,6 +354,8 @@ package body SData.Statistics is
    ---------------
    -- Gamma_CDF --
    ---------------
+   --  CDF of Gamma(α, β) via the regularized lower incomplete gamma:
+   --  F(x) = P(α, β·x).  [DLMF] 8.2.4; [A&S] 6.5.1.
    function Gamma_CDF (X, Alpha, Beta : Float) return Float is
    begin
       if X <= 0.0 then return 0.0; end if;
@@ -332,7 +365,9 @@ package body SData.Statistics is
    --------------
    -- Gamma_RN --
    --------------
-   --  Using Marsaglia and Tsang's method (2000)
+   --  Marsaglia-Tsang squeeze method for Gamma(α, β) variates.  [MT00].
+   --  For α < 1 uses the identity Gamma(α) = Gamma(α+1) · U^(1/α),
+   --  where U ~ Uniform(0,1) — [MT00] eq. (4).
    function Gamma_RN (Alpha, Beta : Float) return Float is
       A : constant Long_Float := Long_Float (Alpha);
       B : constant Long_Float := Long_Float (Beta);
@@ -389,6 +424,9 @@ package body SData.Statistics is
    -------------------
    -- Student_T_CDF --
    -------------------
+   --  CDF of Student's t(ν) via the regularized incomplete beta:
+   --  F(t) = 1 - ½·I_{ν/(ν+t²)}(ν/2, ½)  for t > 0;  ½·I_{…}  for t ≤ 0.
+   --  [A&S] 26.7.8; [NR] §6.4.
    function Student_T_CDF (T, DF : Float) return Float is
       V : constant Long_Float := Long_Float (DF);
       X : constant Long_Float := Long_Float (T);
@@ -417,6 +455,8 @@ package body SData.Statistics is
    -----------
    -- F_CDF --
    -----------
+   --  CDF of F(d₁, d₂) via regularized incomplete beta:
+   --  F(x) = I_{d₁·x/(d₁·x+d₂)}(d₁/2, d₂/2).  [A&S] 26.6.15; [NR] §6.4.
    function F_CDF (X, DF1, DF2 : Float) return Float is
       V1 : constant Long_Float := Long_Float (DF1);
       V2 : constant Long_Float := Long_Float (DF2);
@@ -431,6 +471,9 @@ package body SData.Statistics is
    ------------------
    -- Binomial_PMF --
    ------------------
+   --  P(X = k) = C(n,k)·p^k·(1-p)^(n-k).  Computed in log space as
+   --  log Γ(n+1) − log Γ(k+1) − log Γ(n-k+1) + k·log p + (n-k)·log(1-p)
+   --  to avoid factorial overflow.  [A&S] 26.1.17.
    function Binomial_PMF (K, N, P : Float) return Float is
       KI : constant Long_Float := Long_Float (Float'Floor (K));
       NI : constant Long_Float := Long_Float (Float'Floor (N));
@@ -450,6 +493,8 @@ package body SData.Statistics is
    ------------------
    -- Binomial_CDF --
    ------------------
+   --  P(X ≤ k) = I_{1-p}(n-k, k+1)  (regularized incomplete beta).
+   --  [A&S] 26.5.24; [NR] §6.4.
    function Binomial_CDF (K, N, P : Float) return Float is
       KI : constant Long_Float := Long_Float (Float'Floor (K));
       NI : constant Long_Float := Long_Float (Float'Floor (N));
@@ -637,6 +682,7 @@ package body SData.Statistics is
    end F_RN;
 
    --  Generic bisection IDF: find x in [Lo, Hi] such that CDF(x) = P.
+   --  Standard bisection, 100 iterations, tolerance 1e-9.  [NR] §9.1.
    --  The CDF must be monotonically non-decreasing.
    generic
       with function CDF_Func (X : Float) return Float;
@@ -655,9 +701,11 @@ package body SData.Statistics is
       return (L + H) / 2.0;
    end Bisect_IDF;
 
-   -----------------------
+   ---------------------
    -- Chi_Square_IDF --
-   -----------------------
+   ---------------------
+   --  Bisection over [0, ν + 10·√(2ν)].  Upper bound ≈ mean + 10 std devs,
+   --  which contains all practically relevant quantiles.
    function Chi_Square_IDF (P, DF : Float) return Float is
       function CDF (X : Float) return Float is (Chi_Square_CDF (X, DF));
       function Bisect is new Bisect_IDF (CDF);
@@ -667,9 +715,10 @@ package body SData.Statistics is
       return Bisect (P, 0.0, DF + 10.0 * Float (Sqrt (Long_Float (2.0 * DF))));
    end Chi_Square_IDF;
 
-   ----------------------
+   -------------------
    -- Student_T_IDF --
-   ----------------------
+   -------------------
+   --  Bisection over [−1000, 1000].  Covers |t| to p < 3e-6 for any ν ≥ 1.
    function Student_T_IDF (P, DF : Float) return Float is
       function CDF (X : Float) return Float is (Student_T_CDF (X, DF));
       function Bisect is new Bisect_IDF (CDF);
@@ -679,9 +728,10 @@ package body SData.Statistics is
       return Bisect (P, -1000.0, 1000.0);
    end Student_T_IDF;
 
-   ---------------
+   ---------
    -- F_IDF --
-   ---------------
+   ---------
+   --  Bisection over [0, 1000].  Covers all practically significant F quantiles.
    function F_IDF (P, DF1, DF2 : Float) return Float is
       function CDF (X : Float) return Float is (F_CDF (X, DF1, DF2));
       function Bisect is new Bisect_IDF (CDF);
@@ -691,9 +741,11 @@ package body SData.Statistics is
       return Bisect (P, 0.0, 1000.0);
    end F_IDF;
 
-   ----------------
+   ---------------
    -- Gamma_IDF --
-   ----------------
+   ---------------
+   --  Bisection over [0, μ + 50σ] where μ = α/β and σ = √α/β.
+   --  Upper bound covers all practically significant quantiles.
    function Gamma_IDF (P, Shape, Rate : Float) return Float is
       function CDF (X : Float) return Float is (Gamma_CDF (X, Shape, Rate));
       function Bisect is new Bisect_IDF (CDF);
@@ -703,9 +755,11 @@ package body SData.Statistics is
       return Bisect (P, 0.0, Shape / Rate + 50.0 * Float (Sqrt (Long_Float (Shape))) / Rate);
    end Gamma_IDF;
 
-   ------------------
+   ----------------
    -- Weibull_IDF --
-   ------------------
+   ----------------
+   --  Bisection over [0, 10·λ].  For shape k ≥ 1, the 99.99th percentile
+   --  is at most a few multiples of the scale λ; 10λ is a safe upper bound.
    function Weibull_IDF (P, Shape, Scale : Float) return Float is
       function CDF (X : Float) return Float is (Weibull_CDF (X, Scale, Shape));
       function Bisect is new Bisect_IDF (CDF);

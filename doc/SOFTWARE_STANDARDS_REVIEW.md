@@ -326,7 +326,7 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | 5 | ~~Add CI/CD (GitHub Actions: `make check` on push)~~ | Operational | ~~4 hours~~ | ~~Test regressions invisible until manual run~~ **Fixed ADR-012 / ADR-018** |
 | 6 | ~~Add unit tests for evaluator, table, and BY-group logic~~ | Maintainability | ~~2–3 days~~ | ~~Silent path failures (the Set_Index_Map bug pattern)~~ **Fixed — `tests/sdata_unit_test.adb`: 65 tests covering Table column/row management, type enforcement, Rename/Drop, Set_Index_Map filter logic, In_Same_Group BY-group detection, and Evaluator pure helpers** |
 | 7 | ~~Add path traversal check in `Full_Path`~~ | Security | ~~2 hours~~ | ~~SUBMIT can escape working directory~~ **`--nosubmit` added 6909f15; won't-fix by default** |
-| 8 | Document numerical algorithm references in `SData.Statistics` | Documentation | 4 hours | Next maintainer reimplements rather than verifies |
+| 8 | ~~Document numerical algorithm references in `SData.Statistics`~~ | Documentation | ~~4 hours~~ | ~~Next maintainer reimplements rather than verifies~~ **Fixed — reference block added at top of `sdata-statistics.adb` ([A&S], [NR], [MT00], [BM58], [DLMF]); per-function annotations added to `Incomplete_Gamma_P`, `Z_CDF`, `Z_IDF`, `Normal_RN`, `Gamma_CDF`, `Gamma_RN`, `Student_T_CDF`, `F_CDF`, `Binomial_PMF`, `Binomial_CDF`, `Bisect_IDF`, and all IDF bisection wrappers** |
 
 ---
 
