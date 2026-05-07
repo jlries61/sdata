@@ -565,7 +565,7 @@ lb lb lb
 l l l.
 Prefix|Distribution|Parameters
 Z|Standard Normal|[\fImu\fR, \fIsigma\fR] (default mu=0, sigma=1)
-N|Normal|\fImu\fR, \fIsigma\fR
+N|Binomial|\fIn\fR, \fIprob\fR (discrete; alias: M)
 U|Uniform|[\fIlo\fR, \fIhi\fR] (default lo=0, hi=1; RN only)
 E|Exponential|\fIrate\fR
 B|Beta|\fIa\fR, \fIb\fR (shape)
@@ -574,7 +574,7 @@ G|Gamma|\fIshape\fR, \fIrate\fR
 X|Chi\-square|\fIdf\fR
 T|Student's t|\fIdf\fR
 F|F distribution|\fIdf1\fR, \fIdf2\fR
-M|Binomial|\fIn\fR, \fIprob\fR (discrete)
+M|Binomial|\fIn\fR, \fIprob\fR (discrete; alias: N)
 W|Weibull|\fIscale\fR, \fIshape\fR
 L|Logistic|none (standard; location=0, scale=1)
 .TE
