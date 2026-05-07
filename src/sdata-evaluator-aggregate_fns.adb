@@ -44,7 +44,7 @@ package body SData.Evaluator.Aggregate_Fns is
       R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
    begin
       if R.N_Count = 0 then return (Kind => Val_Missing); end if;
-      return (Kind => Val_Numeric, Num_Val => Float (R.Sum));
+      return Numeric_Result_Checked (Float (R.Sum));
    end Handle_Sum;
 
    function Handle_Mean (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -52,7 +52,7 @@ package body SData.Evaluator.Aggregate_Fns is
       R : constant Stats_Pass_Result := Compute_Stats_Pass (Vals);
    begin
       if R.N_Count = 0 then return (Kind => Val_Missing); end if;
-      return (Kind => Val_Numeric, Num_Val => Float (R.Sum / Long_Float (R.N_Count)));
+      return Numeric_Result_Checked (Float (R.Sum / Long_Float (R.N_Count)));
    end Handle_Mean;
 
    function Handle_Var_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -62,7 +62,8 @@ package body SData.Evaluator.Aggregate_Fns is
    begin
       if R.N_Count < 2 then return (Kind => Val_Missing); end if;
       NF := Long_Float (R.N_Count);
-      return (Kind => Val_Numeric, Num_Val => Float ((R.Sum_Sq - (R.Sum ** 2 / NF)) / (NF - 1.0)));
+      return Numeric_Result_Checked
+         (Float ((R.Sum_Sq - (R.Sum ** 2 / NF)) / (NF - 1.0)));
    end Handle_Var_Fn;
 
    function Handle_Std_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -72,8 +73,8 @@ package body SData.Evaluator.Aggregate_Fns is
    begin
       if R.N_Count < 2 then return (Kind => Val_Missing); end if;
       NF := Long_Float (R.N_Count);
-      return (Kind => Val_Numeric,
-              Num_Val => Sqrt (Float ((R.Sum_Sq - (R.Sum ** 2 / NF)) / (NF - 1.0))));
+      return Numeric_Result_Checked
+         (Sqrt (Float ((R.Sum_Sq - (R.Sum ** 2 / NF)) / (NF - 1.0))));
    end Handle_Std_Fn;
 
    function Handle_Min_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
