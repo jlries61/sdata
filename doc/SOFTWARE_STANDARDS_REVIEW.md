@@ -104,7 +104,7 @@ No commented-out code detected. No anonymous TODOs. This is clean.
 
 ---
 
-## 3. Efficiency & Performance — 74/100
+## 3. Efficiency & Performance — ~~74~~ 78/100
 
 ### 3.1 Algorithmic Choices
 
@@ -305,13 +305,13 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 |---|---|
 | Architectural Integrity | 65/100 |
 | Code Quality & Craftsmanship | 72/100 |
-| Efficiency & Performance | 74/100 |
+| Efficiency & Performance | ~~74/100~~ **78/100** |
 | Maintainability & Evolvability | 60/100 |
 | Error Handling & Resilience | 58/100 |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ **65/100** |
 | Operational Readiness | 50/100 |
 | Documentation | ~~76/100~~ **82/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ **526/800 (65.8%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ **530/800 (66.3%)** |
 
 ---
 
