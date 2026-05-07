@@ -54,8 +54,13 @@ run: build
 
 check: build
 	@[ -x bin/csv_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
+	@[ -x bin/sdata_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
 	@echo "Running unit tests..."
 	@$(TIMEOUT) 30 ./bin/csv_unit_test; \
+	 if [ $$? -ne 0 ]; then \
+	   echo "Unit tests FAILED"; exit 1; \
+	 fi
+	@$(TIMEOUT) 30 ./bin/sdata_unit_test; \
 	 if [ $$? -ne 0 ]; then \
 	   echo "Unit tests FAILED"; exit 1; \
 	 fi

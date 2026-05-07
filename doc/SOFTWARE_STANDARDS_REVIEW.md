@@ -324,7 +324,7 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | 3 | ~~Decompose `Parse_CSV` into tokenizer + type-inference passes~~ | Code Quality | ~~2–3 days~~ | ~~Grows worse with each format quirk added~~ **Fixed ab4d5c8** |
 | 4 | ~~Change `Program_Error` → `Script_Error` in `Parse_ODF`~~ | Error Handling | ~~30 min~~ | ~~Falls through `-k` handling silently~~ **Fixed 9c7771f — also applied to Parse_OOXML** |
 | 5 | ~~Add CI/CD (GitHub Actions: `make check` on push)~~ | Operational | ~~4 hours~~ | ~~Test regressions invisible until manual run~~ **Fixed ADR-012 / ADR-018** |
-| 6 | Add unit tests for evaluator, table, and BY-group logic | Maintainability | 2–3 days | Silent path failures (the Set_Index_Map bug pattern) |
+| 6 | ~~Add unit tests for evaluator, table, and BY-group logic~~ | Maintainability | ~~2–3 days~~ | ~~Silent path failures (the Set_Index_Map bug pattern)~~ **Fixed — `tests/sdata_unit_test.adb`: 65 tests covering Table column/row management, type enforcement, Rename/Drop, Set_Index_Map filter logic, In_Same_Group BY-group detection, and Evaluator pure helpers** |
 | 7 | ~~Add path traversal check in `Full_Path`~~ | Security | ~~2 hours~~ | ~~SUBMIT can escape working directory~~ **`--nosubmit` added 6909f15; won't-fix by default** |
 | 8 | Document numerical algorithm references in `SData.Statistics` | Documentation | 4 hours | Next maintainer reimplements rather than verifies |
 
