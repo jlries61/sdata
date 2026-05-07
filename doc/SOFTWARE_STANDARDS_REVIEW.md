@@ -180,7 +180,7 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 | Integration-only test coverage | High | 2–3 days per module | Stable |
 | BY-variable list duplication (interpreter + table) | Medium | 4 hours | Stable |
 | Column hash lookup per record | Low | 1 day | Stable |
-| No CI/CD pipeline | Medium | 4 hours | Stable |
+| ~~No CI/CD pipeline~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed ADR-012** |
 | Global interpreter state (remaining post-Step_Context) | Medium | 2–3 days | Shrinking |
 
 **Total estimated remediation: ~12–15 days. Interest rate: Stable.** The codebase is not actively accruing debt; it is maintaining its current level.
@@ -266,14 +266,14 @@ No hardcoded credentials. No network services. No authentication tokens. This is
 
 Configuration is externalized correctly — CLI flags control all runtime behaviour, no hardcoded paths, no config files required. The `OPTIONS` command provides runtime reconfiguration. Multi-platform packaging (RPM, DEB, Slackware, macOS, Windows MSI) is mature and version-coordinated via `scripts/bump-version.sh` — the tooling here is better than most projects four times this size.
 
-**Missing:** No CI/CD pipeline. No GitHub Actions, no automated build verification on push, no automated test execution on PR. Every release depends entirely on the developer running `make check` manually.
+~~**Missing:** No CI/CD pipeline. No GitHub Actions, no automated build verification on push, no automated test execution on PR. Every release depends entirely on the developer running `make check` manually.~~ **Resolved ADR-012:** `.github/workflows/test.yml` runs `alr build` + `make check` on every push to main and every PR. A Verify binaries step guards against missing executables (ADR-018).
 
 | Capability | Score |
 |---|---|
 | Config externalization | 9/10 |
 | Packaging breadth | 9/10 |
-| Deployment automation | 3/10 (manual only) |
-| CI/CD | 0/10 |
+| Deployment automation | 8/10 |
+| CI/CD | 9/10 |
 | Rollback | 8/10 (git tags, versioned packages) |
 
 ---
@@ -323,7 +323,7 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | 2 | ~~Quote column names in SQLite DDL/DML; audit for injection~~ | Security | ~~4 hours~~ | ~~SQL injection via CSV headers~~ **Fixed 456d1e0** |
 | 3 | ~~Decompose `Parse_CSV` into tokenizer + type-inference passes~~ | Code Quality | ~~2–3 days~~ | ~~Grows worse with each format quirk added~~ **Fixed ab4d5c8** |
 | 4 | ~~Change `Program_Error` → `Script_Error` in `Parse_ODF`~~ | Error Handling | ~~30 min~~ | ~~Falls through `-k` handling silently~~ **Fixed 9c7771f — also applied to Parse_OOXML** |
-| 5 | Add CI/CD (GitHub Actions: `make check` on push) | Operational | 4 hours | Test regressions invisible until manual run |
+| 5 | ~~Add CI/CD (GitHub Actions: `make check` on push)~~ | Operational | ~~4 hours~~ | ~~Test regressions invisible until manual run~~ **Fixed ADR-012 / ADR-018** |
 | 6 | Add unit tests for evaluator, table, and BY-group logic | Maintainability | 2–3 days | Silent path failures (the Set_Index_Map bug pattern) |
 | 7 | ~~Add path traversal check in `Full_Path`~~ | Security | ~~2 hours~~ | ~~SUBMIT can escape working directory~~ **`--nosubmit` added 6909f15; won't-fix by default** |
 | 8 | Document numerical algorithm references in `SData.Statistics` | Documentation | 4 hours | Next maintainer reimplements rather than verifies |
@@ -354,7 +354,7 @@ The codebase scores **63%** — solidly competent, clearly improving (the SKEPTI
 | Silent exception swallow | `sdata-csv.adb:42–45` | `when others => return False` twice |
 | Column-name SQL construction | `sdata-table.adb` | ~~DDL built from user-controlled column names~~ **Fixed 456d1e0 — Sql_Id helper escapes `]`→`]]`** |
 | SYSTEM shell injection surface | `sdata-system.adb:68–95` | ~~Unquoted string passed to `/bin/sh -c`~~ **Deliberate design; same trust model as R/SAS/Python; won't-fix** |
-| No CI pipeline | `.github/` absent | No automated build/test on push |
+| ~~No CI pipeline~~ | `.github/workflows/test.yml` | ~~No automated build/test on push~~ **Fixed ADR-012** |
 | BY-variable list duplication | `sdata-interpreter.adb:59`, `sdata-table.adb:53` | Two independent copies of the same vector |
 | 1 unit test module | `tests/csv_unit_test.adb` | No evaluator/table/interpreter unit tests |
 | Execute_Assignment 135 lines | `sdata-interpreter.adb:659–793` | Multiple assignment concerns in one body |
