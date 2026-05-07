@@ -662,6 +662,18 @@ package body SData.Interpreter is
       Result       : Value;  --  Initialised in body so exceptions are caught below
    begin
       Result := Evaluate (Stmt.Expr);
+      if Var_Name_Str'Length > 0
+         and then Var_Name_Str (Var_Name_Str'Last) = '%'
+         and then Result.Kind = Val_Numeric
+         and then Is_Inf (Result.Num_Val)
+      then
+         if SData.Config.Ignore_Math_Errors then
+            Put_Line_Error ("Warning: Cannot convert Inf to integer.");
+            Result := (Kind => Val_Missing);
+         else
+            raise Script_Error with "Cannot convert Inf to integer.";
+         end if;
+      end if;
       if Stmt.Is_Array then
          --  Check if the array exists first.
          if not Has_Array (Var_Name_Str) then
