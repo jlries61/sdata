@@ -13,7 +13,7 @@ Common argument names:
 
 Distribution prefixes:
   Z  Standard Normal (fixed mu=0, sigma=1)
-  N  Normal with parameters mu, sigma
+  N  Binomial  (n trials, prob success probability)
   U  Uniform on [lo, hi]
   E  Exponential with rate parameter
   B  Beta  (shape parameters a, b)

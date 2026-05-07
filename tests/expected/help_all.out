@@ -669,7 +669,7 @@ Common argument names:
 
 Distribution prefixes:
   Z  Standard Normal (fixed mu=0, sigma=1)
-  N  Normal with parameters mu, sigma
+  N  Binomial  (n trials, prob success probability)
   U  Uniform on [lo, hi]
   E  Exponential with rate parameter
   B  Beta  (shape parameters a, b)
@@ -689,14 +689,15 @@ Normal distribution (mu and sigma are optional; default mu=0, sigma=1):
   ZCF(x [, mu, sigma])   cumulative probability P(X <= x)
   ZIF(p [, mu, sigma])   quantile: x such that P(X <= x) = p  (0 < p < 1)
   ZRN([mu, sigma])       random variate
-See also: NDF/NCF/NIF/NRN (always require mu and sigma).
 
-Normal distribution:
-  NDF(x, mu, sigma)   probability density at x
-  NCF(x, mu, sigma)   cumulative probability P(X <= x)
-  NIF(p, mu, sigma)   quantile  (0 < p < 1)
-  NRN(mu, sigma)      random variate
-  mu: mean; sigma: standard deviation (sigma > 0)
+Binomial distribution (discrete):
+  NDF(k, n, prob)   probability mass P(X = k)  (k = 0, 1, ..., n)
+  NCF(k, n, prob)   cumulative probability P(X <= k)
+  NIF(p, n, prob)   quantile  (0 < p < 1)
+  NRN(n, prob)      random variate
+  n: number of trials (positive integer)
+  prob: success probability per trial (0 <= prob <= 1)
+See also: MDF/MCF/MIF/MRN (identical functions, alternative prefix).
 
 Uniform distribution on [lo, hi]:
   UDF(x, lo, hi)   probability density (1/(hi-lo) for lo <= x <= hi)
@@ -765,6 +766,7 @@ Binomial distribution (discrete):
   MRN(n, prob)      random variate
   n: number of trials (positive integer)
   prob: success probability per trial (0 <= prob <= 1)
+See also: NDF/NCF/NIF/NRN (identical functions, alternative prefix).
 
 Weibull distribution:
   WDF(x, scale, shape)   probability density (x >= 0)

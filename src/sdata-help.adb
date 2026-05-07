@@ -907,7 +907,7 @@ package body SData.Help is
       New_Line;
       Put_Line ("Distribution prefixes:");
       Put_Line ("  Z  Standard Normal (fixed mu=0, sigma=1)");
-      Put_Line ("  N  Normal with parameters mu, sigma");
+      Put_Line ("  N  Binomial  (n trials, prob success probability)");
       Put_Line ("  U  Uniform on [lo, hi]");
       Put_Line ("  E  Exponential with rate parameter");
       Put_Line ("  B  Beta  (shape parameters a, b)");
@@ -930,17 +930,18 @@ package body SData.Help is
       Put_Line ("  ZCF(x [, mu, sigma])   cumulative probability P(X <= x)");
       Put_Line ("  ZIF(p [, mu, sigma])   quantile: x such that P(X <= x) = p  (0 < p < 1)");
       Put_Line ("  ZRN([mu, sigma])       random variate");
-      Put_Line ("See also: NDF/NCF/NIF/NRN (always require mu and sigma).");
    end Help_ZDF;
 
    procedure Help_NDF is
    begin
-      Put_Line ("Normal distribution:");
-      Put_Line ("  NDF(x, mu, sigma)   probability density at x");
-      Put_Line ("  NCF(x, mu, sigma)   cumulative probability P(X <= x)");
-      Put_Line ("  NIF(p, mu, sigma)   quantile  (0 < p < 1)");
-      Put_Line ("  NRN(mu, sigma)      random variate");
-      Put_Line ("  mu: mean; sigma: standard deviation (sigma > 0)");
+      Put_Line ("Binomial distribution (discrete):");
+      Put_Line ("  NDF(k, n, prob)   probability mass P(X = k)  (k = 0, 1, ..., n)");
+      Put_Line ("  NCF(k, n, prob)   cumulative probability P(X <= k)");
+      Put_Line ("  NIF(p, n, prob)   quantile  (0 < p < 1)");
+      Put_Line ("  NRN(n, prob)      random variate");
+      Put_Line ("  n: number of trials (positive integer)");
+      Put_Line ("  prob: success probability per trial (0 <= prob <= 1)");
+      Put_Line ("See also: MDF/MCF/MIF/MRN (identical functions, alternative prefix).");
    end Help_NDF;
 
    procedure Help_UDF is
@@ -1036,6 +1037,7 @@ package body SData.Help is
       Put_Line ("  MRN(n, prob)      random variate");
       Put_Line ("  n: number of trials (positive integer)");
       Put_Line ("  prob: success probability per trial (0 <= prob <= 1)");
+      Put_Line ("See also: NDF/NCF/NIF/NRN (identical functions, alternative prefix).");
    end Help_MDF;
 
    procedure Help_WDF is
