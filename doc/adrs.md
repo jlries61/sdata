@@ -43,6 +43,7 @@ that might relitigate a settled question.
 | ADR-031 | Keep SYSTEM/SHELL enabled by default; mark sandboxing/allowlist/escaping as won't-fix | 2026-05-06 | Accepted |
 | ADR-032 | Add --nosubmit flag to disable SUBMIT command | 2026-05-06 | Accepted |
 | ADR-033 | Use a C stub for privilege detection rather than florist_blady | 2026-05-06 | Accepted |
+| ADR-034 | Measure MAXINTAB / -m in cells (rows × columns), not rows | 2026-05-07 | Accepted |
 
 ---
 
@@ -397,6 +398,17 @@ that might relitigate a settled question.
 **Decision:** Implement privilege detection as an 18-line C stub (`src/sdata_privilege.c`) using `#ifdef _WIN32` to branch between `GetUserNameA` (Windows) and `getuid()` (POSIX). The stub is wrapped by a single Ada function `SData.System.Running_As_System_Account` via `pragma Import`. The GPR project gains `for Languages use ("Ada", "C")` to compile the stub.
 
 **Consequences:** The project gains a minimal, intentional C dependency for one specific purpose. This is acceptable given that the project already links a C library (Ada_Sqlite3 via its SQLite3 amalgamation) and the stub is self-contained with no further C code planned. `florist_blady` was explicitly evaluated and rejected: its Windows exclusion makes it less portable than the C stub it would replace.
+
+---
+
+### ADR-034: Measure MAXINTAB / -m in cells (rows × columns), not rows
+**Date:** 2026-05-07 | **Status:** Accepted
+
+**Context:** The `-m` CLI flag and `OPTIONS MAXINTAB` both set `Max_Table_Rows`, which was compared against the in-memory row count to decide when to spill a segment to SQLite. The help text said "max in-memory table size," but the implementation was a pure row limit. For a 100-column table the memory consumed per threshold unit is 100× that of a 1-column table, so the parameter had no stable meaning as a size limit across different datasets.
+
+**Decision:** Redefine the unit of MAXINTAB / `-m` as cells (rows × columns). Both spill checks — in `Add_Row` for the input table and in `Add_Output_Row` for the output table — now compare `rows_in_current_segment × column_count` against the threshold. `Fetch_From_Disk` derives the equivalent rows-per-segment for cache-page alignment as `threshold / column_count` (floored at 1), preserving consistent segment boundaries between write and read paths. The variable name `Max_Table_Rows` is retained in the source to minimize churn; the semantics are recorded here and in the help strings. Default remains 0 (unlimited, no automatic spill). A practical guideline: 1 000 000 cells ≈ 25–32 MB at typical cell sizes; 10 000 000 cells ≈ 250–320 MB.
+
+**Consequences:** The threshold is now proportional to actual memory consumption regardless of dataset width. The default of 0 preserves existing behavior for all users who have not set the option. The one-to-one correspondence between write-segment size and read-segment size is maintained because both derive rows-per-segment from the same formula. Column count is stable during the row-adding phase for both the input and output tables (columns are finalized before rows are appended in all parsers and in `Flush_PDV_To_Output`), so the divisor does not change within a single spill calculation.
 
 ---
 
