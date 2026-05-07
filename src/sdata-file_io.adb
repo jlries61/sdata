@@ -612,7 +612,10 @@ package body SData.File_IO is
             end loop;
          end if;
 
-         for I in Names'Range loop Free (Names (I)); end loop;
+         for I in Names'Range loop
+            Free (Names (I));
+            Col_Names (I) := null;
+         end loop;
       end Load_Data_Rows;
 
    begin
