@@ -4,18 +4,15 @@
 
 #ifdef _WIN32
 #  include <windows.h>
-#  include <string.h>
+#  include <shlobj.h>
 int sdata_is_system_account (void)
 {
-    char   name[256];
-    DWORD  size = sizeof (name);
-    if (!GetUserNameA (name, &size)) return 0;
-    return strcmp (name, "SYSTEM") == 0;
+    return IsUserAnAdmin () != 0;
 }
 #else
 #  include <unistd.h>
 int sdata_is_system_account (void)
 {
-    return getuid () == 0;
+    return geteuid () == 0;
 }
 #endif
