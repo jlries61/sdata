@@ -493,18 +493,25 @@ package body SData.File_IO is
       Scan_Count  : Natural := 0;
       Header_Line : Unbounded_String;
 
-      --  Inner helper: detect types, build columns, and stream data rows.
-      procedure Load_Columns_And_Data
-         (H_Str  : String;
-          Names_From_Header : Boolean)
+      N_Cols    : Natural         := 0;
+      Col_Names : Name_Array     := (others => null);
+      Col_Types : Col_Type_Array := (others => Col_Numeric);
+
+      --  Pass 3 helper: scan up to NSCAN rows to determine column types and names.
+      --  Sets N_Cols, Col_Names(1..N_Cols), Col_Types(1..N_Cols).
+      procedure Infer_Column_Types
+         (H_Str : String; Names_From_Header : Boolean)
       is
          N_Hdr : Natural;
-         H_Idx : constant Field_Array := Split_Indices (H_Str, Delimiter, N_Hdr);
-         Names : String_List (1 .. N_Hdr);
-         Col_Determined : array (1 .. N_Hdr) of Boolean     := (others => False);
-         Col_Types      : array (1 .. N_Hdr) of Column_Type := (others => Col_Numeric);
+         H_Idx : constant Field_Array :=
+            Split_Indices (H_Str, Delimiter, N_Hdr);
+         Col_Determined : array (1 .. N_Hdr) of Boolean := (others => False);
       begin
-         --  Per spec: a column whose header already ends in "$" is forced character.
+         N_Cols    := N_Hdr;
+         Col_Types := (others => Col_Numeric);
+         Col_Names := (others => null);
+
+         --  Columns whose header already ends in "$" are forced character.
          if Names_From_Header then
             for I in 1 .. N_Hdr loop
                declare
@@ -512,19 +519,20 @@ package body SData.File_IO is
                      Trim (H_Str (H_Idx (I).S .. H_Idx (I).E), Ada.Strings.Both);
                begin
                   if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
-                     Col_Types (I) := Col_String;
+                     Col_Types (I)      := Col_String;
                      Col_Determined (I) := True;
                   end if;
                end;
             end loop;
          end if;
 
-         --  Detect column types from up to NSCAN scan rows.
+         --  Scan data rows to determine remaining column types.
          for R in 1 .. Scan_Count loop
             declare
                D_Str : constant String := To_String (Scan_Lines (R));
                N_Fld : Natural;
-               D_Idx : constant Field_Array := Split_Indices (D_Str, Delimiter, N_Fld);
+               D_Idx : constant Field_Array :=
+                  Split_Indices (D_Str, Delimiter, N_Fld);
             begin
                for I in 1 .. N_Hdr loop
                   if not Col_Determined (I) and then I <= N_Fld then
@@ -544,15 +552,15 @@ package body SData.File_IO is
             end;
          end loop;
 
-         Clear;
+         --  Build column names; append "$" to string columns that lack it.
          for I in 1 .. N_Hdr loop
             declare
                Base_Name : constant String :=
                   (if Names_From_Header
-                   then Safe_Name (CSV_Unquote (H_Str (H_Idx (I).S .. H_Idx (I).E)),
-                                   "COL" & Trim (I'Img, Ada.Strings.Both))
+                   then Safe_Name
+                           (CSV_Unquote (H_Str (H_Idx (I).S .. H_Idx (I).E)),
+                            "COL" & Trim (I'Img, Ada.Strings.Both))
                    else "COL" & Trim (I'Img, Ada.Strings.Both));
-               --  Per spec: append "$" to string column names that don't already end in "$"
                Name : constant String :=
                   (if Col_Types (I) = Col_String
                       and then (Base_Name'Length = 0
@@ -560,23 +568,33 @@ package body SData.File_IO is
                    then Base_Name & "$"
                    else Base_Name);
             begin
-               Names (I) := new String'(Name);
-               Add_Column (Name, Col_Types (I));
+               Col_Names (I) := new String'(Name);
             end;
          end loop;
+      end Infer_Column_Types;
 
-         if Names_From_Header and then Scan_Count = 0 then
+      --  Pass 4 helper: register columns, stream scan lines and remaining file rows.
+      procedure Load_Data_Rows is
+         Names : String_List (1 .. N_Cols);
+      begin
+         Clear;
+         for I in 1 .. N_Cols loop
+            Names (I) := Col_Names (I);
+            Add_Column (Col_Names (I).all, Col_Types (I));
+         end loop;
+
+         if Has_File_Header and then Scan_Count = 0 then
             SData.IO.Put_Line_Error
                ("Warning: File contains a header but no data records.");
          end if;
 
-         --  Process buffered scan lines (all of them when no-header mode).
+         --  Replay buffered scan rows.
          for R in 1 .. Scan_Count loop
             exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
             Process_Line_Direct (To_String (Scan_Lines (R)), Names);
          end loop;
 
-         --  Process remaining lines (text file or pre-loaded buffer).
+         --  Stream the remainder of the file.
          if Is_Buffered then
             while All_Lines_Idx < Natural (All_Lines.Length) loop
                exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
@@ -595,7 +613,7 @@ package body SData.File_IO is
          end if;
 
          for I in Names'Range loop Free (Names (I)); end loop;
-      end Load_Columns_And_Data;
+      end Load_Data_Rows;
 
    begin
       --  Pass 1: resolve charset; optionally transcode and buffer whole file.
@@ -683,11 +701,13 @@ package body SData.File_IO is
          end loop;
       end if;
 
+      --  Passes 3 + 4: infer column types, create table columns, stream rows.
       if Has_File_Header then
-         Load_Columns_And_Data (To_String (Header_Line), Names_From_Header => True);
+         Infer_Column_Types (To_String (Header_Line), Names_From_Header => True);
+         Load_Data_Rows;
       elsif Scan_Count > 0 then
-         --  No header: synthesise column names from the first data row's field count.
-         Load_Columns_And_Data (To_String (Scan_Lines (1)), Names_From_Header => False);
+         Infer_Column_Types (To_String (Scan_Lines (1)), Names_From_Header => False);
+         Load_Data_Rows;
       end if;
 
       Free_Buf (Line_Buf);
