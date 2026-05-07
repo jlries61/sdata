@@ -34,6 +34,7 @@ package SData.Config.Runtime is
    Options_TXTFMT_Len  : Natural                          := 4;
    Options_CHARSET     : String (1 .. Max_Charset_Len)    := (others => ' ');
    Options_CHARSET_Len : Natural                          := 0;
+   IEEE_Divide         : Boolean                          := False;
 
    --  Effective delimiter/header/charset saved at SAVE-statement time for use at write time
    Save_DLM         : String (1 .. Max_Delimiter_Len)  := (',' , others => ' ');

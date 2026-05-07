@@ -1525,6 +1525,8 @@ package body SData.Interpreter is
                         Val (Val'First .. Val'First + VL - 1);
                      SData.Config.Runtime.Options_CHARSET_Len := VL;
                   end;
+               elsif Key = "IEEE_DIVIDE" then
+                  SData.Config.Runtime.IEEE_Divide := (Val_Upper = "YES");
                else
                   Put_Line_Error ("Warning: Unknown OPTIONS key: " & Key);
                end if;

@@ -26,6 +26,7 @@ package body SData.Config.Runtime is
       Options_TXTFMT_Len  := 4;
       Options_CHARSET     := (others => ' ');
       Options_CHARSET_Len := 0;
+      IEEE_Divide         := False;
       Save_DLM         := (others => ' ');
       Save_DLM (1)     := ',';
       Save_DLM_Len     := 1;

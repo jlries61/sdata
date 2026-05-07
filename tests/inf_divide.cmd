@@ -1,0 +1,12 @@
+-- Test OPTIONS IEEE_DIVIDE: nonzero/0 -> Inf, 0/0 -> NaN error
+DIGITS 5
+OPTIONS IEEE_DIVIDE YES
+REPEAT 1
+  LET A = 1.0 / 0.0
+  LET B = -1.0 / 0.0
+  PRINT A
+  PRINT B
+  LET C = 0.0 / 0.0
+  PRINT C
+RUN
+QUIT
