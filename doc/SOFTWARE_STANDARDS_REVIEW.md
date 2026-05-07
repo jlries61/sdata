@@ -112,12 +112,11 @@ The dispatch table in `SData.Evaluator` (hashed map, O(1) per lookup) is correct
 
 The `Filter_Map` is an array of physical row indices, built once per RUN via `Rebuild_Filter_Map`. Logical-to-physical mapping is O(1) thereafter. This is the correct design.
 
-**Algorithmic concern — column access:**
-`Data_Table` is `Column_Maps.Map` keyed by column name (`Ada.Containers.Indefinite_Hashed_Maps`). Per-cell access is `Data_Table("COLNAME").Data(Row_Index)`. This means every cell read during a data step — which happens M × N times (M statements × N rows) — performs a hash lookup on the column name. For a dataset with 50 columns and 100,000 rows, this is 5 million unnecessary hash lookups per data step if PDV indices could be pre-resolved. The PDV index cache (`Expr.Var_Index`) partially mitigates this for parsed expressions, but direct column reads in `Get_PDV_Value`/`Load_PDV_From_Table` still go through the hash map on every record.
+**~~Algorithmic concern — column access~~ Resolved 415714a:** ~~`Data_Table` is `Column_Maps.Map` keyed by column name (`Ada.Containers.Indefinite_Hashed_Maps`). Per-cell access is `Data_Table("COLNAME").Data(Row_Index)`. This means every cell read during a data step — which happens M × N times (M statements × N rows) — performs a hash lookup on the column name. For a dataset with 50 columns and 100,000 rows, this is 5 million unnecessary hash lookups per data step if PDV indices could be pre-resolved. The PDV index cache (`Expr.Var_Index`) partially mitigates this for parsed expressions, but direct column reads in `Get_PDV_Value`/`Load_PDV_From_Table` still go through the hash map on every record.~~ A `Column_Cursor_Cache` / `Output_Cursor_Cache` (vectors of pre-resolved `Column_Maps.Cursor`) is now built once per RUN via `Rebuild_Column_Cache` / `Rebuild_Output_Cache` and invalidated on every schema change. `Load_PDV_From_Table` and the value-setting loop in `Flush_PDV_To_Output` use `Get_Value_By_Col` / `Set_Output_Value_By_Col` — O(1) cursor dereferences with no hash lookup.
 
 | Concern | Impact | Fix Difficulty |
 |---|---|---|
-| Column-name hash lookup per record in table operations | Medium (measurable on large datasets) | Medium |
+| ~~Column-name hash lookup per record in table operations~~ | ~~Medium (measurable on large datasets)~~ | ~~Medium~~ **Fixed 415714a** |
 | Linear help-table scan | None (cold path) | Easy |
 | ~~BY-variable list duplicated (interpreter + table)~~ | ~~Negligible performance, high maintenance cost~~ | ~~Medium~~ **Fixed 9460375** |
 
@@ -180,7 +179,7 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 | `Execute_Assignment` too broad | Medium | 1 day | Stable |
 | Integration-only test coverage | High | 2–3 days per module | Stable |
 | ~~BY-variable list duplication (interpreter + table)~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed 9460375** |
-| Column hash lookup per record | Low | 1 day | Stable |
+| ~~Column hash lookup per record~~ | ~~Low~~ | ~~1 day~~ | **Fixed 415714a** |
 | ~~No CI/CD pipeline~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed ADR-012** |
 | ~~Global interpreter state (remaining post-Step_Context)~~ | ~~Medium~~ | ~~2–3 days~~ | **Fixed 88def8c — `BOG_Flag`/`EOG_Flag` moved to `Nav_Fns` body; no evaluator-level globals remain** |
 
