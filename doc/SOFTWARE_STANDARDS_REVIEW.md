@@ -54,7 +54,7 @@ Four direct dependencies, all justified, all maintained, no version-pinning mism
 
 ---
 
-## 2. Code Quality & Craftsmanship — 72/100
+## 2. Code Quality & Craftsmanship — ~~72~~ 75/100
 
 ### 2.1 Naming & Readability
 
@@ -63,7 +63,7 @@ Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output
 | Dimension | Score | Notes |
 |---|---|---|
 | Naming Precision | 9/10 | Excellent; Ada verbosity works in the codebase's favour |
-| Self-Documentation | 7/10 | Good in evaluator/table; weakens inside file_io monoliths |
+| Self-Documentation | ~~7/10~~ 7.5/10 | Evaluator improved (algorithm references, elaboration note); variable comment rewritten as rationale; file_io monoliths still weaken it |
 | Cognitive Load | Medium | Low in evaluator (hidden state eliminated), interpreter (Step_Context explicit); **Medium** in Parse_CSV (passes now separated: `Process_Line_Direct` → `Infer_Column_Types` → `Load_Data_Rows`); **High** in Parse_OOXML (389 lines, still monolithic) and Parse_ODF (272 lines) |
 
 ### 2.2 Function Design
