@@ -112,6 +112,8 @@ package SData.Table is
    --  depending on the interpreter package.
    procedure Clear_By_Vars;
    procedure Add_By_Var (Name : String);
+   function By_Var_Count return Natural;
+   function By_Var_Name (I : Positive) return String;
    function In_Same_Group (Idx1, Idx2 : Positive) return Boolean;
 
    --  Package to store lists of column names.

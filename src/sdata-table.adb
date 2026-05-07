@@ -567,6 +567,16 @@ package body SData.Table is
       Table_By_Vars.Append (To_Unbounded_String (Name));
    end Add_By_Var;
 
+   function By_Var_Count return Natural is
+   begin
+      return Natural (Table_By_Vars.Length);
+   end By_Var_Count;
+
+   function By_Var_Name (I : Positive) return String is
+   begin
+      return To_String (Table_By_Vars.Element (I));
+   end By_Var_Name;
+
    -------------------
    -- In_Same_Group --
    -------------------

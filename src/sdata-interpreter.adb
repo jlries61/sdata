@@ -53,16 +53,12 @@ with Ada.Text_IO.Unbounded_IO;
 
 package body SData.Interpreter is
 
-   package By_Group_Names is new Ada.Containers.Vectors (Index_Type => Positive, Element_Type => Unbounded_String);
-   --  Ordered list of BY variable names (upper-cased).  Empty when no BY
-   --  grouping is active.  Populated by Stmt_BY; cleared by bare BY or NEW.
-   Current_By_Vars : By_Group_Names.Vector;
-
    --  Per-record execution context, created once per data step and threaded
    --  through the entire execution chain.  Eliminates the Global_Record_Deleted
    --  package variable and makes per-record state visible in signatures.
+   --  BY variable names are queried directly from SData.Table (single source
+   --  of truth); no local copy is kept here.
    type Step_Context is record
-      By_Vars : By_Group_Names.Vector;
       Deleted : Boolean := False;
       BOG     : Boolean := False;
       EOG     : Boolean := False;
@@ -112,8 +108,7 @@ package body SData.Interpreter is
    procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
    function  Group_Flags (Logical_I     : Positive;
-                          Logical_Count : Natural;
-                          By_Vars       : By_Group_Names.Vector)
+                          Logical_Count : Natural)
                           return Group_Flags_Result;
    procedure Rebuild_Filter_Map;
    procedure Process_One_Record   (Logical_I        : Positive;
@@ -182,7 +177,6 @@ package body SData.Interpreter is
       end loop;
       Active_Program_Vec.Clear;
       SData.Table.Clear_Index_Map;
-      Current_By_Vars.Clear;
       SData.Table.Clear_By_Vars;
    end Clear_Active_Program;
 
@@ -1452,7 +1446,6 @@ package body SData.Interpreter is
             if SData.Table.Column_Count = 0 and then not SData.Config.Runtime.Repeat_Active then
                raise Script_Error with "BY statement requires an active dataset (use USE or REPEAT first).";
             end if;
-            Current_By_Vars.Clear;
             SData.Table.Clear_By_Vars;
             declare
                Curr_Var : Variable_List := Stmt.Sort_Vars;
@@ -1470,7 +1463,6 @@ package body SData.Interpreter is
                         Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
                         Crit (Idx).Len := Curr_Var.Var.Start_Len;
                         Crit (Idx).Dir := Ascending;
-                        Current_By_Vars.Append (To_Unbounded_String (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len))));
                         SData.Table.Add_By_Var (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
                         Idx := Idx + 1; Curr_Var := Curr_Var.Next;
                      end loop;
@@ -1799,48 +1791,23 @@ package body SData.Interpreter is
    --  its arguments and the current table contents.  This is the seam that
    --  makes BY-group logic independently inspectable and testable.
    function Group_Flags (Logical_I     : Positive;
-                         Logical_Count : Natural;
-                         By_Vars       : By_Group_Names.Vector)
+                         Logical_Count : Natural)
                          return Group_Flags_Result
    is
       Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Logical_I);
-      BOG, EOG  : Boolean;
    begin
-      if By_Vars.Is_Empty then
+      --  During REPEAT the input table is empty; BY variables have no data to
+      --  compare, so all generated records form one implicit group.
+      if SData.Table.Row_Count = 0 then
          return (BOG => Logical_I = 1, EOG => Logical_I = Logical_Count);
       end if;
-
-      BOG := Logical_I = 1;
-      if not BOG then
-         declare
-            Phys_Prev : constant Positive := SData.Table.Logical_To_Physical (Logical_I - 1);
-         begin
-            for V of By_Vars loop
-               if not (Get_Value (Phys_Curr, To_String (V)) =
-                       Get_Value (Phys_Prev, To_String (V))) then
-                  BOG := True;
-                  exit;
-               end if;
-            end loop;
-         end;
-      end if;
-
-      EOG := Logical_I = Logical_Count;
-      if not EOG then
-         declare
-            Phys_Next : constant Positive := SData.Table.Logical_To_Physical (Logical_I + 1);
-         begin
-            for V of By_Vars loop
-               if not (Get_Value (Phys_Curr, To_String (V)) =
-                       Get_Value (Phys_Next, To_String (V))) then
-                  EOG := True;
-                  exit;
-               end if;
-            end loop;
-         end;
-      end if;
-
-      return (BOG => BOG, EOG => EOG);
+      return
+        (BOG => (Logical_I = 1) or else
+                not SData.Table.In_Same_Group
+                      (Phys_Curr, SData.Table.Logical_To_Physical (Logical_I - 1)),
+         EOG => (Logical_I = Logical_Count) or else
+                not SData.Table.In_Same_Group
+                      (Phys_Curr, SData.Table.Logical_To_Physical (Logical_I + 1)));
    end Group_Flags;
 
    --  Rebuild_Filter_Map — re-evaluates the SELECT filter against the current
@@ -1918,14 +1885,15 @@ package body SData.Interpreter is
       Load_PDV_From_Table (Phys_I);
 
       declare
-         Flags : constant Group_Flags_Result :=
-            Group_Flags (Logical_I, Logical_Count, Ctx.By_Vars);
+         Flags  : constant Group_Flags_Result :=
+            Group_Flags (Logical_I, Logical_Count);
+         By_N   : constant Natural := SData.Table.By_Var_Count;
       begin
          Ctx.BOG := Flags.BOG;
          Ctx.EOG := Flags.EOG;
          Set_Group_Boundary (BOG => Ctx.BOG, EOG => Ctx.EOG);
-         for V of Ctx.By_Vars loop
-            declare Name : constant String := To_String (V); begin
+         for I in 1 .. By_N loop
+            declare Name : constant String := SData.Table.By_Var_Name (I); begin
                Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if Flags.BOG then 1 else 0)));
                Set_Temporary ("LAST."  & Name, (Kind => Val_Integer, Int_Val => (if Flags.EOG then 1 else 0)));
             end;
@@ -1938,16 +1906,16 @@ package body SData.Interpreter is
                   Ada.Strings.Unbounded.To_Unbounded_String
                      ("-- record" & Logical_I'Image & " (physical" & Phys_I'Image & ")");
             begin
-               if not Ctx.By_Vars.Is_Empty and then Flags.BOG then
+               if By_N > 0 and then Flags.BOG then
                   declare
                      Label : constant String :=
                         (if Logical_I = 1 then "BY GROUP START" else "BY GROUP CHANGE");
                   begin
                      Ada.Strings.Unbounded.Append (Header, "  [" & Label & ":");
-                     for V of Ctx.By_Vars loop
+                     for I in 1 .. By_N loop
                         declare
                            Name    : constant String :=
-                              Ada.Strings.Unbounded.To_String (V);
+                              SData.Table.By_Var_Name (I);
                            New_Val : constant Value :=
                               SData.Variables.Get (Name);
                         begin
@@ -2182,7 +2150,6 @@ package body SData.Interpreter is
       Act       : Step_Action := Action_Continue;
       Ctx       : Step_Context;
    begin
-      Ctx.By_Vars := Current_By_Vars;
       Initialize_PDV;
       Resolve_Expr_Indices (Start, Boundary);
       SData.Table.Initialize_Output_Table;
