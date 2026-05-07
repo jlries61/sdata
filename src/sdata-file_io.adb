@@ -969,7 +969,7 @@ package body SData.File_IO is
          Tables := DOM.Core.Documents.Get_Elements_By_Tag_Name (Doc, "table:table");
          if Length (Tables) = 0 then
             Free (Tables); DOM.Readers.Free (Reader);
-            raise Program_Error with "No tables found in ODS file";
+            raise SData.Script_Error with "No tables found in ODS file";
          end if;
 
          --  Select the target table: by name if Sheet_Name is non-empty,
@@ -1153,7 +1153,7 @@ package body SData.File_IO is
    exception
       when E : others =>
          if GNAT.OS_Lib.Is_Regular_File (Temp_XML) then declare OK : Boolean; begin GNAT.OS_Lib.Delete_File (Temp_XML, OK); end; end if;
-         raise Program_Error with "Failed to parse ODS file """ & File_Name & """: " &
+         raise SData.Script_Error with "Failed to parse ODS file """ & File_Name & """: " &
             Ada.Exceptions.Exception_Message (E);
    end Parse_ODF;
 
@@ -1547,7 +1547,7 @@ package body SData.File_IO is
             if GNAT.OS_Lib.Is_Regular_File (Temp_Workbook) then GNAT.OS_Lib.Delete_File (Temp_Workbook, OK); end if;
             if GNAT.OS_Lib.Is_Regular_File (Temp_Rels)     then GNAT.OS_Lib.Delete_File (Temp_Rels,     OK); end if;
          end;
-         raise Program_Error with "Failed to parse OOXML file """ & File_Name & """: " &
+         raise SData.Script_Error with "Failed to parse OOXML file """ & File_Name & """: " &
             Ada.Exceptions.Exception_Message (E);
    end Parse_OOXML;
 
