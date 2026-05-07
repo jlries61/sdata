@@ -1,0 +1,2819 @@
+Data Command Interpreter Specification
+
+1. INTRODUCTION
+
+1.1 Overview
+
+This document specifies a command interpreter modeled on Systat BASIC
+that operates on a two-dimensional table residing either in memory or an
+external file. The interpreter shall be written in Ada and compilable
+with any recent version of GNU GNAT on any platform upon which it runs.
+The language shall be entirely case insensitive.
+
+Key Requirements:
+
+- No hard memory or dimensional constraints.
+- No limits on nesting of FOR loops or other structures.
+- Can run as stand-alone text-based application or embedded in a larger
+  system.
+- External libraries must be freely available and compatible with
+  proprietary software.
+- Code must be modular, readable, maintainable, and well-documented.
+- No copyrighted code may be copied into the generated code base.
+
+1.2 BW BASIC Compatibility
+
+Unless otherwise specified, the commands and functions listed shall be
+implemented as specified in the documentation for Bywater BASIC 3.20,
+but deviations are allowed when necessary. Bywater commands and
+functions not listed in this document shall not be supported.
+
+2. DATA MODEL
+
+2.1 The Internal Table
+
+The interpreter operates on a two-dimensional table containing any
+number of rows (records) and columns (variables). The table may reside
+in memory if small enough, or in an external file with an in-memory
+cache.
+
+Memory Management:
+
+- Maximum in-memory size: set by -m command line option or OPTIONS
+  MAXINTAB.
+- External file storage: used when table exceeds maximum in-memory size.
+- Cache size: equal to maximum in-memory size, but never less than the
+  size of a single row.
+- Implementation details: format and properties of external file and
+  cache are implementation-defined.
+
+Column Ordering: Permanent variables (including arrays) shall appear as
+columns in the internal table in the order in which they were created.
+
+2.2 Data Types
+
+Three data types shall be supported:
+
+Floating Point Numeric
+
+Platform-dependent precision:
+
+- 128-bit architectures: IEEE 754 quadruple precision (128-bit).
+- 64-bit architectures: IEEE 754 double precision (64-bit).
+- 32-bit architectures: IEEE 754 single precision (32-bit).
+- Architectures with word size < 32 bits: unsupported.
+
+Integer
+
+32-bit signed integer.
+
+Character
+
+- Variable-length character strings.
+- Maximum length: specifiable via –clen command line argument (default:
+  256 characters).
+- Truncation: If a string exceeds maximum length, a warning shall be
+  issued and the string truncated from the right, keeping only the
+  leftmost characters that fit.
+
+2.3 Type Conversion and Mixed Mode Arithmetic
+
+Conversion Rules:
+
+- If an operation uses both floating point and integer values, integer
+  values shall first be converted to their floating point equivalents.
+- If an integer value is written to a floating point variable, it shall
+  be converted to its floating point equivalent.
+- If a floating point value is written to an integer variable, the
+  fractional part shall be truncated (rounded toward zero).
+- Arithmetic operations involving character values shall be unsupported.
+
+2.4 Overflow Handling
+
+Integer Overflow: Operations producing values outside the range
+-2,147,483,648 to 2,147,483,647 shall fail with an error message.
+
+Floating Point Overflow: Floating point operations that would produce
+values exceeding the representable range shall likewise fail with an
+error message.
+
+Note: Future versions may support special missing value codes for IEEE
+754 infinity and NaN values.
+
+2.5 Missing Values
+
+Representation:
+
+- Numeric missing value: unquoted period (.).
+- Character missing value: empty string ("").
+
+Propagation Rules:
+
+- Operations on missing values shall result in missing values.
+- Null strings ("") in string operations shall be taken literally.
+- If no non-missing arguments are passed to an aggregate function, a
+  missing value shall be returned.
+- Aggregate functions shalfunctionl ignore missing values when making
+  computations.
+
+Error Conditions (not missing values):
+
+- Division by zero shall terminate the current running program with an
+  error message.
+- Attempted operations that reference non-existent array elements shall
+  fail with an error message.
+- Mathematical functions receiving invalid arguments (e.g., non-positive
+  argument to LOG) shall fail with an error message.
+
+3. VARIABLES AND ARRAYS
+
+3.1 Variable Types
+
+Two categories of variables are supported:
+
+Permanent Variables
+
+- Stored as columns in the internal table.
+- Written to output datasets when SAVE command is executed.
+- Unless a HOLD statement is in effect, permanent variables not
+  appearing in the input dataset shall be reset to missing each time a
+  new record is read (if USE statement in effect) or created (if REPEAT
+  statement in effect).
+- If HOLD statement is in effect, affected variables not in the input
+  dataset retain their values until explicitly changed.
+- If KEEP statement is executed, all permanent variables not listed in
+  it shall be deleted at the last step of the next RUN statement.
+
+Temporary Variables
+
+- Single values (numeric or character) not saved when internal table is
+  written to external file.
+- Retained for the duration of the session until explicitly deleted
+  (DROP statement) or implicitly deleted (NEW statement).
+- Always retain their values until/unless explicitly changed.
+- Maximum memory: set via command line -t option or OPTIONS MAXTEMPMEM.
+- If maximum would be exceeded by creating a new variable/array or
+  increasing array size, the statement shall fail with an error message.
+
+3.2 Variable Names and Syntax
+
+Base Variable Names:
+
+- 1 to 64 characters.
+- May contain: uppercase letters, numerals, underscores.
+- Case insensitive.
+
+Type Indicators:
+
+- Character variables: base name + $ suffix.
+- Integer variables: base name + % suffix.
+- Floating point variables: base name only (no suffix).
+
+Array Elements:
+
+- Format: arrayname(subscript).
+- Example: TEMP(5), NAME$(3)
+
+Examples:
+
+- LENGTH - Scalar numeric variable.
+- NAME$ - Scalar character variable.
+- COUNT% - Scalar integer variable.
+- FINGER_LEN(1) - Member of a numeric array.
+- ALIAS$(2) - Member of a character array.
+
+3.3 Arrays
+
+Three types of arrays are supported:
+
+Permanent Arrays
+
+- Elements are columns in the internal table
+- Written to output datasets via SAVE command
+- When written, one column created per element in consecutive columns
+- Column names: array name + subscript in parentheses (e.g., DATA(1),
+  DATA(2))
+- Columns appear in numeric order of subscripts
+
+Temporary Arrays
+
+- Elements not written to output datasets
+- Remain in memory until deleted or redefined
+- Subject to temporary variable memory limits
+
+Virtual Arrays
+
+- Consist of one or more existing scalar variables
+- Constituent variables ordered as specified in ARRAY statement
+- All elements must be same type as specified by array name
+- When creating a virtual array with ARRAY command, all constituent
+  variables must already exist; otherwise statement fails with error
+- May consist of permanent variables, temporary variables, or both
+- Element names are aliases for constituent variable names
+
+Array Subscripting:
+
+- Default: 1-based (first element = subscript 1, second = subscript 2,
+  etc.) .
+- Custom subscripts: Supported for DIM arrays only (e.g., DIM MONTH(0 TO
+  11), DIM YEAR(2000 TO 2030)).
+- Virtual arrays: Custom subscripts not supported
+
+Multiple Element Reference:
+
+- Comma-delimited list of subscripts: ARRAY(1,3,5).
+- Subscript ranges: ARRAY(2:5).
+- Elements must already exist.
+
+Interchangeability: Except as specified elsewhere, arrays of the three
+types shall be fully interchangeable in all operations.
+
+Error Condition: References to non-existent array elements cause the
+current program to fail with an error message.
+
+3.4 Variable Lifecycle
+
+Creation
+
+Variables and arrays may be created by:
+
+- USE command:
+
+  - Columns of input dataset added as permanent variables/arrays.
+  - If variables/arrays with same names already exist, they are
+    replaced.
+  - If names match existing virtual arrays, those virtual arrays are
+    undefined.
+
+- LET command: Creates permanent scalar variables.
+
+- SET command: Creates temporary scalar variables.
+
+- DIM command:
+
+  - Creates permanent or temporary arrays.
+  - Elements initially filled with missing values.
+  - May be modified by subsequent LET or SET statements.
+  - Appending /TEMP to DIM statement creates temporary array.
+
+- ARRAY command: Creates virtual arrays from existing variables.
+
+- Function return values: Some functions return arrays when referenced
+  in LET or SET statements.
+
+Initialization
+
+Permanent Variables:
+
+- Unless HOLD statement is in effect, reset to missing each time new
+  record is read or created.
+- If HOLD statement is in effect, variables not in input dataset retain
+  values until explicitly changed.
+- Variables appearing in input dataset are set to new values as each
+  record is read (HOLD has no effect on these).
+
+Temporary Variables: - Always retain values until/unless explicitly
+changed.
+
+Deletion
+
+Variables and arrays may be deleted by:
+
+- DROP command:
+
+  - Explicitly deletes specified variables/arrays.
+  - If DROP lists a variable also in KEEP statement, variable is deleted
+    nevertheless (modifies KEEP statement).
+  - Individual array elements cannot be deleted.
+
+- KEEP statement:
+
+  - When executed, all permanent variables/arrays NOT listed are deleted
+    at last step of next RUN statement.
+  - If virtual array mentioned in KEEP, all constituent variables are
+    retained.
+  - If virtual array mentioned in DROP, all constituent variables are
+    deleted along with virtual array definition.
+
+- Virtual array operations: May be redefined or deleted without
+  affecting constituent variables using ARRAY statement.
+
+3.5 Variable Modification
+
+Redefinition Rules
+
+- Existing scalar variables and array elements may be redefined by LET
+  or SET statements.
+- Permanent → Temporary: If permanent variable/array redefined by SET,
+  it becomes temporary.
+- Temporary → Permanent: If temporary variable/array redefined by LET,
+  it becomes permanent.
+- Temporary → Permanent via KEEP: Listing temporary variable/array in
+  KEEP statement makes it permanent.
+- Existing arrays may not be redefined as scalar variables unless first
+  deleted.
+- Existing scalar variables may not be redefined as arrays unless first
+  deleted.
+
+Array Modification Restrictions
+
+- LET statement may not modify individual elements of temporary array.
+- SET statement may not modify individual elements of virtual or
+  permanent array.
+- Virtual array may be redefined by new ARRAY statement (no effect on
+  constituent variables).
+- Virtual array may be replaced by permanent/temporary array using DIM
+  (no effect on former constituent variables).
+
+Array Resizing
+
+Arrays with numbered elements may be resized with new DIM statement:
+
+- Contraction: Elements outside new range are deleted.
+- Expansion: New elements filled with missing values.
+- Mixed (expand one end, contract other): Both above rules apply.
+
+Array Redefinition
+
+Existing array may be redefined by LET or SET statement that would
+otherwise create new array. If array is virtual, constituent scalar
+variables are not modified.
+
+3.6 Ranges and Literals
+
+Range Notation
+
+Two kinds of range notation are supported:
+
+- Dash Range (table order):
+
+  - Format: VAR1-VAR5
+  - Includes: Named variables and any between them in the internal
+    table, in table order.
+  - Example: CRIM-LSTAT (CRIM through LSTAT in current internal table).
+
+- Colon Range (numeric order):
+
+  - Format: VAR1:VAR10
+  - Includes: Variables between named ones in numeric order
+  - Variable names must end with one or more numerals (excluding $, %,
+    subscript).
+  - Non-existent variables are created if applicable (not needed for
+    DROP statement).
+  - Example: MONTHPAY1:MONTHPAY60 (MONTHPAY1 through MONTHPAY60 in
+    numeric order).
+
+Array Element Ranges:
+
+- Format: ARRAY(start:end).
+- Example: FINGER_LEN(2:3) (second and third members).
+
+Usage with LET/SET:
+
+- Ranges may be used to redefine array subsets.
+- Size of array defined by expression must equal size of array subset
+  being written.
+
+Literals
+
+- Numeric Literals:
+
+  - Base ten only (may change in future versions).
+  - May be integers, floating point numbers, or E notation.
+  - Missing numeric value: unquoted period (.).
+
+- Character Literals:
+
+  - Surrounded by single or double quotes.
+  - Missing character value: empty string ("").
+
+4. FILE I/O
+
+4.1 Supported File Formats
+
+Three file formats are supported for data input and output:
+
+CSV Files
+
+- Character Sets:
+
+  - Supported: ASCII, UTF-8, UTF-16, plus any other character sets
+    supported by host system.
+  - Portable guarantee: Only ASCII, UTF-8, and UTF-16 guaranteed
+    portable between systems.
+
+- Input (USE command):
+
+  - Character set auto-detected by default.
+  - Override with CHARSET option to correct wrong guesses.
+  - Invalid characters for detected/specified charset: operation fails
+    with error message.
+
+- Output (SAVE command):
+
+  - Character set specified by CHARSET option.
+  - Default: session locale, unless changed with OPTIONS CHARSET.
+  - Characters not representable in output charset: operation fails with
+    error message.
+
+- Delimiters:
+
+  - Determined by DLM flag on USE and SAVE commands.
+  - Default: comma, unless changed by OPTIONS CSVDLM.
+  - May be more than one character long.
+
+- Quote Handling:
+
+  - Embedded quotes: handled by doubling.
+  - Single quotes inside double-quoted string: taken literally.
+  - Double quotes inside single-quoted string: taken literally.
+
+- Headers:
+
+  - Governed by HEADER option on USE and SAVE commands (values: YES or
+    NO).
+  - Default: YES, unless changed by OPTIONS HEADER.
+  - Affects spreadsheets same way as CSV.
+
+- Line Endings:
+
+  - Default: standard for operating system.
+  - Changed via OPTIONS TXTFMT.
+
+- Input (USE):
+
+  - Attempts auto-detection if OPTIONS TXTFMT = AUTO (default).
+
+- Output (SAVE):
+
+  - Uses current TXTFMT setting.
+
+- Overwrite Behavior:
+
+  - Governed by OPTIONS SAVEOVERWRT.
+  - Default: overwriting permitted.
+
+ODF Spreadsheets
+
+- Input (USE):
+
+  - Multiple sheets: First sheet read unless different sheet specified
+    in brackets after filename.
+  - Example: "multibook.ods[sheet2]" - Empty rows and columns:
+    Completely empty ones are skipped.
+
+- Output (SAVE):
+
+  - If sheet not specified and workbook doesn’t exist: Created with
+    single sheet named “Sheet1”.
+
+  - If workbook exists with single sheet: That sheet overwritten (unless
+    overwriting disabled).
+
+  - If specific sheet specified:
+
+    - Sheet exists: Overwritten (unless disabled).
+    - Sheet doesn’t exist: Created.
+
+- Formulas:
+
+  - Evaluated during read process.
+
+  - Computed values used.
+
+  - If formula cannot be evaluated (errors or unsupported functions):
+
+    - Cell treated as missing value.
+    - Formulas not supported for internal calculations or output.
+
+- Merged Cells:
+
+  - Unsupported.
+  - Attempt to read spreadsheet with merged cells: fails with error
+    message.
+
+- Overwrite Behavior: Same as for CSV.
+
+OOXML Spreadsheets
+
+Same behavior as ODF spreadsheets (see above).
+
+Note: Support for other formats likely to be added in future versions.
+
+4.2 Input Operations
+
+USE Statement: Reads dataset into internal table, creating permanent
+variables from columns.
+
+- Type Detection:
+
+  - First NSCAN records examined to determine column types (default
+    NSCAN = 20).
+  - After type detection, non-numeric values in numeric columns: set to
+    missing value, warning issued.
+  - Duplicate column names: Last occurrence wins, warning issued.
+
+- Error Conditions:
+
+  - Non-existent file: fails with error.
+  - File without read permission: fails with error.
+
+4.3 Output Operations
+
+SAVE Statement: Writes internal table to specified dataset.
+
+- Missing Value Representation:
+
+  - CSV files: Consecutive delimiters.
+  - Spreadsheets: Empty cell.
+
+- Error Conditions:
+
+  - File without write permission: fails with error.
+  - Non-existent target directory: fails with error.
+  - Permission verification: Immediately upon statement execution,
+    before actual write.
+
+- Overwrite Behavior: Controlled by OPTIONS SAVEOVERWRT (default:
+  permitted).
+
+4.4 File Naming Conventions
+
+- Format Detection by Extension:
+
+  - .xlsx, .XLSX: OOXML Workbook.
+  - .ods, .ODS: ODF Workbook.
+  - No extension or other extension: CSV.
+
+- Unquoted Filenames:
+
+  - Converted to uppercase.
+
+  - Default extension appended if none present:
+
+    - Data files (USE/SAVE): .CSV
+    - Console output files (OUTPUT): .DAT
+    - Scripts (SUBMIT): .CMD
+
+- Explicit Format Specification: Format may be specified explicitly with
+  FMT option on USE and SAVE commands, overriding extension-based
+  detection.
+
+4.5 Error Handling
+
+- Permission Errors:
+
+  - Attempt to read file without permission: fails with error message.
+  - Attempt to write file without permission: fails with error message.
+
+- File System Errors:
+
+  - Non-existent input file: fails with error message.
+  - Non-existent target directory for output: fails with error message.
+  - Permission verification for SAVE/OUTPUT: performed immediately when
+    statement executed.
+
+- Character Set Errors:
+
+  - Invalid characters in detected/specified charset (USE): fails with
+    error message.
+  - Characters not representable in output charset (SAVE): fails with
+    error message.
+
+- Data Integrity: For SAVE and OUTPUT statements, interpreter shall
+  immediately verify:
+
+  - Target directory exists - User has permission to create target file
+    OR overwrite existing file.
+  - If conditions not met: statement fails with error message.
+
+5. EXECUTION MODEL
+
+5.1 The Data Step
+
+The interpreter operates in a “data step” model where statements are
+executed for each record (row) in the internal table.
+
+Record Iteration:
+
+- When USE statement is in effect:
+
+  - Statements execute once per record read from input dataset.
+
+- When REPEAT statement is in effect:
+
+  - Statements execute n times, creating records.
+  - Current record context maintained throughout execution.
+
+Record Processing:
+
+- Each record read or created becomes the “current record”.
+- Variable values for current record accessible to all statements.
+- Output record written when data step completes for that record.
+
+5.2 BY Group Processing
+
+- Purpose: BY statement divides input into blocks based on variable
+  value combinations.
+
+- Grouping Rules:
+
+  - Blocks defined by consecutive records with same combination of BY
+    variable values.
+  - New block begins whenever ANY BY variable value changes.
+  - Blocks with same value combination but not consecutive are treated
+    as separate blocks.
+  - Blocks need not be in sorted order.
+  - Missing values in BY variables treated as distinct values for
+    grouping purposes.
+
+- Requirements: - USE statement must be in effect; otherwise BY
+  statement fails with error message
+
+- Functions:
+
+  - BOG(): True (1) at beginning of BY group, false (0) otherwise.
+  - EOG(): True (1) at end of BY group, false (0) otherwise.
+  - If BY statement not in effect, BOG() behaves like BOF(), EOG()
+    behaves like EOF().
+
+5.3 Control Flow
+
+Nesting
+
+- Looping Blocks:
+
+  - FOR/NEXT, REPEAT/UNTIL, WHILE/WEND may be nested inside each other.
+  - Limited only by available stack space.
+  - Running program fails with error message if it runs out of memory
+    (user responsibility to prevent).
+
+- Conditional Blocks:
+
+  - IF/THEN/ELSE blocks may also be nested.
+  - Same stack space limitations apply.
+
+Looking blocks may also be nested inside of conditional blocks and vice
+versa.
+
+Control Structures
+
+- IF/THEN/ELSE:
+
+  - Standard conditional execution.
+  - May be nested.
+  - ELSEIF supported for multi-way branching.
+
+- FOR/NEXT:
+
+  - Counter-controlled iteration.
+  - As specified in BW BASIC documentation.
+
+- WHILE/WEND:
+
+  - Condition-controlled iteration.
+  - Loop continues while condition is true.
+
+- REPEAT/UNTIL:
+
+  - Condition-controlled iteration.
+  - Loop continues until condition becomes true.
+  - Note: Also used as REPEAT command (different purpose).
+
+- SELECT/CASE:
+
+  - Multi-way branching.
+  - Case-based selection.
+
+5.4 Declarative vs Non-Declarative Statements
+
+- Declarative Statements:
+
+  - May not appear in FOR, WHILE, or REPEAT/UNTIL blocks.
+  - Examples: USE, SAVE, KEEP, DROP, BY, DIM, ARRAY, DIGITS, OPTIONS.
+  - Command reference table indicates which commands are declarative.
+
+- Non-Declarative Statements:
+
+  - May appear anywhere, including inside loops.
+  - Examples: LET, SET, PRINT, IF, DELETE (record).
+
+- Line Continuation: Statement ending with comma shall be continued to
+  next line.
+
+5.5 USE and REPEAT Compatibility
+
+A USE statement and a REPEAT statement cannot both be in effect at the
+same time, and no more than one of either can be in effect at the same
+time.
+
+Mutual Cancellation:
+
+- USE statement cancels any REPEAT or USE statement currently in effect.
+
+- REPEAT statement cancels any USE or REPEAT statement currently in
+  effect.
+
+  - Either cancels any non-declarative statements currently in effect.
+
+Note: This refers to the REPEAT command (specify number of records), not
+REPEAT/UNTIL loop.
+
+5.6 Script Execution
+
+SUBMIT Statement: Reads and executes commands from specified file.
+
+- Restrictions:
+
+  - If SUBMIT appears inside IF, FOR, WHILE, or REPEAT/UNTIL block,
+    submitted file may not contain declarative statements.
+  - File may contain one or more SUBMIT statements.
+
+- Recursion Prevention:
+
+  - SUBMIT statement that attempts to submit a file already in the
+    current execution chain fails with error message.
+  - This prevents both: - Direct recursion (A → A) - Indirect recursion
+    (A → B → A).
+
+- Execution Chain: Sequence of files currently being executed via nested
+  SUBMIT statements.
+
+6. INPUT/OUTPUT
+
+6.1 Console Output
+
+By default, console output is written to standard output. If an OUTPUT
+file is
+
+specified, output is written to both the file and standard output,
+unless the -q flag
+
+or ECHO OFF is in effect.
+
+- Character Sets:
+
+  - Default: System locale.
+
+  - Override:
+
+    - CHARSET option on OUTPUT command, or OPTIONS CHARSET.
+    - OPTIONS CHARSET sets default for subsequent OUTPUT files but
+      doesn’t affect currently open file.
+
+- Line Endings:
+
+  - Default: Standard for platform.
+  - Override: FMT option on OUTPUT command, or OPTIONS TXTFMT.
+  - OPTIONS TXTFMT sets default for subsequent OUTPUT files but doesn’t
+    affect currently open file.
+
+- Output Control:
+
+  - ECHO command:
+
+    - Enables or disables writing console output to standard output.
+    - Enabled by default.
+
+6.2 The PRINT Command
+
+- Purpose: Output values to console.
+
+- Syntax:
+
+  - PRINT [<value>...]: Print specified values separated by spaces.
+  - PRINT (no arguments): Print values of all currently defined
+    permanent variables with their names for current record.
+
+- Number Formatting: Floating point values printed with precision
+  specified by most recently issued DIGITS statement.
+
+6.3 Interactive Mode
+
+In interactive mode, declarative commands such as USE, NAMES, OUTPUT,
+DIGITS, and ECHO execute immediately upon entry to provide real-time
+feedback:
+
+- Prompt: “>” shall be used as the prompt.
+- Statement Echo: Statements shall be echoed to screen, even if console
+  output is disabled.
+- Terminal Handling: Any applicable terminal settings shall be handled
+  appropriately.
+- Paging: If output text would otherwise scroll off the screen, display
+  a page at a time using: - Pager specified at command line, OR -
+  Sensible default for the operating system
+- Console Control: Interactive mode provides REPL (Read-Eval-Print-Loop)
+  environment for command entry and immediate execution.
+
+7. LANGUAGE REFERENCE
+
+7.1 Commands
+
+Commands control the flow of execution, manage data, and configure the
+interpreter. The table below lists all supported commands
+alphabetically. It should be noted that while all declarative commands
+are to be immediately executed, not all commands to be immediately
+executed are declarative. Statements that are not to be immediately
+executed (“deferred execution statements”) become part of the program to
+be executed when the next RUN statement is executed.
+
++-------------------------+----------------+----------------+-----------------+
+| Command                 | Syntax         | Type           | Description     |
++-------------------------+----------------+----------------+-----------------+
+| ARRAY                   | ARRAY <array   | Declarative    | Create a        |
+|                         | name> [<>...]  |                | virtual array   |
+|                         |                |                | consisting of   |
+|                         |                |                | the variables   |
+|                         |                |                | specified       |
+|                         |                |                | (comma          |
+|                         |                |                | delimited       |
+|                         |                |                | list).          |
+|                         |                |                | Specifying the  |
+|                         |                |                | array name      |
+|                         |                |                | without the     |
+|                         |                |                | list undefines  |
+|                         |                |                | any virtual     |
+|                         |                |                | arrays by that  |
+|                         |                |                | name (but not   |
+|                         |                |                | any actual      |
+|                         |                |                | arrays).        |
+|                         |                |                | Issuing the     |
+|                         |                |                | command only    |
+|                         |                |                | lists the       |
+|                         |                |                | virtual arrays  |
+|                         |                |                | currently       |
+|                         |                |                | defined.        |
+|                         |                |                | Virtual arrays  |
+|                         |                |                | may be          |
+|                         |                |                | referenced in   |
+|                         |                |                | exactly the     |
+|                         |                |                | same ways as    |
+|                         |                |                | actual arrays   |
+|                         |                |                | created by the  |
+|                         |                |                | DIM command. If |
+|                         |                |                | an actual array |
+|                         |                |                | with the name   |
+|                         |                |                | specified       |
+|                         |                |                | already exists  |
+|                         |                |                | then the        |
+|                         |                |                | command shall   |
+|                         |                |                | fail with an    |
+|                         |                |                | error message.  |
+|                         |                |                | If a virtual    |
+|                         |                |                | array with the  |
+|                         |                |                | name specified  |
+|                         |                |                | exists then the |
+|                         |                |                | new definition  |
+|                         |                |                | shall replace   |
+|                         |                |                | the old one.    |
+|                         |                |                | All variables   |
+|                         |                |                | constituting    |
+|                         |                |                | the new array   |
+|                         |                |                | must exist and  |
+|                         |                |                | must be of the  |
+|                         |                |                | same type.      |
++-------------------------+----------------+----------------+-----------------+
+| BY                      | BY             | Declarative    | Divide the      |
+|                         | [<varname>...] |                | input into      |
+|                         |                |                | blocks defined  |
+|                         |                |                | by the          |
+|                         |                |                | combination of  |
+|                         |                |                | variable        |
+|                         |                |                | values. An      |
+|                         |                |                | empty BY        |
+|                         |                |                | statement       |
+|                         |                |                | cancels any BY  |
+|                         |                |                | statement       |
+|                         |                |                | currently in    |
+|                         |                |                | effect. A new   |
+|                         |                |                | BY statement    |
+|                         |                |                | overrides any   |
+|                         |                |                | BY statement    |
+|                         |                |                | currently in    |
+|                         |                |                | effect. Blocks  |
+|                         |                |                | are defined by  |
+|                         |                |                | consecutive     |
+|                         |                |                | records with    |
+|                         |                |                | the same        |
+|                         |                |                | combination of  |
+|                         |                |                | BY variable     |
+|                         |                |                | values. A new   |
+|                         |                |                | block begins    |
+|                         |                |                | whenever any BY |
+|                         |                |                | variable value  |
+|                         |                |                | changes, even   |
+|                         |                |                | if a previous   |
+|                         |                |                | block had the   |
+|                         |                |                | same            |
+|                         |                |                | combination of  |
+|                         |                |                | values. The     |
+|                         |                |                | blocks need not |
+|                         |                |                | be in sorted    |
+|                         |                |                | order. Missing  |
+|                         |                |                | values in the   |
+|                         |                |                | named variables |
+|                         |                |                | shall be        |
+|                         |                |                | treated as      |
+|                         |                |                | distinct values |
+|                         |                |                | for grouping    |
+|                         |                |                | purposes. If no |
+|                         |                |                | USE statement   |
+|                         |                |                | is in effect    |
+|                         |                |                | then a BY       |
+|                         |                |                | statement shall |
+|                         |                |                | fail with an    |
+|                         |                |                | error message.  |
++-------------------------+----------------+----------------+-----------------+
+| DELETE                  | DELETE <line>  | Immediate      | As specified in |
+|                         | [- <line>]     | Execition      | the BW BASIC    |
+|                         |                |                | documentation.  |
++-------------------------+----------------+----------------+-----------------+
+| DELETE                  | DELETE         | Deferred       | Delete the      |
+|                         |                | Execution      | current record  |
+|                         |                |                | and start       |
+|                         |                |                | processing the  |
+|                         |                |                | next record.    |
++-------------------------+----------------+----------------+-----------------+
+| DIGITS                  | DIGITS(n)      | Declarative    | As specified in |
+|                         |                |                | the BW BASIC    |
+|                         |                |                | documentation.  |
+|                         |                |                |                 |
+|                         |                |                | This sets the   |
+|                         |                |                | maximum number  |
+|                         |                |                | of decimal      |
+|                         |                |                | places to       |
+|                         |                |                | display         |
+|                         |                |                | (default = 3).  |
++-------------------------+----------------+----------------+-----------------+
+| DIM                     | DIM            | Declarative    | As specified in |
+|                         | <arrayname>    |                | the BW BASIC    |
+|                         | ([<lower> TO ] |                | documentation,  |
+|                         | <upper>)       |                | except that     |
+|                         | [/TEMP]        |                | <filenum> is    |
+|                         |                |                | not supported.  |
+|                         |                |                | The array is    |
+|                         |                |                | saved to the    |
+|                         |                |                | output dataset  |
+|                         |                |                | as a set of     |
+|                         |                |                | subscripted     |
+|                         |                |                | variables.      |
+|                         |                |                | Appending /TEMP |
+|                         |                |                | to a DIM        |
+|                         |                |                | statement shall |
+|                         |                |                | create a        |
+|                         |                |                | temporary array |
+|                         |                |                | which not be    |
+|                         |                |                | written to      |
+|                         |                |                | output datasets |
+|                         |                |                | . A DIM         |
+|                         |                |                | statement that  |
+|                         |                |                | references an   |
+|                         |                |                | existing        |
+|                         |                |                | variable or     |
+|                         |                |                | array shall     |
+|                         |                |                | fail with an    |
+|                         |                |                | error message.  |
++-------------------------+----------------+----------------+-----------------+
+| DROP                    | DROP <>...     | Declarative    | Prevent one or  |
+|                         |                |                | more permanent  |
+|                         |                |                | variables from  |
+|                         |                |                | being retained  |
+|                         |                |                | after the next  |
+|                         |                |                | RUN statement   |
+|                         |                |                | is executed.    |
+|                         |                |                | The affected    |
+|                         |                |                | variables may   |
+|                         |                |                | not be          |
+|                         |                |                | referenced      |
+|                         |                |                | after they      |
+|                         |                |                | given in a DROP |
+|                         |                |                | statement, but  |
+|                         |                |                | may be          |
+|                         |                |                | redefined with  |
+|                         |                |                | a LET or SET    |
+|                         |                |                | statement.      |
+|                         |                |                | Individual      |
+|                         |                |                | array elements  |
+|                         |                |                | cannot be       |
+|                         |                |                | deleted. Once   |
+|                         |                |                | given, a DROP   |
+|                         |                |                | statement may   |
+|                         |                |                | only be         |
+|                         |                |                | canceled by     |
+|                         |                |                | deleting it.    |
++-------------------------+----------------+----------------+-----------------+
+| ECHO                    | ECHO <ON |     | Declarative    | Enable or       |
+|                         | OFF>           |                | disable the     |
+|                         |                |                | writing of      |
+|                         |                |                | console output  |
+|                         |                |                | to standard     |
+|                         |                |                | output. Enabled |
+|                         |                |                | by default.     |
++-------------------------+----------------+----------------+-----------------+
+| FOR/NEXT                |                | Deferred       | As specified in |
+|                         |                | execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
++-------------------------+----------------+----------------+-----------------+
+| FPATH                   | FPATH [<path>] | Declarative    | Set the default |
+|                         | / [OUTPUT |    |                | directory for   |
+|                         | SAVE | SUBMIT  |                | input/output    |
+|                         | | USE]         |                | commands. FPATH |
+|                         |                |                | without         |
+|                         |                |                | argument or     |
+|                         |                |                | flags resets    |
+|                         |                |                | all default     |
+|                         |                |                | directories to  |
+|                         |                |                | the current     |
+|                         |                |                | working         |
+|                         |                |                | directory.      |
+|                         |                |                | <path> is the   |
+|                         |                |                | relative or     |
+|                         |                |                | absolute path   |
+|                         |                |                | to the new      |
+|                         |                |                | default         |
+|                         |                |                | directory. If   |
+|                         |                |                | quoted, then it |
+|                         |                |                | shall be taken  |
+|                         |                |                | literally.      |
+|                         |                |                | Otherwise, it   |
+|                         |                |                | will be taken   |
+|                         |                |                | as an           |
+|                         |                |                | expression      |
+|                         |                |                | signifying the  |
+|                         |                |                | path name to be |
+|                         |                |                | used. The flags |
+|                         |                |                | specify the     |
+|                         |                |                | command for     |
+|                         |                |                | which the       |
+|                         |                |                | default         |
+|                         |                |                | directory is to |
+|                         |                |                | be set or       |
+|                         |                |                | unset. If       |
+|                         |                |                | <path> is not   |
+|                         |                |                | specified, then |
+|                         |                |                | the existing    |
+|                         |                |                | relevant        |
+|                         |                |                | default         |
+|                         |                |                | directories     |
+|                         |                |                | shall be reset  |
+|                         |                |                | to the current  |
+|                         |                |                | working         |
+|                         |                |                | directory.      |
+|                         |                |                | Multiple        |
+|                         |                |                | commands may be |
+|                         |                |                | specified with  |
+|                         |                |                | a               |
+|                         |                |                | comma-delimited |
+|                         |                |                | list. If no     |
+|                         |                |                | flag is         |
+|                         |                |                | specified, then |
+|                         |                |                | the default     |
+|                         |                |                | directory is    |
+|                         |                |                | set or unset    |
+|                         |                |                | for all         |
+|                         |                |                | commands.       |
++-------------------------+----------------+----------------+-----------------+
+| HELP                    | HELP [command  | Immediate      | Display online  |
+|                         | | /ALL]        | Execution      | help for the    |
+|                         |                |                | given command.  |
+|                         |                |                | If no command   |
+|                         |                |                | is given, then  |
+|                         |                |                | list the        |
+|                         |                |                | supported       |
+|                         |                |                | commands        |
+|                         |                |                | together with   |
+|                         |                |                | instructions on |
+|                         |                |                | how to get help |
+|                         |                |                | for individual  |
+|                         |                |                | commands and    |
+|                         |                |                | functions. HELP |
+|                         |                |                | /ALL prints     |
+|                         |                |                | HELP for all    |
+|                         |                |                | commands and    |
+|                         |                |                | functions.      |
++-------------------------+----------------+----------------+-----------------+
+| HOLD                    | HOLD           | Declarative    | By default,     |
+|                         | [<varname> ... |                | permanent       |
+|                         | ]              |                | variables are   |
+|                         |                |                | initialized to  |
+|                         |                |                | missing         |
+|                         |                |                | immediately     |
+|                         |                |                | before a new    |
+|                         |                |                | record is read  |
+|                         |                |                | in. This        |
+|                         |                |                | command         |
+|                         |                |                | disables this   |
+|                         |                |                | behavior for    |
+|                         |                |                | the variables   |
+|                         |                |                | named; or for   |
+|                         |                |                | all permanent   |
+|                         |                |                | variables if    |
+|                         |                |                | none are        |
+|                         |                |                | listed. A new   |
+|                         |                |                | HOLD statement  |
+|                         |                |                | cancels any     |
+|                         |                |                | previously      |
+|                         |                |                | issued.         |
++-------------------------+----------------+----------------+-----------------+
+| IF/THEN/ELSE/ELSEIF/END |                | Deferred       | As specified in |
+| IF                      |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
++-------------------------+----------------+----------------+-----------------+
+| KEEP                    | KEEP           | Declarative    | Specifies which |
+|                         | [<varname>...] |                | variables will  |
+|                         |                |                | be retained     |
+|                         |                |                | after the next  |
+|                         |                |                | RUN statement   |
+|                         |                |                | is executed. If |
+|                         |                |                | no variables    |
+|                         |                |                | are specified,  |
+|                         |                |                | then any KEEP   |
+|                         |                |                | statement       |
+|                         |                |                | currently in    |
+|                         |                |                | effect will be  |
+|                         |                |                | canceled and    |
+|                         |                |                | all permanent   |
+|                         |                |                | variables not   |
+|                         |                |                | already deleted |
+|                         |                |                | shall be        |
+|                         |                |                | retained.       |
+|                         |                |                | Individual      |
+|                         |                |                | array elements  |
+|                         |                |                | may not appear  |
+|                         |                |                | in a KEEP       |
+|                         |                |                | statement. A    |
+|                         |                |                | KEEP statement  |
+|                         |                |                | that lists      |
+|                         |                |                | variables that  |
+|                         |                |                | either do not   |
+|                         |                |                | exist or have   |
+|                         |                |                | been deleted    |
+|                         |                |                | with a DROP     |
+|                         |                |                | statement shall |
+|                         |                |                | fail with an    |
+|                         |                |                | error message.  |
++-------------------------+----------------+----------------+-----------------+
+| LET                     |                | Deferred       | As specified in |
+|                         |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
+|                         |                |                |                 |
+|                         |                |                | Defines         |
+|                         |                |                | permanent       |
+|                         |                |                | variables       |
+|                         |                |                | (those in the   |
+|                         |                |                | internal table) |
+|                         |                |                | only. A LET     |
+|                         |                |                | statement that  |
+|                         |                |                | writes to a     |
+|                         |                |                | temporary       |
+|                         |                |                | variable shall  |
+|                         |                |                | make that       |
+|                         |                |                | variable        |
+|                         |                |                | permanent.      |
++-------------------------+----------------+----------------+-----------------+
+| LIST                    |                | Immediate      | As specified in |
+|                         |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
++-------------------------+----------------+----------------+-----------------+
+| NAMES                   | NAMES          | Immediate      | Display the     |
+|                         |                | Execution      | names of the    |
+|                         |                |                | currently       |
+|                         |                |                | defined         |
+|                         |                |                | variables,      |
+|                         |                |                | listing         |
+|                         |                |                | permanent and   |
+|                         |                |                | temporary       |
+|                         |                |                | variables       |
+|                         |                |                | separately.     |
++-------------------------+----------------+----------------+-----------------+
+| NEW                     |                | Immediate      | As specified in |
+|                         |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
+|                         |                |                | In addition,    |
+|                         |                |                | any declarative |
+|                         |                |                | statements in   |
+|                         |                |                | effect, except  |
+|                         |                |                | for OUTPUT, are |
+|                         |                |                | canceled.       |
++-------------------------+----------------+----------------+-----------------+
+| OUTPUT                  | OUTPUT         | Yes            | Redirect        |
+|                         | [filename] [/  |                | console output  |
+|                         | [CHARSET =     |                | to a file, or   |
+|                         | <AUTO | UTF-8  |                | cancel an       |
+|                         | | UTF-16 |     |                | existing        |
+|                         | ASCII>] | [FMT |                | redirection.    |
+|                         | = <AUTO | LF | |                | File names      |
+|                         | CRLF | CR>]    |                | shall be        |
+|                         | ...]           |                | interpreted in  |
+|                         |                |                | the same manner |
+|                         |                |                | as by the USE   |
+|                         |                |                | command, except |
+|                         |                |                | that the file   |
+|                         |                |                | format shall be |
+|                         |                |                | text,           |
+|                         |                |                | regardless of   |
+|                         |                |                | the extension;  |
+|                         |                |                | and the default |
+|                         |                |                | extension shall |
+|                         |                |                | be “.DAT”. If   |
+|                         |                |                | no file name is |
+|                         |                |                | specified, then |
+|                         |                |                | any OUTPUT      |
+|                         |                |                | statement in    |
+|                         |                |                | effect shall be |
+|                         |                |                | canceled and    |
+|                         |                |                | console output  |
+|                         |                |                | shall be        |
+|                         |                |                | written to      |
+|                         |                |                | standard output |
+|                         |                |                | only. The       |
+|                         |                |                | CHARSET option  |
+|                         |                |                | shall specify   |
+|                         |                |                | the character   |
+|                         |                |                | set to be used  |
+|                         |                |                | to write the    |
+|                         |                |                | console output  |
+|                         |                |                | (AUTO specifies |
+|                         |                |                | the default     |
+|                         |                |                | character set   |
+|                         |                |                | for the session |
+|                         |                |                | locale and is   |
+|                         |                |                | the default     |
+|                         |                |                | unless changed  |
+|                         |                |                | by OPTIONS      |
+|                         |                |                | CHARSET). The   |
+|                         |                |                | FMT option      |
+|                         |                |                | shall determine |
+|                         |                |                | the text line   |
+|                         |                |                | ending (AUTO    |
+|                         |                |                | shall specify   |
+|                         |                |                | the system      |
+|                         |                |                | default and is  |
+|                         |                |                | the default).   |
++-------------------------+----------------+----------------+-----------------+
+| PRINT                   | PRINT          | Deferred       | Print one or    |
+|                         | [<value>...]   | Execution      | more values     |
+|                         |                |                | separated by    |
+|                         |                |                | spaces. If no   |
+|                         |                |                | arguments are   |
+|                         |                |                | given, then     |
+|                         |                |                | print the       |
+|                         |                |                | values all      |
+|                         |                |                | currently       |
+|                         |                |                | defined         |
+|                         |                |                | permanent       |
+|                         |                |                | variables with  |
+|                         |                |                | their names for |
+|                         |                |                | the current     |
+|                         |                |                | record.         |
+|                         |                |                | Floating point  |
+|                         |                |                | values shall be |
+|                         |                |                | printed with    |
+|                         |                |                | the precision   |
+|                         |                |                | specified by    |
+|                         |                |                | the most        |
+|                         |                |                | recently issued |
+|                         |                |                | DIGITS          |
+|                         |                |                | statement.      |
++-------------------------+----------------+----------------+-----------------+
+| QUIT|END                |                | Immediate      | As specified in |
+|                         |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
+|                         |                |                | Initially, END  |
+|                         |                |                | shall be an     |
+|                         |                |                | alias for QUIT. |
++-------------------------+----------------+----------------+-----------------+
+| REM                     |                | Immediate      | As specified in |
+|                         |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
++-------------------------+----------------+----------------+-----------------+
+| RENAME                  | RENAME         | Declarative    | Rename one or   |
+|                         | <oldname =     |                | more variables. |
+|                         | newname, …>    |                | A renamed       |
+|                         |                |                | variable may    |
+|                         |                |                | not assigned    |
+|                         |                |                | the name of an  |
+|                         |                |                | existing        |
+|                         |                |                | variable unless |
+|                         |                |                | it has been     |
+|                         |                |                | DROPped. If the |
+|                         |                |                | variable is     |
+|                         |                |                | permanent then  |
+|                         |                |                | it will take    |
+|                         |                |                | the new name in |
+|                         |                |                | the output      |
+|                         |                |                | dataset if      |
+|                         |                |                | there is one.   |
+|                         |                |                |                 |
+|                         |                |                | Any statements  |
+|                         |                |                | following a     |
+|                         |                |                | RENAME          |
+|                         |                |                | statement must  |
+|                         |                |                | reference the   |
+|                         |                |                | affected        |
+|                         |                |                | variables under |
+|                         |                |                | their new       |
+|                         |                |                | names. A        |
+|                         |                |                | numeric         |
+|                         |                |                | variable may    |
+|                         |                |                | not be assigned |
+|                         |                |                | a character     |
+|                         |                |                | variable name   |
+|                         |                |                | and vice versa. |
++-------------------------+----------------+----------------+-----------------+
+| REPEAT                  | REPEAT <n>     | Declarative    | Specify the     |
+|                         |                |                | number of       |
+|                         |                |                | records to be   |
+|                         |                |                | written to the  |
+|                         |                |                | internal table  |
+|                         |                |                | or output       |
+|                         |                |                | dataset. This   |
+|                         |                |                | command will    |
+|                         |                |                | cancel any USE  |
+|                         |                |                | statement       |
+|                         |                |                | currently in    |
+|                         |                |                | effect.         |
++-------------------------+----------------+----------------+-----------------+
+| REPEAT/UNTIL            |                | Deferred       | As specified in |
+|                         |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
++-------------------------+----------------+----------------+-----------------+
+| RSEED                   | RSEED <n>      | Deferred       | Set the random  |
+|                         |                | Execution      | number seed to  |
+|                         |                |                | the specified   |
+|                         |                |                | value (must be  |
+|                         |                |                | a literal       |
+|                         |                |                | integer).       |
+|                         |                |                | Persists until  |
+|                         |                |                | changed. At the |
+|                         |                |                | beginning of    |
+|                         |                |                | each session,   |
+|                         |                |                | the random      |
+|                         |                |                | number seed is  |
+|                         |                |                | set from the    |
+|                         |                |                | system time.    |
++-------------------------+----------------+----------------+-----------------+
+| RUN                     |                | Immediate      | As specified in |
+|                         |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
+|                         |                |                | Following the   |
+|                         |                |                | execution of    |
+|                         |                |                | any statements  |
+|                         |                |                | then in effect, |
+|                         |                |                | the internal    |
+|                         |                |                | table is        |
+|                         |                |                | written to the  |
+|                         |                |                | output dataset  |
+|                         |                |                | specified by    |
+|                         |                |                | the SAVE        |
+|                         |                |                | command (if     |
+|                         |                |                | there is one).  |
+|                         |                |                | If a variable   |
+|                         |                |                | appears in both |
+|                         |                |                | the current     |
+|                         |                |                | KEEP statement  |
+|                         |                |                | and a           |
+|                         |                |                | subsequent DROP |
+|                         |                |                | statement, then |
+|                         |                |                | the latter      |
+|                         |                |                | shall take      |
+|                         |                |                | precedence.     |
+|                         |                |                | Once the        |
+|                         |                |                | program is run, |
+|                         |                |                | the numbers of  |
+|                         |                |                | records and     |
+|                         |                |                | variables are   |
+|                         |                |                | displayed.      |
++-------------------------+----------------+----------------+-----------------+
+| SAVE                    | SAVE [         | Declarative    | Specify the     |
+|                         | <filename>] [/ |                | file to which   |
+|                         | [FMT = <CSV |  |                | the table       |
+|                         | ODF| OOXML |   |                | produced by the |
+|                         | MSEXCEL>] | [  |                | RUN command     |
+|                         | CHARSET =      |                | will be         |
+|                         | <ASCII | UTF-8 |                | written. The    |
+|                         | | UTF-16 | <   |                | file name shall |
+|                         | csname >> ] |  |                | be interpreted  |
+|                         | [ HEADER =     |                | in the same way |
+|                         | <YES | NO>]    |                | as by the USE   |
+|                         | [DLM =         |                | command. The    |
+|                         | <dlmstr>]...]  |                | column names    |
+|                         |                |                | shall be as     |
+|                         |                |                | stored in the   |
+|                         |                |                | internal table. |
+|                         |                |                | If no file name |
+|                         |                |                | is specified,   |
+|                         |                |                | then any SAVE   |
+|                         |                |                | statement in    |
+|                         |                |                | effect shall be |
+|                         |                |                | canceled. The   |
+|                         |                |                | FMT option      |
+|                         |                |                | governs the     |
+|                         |                |                | output file     |
+|                         |                |                | format (OOXML   |
+|                         |                |                | and MSEXCEL are |
+|                         |                |                | equivalent).    |
+|                         |                |                | The HEADER      |
+|                         |                |                | option          |
+|                         |                |                | determines      |
+|                         |                |                | whether a       |
+|                         |                |                | header is       |
+|                         |                |                | written to the  |
+|                         |                |                | output file or  |
+|                         |                |                | spreadsheet.    |
+|                         |                |                | The DLM option  |
+|                         |                |                | sets the field  |
+|                         |                |                | delimiter on    |
+|                         |                |                | CSV files       |
+|                         |                |                | (string must be |
+|                         |                |                | quoted).        |
+|                         |                |                | Variables shall |
+|                         |                |                | be written in   |
+|                         |                |                | the order in    |
+|                         |                |                | which they      |
+|                         |                |                | appear in the   |
+|                         |                |                | internal table. |
++-------------------------+----------------+----------------+-----------------+
+| SELECT                  | SELECT         | Declarative    | Process only    |
+|                         | <expr>...      |                | the subset of   |
+|                         |                |                | the data        |
+|                         |                |                | described by    |
+|                         |                |                | the             |
+|                         |                |                | comma-delimited |
+|                         |                |                | set of boolean  |
+|                         |                |                | expressions.    |
++-------------------------+----------------+----------------+-----------------+
+| SELECT CASE/CASE/CASE   |                | Deferred       | As specified in |
+| END                     |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
++-------------------------+----------------+----------------+-----------------+
+| SET                     | SET <varname>  | Deferred       | Write the       |
+|                         | = < expr>      | Execution      | output of the   |
+|                         |                |                | expression to a |
+|                         |                |                | temporary       |
+|                         |                |                | variable, which |
+|                         |                |                | will disappear  |
+|                         |                |                | after the next  |
+|                         |                |                | RUN statement   |
+|                         |                |                | is executed. A  |
+|                         |                |                | SET statement   |
+|                         |                |                | that attempts   |
+|                         |                |                | to write to a   |
+|                         |                |                | permanent       |
+|                         |                |                | variable will   |
+|                         |                |                | fail with an    |
+|                         |                |                | error message.  |
++-------------------------+----------------+----------------+-----------------+
+| SORT                    | SORT <         | Immediate      | Sort the output |
+|                         | varname>...    | Execution      | dataset by the  |
+|                         |                |                | variables       |
+|                         |                |                | named.          |
++-------------------------+----------------+----------------+-----------------+
+| SUBMIT                  | SUBMIT         | Deferred       | Read and        |
+|                         | <filename >    | Execution      | execute the     |
+|                         |                |                | commands        |
+|                         |                |                | contained in    |
+|                         |                |                | the specified   |
+|                         |                |                | file. If the    |
+|                         |                |                | statement       |
+|                         |                |                | appears inside  |
+|                         |                |                | an IF, FOR,     |
+|                         |                |                | WHILE, or       |
+|                         |                |                | REPEAT/UNTIL    |
+|                         |                |                | block then the  |
+|                         |                |                | file may not    |
+|                         |                |                | contain any     |
+|                         |                |                | declarative     |
+|                         |                |                | statements. The |
+|                         |                |                | file to be      |
+|                         |                |                | executed may    |
+|                         |                |                | contain one or  |
+|                         |                |                | more SUBMIT     |
+|                         |                |                | statements, but |
+|                         |                |                | a SUBMIT        |
+|                         |                |                | statement that  |
+|                         |                |                | attempts to     |
+|                         |                |                | submit a file   |
+|                         |                |                | that is already |
+|                         |                |                | in the current  |
+|                         |                |                | execution chain |
+|                         |                |                | will fail with  |
+|                         |                |                | an error        |
+|                         |                |                | message.        |
++-------------------------+----------------+----------------+-----------------+
+| SYSTEM                  | SYSTEM [<cmd>] | Immediate      | Execute the     |
+|                         |                | execution      | specified       |
+|                         |                |                | system command. |
+|                         |                |                | If no command   |
+|                         |                |                | is given, then  |
+|                         |                |                | spawn a shell   |
+|                         |                |                | and resume the  |
+|                         |                |                | program when    |
+|                         |                |                | the shell       |
+|                         |                |                | exits. If the   |
+|                         |                |                | command is      |
+|                         |                |                | quoted, then it |
+|                         |                |                | will be taken   |
+|                         |                |                | literally.      |
+|                         |                |                | Otherwise, it   |
+|                         |                |                | will be taken   |
+|                         |                |                | as the name of  |
+|                         |                |                | a variable or   |
+|                         |                |                | expression. If  |
+|                         |                |                | execution of a  |
+|                         |                |                | system command  |
+|                         |                |                | inside of a     |
+|                         |                |                | program is      |
+|                         |                |                | desired, then   |
+|                         |                |                | use the SHELL   |
+|                         |                |                | function.       |
++-------------------------+----------------+----------------+-----------------+
+| UNHOLD                  | UNHOLD         | Declarative    | Cancel any HOLD |
+|                         |                |                | statement       |
+|                         |                |                | currently in    |
+|                         |                |                | effect.         |
++-------------------------+----------------+----------------+-----------------+
+| USE                     | USE [MOCK |    | Declarative    | Open a dataset  |
+|                         | <filename>] /  |                | for reading and |
+|                         | NSCAN = <n>    |                | display the     |
+|                         |                |                | names of the    |
+|                         |                |                | columns and the |
+|                         |                |                | number of       |
+|                         |                |                | records. The    |
+|                         |                |                | internal table  |
+|                         |                |                | shall be        |
+|                         |                |                | overwritten     |
+|                         |                |                | with the        |
+|                         |                |                | contents of the |
+|                         |                |                | file. Any       |
+|                         |                |                | column with a   |
+|                         |                |                | name that ends  |
+|                         |                |                | in “$” is       |
+|                         |                |                | assumed to be   |
+|                         |                |                | character.      |
+|                         |                |                | Otherwise, any  |
+|                         |                |                | column with     |
+|                         |                |                | non-numeric     |
+|                         |                |                | values in any   |
+|                         |                |                | of the first n  |
+|                         |                |                | rows (if there  |
+|                         |                |                | are that many)  |
+|                         |                |                | will be taken   |
+|                         |                |                | as character    |
+|                         |                |                | and “$” will be |
+|                         |                |                | added to the    |
+|                         |                |                | name. If        |
+|                         |                |                | subsequently, a |
+|                         |                |                | non-numeric     |
+|                         |                |                | value appears   |
+|                         |                |                | in such a       |
+|                         |                |                | column, it will |
+|                         |                |                | be taken as     |
+|                         |                |                | missing and a   |
+|                         |                |                | warning will be |
+|                         |                |                | issued (maximum |
+|                         |                |                | of 10 shall be  |
+|                         |                |                | written). If a  |
+|                         |                |                | column name     |
+|                         |                |                | appears more    |
+|                         |                |                | than once in    |
+|                         |                |                | the file, only  |
+|                         |                |                | the last column |
+|                         |                |                | with the name   |
+|                         |                |                | will be used    |
+|                         |                |                | and a warning   |
+|                         |                |                | shall be        |
+|                         |                |                | issued. If the  |
+|                         |                |                | file name is    |
+|                         |                |                | unquoted, it is |
+|                         |                |                | converted to    |
+|                         |                |                | uppercase. If   |
+|                         |                |                | the name is     |
+|                         |                |                | unquoted and    |
+|                         |                |                | has no          |
+|                         |                |                | extension,      |
+|                         |                |                | “.CSV” is       |
+|                         |                |                | appended to the |
+|                         |                |                | name. The       |
+|                         |                |                | default         |
+|                         |                |                | directory is    |
+|                         |                |                | the current     |
+|                         |                |                | working         |
+|                         |                |                | directory       |
+|                         |                |                | unless changed  |
+|                         |                |                | by the FPATH    |
+|                         |                |                | command. The    |
+|                         |                |                | format of the   |
+|                         |                |                | file will be    |
+|                         |                |                | assumed based   |
+|                         |                |                | on the file     |
+|                         |                |                | name extension. |
+|                         |                |                | Any DROP, KEEP, |
+|                         |                |                | LET, or REPEAT  |
+|                         |                |                | statements are  |
+|                         |                |                | canceled when a |
+|                         |                |                | new dataset is  |
+|                         |                |                | read in. USE    |
+|                         |                |                | MOCK generates  |
+|                         |                |                | mock data for   |
+|                         |                |                | testing         |
+|                         |                |                | purposes.       |
++-------------------------+----------------+----------------+-----------------+
+| WHILE/WEND              |                | Deferred       | As specified in |
+|                         |                | Execution      | the BW BASIC    |
+|                         |                |                | documentation.  |
++-------------------------+----------------+----------------+-----------------+
+| WRITE                   | WRITE          | Deferred       | Explicitly      |
+|                         |                | Execution      | write the       |
+|                         |                |                | current record  |
+|                         |                |                | (PDV) to the    |
+|                         |                |                | data table.     |
+|                         |                |                | Suppresses the  |
+|                         |                |                | default record  |
+|                         |                |                | output at the   |
+|                         |                |                | end of the Data |
+|                         |                |                | Step.           |
++-------------------------+----------------+----------------+-----------------+
+
+Deferred Execution Commands are part of the program that is executed
+with the next RUN statement. Statements and blocks are executed in the
+order in which they were entered. The currently defined program may be
+listed with the LIST command. Statements may be deleted with the DELETE
+command.
+
+Declarative Commands are executed immediately. They typically configure
+the interpreter state or define data structures.
+
+Line Continuation: A statement ending with a comma shall be continued to
+the next line.
+
+7.2 Functions
+
+Functions perform computations and return values. Unless otherwise
+stated:
+
++------------+---------------------+--------------+--------------------+
+| Name       | Usage               | Constraints  | Description        |
++------------+---------------------+--------------+--------------------+
+| ABS        | ABS(x)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| ARCCOS     | ARCCOS(x)           | -1 ≤ x ≤ 1   | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| ARCSIN     | ARCSIN(x)           | -1 ≤ x ≤ 1   | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| ARCTAN     | ARCTAN(x)           |              | As specified in    |
+|            |                     |              | the BW BASIC.      |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| ASCII      | ASCII(A$)           |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| BCF        | BCF(β, p, q)        | 0 ≤ β ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     | p > 0        | distribution       |
+|            |                     |              | function for the   |
+|            |                     | q > 0        | beta distribution, |
+|            |                     |              | where β is the     |
+|            |                     |              | evaluation point   |
+|            |                     |              | and p and q are    |
+|            |                     |              | the alpha and beta |
+|            |                     |              | shape parameters.  |
++------------+---------------------+--------------+--------------------+
+| BDF        | BDF(β, p, q)        | 0 ≤ β ≤ 1    | Return the value   |
+|            |                     |              | of the beta        |
+|            |                     | p > 0        | density function   |
+|            |                     |              | where β is the     |
+|            |                     | q > 0        | evaluation point   |
+|            |                     |              | and p and q are    |
+|            |                     |              | the alpha and beta |
+|            |                     |              | shape parameters.  |
++------------+---------------------+--------------+--------------------+
+| BIF        | BIF(ᶲ, p, q)        | 0 ≤ ᶲ ≤ 1    | Return the value   |
+|            |                     |              | of the inverse     |
+|            |                     | p > 0        | probability        |
+|            |                     |              | density function   |
+|            |                     | q  > 0       | for the beta       |
+|            |                     |              | distribution,      |
+|            |                     |              | where ᶲ is the     |
+|            |                     |              | probability. and p |
+|            |                     |              | and q are the      |
+|            |                     |              | alpha and beta     |
+|            |                     |              | shape parameters.  |
++------------+---------------------+--------------+--------------------+
+| BIN$       | BIN$(X, Y%)         | 0 ≤ Y% ≤ 255 | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| BOF        | No arguments        |              | True (1) for the   |
+|            |                     |              | first record of a  |
+|            |                     |              | dataset and false  |
+|            |                     |              | (0) otherwise.     |
++------------+---------------------+--------------+--------------------+
+| BOG        | No arguments        |              | True (1) at the    |
+|            |                     |              | beginning of a BY  |
+|            |                     |              | group and false    |
+|            |                     |              | (0) otherwise.     |
+|            |                     |              | Same output as BOF |
+|            |                     |              | if a BY statement  |
+|            |                     |              | is not in effect.  |
++------------+---------------------+--------------+--------------------+
+| BRN        | BRN(p, q)           | p > 0        | Return a random    |
+|            |                     |              | number from the    |
+|            |                     | q > 0        | beta distribution. |
+|            |                     |              | p and q are the    |
+|            |                     |              | alpha and beta     |
+|            |                     |              | shape parameters.  |
+|            |                     |              | Both must be       |
+|            |                     |              | greater than 0.    |
++------------+---------------------+--------------+--------------------+
+| CLG        | CLG(X)              | X > 0        | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| COS        | COS(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| COSD       | COSD(X)             |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| COT        | COT(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| CSC        | CSC(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| DEG/DEGREE | DEG(x)              |              | Convert x from     |
+|            |                     |              | radians to         |
+|            |                     |              | degrees.           |
++------------+---------------------+--------------+--------------------+
+| ECF        | ECF(x)              | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     |              | distribution       |
+|            |                     |              | function of the    |
+|            |                     |              | exponential        |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point.  |
++------------+---------------------+--------------+--------------------+
+| EDF        | EDF(x)              | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     |              | density function   |
+|            |                     |              | of the exponential |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point.  |
++------------+---------------------+--------------+--------------------+
+| EIF        | EIF(ᶲ)              | 0 ≤ ᶲ ≤ 1    | Return the value   |
+|            |                     |              | of the inverse     |
+|            |                     |              | probability        |
+|            |                     |              | density function   |
+|            |                     |              | of the exponential |
+|            |                     |              | distribution where |
+|            |                     |              | ᶲ is the           |
+|            |                     |              | probability.       |
++------------+---------------------+--------------+--------------------+
+| EOF        | No arguments        |              | True (1) for the   |
+|            |                     |              | last record of the |
+|            |                     |              | input dataset and  |
+|            |                     |              | false (0)          |
+|            |                     |              | otherwise.         |
++------------+---------------------+--------------+--------------------+
+| EOG        | No arguments        |              | True (1) for the   |
+|            |                     |              | last record of a   |
+|            |                     |              | BY group and false |
+|            |                     |              | (0) otherwise.     |
+|            |                     |              | Same value as EOF  |
+|            |                     |              | if a BY statement  |
+|            |                     |              | is not in effect.  |
++------------+---------------------+--------------+--------------------+
+| ERN        | ERN                 |              | Return a random    |
+|            |                     |              | number in the      |
+|            |                     |              | exponential        |
+|            |                     |              | distribution.      |
++------------+---------------------+--------------+--------------------+
+| EXP        | EXP(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| FALSE      | No arguments        |              | Return 0, which is |
+|            |                     |              | taken as false.    |
++------------+---------------------+--------------+--------------------+
+| FCF        | FCF(F, df1, df2)    | 0 ≤ F ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     | df1 > 0      | distribution       |
+|            |                     |              | function of the F  |
+|            |                     | df2 > 0      | distribution where |
+|            |                     |              | F is the           |
+|            |                     |              | evaluation point   |
+|            |                     |              | and df1 and df2    |
+|            |                     |              | are the set of     |
+|            |                     |              | degrees of         |
+|            |                     |              | freedom.           |
++------------+---------------------+--------------+--------------------+
+| FDF        | FDF(F, df1, df2)    | 0 ≤ F ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     | df1 > 0      | density function   |
+|            |                     |              | of the F           |
+|            |                     | df2 > 0      | distribution where |
+|            |                     |              | F is the           |
+|            |                     |              | evaluation point   |
+|            |                     |              | and df1 and df2    |
+|            |                     |              | are the set of     |
+|            |                     |              | degrees of         |
+|            |                     |              | freedom.           |
++------------+---------------------+--------------+--------------------+
+| FIF        | FIF(ᶲ, df1, df2)    | 0 ≤ ᶲ ≤ 1    | Return the value   |
+|            |                     |              | of the inverse     |
+|            |                     | df1 > 0      | probability        |
+|            |                     |              | density function   |
+|            |                     | df2 > 0      | of the F           |
+|            |                     |              | distribution where |
+|            |                     |              | ᶲ is the           |
+|            |                     |              | probability and    |
+|            |                     |              | df1 and df2 are    |
+|            |                     |              | the set of degrees |
+|            |                     |              | of freedom.        |
++------------+---------------------+--------------+--------------------+
+| FIX        | FIX(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| FP/FRAC    | FP(X)               |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| FRN        | FRN(df1, df2)       | df1 > 0      | Return a random    |
+|            |                     |              | number in the F    |
+|            |                     | df2 > 0      | distribution,      |
+|            |                     |              | where df1 and df2  |
+|            |                     |              | are the set of     |
+|            |                     |              | degrees of         |
+|            |                     |              | freedom.           |
++------------+---------------------+--------------+--------------------+
+| GCF        | GCF(γ, p)           | 0 ≤ γ ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     | p > 0        | distribution       |
+|            |                     |              | function of the    |
+|            |                     |              | gamma distribution |
+|            |                     |              | where γ is the     |
+|            |                     |              | evaluation point   |
+|            |                     |              | and p is the shape |
+|            |                     |              | parameter.         |
++------------+---------------------+--------------+--------------------+
+| GDF        | GDF(γ, p)           | 0 ≤ γ ≤ 1    | Return the value   |
+|            |                     |              | of the gamma       |
+|            |                     | p > 0        | density function   |
+|            |                     |              | where γ is the     |
+|            |                     |              | evaluation point   |
+|            |                     |              | and p is the shape |
+|            |                     |              | parameter.         |
++------------+---------------------+--------------+--------------------+
+| GIF        | GIF(ᶲ, p)           | 0 ≤ ᶲ ≤ 1    | Return the value   |
+|            |                     |              | of the inverse     |
+|            |                     | p > 0        | probability        |
+|            |                     |              | density function   |
+|            |                     |              | of the gamma       |
+|            |                     |              | distribution where |
+|            |                     |              | ᶲ is the           |
+|            |                     |              | probability and p  |
+|            |                     |              | is the shape       |
+|            |                     |              | parameter.         |
++------------+---------------------+--------------+--------------------+
+| GMEAN      | GMEAN(<value...>)   |              | Return the         |
+|            |                     |              | geometric mean of  |
+|            |                     |              | the arguments. All |
+|            |                     |              | elements in any    |
+|            |                     |              | arrays specified   |
+|            |                     |              | shall be used.     |
+|            |                     |              | Missing values     |
+|            |                     |              | shall be ignored.  |
++------------+---------------------+--------------+--------------------+
+| GRN        | GRN(p)              | p > 0        | Return a random    |
+|            |                     |              | number in the      |
+|            |                     |              | gamma distribution |
+|            |                     |              | where p is the     |
+|            |                     |              | shape parameter.   |
++------------+---------------------+--------------+--------------------+
+| HCS        | HCS(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| HEX        | HEX(A$)             |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| HEX$       | HEX$(X, Y)          | 0 < Y ≤ 255  | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| HMEAN      | HMEAN(<value>...)   |              | Return the         |
+|            |                     |              | harmonic mean of   |
+|            |                     |              | the arguments. If  |
+|            |                     |              | an array is        |
+|            |                     |              | specified, then    |
+|            |                     |              | all elements shall |
+|            |                     |              | be used. Missing   |
+|            |                     |              | values shall be    |
+|            |                     |              | ignored.           |
++------------+---------------------+--------------+--------------------+
+| HSN        | HSN(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| HTN        | HTN(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| INDEX      | INDEX(A$, B$)       |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| INSTR      | INSTR(X%, A$, B$)   |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| INT        | INT(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| IP         | IP(X)               |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| LAG        | LAG(<varname> [,    | n > 0        | Return the nth     |
+|            | <n>])               |              | prior value of the |
+|            |                     |              | specified scalar   |
+|            |                     |              | variable, array,   |
+|            |                     |              | or array subset of |
+|            |                     |              | any type. If n is  |
+|            |                     |              | unspecified then   |
+|            |                     |              | it will default    |
+|            |                     |              | to 1. If an array  |
+|            |                     |              | or array subset is |
+|            |                     |              | specified, an      |
+|            |                     |              | array of the same  |
+|            |                     |              | size is returned.  |
+|            |                     |              | If there are fewer |
+|            |                     |              | than n prior       |
+|            |                     |              | records, then      |
+|            |                     |              | return a missing   |
+|            |                     |              | value or an array  |
+|            |                     |              | of missing values  |
+|            |                     |              | as the case may    |
+|            |                     |              | require. The value |
+|            |                     |              | returned will      |
+|            |                     |              | always be of the   |
+|            |                     |              | same type as the   |
+|            |                     |              | specified          |
+|            |                     |              | variable. If a BY  |
+|            |                     |              | statement is in    |
+|            |                     |              | effect then the    |
+|            |                     |              | search shall be    |
+|            |                     |              | restricted to      |
+|            |                     |              | records within the |
+|            |                     |              | current BY group.  |
++------------+---------------------+--------------+--------------------+
+| LBOUND     | LBOUND(arrayname)   |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LCASE$     | LCASE$(A$)          |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LCF        | LCF(x)              | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     |              | distribution       |
+|            |                     |              | function of the    |
+|            |                     |              | logistic           |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point.  |
++------------+---------------------+--------------+--------------------+
+| LDF        | LDF(x)              | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the inverse     |
+|            |                     |              | probability        |
+|            |                     |              | density function   |
+|            |                     |              | function of the    |
+|            |                     |              | logistic           |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point.  |
++------------+---------------------+--------------+--------------------+
+| LIF        | LIF(p)              | 0 ≤ p ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     |              | density function   |
+|            |                     |              | function of the    |
+|            |                     |              | logistic           |
+|            |                     |              | distribution where |
+|            |                     |              | p is the           |
+|            |                     |              | probability.       |
++------------+---------------------+--------------+--------------------+
+| LEFT$      | LEFT$(A$, X)        |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LEN        | LEN(A$)             |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LGT        | LGT(X)              | X > 0        | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LN         | LN(X)               | X > 0        | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LOG        | LOG(X)              | X > 0        | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LOG10      | LOG10(X)            | X > 0        | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LOG2       | LOG2(X)             | X > 0        | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LOGE       | LOGE(X)             | X > 0        | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LOWER$     | LOWER$(A$)          |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LRN        | LRN                 |              | Return a random    |
+|            |                     |              | number in the      |
+|            |                     |              | logistic           |
+|            |                     |              | distribution.      |
++------------+---------------------+--------------+--------------------+
+| LTRIM$     | LTRIM$(A$)          |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| LTW        | LTW(X)              | X > 0        | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| MATCH      | MATCH(A$, B$, X%)   |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| MAX        | MAX(<value>,...)    |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation;     |
+|            |                     |              | except that any    |
+|            |                     |              | number of          |
+|            |                     |              | arguments shall be |
+|            |                     |              | permitted and that |
+|            |                     |              | all elements in    |
+|            |                     |              | any array          |
+|            |                     |              | arguments shall be |
+|            |                     |              | compared.          |
++------------+---------------------+--------------+--------------------+
+| MAXINT     |                     |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| MAXLEN     | MAXLEN(A$)          |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| MAXLVL     |                     |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| MAXNUM     |                     |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| MEAN       | MEAN(v1, [v2, ...]) |              | Return the         |
+|            |                     |              | arithmetic mean of |
+|            |                     |              | the arguments. If  |
+|            |                     |              | an array is        |
+|            |                     |              | referenced, then   |
+|            |                     |              | all elements are   |
+|            |                     |              | included. Missing  |
+|            |                     |              | values shall be    |
+|            |                     |              | ignored.           |
++------------+---------------------+--------------+--------------------+
+| MEDIAN     | MEDIAN(<value>...)  |              | Return the median  |
+|            |                     |              | value of the       |
+|            |                     |              | arguments. If an   |
+|            |                     |              | array is           |
+|            |                     |              | referenced, then   |
+|            |                     |              | all elements shall |
+|            |                     |              | be included.       |
+|            |                     |              | Missing values     |
+|            |                     |              | shall be ignored.  |
++------------+---------------------+--------------+--------------------+
+| MID$       | MID$(A$, X%, Y%)    |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| MIN        | MIN(<value>...)     |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation;     |
+|            |                     |              | except that any    |
+|            |                     |              | number of          |
+|            |                     |              | arguments shall be |
+|            |                     |              | permitted and that |
+|            |                     |              | all elements in    |
+|            |                     |              | any array          |
+|            |                     |              | arguments shall be |
+|            |                     |              | compared.          |
++------------+---------------------+--------------+--------------------+
+| MININT     |                     |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| MINNUM     |                     |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| MISSING    | MISSING(<varname>)  |              | Return true if the |
+|            |                     |              | referenced         |
+|            |                     |              | variable           |
+|            |                     |              | (character or      |
+|            |                     |              | numeric) is        |
+|            |                     |              | missing. If an     |
+|            |                     |              | array is           |
+|            |                     |              | referenced, then   |
+|            |                     |              | return true if any |
+|            |                     |              | of the elements is |
+|            |                     |              | missing. Otherwise |
+|            |                     |              | return false.      |
++------------+---------------------+--------------+--------------------+
+| MOD        | MOD(X%, Y%)         | Y% ≠ 0       | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| NCF        | NCF(x,n,p)          | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     | n > 0        | distribution       |
+|            |                     |              | function for the   |
+|            |                     | 0 < p < 1    | binomial           |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point,  |
+|            |                     |              | n is the number of |
+|            |                     |              | trials, and p is   |
+|            |                     |              | the probability of |
+|            |                     |              | success in each    |
+|            |                     |              | trial.             |
++------------+---------------------+--------------+--------------------+
+| NDF        | NDF(x,n,p)          | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     | n > 0        | density function   |
+|            |                     |              | for the binomial   |
+|            |                     | 0 < p < 1    | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point,  |
+|            |                     |              | n is the number of |
+|            |                     |              | trials, and p is   |
+|            |                     |              | the probability of |
+|            |                     |              | success in each    |
+|            |                     |              | trial.             |
++------------+---------------------+--------------+--------------------+
+| NEXT       | NEXT(<varname> [,   | n > 0        | Return the nth     |
+|            | <n>])               |              | succeeding value   |
+|            |                     |              | of the specified   |
+|            |                     |              | scalar variable,   |
+|            |                     |              | array, or array    |
+|            |                     |              | subset of any      |
+|            |                     |              | type. If n is      |
+|            |                     |              | unspecified then   |
+|            |                     |              | it shall default   |
+|            |                     |              | to 1. If an array  |
+|            |                     |              | or array subset is |
+|            |                     |              | specified, an      |
+|            |                     |              | array of the same  |
+|            |                     |              | size is returned.  |
+|            |                     |              | If there are fewer |
+|            |                     |              | than n succeeding  |
+|            |                     |              | records, then      |
+|            |                     |              | return a missing   |
+|            |                     |              | value or an array  |
+|            |                     |              | of missing values  |
+|            |                     |              | as the case may    |
+|            |                     |              | require. The value |
+|            |                     |              | returned shall     |
+|            |                     |              | always be of the   |
+|            |                     |              | same type as the   |
+|            |                     |              | specified          |
+|            |                     |              | variable. If a BY  |
+|            |                     |              | statement is in    |
+|            |                     |              | effect then the    |
+|            |                     |              | search shall be    |
+|            |                     |              | restricted to      |
+|            |                     |              | records within the |
+|            |                     |              | current BY group.  |
++------------+---------------------+--------------+--------------------+
+| NMISS      | NMISS(<varname>...) |              | Return the number  |
+|            |                     |              | of missing values  |
+|            |                     |              | in the arguments.  |
+|            |                     |              | For array          |
+|            |                     |              | arguments, all     |
+|            |                     |              | missing elements   |
+|            |                     |              | shall be counted.  |
++------------+---------------------+--------------+--------------------+
+| NRN        | NRN(n, p)           | n > 0        | Return a random    |
+|            |                     |              | number in the      |
+|            |                     | 0 < p < 1    | binomial           |
+|            |                     |              | distribution where |
+|            |                     |              | n is the number of |
+|            |                     |              | trials and p is    |
+|            |                     |              | the probability of |
+|            |                     |              | success in each    |
+|            |                     |              | trial.             |
++------------+---------------------+--------------+--------------------+
+| NUM        | NUM(<value>...)     |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation,     |
+|            |                     |              | except that any    |
+|            |                     |              | number of          |
+|            |                     |              | arguments shall be |
+|            |                     |              | accepted. If there |
+|            |                     |              | is a single scalar |
+|            |                     |              | argument, then a   |
+|            |                     |              | single value will  |
+|            |                     |              | be returned,       |
+|            |                     |              | otherwise an array |
+|            |                     |              | containing one     |
+|            |                     |              | element per scalar |
+|            |                     |              | argument or array  |
+|            |                     |              | argument element.  |
+|            |                     |              | Any individual     |
+|            |                     |              | array elements     |
+|            |                     |              | shall be treated   |
+|            |                     |              | as scalars. Only   |
+|            |                     |              | character          |
+|            |                     |              | arguments allowed. |
++------------+---------------------+--------------+--------------------+
+| NUM$       | NUM$(<value>...)    |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation,     |
+|            |                     |              | except that any    |
+|            |                     |              | number of          |
+|            |                     |              | arguments shall be |
+|            |                     |              | accepted and shall |
+|            |                     |              | be processed as by |
+|            |                     |              | NUM. Only numeric  |
+|            |                     |              | arguments shall be |
+|            |                     |              | permitted.         |
++------------+---------------------+--------------+--------------------+
+| OCT$       | OCT$(X, Y% )        | 0 < Y% ≤ 255 | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| ORD        | ORD(A$)             | LEN(A$) > 0  | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| PCF        | PCF(x, p)           | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     | 0 ≤ p ≤ 1    | distribution       |
+|            |                     |              | function of the    |
+|            |                     |              | Poisson            |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point   |
+|            |                     |              | and p is the       |
+|            |                     |              | Poisson parameter. |
++------------+---------------------+--------------+--------------------+
+| PDF        | PDF(x, p)           | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     | 0 ≤ p ≤ 1    | mass function of   |
+|            |                     |              | the Poisson        |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point   |
+|            |                     |              | and p is the       |
+|            |                     |              | Poisson parameter. |
++------------+---------------------+--------------+--------------------+
+| PI         |                     |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation,     |
+|            |                     |              | except that pi     |
+|            |                     |              | shall be returned  |
+|            |                     |              | as precisely as    |
+|            |                     |              | the word size will |
+|            |                     |              | permit.            |
++------------+---------------------+--------------+--------------------+
+| PIF        | PIF(ᶲ, p)           | 0 ≤ ᶲ ≤ 1    | Return the value   |
+|            |                     |              | of the inverse     |
+|            |                     | 0 ≤ p ≤ 1    | probability mass   |
+|            |                     |              | function of the    |
+|            |                     |              | Poisson            |
+|            |                     |              | distribution where |
+|            |                     |              | ᶲ is the           |
+|            |                     |              | probability and p  |
+|            |                     |              | is the Poisson     |
+|            |                     |              | parameter.         |
++------------+---------------------+--------------+--------------------+
+| POS        | POS(A$, B$)         |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| POS        | POS(A$, B$, X)      |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation      |
++------------+---------------------+--------------+--------------------+
+| PRN        | PRN(p)              |              | Return a random    |
+|            |                     |              | number in the      |
+|            |                     |              | Poisson            |
+|            |                     |              | distribution where |
+|            |                     |              | p is the Poisson   |
+|            |                     |              | parameter.         |
++------------+---------------------+--------------+--------------------+
+| RAD/RADIAN | RAD(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| RIGHT$     | RIGHT$(A$, X%)      | X% > 0       | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| ROUND      | ROUND(X, Y%)        | Y% ≥ 0       | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| RTRIM$     | RTRIM$(A$)          |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| SEC        | RTRIM$(A$)          |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| SEG$       | SEG$(A$, X%, Y%)    | X% ≥ 0       | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     | Y% > 0       | documentation.     |
++------------+---------------------+--------------+--------------------+
+| SGN        | SGN(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| SHELL      | SHELL(A$)           |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| SIN        | SIN(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| SIND       | SIND(X)             |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| SINH       | SINH(X)             |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| SQR        | SQR(X)              | X ≥ 0        | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| STD        | STD(v1, [v2, ...])  |              | Return the         |
+|            |                     |              | standard deviation |
+|            |                     |              | of the arguments,  |
+|            |                     |              | each element of    |
+|            |                     |              | any array          |
+|            |                     |              | arguments being    |
+|            |                     |              | treated as a       |
+|            |                     |              | single argument.   |
+|            |                     |              | Missing values     |
+|            |                     |              | shall be ignored.  |
++------------+---------------------+--------------+--------------------+
+| SUM        | SUM(v1, [v2, ...])  |              | Row-wise sum.      |
+|            |                     |              | Arrays passed as   |
+|            |                     |              | arguments are      |
+|            |                     |              | expanded.          |
++------------+---------------------+--------------+--------------------+
+| TAN        | TAN(X)              |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| TAND       | TAND(X)             |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| TANH       | TANH(X)             |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| TCF        | TCF(t, df)          | 0 ≤ t ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     | df > 0       | distribution       |
+|            |                     |              | function of the T  |
+|            |                     |              | distribution where |
+|            |                     |              | t is the           |
+|            |                     |              | evaluation point   |
+|            |                     |              | and df is the      |
+|            |                     |              | number of degrees  |
+|            |                     |              | of freedom.        |
++------------+---------------------+--------------+--------------------+
+| TDF        | TDF(t, df)          | 0 ≤ t ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     | df > 0       | density function   |
+|            |                     |              | of the T           |
+|            |                     |              | distribution where |
+|            |                     |              | t is the           |
+|            |                     |              | evaluation point   |
+|            |                     |              | and df is the      |
+|            |                     |              | number of degrees  |
+|            |                     |              | of freedom.        |
++------------+---------------------+--------------+--------------------+
+| TIF        | TIF(ᶲ, df)          | 0 ≤ ᶲ ≤ 1    | Return the value   |
+|            |                     |              | of the inverse     |
+|            |                     | df > 0       | probability        |
+|            |                     |              | density function   |
+|            |                     |              | of the T           |
+|            |                     |              | distribution where |
+|            |                     |              | ᶲ is the           |
+|            |                     |              | probability and df |
+|            |                     |              | is the number of   |
+|            |                     |              | degrees of         |
+|            |                     |              | freedom.           |
++------------+---------------------+--------------+--------------------+
+| TIMER      | No arguments        |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| TRIM$      | TRIM$(A$)           |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| TRN        | TRN(df)             |              | Return a random    |
+|            |                     |              | number in the T    |
+|            |                     |              | distribution where |
+|            |                     |              | df is the number   |
+|            |                     |              | of degrees of      |
+|            |                     |              | freedom.           |
++------------+---------------------+--------------+--------------------+
+| TRUE       | No arguments        |              | Return 1, which is |
+|            |                     |              | taken as true.     |
++------------+---------------------+--------------+--------------------+
+| TRUNCATE   | TRUNCATE(X, Y%)     | Y% ≥ 0       | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| UBOUND     | UBOUND(arrayname)   |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| UCASE$     | UCASE$(A$)          |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| UCF        | UCF(x)              | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     |              | distribution       |
+|            |                     |              | function of the    |
+|            |                     |              | uniform            |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point.  |
++------------+---------------------+--------------+--------------------+
+| UDF        | UDF(x)              | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     |              | density function   |
+|            |                     |              | of the uniform     |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point.  |
++------------+---------------------+--------------+--------------------+
+| UIF        | UIF(ᶲ)              | 0 ≤ ᶲ ≤ 1    | Return the value   |
+|            |                     |              | of the inverse     |
+|            |                     |              | probability        |
+|            |                     |              | density function   |
+|            |                     |              | of the uniform     |
+|            |                     |              | distribution where |
+|            |                     |              | ᶲ is the           |
+|            |                     |              | probability.       |
++------------+---------------------+--------------+--------------------+
+| UPPER$     | UPPER$(A$)          |              | As specified in    |
+|            |                     |              | the BW BASIC       |
+|            |                     |              | documentation.     |
++------------+---------------------+--------------+--------------------+
+| URN        | No arguments        |              | Return a uniformly |
+|            |                     |              | distributed random |
+|            |                     |              | number between 0   |
+|            |                     |              | and 1.             |
++------------+---------------------+--------------+--------------------+
+| VAR        | VAR(v1, [v2, ...])  |              | Row-wise sample    |
+|            |                     |              | variance.          |
++------------+---------------------+--------------+--------------------+
+| XCF        | XCF(x, df)          | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     | df > 0       | distribution       |
+|            |                     |              | function of the    |
+|            |                     |              | chi square         |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point   |
+|            |                     |              | and df is the      |
+|            |                     |              | number of degrees  |
+|            |                     |              | of freedom.        |
++------------+---------------------+--------------+--------------------+
+| XDF        | XDF(x, df)          | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     | df > 0       | density function   |
+|            |                     |              | of the chi square  |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point   |
+|            |                     |              | and df is the      |
+|            |                     |              | number of degrees  |
+|            |                     |              | of freedom.        |
++------------+---------------------+--------------+--------------------+
+| XIF        | XIF(ᶲ, df)          | 0 ≤ ᶲ ≤ 1    | Return the value   |
+|            |                     |              | of the inverse     |
+|            |                     | df > 0       | probability        |
+|            |                     |              | density function   |
+|            |                     |              | of the chi square  |
+|            |                     |              | distribution where |
+|            |                     |              | ᶲ is the           |
+|            |                     |              | probability and df |
+|            |                     |              | is the number of   |
+|            |                     |              | degrees of         |
+|            |                     |              | freedom.           |
++------------+---------------------+--------------+--------------------+
+| XRN        | XRN(df)             | df > 0       | Return a random    |
+|            |                     |              | number in the chi  |
+|            |                     |              | square             |
+|            |                     |              | distribution where |
+|            |                     |              | df is the number   |
+|            |                     |              | of degrees of      |
+|            |                     |              | freedom.           |
++------------+---------------------+--------------+--------------------+
+| WCF        | WCF(x, p, q)        | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the cumulative  |
+|            |                     | p > 0        | distribution       |
+|            |                     |              | function of the    |
+|            |                     | q > 0        | Weibull            |
+|            |                     |              | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point,  |
+|            |                     |              | p is the scale     |
+|            |                     |              | parameter, and q   |
+|            |                     |              | is the shape       |
+|            |                     |              | parameter.         |
++------------+---------------------+--------------+--------------------+
+| WDF        | WDF(x, p, q)        | 0 ≤ x ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     | p > 0        | density function   |
+|            |                     |              | of the Weibull     |
+|            |                     | q > 0        | distribution where |
+|            |                     |              | x is the           |
+|            |                     |              | evaluation point,  |
+|            |                     |              | p is the scale     |
+|            |                     |              | parameter, and q   |
+|            |                     |              | is the shape       |
+|            |                     |              | parameter.         |
++------------+---------------------+--------------+--------------------+
+| WIF        | WIF(ᶲ, p, q)        | 0 ≤ ᶲ ≤ 1    | Return the value   |
+|            |                     |              | of the probability |
+|            |                     | p > 0        | density function   |
+|            |                     |              | of the Weibull     |
+|            |                     | q > 0        | distribution where |
+|            |                     |              | ᶲ is the           |
+|            |                     |              | probability, p is  |
+|            |                     |              | the scale          |
+|            |                     |              | parameter, and q   |
+|            |                     |              | is the shape       |
+|            |                     |              | parameter.         |
++------------+---------------------+--------------+--------------------+
+| WRN        | WRN(p, q)           | p > 0        | Return a random    |
+|            |                     |              | number on the      |
+|            |                     | q > 0        | Weibull            |
+|            |                     |              | distribution where |
+|            |                     |              | p is the scale     |
+|            |                     |              | parameter, and q   |
+|            |                     |              | is the shape       |
+|            |                     |              | parameter.         |
++------------+---------------------+--------------+--------------------+
+| ZCF        | ZCF(x [, mu,        | 0 ≤ z ≤ 1    | Returns the value  |
+|            | sigma])             |              | of the cumulative  |
+|            |                     | sigma > 0    |                    |
+|            |                     |              | distribution       |
+|            |                     |              | function of the    |
+|            |                     |              | normal             |
+|            |                     |              | distribution       |
+|            |                     |              | evaluated at x,    |
+|            |                     |              | where mu is the    |
+|            |                     |              | mean and sigma is  |
+|            |                     |              | the standard       |
+|            |                     |              | deviation. If mu   |
+|            |                     |              | and sigma are      |
+|            |                     |              | omitted, the       |
+|            |                     |              | Standard Normal    |
+|            |                     |              | distribution (mean |
+|            |                     |              | 0, standard        |
+|            |                     |              | deviation 1) is    |
+|            |                     |              | used.              |
++------------+---------------------+--------------+--------------------+
+| ZDF        | ZDF(x [, mu,        | 0 ≤ z ≤ 1    | Returns the value  |
+|            | sigma])             |              | of the probability |
+|            |                     | sigma > 0    |                    |
+|            |                     |              | density function   |
+|            |                     |              | of the normal      |
+|            |                     |              | distribution       |
+|            |                     |              | evaluated at x,    |
+|            |                     |              | where mu is the    |
+|            |                     |              | mean and sigma is  |
+|            |                     |              | the standard       |
+|            |                     |              | deviation. If mu   |
+|            |                     |              | and sigma are      |
+|            |                     |              | omitted, the       |
+|            |                     |              | Standard Normal    |
+|            |                     |              |                    |
+|            |                     |              | distribution (mean |
+|            |                     |              | 0, standard        |
+|            |                     |              | deviation 1) is    |
+|            |                     |              | used.              |
++------------+---------------------+--------------+--------------------+
+| ZIF        | ZIF(p [, mu,        | 0 ≤ p ≤ 1    | Returns the        |
+|            | sigma])             |              | inverse            |
+|            |                     | sigma > 0    |                    |
+|            |                     |              | cumulative         |
+|            |                     |              | distribution       |
+|            |                     |              | function           |
+|            |                     |              | (quantile) of the  |
+|            |                     |              | normal             |
+|            |                     |              | distribution for   |
+|            |                     |              | probability *p*,   |
+|            |                     |              |                    |
+|            |                     |              | where *mu* is the  |
+|            |                     |              | mean and *sigma*   |
+|            |                     |              | is the standard    |
+|            |                     |              | deviation. If *mu* |
+|            |                     |              | and *sigma* are    |
+|            |                     |              |                    |
+|            |                     |              | omitted, the       |
+|            |                     |              | Standard Normal    |
+|            |                     |              | distribution (mean |
+|            |                     |              | 0, standard        |
+|            |                     |              | deviation 1) is    |
+|            |                     |              | used.              |
++------------+---------------------+--------------+--------------------+
+| ZRN        | ZRN([mu, sigma])    | sigma > 0    | Returns a random   |
+|            |                     |              | variate from the   |
+|            |                     |              | normal             |
+|            |                     |              | distribution where |
+|            |                     |              | mu is the mean and |
+|            |                     |              | sigma is the       |
+|            |                     |              | standard           |
+|            |                     |              | deviation. If      |
+|            |                     |              | arguments are      |
+|            |                     |              | omitted, the       |
+|            |                     |              | Standard Normal    |
+|            |                     |              | distribution (mean |
+|            |                     |              | 0, standard        |
+|            |                     |              | deviation 1) is    |
+|            |                     |              | used.              |
++------------+---------------------+--------------+--------------------+
+
+- Functions returning character values end with $.
+- Functions returning numeric values do not end with $.
+
+Function Arguments:
+
+- Variable ranges may not be function arguments.
+- If numeric argument set to character value (or vice versa): function
+  call fails with error.
+- Argument values outside permitted range: function call fails with
+  error.
+- Invalid arguments to mathematical functions (e.g., non-positive
+  argument to LOG): fails with error
+
+Aliases: Multiple function names separated by “/” are aliases of the
+same function. All aliases shown in the function table shall be
+supported; additional aliases are not required.
+
+Aggregate Functions:
+
+- Ignore missing values when making computations.
+- If no non-missing arguments passed: return missing value.
+
+7.3 Operators and Expression Evaluation
+
+Operator Precedence: As specified in BW BASIC documentation.
+
+Expression Types:
+
+- Arithmetic expressions: Numeric values, variables, and functions
+  combined with arithmetic operators.
+- String expressions: Character values, variables, and functions
+  combined with string operators.
+- Logical expressions: Boolean values resulting from comparisons and
+  logical operations.
+
+Type Checking: Type mismatches in expressions result in error messages
+(e.g., adding numeric to character value).
+
+8. IMPLEMENTATION NOTES
+
+8.1 Usage
+
+sdata [-q -u<filename> [--infmt=<csv|odf|ooxml>]] [-s<filename> \
+
+[--outfmt=<csv|odf|ooxml>]] [-o <filename>] [-m<n>] [--clen=<n>] \
+
+[--noshell] [filename]
+
+8.11 Command-Line Options
+
+The interpreter accepts the following command-line options:
+
+Memory Management:
+
+- -m <size>: Maximum in-memory table size.
+- -t <size>: Maximum temporary variable/array memory.
+
+Character Variables:
+
+- --clen <length>: Maximum character variable length (default: 256).
+
+Execution Control:
+
+- --noshell: Disable the SYSTEM command and the SHELL function.
+
+Input Control:
+
+- -u <filename>: Open the specified file as the input dataset
+  (Equivalent to a USE statement).
+- --infmt: Specify the format of the input dataset (ignored unless the
+  -u option is specified).
+
+Output Control:
+
+- -o: Open the specified file for console output (Equivalent to an
+  OUTPUT statement).
+- -p <specstr>: Pager specification for interactive mode.
+- -q: Suppress writing of console output to standard output (can be
+  undone with ECHO ON).
+- -s: Open the specified file as the output dataset (Equivalent to a
+  SAVE statement).
+- --outfmt: Specify the format of the output dataset (ignored unless the
+  -s option is specified).
+
+8.12 Argument
+
+The name of a script (“command file”) to run. If not specified then an
+interactive session is opened.
+
+8.2 Case Insensitivity
+
+The language is entirely case insensitive:
+
+- Variable names: TEMP, temp, and Temp refer to same variable.
+- Commands: PRINT, print, and Print are equivalent.
+- Function names: SIN, sin, and Sin are equivalent.
+- Keywords: IF, if, and If are equivalent.
+
+Exception: Character string literals preserve case: - "Hello" and
+"HELLO" are different values.
+
+8.3 Reserved Names and Keywords
+
+No explicit list of reserved words is provided, but best practice is to
+avoid using command names and function names as variable names to
+prevent confusion.
+
+8.4 Error Messages
+
+All error conditions specified in this document shall produce clear,
+descriptive error messages that:
+
+- Identify the nature of the error.
+- Indicate the location (line number if applicable).
+- Suggest corrective action where appropriate.
+
+8.5 Future Extensions
+
+This specification notes several areas where future versions may provide
+additional capabilities:
+
+- Special missing value codes for IEEE 754 infinity and NaN (.i, -.i,
+  .n).
+- Additional file format support.
+- Numeric literals in bases other than ten.
+- Enhanced formula evaluation in spreadsheets.
+
+These extensions are noted for planning purposes but are not
+requirements for the initial implementation.
