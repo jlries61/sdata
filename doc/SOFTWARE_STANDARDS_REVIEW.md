@@ -108,17 +108,17 @@ No commented-out code detected. No anonymous TODOs. This is clean.
 
 ### 3.1 Algorithmic Choices
 
-The dispatch table in `SData.Evaluator` (hashed map, O(1) per lookup) is correct for ~150 registered functions. Linear scan in `Help_Table` (`sdata-help.adb:1449–1455`) is O(n) over ~170 entries — acceptable given that HELP is not a hot path.
+The dispatch table in `SData.Evaluator` (hashed map, O(1) per lookup) is correct for ~150 registered functions. Linear scan in `Help_Table` (`sdata-help.adb:1449–1455`) is O(n) over ~170 entries — acceptable given that HELP is not a hot path. **Deferred:** impact is None; ADR-024 noted this and deemed it acceptable; will revisit only if the help table grows substantially.
 
 The `Filter_Map` is an array of physical row indices, built once per RUN via `Rebuild_Filter_Map`. Logical-to-physical mapping is O(1) thereafter. This is the correct design.
 
 **~~Algorithmic concern — column access~~ Resolved 415714a:** ~~`Data_Table` is `Column_Maps.Map` keyed by column name (`Ada.Containers.Indefinite_Hashed_Maps`). Per-cell access is `Data_Table("COLNAME").Data(Row_Index)`. This means every cell read during a data step — which happens M × N times (M statements × N rows) — performs a hash lookup on the column name. For a dataset with 50 columns and 100,000 rows, this is 5 million unnecessary hash lookups per data step if PDV indices could be pre-resolved. The PDV index cache (`Expr.Var_Index`) partially mitigates this for parsed expressions, but direct column reads in `Get_PDV_Value`/`Load_PDV_From_Table` still go through the hash map on every record.~~ A `Column_Cursor_Cache` / `Output_Cursor_Cache` (vectors of pre-resolved `Column_Maps.Cursor`) is now built once per RUN via `Rebuild_Column_Cache` / `Rebuild_Output_Cache` and invalidated on every schema change. `Load_PDV_From_Table` and the value-setting loop in `Flush_PDV_To_Output` use `Get_Value_By_Col` / `Set_Output_Value_By_Col` — O(1) cursor dereferences with no hash lookup.
 
-| Concern | Impact | Fix Difficulty |
-|---|---|---|
-| ~~Column-name hash lookup per record in table operations~~ | ~~Medium (measurable on large datasets)~~ | ~~Medium~~ **Fixed 415714a** |
-| Linear help-table scan | None (cold path) | Easy |
-| ~~BY-variable list duplicated (interpreter + table)~~ | ~~Negligible performance, high maintenance cost~~ | ~~Medium~~ **Fixed 9460375** |
+| Concern | Impact | Fix Difficulty | Status |
+|---|---|---|---|
+| ~~Column-name hash lookup per record in table operations~~ | ~~Medium (measurable on large datasets)~~ | ~~Medium~~ | **Fixed 415714a** |
+| Linear help-table scan | None (cold path) | Easy | **Deferred** |
+| ~~BY-variable list duplicated (interpreter + table)~~ | ~~Negligible performance, high maintenance cost~~ | ~~Medium~~ | **Fixed 9460375** |
 
 ### 3.2 Resource Management
 
