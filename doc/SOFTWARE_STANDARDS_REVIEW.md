@@ -23,7 +23,7 @@
 
 ---
 
-## 1. Architectural Integrity — 65/100
+## 1. Architectural Integrity — ~~65~~ 72/100
 
 ### 1.1 Structural Coherence
 
@@ -31,7 +31,7 @@
 Yes. The three-tier model (Declarative → Immediate → Deferred) is coherent, documented at the top of `sdata-interpreter.adb`, and consistently applied. The evaluator, table, variables, and help subsystems have clear charters. The parser and lexer are separate packages with appropriate layering.
 
 **Can a new developer understand the system's organization in under 30 minutes?**
-Mostly. The package structure is logical; an Ada developer can navigate it. But `sdata-interpreter.adb` (2,213 lines) and `sdata-file_io.adb` (1,646 lines) are still intimidating single-file subsystems. The evaluator refactoring brought `sdata-evaluator.adb` from 2,589 lines to 517, which was a significant quality improvement — but the same treatment has not been applied to file I/O or the interpreter.
+Mostly. The package structure is logical; an Ada developer can navigate it. But `sdata-interpreter.adb` (~~2,213~~ 2,269 lines) and `sdata-file_io.adb` (~~1,646~~ 1,758 lines) are still intimidating single-file subsystems. The evaluator refactoring brought `sdata-evaluator.adb` from 2,589 lines to ~~517~~ 543 lines, which was a significant quality improvement — but the same treatment has not been applied to file I/O or the interpreter.
 
 **Are there orphaned modules?**
 No orphaned modules detected. Every package is actively used.
