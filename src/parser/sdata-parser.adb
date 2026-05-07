@@ -1277,21 +1277,28 @@ package body SData.Parser is
 
          when Token_OPTIONS =>
             declare
-               Key_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Key_Str : constant String :=
-                  To_Upper (Key_Tok.Text (1 .. Key_Tok.Length));
-               Val_Str : constant String := Val_Tok.Text (1 .. Val_Tok.Length);
-               K_Len   : constant Natural :=
-                  Natural'Min (Key_Tok.Length, Max_Name_Len);
-               V_Len   : constant Natural :=
-                  Natural'Min (Val_Tok.Length, 256);
+               Peek : constant Token_Kind := Peek_Next_Token (Ctx.Lex_Ctx).Kind;
             begin
                Stmt := new Statement (Stmt_OPTIONS);
-               Stmt.Options_Key (1 .. K_Len) := Key_Str (Key_Str'First .. Key_Str'First + K_Len - 1);
-               Stmt.Options_Key_Len := K_Len;
-               Stmt.Options_Val (1 .. V_Len) := Val_Str (Val_Str'First .. Val_Str'First + V_Len - 1);
-               Stmt.Options_Val_Len := V_Len;
+               if Peek /= Token_Newline and then Peek /= Token_EOF then
+                  declare
+                     Key_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     Key_Str : constant String :=
+                        To_Upper (Key_Tok.Text (1 .. Key_Tok.Length));
+                     Val_Str : constant String := Val_Tok.Text (1 .. Val_Tok.Length);
+                     K_Len   : constant Natural :=
+                        Natural'Min (Key_Tok.Length, Max_Name_Len);
+                     V_Len   : constant Natural :=
+                        Natural'Min (Val_Tok.Length, 256);
+                  begin
+                     Stmt.Options_Key (1 .. K_Len) := Key_Str (Key_Str'First .. Key_Str'First + K_Len - 1);
+                     Stmt.Options_Key_Len := K_Len;
+                     Stmt.Options_Val (1 .. V_Len) := Val_Str (Val_Str'First .. Val_Str'First + V_Len - 1);
+                     Stmt.Options_Val_Len := V_Len;
+                  end;
+               end if;
+               --  Options_Key_Len = 0 means bare OPTIONS — display current values.
             end;
 
          when Token_RENAME =>

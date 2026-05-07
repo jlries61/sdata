@@ -274,8 +274,9 @@ Command: QUIT | END
 Exits the interpreter.
 Execution: Immediate -- exits at once.
 
-Command: OPTIONS key value
+Command: OPTIONS [key value]
 Sets a runtime option. Execution: Immediate -- takes effect at once.
+With no arguments, OPTIONS lists all current option values.
 
   OPTIONS MAXINTAB n         : Max in-memory table cells (rows*cols; 0 = unlimited)
   OPTIONS MAXTEMPMEM n       : Max temporary variables (0 = unlimited)

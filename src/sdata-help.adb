@@ -478,8 +478,9 @@ package body SData.Help is
 
    procedure Help_OPTIONS is
    begin
-      Put_Line ("Command: OPTIONS key value");
+      Put_Line ("Command: OPTIONS [key value]");
       Put_Line ("Sets a runtime option. Execution: Immediate -- takes effect at once.");
+      Put_Line ("With no arguments, OPTIONS lists all current option values.");
       Put_Line ("");
       Put_Line ("  OPTIONS MAXINTAB n         : Max in-memory table cells (rows*cols; 0 = unlimited)");
       Put_Line ("  OPTIONS MAXTEMPMEM n       : Max temporary variables (0 = unlimited)");

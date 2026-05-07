@@ -1511,8 +1511,36 @@ package body SData.Interpreter is
                Val : constant String :=
                   Stmt.Options_Val (1 .. Stmt.Options_Val_Len);
                Val_Upper : constant String := To_Upper (Val);
+
+               function Dlm_Display (S : String) return String is
+               begin
+                  if S'Length = 0       then return """,""";  end if;
+                  if S (S'First) = ','  then return """,""";  end if;
+                  if S (S'First) = ASCII.HT then return """\t"""; end if;
+                  if S (S'First) = ASCII.LF then return "NEWLINE"; end if;
+                  if S (S'First) = '|'  then return """|""";  end if;
+                  if S (S'First) = ' '  then return "SPACE";  end if;
+                  return """" & S & """";
+               end Dlm_Display;
+
+               function Bool_Display (B : Boolean) return String is
+               begin
+                  return (if B then "YES" else "NO");
+               end Bool_Display;
+
             begin
-               if Key = "MAXINTAB" then
+               if Key = "" then
+                  Put_Line ("OPTIONS MAXINTAB "    & Ada.Strings.Fixed.Trim (SData.Config.Max_Table_Rows'Image, Ada.Strings.Both));
+                  Put_Line ("OPTIONS MAXTEMPMEM "  & Ada.Strings.Fixed.Trim (SData.Config.Max_Temp_Vars'Image, Ada.Strings.Both));
+                  Put_Line ("OPTIONS CSVDLM "      & Dlm_Display (SData.Config.Runtime.Options_CSVDLM (1 .. SData.Config.Runtime.Options_CSVDLM_Len)));
+                  Put_Line ("OPTIONS HEADER "      & Bool_Display (SData.Config.Runtime.Options_Header));
+                  Put_Line ("OPTIONS SAVEOVERWRT " & Bool_Display (SData.Config.Runtime.Options_SAVEOVERWRT));
+                  Put_Line ("OPTIONS TXTFMT "      & SData.Config.Runtime.Options_TXTFMT (1 .. SData.Config.Runtime.Options_TXTFMT_Len));
+                  Put_Line ("OPTIONS CHARSET "     &
+                     (if SData.Config.Runtime.Options_CHARSET_Len = 0 then "AUTO"
+                      else SData.Config.Runtime.Options_CHARSET (1 .. SData.Config.Runtime.Options_CHARSET_Len)));
+                  Put_Line ("OPTIONS IEEE_DIVIDE " & Bool_Display (SData.Config.Runtime.IEEE_Divide));
+               elsif Key = "MAXINTAB" then
                   SData.Config.Max_Table_Rows := Natural'Value (Val);
                elsif Key = "MAXTEMPMEM" then
                   SData.Config.Max_Temp_Vars := Natural'Value (Val);
