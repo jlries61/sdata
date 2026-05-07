@@ -1,0 +1,8 @@
+-- Test OPTIONS IEEE_DIVIDE NO restores default: /0 raises Script_Error again
+OPTIONS IEEE_DIVIDE YES
+OPTIONS IEEE_DIVIDE NO
+REPEAT 1
+  LET X = 1.0 / 0.0
+  PRINT X
+RUN
+QUIT
