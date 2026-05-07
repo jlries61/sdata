@@ -280,6 +280,18 @@ package body SData.File_IO is
       end case;
    end Open_Output;
 
+   ----------------------
+   -- CSV parse helpers --
+   ----------------------
+
+   --  Practical upper bound on columns for type-inference buffers.
+   Max_CSV_Cols : constant := 4_096;
+
+   package Line_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
+
+   type Name_Array     is array (1 .. Max_CSV_Cols) of GNAT.Strings.String_Access;
+   type Col_Type_Array is array (1 .. Max_CSV_Cols) of Column_Type;
+
    ---------------
    -- Parse_CSV --
    ---------------
@@ -293,7 +305,6 @@ package body SData.File_IO is
       File : Ada.Text_IO.File_Type;
 
       --  Charset handling: buffered path for UTF-16, ASCII validation flag.
-      package Line_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
       All_Lines       : Line_Vecs.Vector;
       All_Lines_Idx   : Natural := 0;
       Is_Buffered     : Boolean := False;
