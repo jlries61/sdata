@@ -481,7 +481,7 @@ package body SData.Help is
       Put_Line ("Command: OPTIONS key value");
       Put_Line ("Sets a runtime option. Execution: Immediate -- takes effect at once.");
       Put_Line ("");
-      Put_Line ("  OPTIONS MAXINTAB n         : Max rows in Data Table (0 = unlimited)");
+      Put_Line ("  OPTIONS MAXINTAB n         : Max in-memory table cells (rows*cols; 0 = unlimited)");
       Put_Line ("  OPTIONS MAXTEMPMEM n       : Max temporary variables (0 = unlimited)");
       Put_Line ("  OPTIONS CSVDLM "",""|""\t""|"";""|""|""  : CSV field delimiter (default: comma)");
       Put_Line ("  OPTIONS HEADER YES|NO      : CSV files have a header row (default: YES)");
@@ -496,7 +496,7 @@ package body SData.Help is
       Put_Line ("  --nosubmit           : Disable SUBMIT");
       Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
       Put_Line ("  --clen <n>           : Set max character variable length");
-      Put_Line ("  -m <n>               : Set max in-memory table rows");
+      Put_Line ("  -m <n>               : Set max in-memory table cells (rows*cols; 0 = unlimited)");
       Put_Line ("  -t <n>               : Set max temporary variables");
       Put_Line ("  -k                   : Continue execution after statement error");
       Put_Line ("  -p <pager>           : External pager for interactive output");

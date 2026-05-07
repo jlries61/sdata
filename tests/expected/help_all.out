@@ -277,7 +277,7 @@ Execution: Immediate -- exits at once.
 Command: OPTIONS key value
 Sets a runtime option. Execution: Immediate -- takes effect at once.
 
-  OPTIONS MAXINTAB n         : Max rows in Data Table (0 = unlimited)
+  OPTIONS MAXINTAB n         : Max in-memory table cells (rows*cols; 0 = unlimited)
   OPTIONS MAXTEMPMEM n       : Max temporary variables (0 = unlimited)
   OPTIONS CSVDLM ","|"\t"|";"|"|"  : CSV field delimiter (default: comma)
   OPTIONS HEADER YES|NO      : CSV files have a header row (default: YES)
@@ -292,7 +292,7 @@ CLI flags (set at startup, not runtime):
   --nosubmit           : Disable SUBMIT
   --ignore-math-errors : Domain errors return MISSING
   --clen <n>           : Set max character variable length
-  -m <n>               : Set max in-memory table rows
+  -m <n>               : Set max in-memory table cells (rows*cols; 0 = unlimited)
   -t <n>               : Set max temporary variables
   -k                   : Continue execution after statement error
   -p <pager>           : External pager for interactive output

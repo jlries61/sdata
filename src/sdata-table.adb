@@ -147,7 +147,8 @@ package body SData.Table is
    procedure Add_Row is
    begin
       if SData.Config.Max_Table_Rows > 0 and then
-         Table_Row_Count >= (Current_Segment_Start + SData.Config.Max_Table_Rows - 1)
+         (Table_Row_Count - Current_Segment_Start + 1)
+            * Natural (Data_Table.Length) >= SData.Config.Max_Table_Rows
       then
          Spill_To_Disk;
          Current_Segment_Start := Table_Row_Count + 1;
@@ -638,7 +639,8 @@ package body SData.Table is
    procedure Add_Output_Row is
    begin
       if SData.Config.Max_Table_Rows > 0 and then
-         Output_Table_Row_Count >= (Output_Segment_Start + SData.Config.Max_Table_Rows - 1)
+         (Output_Table_Row_Count - Output_Segment_Start + 1)
+            * Natural (Output_Data_Table.Length) >= SData.Config.Max_Table_Rows
       then
          Spill_Output_To_Disk;
          Output_Segment_Start := Output_Table_Row_Count + 1;
@@ -844,8 +846,11 @@ package body SData.Table is
       --  Load a new segment when Row falls outside the cached range.
       if Seg_Start = 0 or else Row < Seg_Start or else Row > Seg_End then
          declare
+            Col_Count : constant Positive := Positive'Max (1, Natural (Data_Table.Length));
             Limit   : constant Positive :=
-               (if SData.Config.Max_Table_Rows > 0 then SData.Config.Max_Table_Rows else 1);
+               (if SData.Config.Max_Table_Rows > 0
+                then Positive'Max (1, SData.Config.Max_Table_Rows / Col_Count)
+                else 1);
             S_Idx   : constant Natural  := (Row - 1) / Limit;
             S_Start : constant Positive := S_Idx * Limit + 1;
             S_End   : constant Positive :=

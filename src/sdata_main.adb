@@ -68,7 +68,7 @@ procedure SData_Main is
       Put_Line ("Options:");
       Put_Line ("  -h, --help    Show this help message");
       Put_Line ("  -v, --version Show version information");
-      Put_Line ("  -m <size>     Set max in-memory table size");
+      Put_Line ("  -m <cells>    Set max in-memory table cells (rows*cols; 0 = unlimited)");
       Put_Line ("  -t <count>    Set max temporary variables");
       Put_Line ("  --clen <len>  Set max character variable length");
       Put_Line ("  --noshell                Disable SHELL command and function");
