@@ -152,10 +152,13 @@ package body SData.Values is
    end "<";
 
 begin
-   --  Float'Last * 2.0 must be computed at runtime (mutable variable) to
-   --  avoid the static-expression Constraint_Error GNAT raises at compile time.
+   --  Float'Last * 2.0 must be computed at runtime to avoid the
+   --  static-expression Constraint_Error GNAT raises at compile time.
+   --  Big cannot be constant for the same reason; suppress the spurious warning.
    declare
+      pragma Warnings (Off, "could be declared constant");
       Big : Float := Float'Last;
+      pragma Warnings (On, "could be declared constant");
    begin
       Pos_Inf :=  Big * 2.0;
       Neg_Inf := -(Big * 2.0);
