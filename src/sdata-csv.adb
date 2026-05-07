@@ -1,3 +1,4 @@
+with Ada.Characters.Handling;
 with Ada.Strings;
 with Ada.Strings.Fixed;     use Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
@@ -10,34 +11,52 @@ package body SData.CSV is
    --  Returns True and sets Result for any valid floating-point value.
    --  Returns False only if the string cannot represent a number.
    function Try_Fast_Float (S : String; Result : out Float) return Boolean is
-      I         : Integer := S'First;
+      T         : constant String := Ada.Strings.Fixed.Trim (S, Ada.Strings.Both);
+      I         : Integer := T'First;
       Whole     : Float   := 0.0;
       Frac      : Float   := 0.0;
       Denom     : Float   := 1.0;
       Sign      : Float   := 1.0;
       After_Dot : Boolean := False;
       Has_Digit : Boolean := False;
+      TU        : String (T'Range);
    begin
-      if I > S'Last then return False; end if;
-      if    S (I) = '-' then Sign := -1.0; I := I + 1;
-      elsif S (I) = '+' then               I := I + 1;
+      for K in T'Range loop TU (K) := Ada.Characters.Handling.To_Upper (T (K)); end loop;
+      if TU = "INF" or else TU = "+INF" or else TU = "INFINITY" or else TU = "+INFINITY" then
+         declare
+            Big : Float := Float'Last;  --  non-constant: forces runtime overflow
+         begin
+            Result := Big * 2.0;  --  +Inf via IEEE 754 overflow
+         end;
+         return True;
+      elsif TU = "-INF" or else TU = "-INFINITY" then
+         declare
+            Big : Float := Float'Last;
+         begin
+            Result := -(Big * 2.0);  --  -Inf via IEEE 754 overflow
+         end;
+         return True;
       end if;
-      while I <= S'Last loop
-         case S (I) is
+      if I > T'Last then return False; end if;
+      if    T (I) = '-' then Sign := -1.0; I := I + 1;
+      elsif T (I) = '+' then               I := I + 1;
+      end if;
+      while I <= T'Last loop
+         case T (I) is
             when '0' .. '9' =>
                Has_Digit := True;
                if After_Dot then
                   Denom := Denom * 10.0;
-                  Frac  := Frac + Float (Character'Pos (S (I)) - 48) / Denom;
+                  Frac  := Frac + Float (Character'Pos (T (I)) - 48) / Denom;
                else
-                  Whole := Whole * 10.0 + Float (Character'Pos (S (I)) - 48);
+                  Whole := Whole * 10.0 + Float (Character'Pos (T (I)) - 48);
                end if;
             when '.' =>
                if After_Dot then return False; end if;
                After_Dot := True;
             when 'E' | 'e' | 'D' | 'd' =>
                begin
-                  Result := Float'Value (S);
+                  Result := Float'Value (T);
                   return True;
                exception
                   when others => return False;
