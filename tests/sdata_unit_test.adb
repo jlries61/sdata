@@ -7,6 +7,7 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData.Table;           use SData.Table;
 with SData.Values;          use SData.Values;
 with SData.Evaluator;       use SData.Evaluator;
+with SData.Variables;       use SData.Variables;
 
 procedure SData_Unit_Test is
    Passed : Natural := 0;
@@ -308,6 +309,153 @@ begin
    Check ("E-13 UBOUND is identifier-ref",       Is_Identifier_Ref_Function ("UBOUND"), True);
    Check ("E-14 ABS is not identifier-ref",      Is_Identifier_Ref_Function ("ABS"),    False);
    Check ("E-15 SQRT is not identifier-ref",     Is_Identifier_Ref_Function ("SQRT"),   False);
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Variables: temporary (session) variables ───────────────────
+   ---------------------------------------------------------------------------
+
+   --  Start from a known state: empty table, empty temp symbols.
+   SData.Table.Clear;
+   Clear_Temporary;
+
+   Set_Temporary ("myvar", (Kind => Val_Numeric, Num_Val => 5.5));
+   Check ("V-01 Defined after Set_Temporary",   Defined ("myvar"), True);
+   Check ("V-02 Defined case-insensitive",       Defined ("MYVAR"), True);
+   V := Get ("myvar");
+   Check       ("V-03 Get temp kind",    V.Kind = Val_Numeric, True);
+   Check_Float ("V-04 Get temp value",   V.Num_Val, 5.5);
+
+   Set_Temporary ("myvar", (Kind => Val_Numeric, Num_Val => 9.9));
+   V := Get ("myvar");
+   Check_Float ("V-05 Update temp value", V.Num_Val, 9.9);
+
+   Unset ("myvar");
+   Check ("V-06 Defined after Unset", Defined ("myvar"), False);
+   V := Get ("myvar");
+   Check ("V-07 Get after Unset returns Missing", V.Kind = Val_Missing, True);
+
+   Set_Temporary ("alpha", (Kind => Val_Numeric, Num_Val => 1.0));
+   Set_Temporary ("beta",  (Kind => Val_Numeric, Num_Val => 2.0));
+   Clear_Temporary;
+   Check ("V-08 Defined after Clear_Temporary alpha", Defined ("alpha"), False);
+   Check ("V-09 Defined after Clear_Temporary beta",  Defined ("beta"),  False);
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Variables: permanent variables (PDV slots) ──────────────────
+   ---------------------------------------------------------------------------
+
+   --  Empty table → empty PDV after Initialize_PDV.
+   SData.Table.Clear;
+   Initialize_PDV;
+
+   Set_Permanent ("SCORE", (Kind => Val_Numeric, Num_Val => 99.0));
+   Check ("V-10 Defined after Set_Permanent",     Defined ("SCORE"), True);
+   V := Get ("SCORE");
+   Check       ("V-11 Get permanent kind",   V.Kind = Val_Numeric, True);
+   Check_Float ("V-12 Get permanent value",  V.Num_Val, 99.0);
+
+   Check ("V-13 PDV_Resolve finds slot", PDV_Resolve ("SCORE") > 0, True);
+   declare
+      Slot : constant Positive := PDV_Resolve ("SCORE");
+   begin
+      V := Get_PDV_Value (Slot);
+      Check_Float ("V-14 Get_PDV_Value matches Get", V.Num_Val, 99.0);
+   end;
+
+   Set_Permanent ("SCORE", (Kind => Val_Numeric, Num_Val => 42.0));
+   V := Get ("SCORE");
+   Check_Float ("V-15 Update permanent value", V.Num_Val, 42.0);
+
+   Check ("V-16 PDV_Resolve unknown returns 0", PDV_Resolve ("NOSUCHVAR"), 0);
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Variables: Load_PDV_From_Table roundtrip ────────────────────
+   ---------------------------------------------------------------------------
+
+   SData.Table.Clear;
+   SData.Table.Add_Column ("A",  SData.Table.Col_Numeric);
+   SData.Table.Add_Column ("B%", SData.Table.Col_Integer);
+   SData.Table.Add_Row;
+   SData.Table.Set_Value (1, "A",  (Kind => Val_Numeric, Num_Val => 3.14));
+   SData.Table.Set_Value (1, "B%", (Kind => Val_Integer, Int_Val => 7));
+
+   Initialize_PDV;
+   --  Before load: all slots are Val_Missing.
+   V := Get ("A");
+   Check ("V-17 PDV before load is Missing", V.Kind = Val_Missing, True);
+
+   Load_PDV_From_Table (1);
+   V := Get ("A");
+   Check       ("V-18 Get A after load kind",  V.Kind = Val_Numeric, True);
+   Check_Float ("V-19 Get A after load value", V.Num_Val, 3.14);
+   V := Get ("B%");
+   Check ("V-20 Get B% after load kind",  V.Kind = Val_Integer, True);
+   Check ("V-21 Get B% after load value", V.Int_Val, 7);
+
+   --  PDV_Resolve requires upper-case name (matches how names are stored).
+   declare
+      Slot_A : constant Positive := PDV_Resolve ("A");
+   begin
+      V := Get_PDV_Value (Slot_A);
+      Check_Float ("V-22 Get_PDV_Value(A) = 3.14", V.Num_Val, 3.14);
+   end;
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Variables: hold / Reset_PDV_Non_Held ─────────────────────────
+   ---------------------------------------------------------------------------
+
+   SData.Table.Clear;
+   SData.Table.Add_Column ("HELD", SData.Table.Col_Numeric);
+   SData.Table.Add_Column ("FREE", SData.Table.Col_Numeric);
+   SData.Table.Add_Row;
+   SData.Table.Set_Value (1, "HELD", (Kind => Val_Numeric, Num_Val => 7.0));
+   SData.Table.Set_Value (1, "FREE", (Kind => Val_Numeric, Num_Val => 3.0));
+   Initialize_PDV;
+   Load_PDV_From_Table (1);
+
+   Set_Hold ("HELD", True);
+   Check ("V-23 Is_Held true",  Is_Held ("HELD"), True);
+   Check ("V-24 Is_Held false", Is_Held ("FREE"), False);
+
+   Reset_PDV_Non_Held;
+
+   --  HELD slot keeps its value (also copied to Temp_Symbols).
+   V := Get ("HELD");
+   Check       ("V-25 Held var survives Reset kind",  V.Kind = Val_Numeric, True);
+   Check_Float ("V-26 Held var survives Reset value", V.Num_Val, 7.0);
+
+   --  FREE slot is reset to Val_Missing.
+   V := Get ("FREE");
+   Check ("V-27 Non-held var is Missing after Reset", V.Kind = Val_Missing, True);
+
+   --  Clean up hold state.
+   Set_Hold ("HELD", False);
+   Check ("V-28 Is_Held after clearing", Is_Held ("HELD"), False);
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Variables: Flush_PDV_To_Output pipeline ──────────────────────
+   ---------------------------------------------------------------------------
+
+   SData.Table.Clear;
+   SData.Table.Add_Column ("X", SData.Table.Col_Numeric);
+   SData.Table.Add_Row;
+   SData.Table.Set_Value (1, "X", (Kind => Val_Numeric, Num_Val => 42.0));
+
+   Initialize_PDV;
+   Load_PDV_From_Table (1);
+
+   SData.Table.Initialize_Output_Table;
+   Flush_PDV_To_Output;
+
+   Check ("V-29 Output_Row_Count = 1 after flush", SData.Table.Output_Row_Count, 1);
+
+   SData.Table.Commit_Output_Table;
+
+   Check ("V-30 Row_Count = 1 after commit",    SData.Table.Row_Count, 1);
+   Check ("V-31 Column X present after commit", SData.Table.Has_Column ("X"), True);
+   V := SData.Table.Get_Value (1, "X");
+   Check       ("V-32 Committed value kind",  V.Kind = Val_Numeric, True);
+   Check_Float ("V-33 Committed value",       V.Num_Val, 42.0);
 
    ---------------------------------------------------------------------------
    --  ── Summary ─────────────────────────────────────────────────────────────
