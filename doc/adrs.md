@@ -45,6 +45,7 @@ that might relitigate a settled question.
 | ADR-033 | Use a C stub for privilege detection rather than florist_blady | 2026-05-06 | Accepted |
 | ADR-034 | Measure MAXINTAB / -m in cells (rows × columns), not rows | 2026-05-07 | Accepted |
 | ADR-035 | Adopt IEEE 754 infinity as a first-class evaluator value | 2026-05-07 | Accepted |
+| ADR-036 | Set MAXINTAB default to 50 000 000 cells with a static value rather than runtime memory detection | 2026-05-07 | Accepted |
 
 ---
 
@@ -407,7 +408,7 @@ that might relitigate a settled question.
 
 **Context:** The `-m` CLI flag and `OPTIONS MAXINTAB` both set `Max_Table_Rows`, which was compared against the in-memory row count to decide when to spill a segment to SQLite. The help text said "max in-memory table size," but the implementation was a pure row limit. For a 100-column table the memory consumed per threshold unit is 100× that of a 1-column table, so the parameter had no stable meaning as a size limit across different datasets.
 
-**Decision:** Redefine the unit of MAXINTAB / `-m` as cells (rows × columns). Both spill checks — in `Add_Row` for the input table and in `Add_Output_Row` for the output table — now compare `rows_in_current_segment × column_count` against the threshold. `Fetch_From_Disk` derives the equivalent rows-per-segment for cache-page alignment as `threshold / column_count` (floored at 1), preserving consistent segment boundaries between write and read paths. The variable name `Max_Table_Rows` is retained in the source to minimize churn; the semantics are recorded here and in the help strings. Default remains 0 (unlimited, no automatic spill). A practical guideline: 1 000 000 cells ≈ 25–32 MB at typical cell sizes; 10 000 000 cells ≈ 250–320 MB.
+**Decision:** Redefine the unit of MAXINTAB / `-m` as cells (rows × columns). Both spill checks — in `Add_Row` for the input table and in `Add_Output_Row` for the output table — now compare `rows_in_current_segment × column_count` against the threshold. `Fetch_From_Disk` derives the equivalent rows-per-segment for cache-page alignment as `threshold / column_count` (floored at 1), preserving consistent segment boundaries between write and read paths. The config variable was subsequently renamed from `Max_Table_Rows` to `Max_Table_Cells` to match the semantics. A practical guideline: 1 000 000 cells ≈ 25–32 MB at typical cell sizes; 10 000 000 cells ≈ 250–320 MB.
 
 **Consequences:** The threshold is now proportional to actual memory consumption regardless of dataset width. The default of 0 preserves existing behavior for all users who have not set the option. The one-to-one correspondence between write-segment size and read-segment size is maintained because both derive rows-per-segment from the same formula. Column count is stable during the row-adding phase for both the input and output tables (columns are finalized before rows are appended in all parsers and in `Flush_PDV_To_Output`), so the divisor does not change within a single spill calculation.
 
@@ -438,3 +439,16 @@ that might relitigate a settled question.
 **Decision:** Add --nosubmit flag mirroring --noshell. When active, any SUBMIT statement emits a user-visible error message and does not execute. Path traversal is marked won't-fix by default; --nosubmit is the opt-in mitigation. The flags are independent and can be combined.
 
 **Consequences:** Pipeline operators have a complete containment toolkit: --noshell prevents OS command execution, --nosubmit prevents external script loading. Both flags together give a maximally restricted execution environment. The implementation is 4 lines: one config flag, one CLI argument branch, one guard in the SUBMIT handler, and one help text update.
+
+---
+
+### ADR-036: Set MAXINTAB default to 50 000 000 cells with a static value rather than runtime memory detection
+**Date:** 2026-05-07 | **Status:** Accepted
+
+**Context:** Once MAXINTAB was redefined in cells (ADR-034), the previous default of 0 (unlimited) risked OOM on large datasets because the spill threshold was never reached. A non-zero default was needed. Two approaches were considered: a static constant, or a runtime calculation based on available physical memory (e.g. querying `/proc/meminfo` on Linux or `sysctl` on BSD/macOS).
+
+**Decision:** Use a static default of 50 000 000 cells, encoded as `Max_Table_Cells : Natural := 50_000_000` in `SData.Config`. Runtime memory detection was rejected for three reasons: (1) "available memory" is a moving target — other processes compete for RAM throughout the run, so a startup snapshot provides false precision; the right question is a *policy* about how much RAM sdata is allowed to claim, and a static value makes that policy explicit and auditable; (2) querying free physical RAM portably requires platform-specific paths (`/proc/meminfo`, `sysctl`, `GlobalMemoryStatusEx`) that add complexity for dubious benefit; (3) the correct response to varying machine sizes is the existing `-m` / `OPTIONS MAXINTAB` override, not automatic detection.
+
+The value 50 000 000 was derived from targeting ~1.5 GB on an 8 GB machine (the low end of "average" in 2026). Each `Value` cell is a variant record sized to its largest variant (`Unbounded_String` in GNAT ≈ 16–20 bytes plus discriminant and alignment), giving an estimated 24–32 bytes per cell. At 32 bytes/cell: 50 000 000 × 32 = 1.6 GB. This covers 500 000 rows × 100 columns or 5 000 000 rows × 10 columns before spilling to SQLite, which is adequate for most statistical workloads. Users who need more set `OPTIONS MAXINTAB N` or `-m N`; users who want the old unlimited behaviour set `OPTIONS MAXINTAB 0` or `-m 0`.
+
+**Consequences:** Large datasets no longer silently exhaust RAM by default. The threshold is conservative for numeric-heavy data (actual cell size ≈ 16 bytes → ~800 MB at 50M cells) and reasonable for mixed data. The static value is easy to explain, easy to override, and requires no OS-specific code.
