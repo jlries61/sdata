@@ -321,7 +321,7 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 |---|---|---|---|---|
 | 1 | ~~Replace `when others => return False` in `sdata-csv.adb` with specific handlers~~ | Security/Error | ~~2 hours~~ | ~~Masks CSV format bugs silently~~ **Fixed 07b065b** |
 | 2 | ~~Quote column names in SQLite DDL/DML; audit for injection~~ | Security | ~~4 hours~~ | ~~SQL injection via CSV headers~~ **Fixed 456d1e0** |
-| 3 | Decompose `Parse_CSV` into tokenizer + type-inference passes | Code Quality | 2–3 days | Grows worse with each format quirk added |
+| 3 | ~~Decompose `Parse_CSV` into tokenizer + type-inference passes~~ | Code Quality | ~~2–3 days~~ | ~~Grows worse with each format quirk added~~ **Fixed ab4d5c8** |
 | 4 | Change `Program_Error` → `Script_Error` in `Parse_ODF` | Error Handling | 30 min | Falls through `-k` handling silently |
 | 5 | Add CI/CD (GitHub Actions: `make check` on push) | Operational | 4 hours | Test regressions invisible until manual run |
 | 6 | Add unit tests for evaluator, table, and BY-group logic | Maintainability | 2–3 days | Silent path failures (the Set_Index_Map bug pattern) |
