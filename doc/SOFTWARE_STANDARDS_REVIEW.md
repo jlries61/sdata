@@ -68,13 +68,13 @@ Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output
 
 ### 2.2 Function Design
 
-**The two problems:**
+**Resolved — Parse_CSV** (`sdata-file_io.adb:399–725`, now **326 lines**, commit ab4d5c8): ~~`Parse_CSV` simultaneously handles field tokenization, quote handling, escape sequences, column-type inference, and row loading.~~ Decomposed into three nested procedures with clean interfaces: `Process_Line_Direct` (tokenizer pass), `Infer_Column_Types` (type-inference pass), `Load_Data_Rows` (data-loading pass). Responsibilities are now separated; a bug in type inference no longer requires navigating tokenizer logic.
 
-`Parse_CSV` (`sdata-file_io.adb:286–677`) is **392 lines**. It simultaneously handles field tokenization, quote handling, escape sequences, column-type inference, and row loading. That is four distinct responsibilities in one procedure. A bug in type inference requires a developer to navigate 300 lines of tokenizer logic to find it.
+**Remaining problems:**
 
-`Parse_OOXML` (`sdata-file_io.adb:1103–1471`) is **369 lines**, with `Parse_ODF` at **268 lines**. All three XML/CSV parsers share the same structural flaw: data extraction and type inference are interleaved rather than separated into passes.
+`Parse_OOXML` (`sdata-file_io.adb:1163–1552`) is **389 lines** (grew from 369). `Parse_ODF` (`sdata-file_io.adb:886–1158`) is **272 lines**. Both XML parsers retain the original structural flaw: data extraction and type inference are interleaved rather than separated into passes.
 
-`Execute_Assignment` (`sdata-interpreter.adb:659–793`) is **135 lines** and handles range expansion, array indexing, LET/SET semantics, type coercion, and PDV updates in a single procedure. It does not have one job.
+`Execute_Assignment` (`sdata-interpreter.adb:659–814`) is **155 lines** (grew from 135) and handles range expansion, array indexing, LET/SET semantics, type coercion, and PDV updates in a single procedure. It does not have one job.
 
 | Procedure | Lines | SRP Score | Verdict |
 |---|---|---|---|
