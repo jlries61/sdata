@@ -883,6 +883,11 @@ package body SData.File_IO is
    ------------------
    --  Parse_ODF  --
    ------------------
+   --  DOM traversal note (applies to both Parse_ODF and Parse_OOXML):
+   --  XML-Ada does not include an XPath engine.  All element lookups therefore
+   --  use Get_Elements_By_Tag_Name / Get_Elements_By_Tag_Name_NS and attribute
+   --  accessors from DOM.Core.Elements.  This is the full query API available;
+   --  XPath expressions like "//table:table-row" cannot be used directly.
    procedure Parse_ODF (File_Name : String; Sheet_Name : String := "";
                         Skip_Rows : Natural := 0; Max_Rows : Natural := 0) is
       use DOM.Core;

@@ -7,9 +7,20 @@ with SData.IO;        use SData.IO;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Interfaces;
 use type Interfaces.Integer_64;
---  The six child packages below are withed for their elaboration side effects:
---  each body's "begin Register;" section populates Dispatch_Table directly.
---  No entity from these packages is used by name in this body.
+--  The six child packages below are withed solely for their elaboration side
+--  effects: each body's "begin Register;" block calls Dispatch_Table.Insert to
+--  self-register its handlers.  No exported entity is referenced by name here,
+--  so pragma Warnings (Off, ...) suppresses the "package not referenced" diagnostic.
+--
+--  Why this pattern rather than explicit Register calls in this body?
+--  Dispatch_Table lives in the parent spec's private part, which is visible to
+--  private child bodies but not to the parent body itself via child-package names.
+--  Calling child-package procedures from the parent body would require the parent
+--  to depend on the children at compile time, creating a circular unit dependency
+--  (children already depend on the parent spec).  The elaboration-side-effect
+--  approach breaks the cycle: the parent body causes the children to elaborate,
+--  each child writes directly into the shared private-part table, and the parent
+--  body never names a child entity.
 with SData.Evaluator.Numeric_Fns;    pragma Warnings (Off, SData.Evaluator.Numeric_Fns);
 with SData.Evaluator.Aggregate_Fns;  pragma Warnings (Off, SData.Evaluator.Aggregate_Fns);
 with SData.Evaluator.String_Fns;     pragma Warnings (Off, SData.Evaluator.String_Fns);

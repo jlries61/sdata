@@ -148,8 +148,10 @@ package body SData.Variables is
             declare
                Arr_Def : constant Array_Definition_Type := Array_Table_Pkg.Element (Cursor);
             begin
-               --  NEW should clear all array definitions (Real Temporary and Virtual)
-               --  to ensure a fresh state for the next dataset/program.
+               --  Permanent arrays (Real, non-temporary) survive RUN boundaries by
+               --  design — they model variables the user expects to persist across
+               --  datasets.  Only temporary Real arrays and Virtual arrays are scoped
+               --  to the current data step and must be freed here.
                if Arr_Def.Kind = Virtual_Array or else
                   (Arr_Def.Kind = Real_Array and then Arr_Def.Is_Temporary)
                then

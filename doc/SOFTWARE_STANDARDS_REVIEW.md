@@ -90,14 +90,14 @@ Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output
 
 **Positives:** The design comments at the top of `sdata-interpreter.adb` and `sdata-evaluator.adb` are genuinely useful — they explain the *why* of the three-tier model and dispatch table design. The `Set_Group_Boundary` spec comment is an exemplary contract declaration.
 
-**Comment sins:**
+**Comment sins — all resolved:**
 
-| Sin | Location | Severity |
-|---|---|---|
-| Section headers masquerading as design rationale | `sdata-help.adb:532` (`-- Math functions`) | Minor |
-| "NEW should clear all array definitions" is action-oriented, not rationale | `sdata-variables.adb:151` | Minor |
-| XML-parsing navigation comments describe *what* the loop does, not *why* the XPath equivalent was rejected | `sdata-file_io.adb:880–920` | Moderate |
-| `pragma Warnings (Off, SData.Evaluator.Numeric_Fns)` has a correct explanatory comment, but the elaboration-cycle constraint that forced it warrants a longer note | `sdata-evaluator.adb:9–14` | Minor |
+| Sin | Location | Severity | Resolution |
+|---|---|---|---|
+| Section headers masquerading as design rationale | `sdata-help.adb:596` (`-- Math functions`) | Minor | Already resolved — procedure section uses proper `=====` banner; dispatch table labels are clearly organisational |
+| "NEW should clear all array definitions" is action-oriented, not rationale | `sdata-variables.adb:151` | Minor | Rewritten: explains that permanent arrays survive RUN boundaries by design; only temporary and virtual arrays are step-scoped |
+| XML-parsing navigation comments describe *what* the loop does, not *why* the XPath equivalent was rejected | `sdata-file_io.adb` (before `Parse_ODF`) | Moderate | Note added before `Parse_ODF`: XML-Ada has no XPath engine; `Get_Elements_By_Tag_Name` + attribute accessors are the full query API available |
+| `pragma Warnings (Off, SData.Evaluator.Numeric_Fns)` warrants a longer note on the elaboration-cycle constraint | `sdata-evaluator.adb:9–14` | Minor | Expanded to explain the circular-dependency constraint: children depend on parent spec; parent body cannot name child entities without reversing that dependency; elaboration side-effect breaks the cycle |
 
 No commented-out code detected. No anonymous TODOs. This is clean.
 
