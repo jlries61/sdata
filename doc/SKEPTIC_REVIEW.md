@@ -24,10 +24,12 @@
 
 ### Findings
 
-**⚠ Concern — Global package state as the integration bus**
+**✅ Resolved — Global package state as the integration bus**
 `src/sdata-interpreter.adb:56–172, src/sdata-evaluator.adb:62–63, src/sdata-table.ads:135–154`
 
-The interpreter, evaluator, and table communicate entirely through package-level mutable state rather than explicit parameter passing. `BOG_Flag`/`EOG_Flag` live in `sdata-evaluator.adb` and are set by the interpreter's data step loop before each record — a dependency the evaluator's package spec does not declare. The BY variable list is duplicated: `Current_By_Vars` in the interpreter (line 59) and `Table_By_Vars` in the table, populated together on every `BY` statement but owned cleanly by neither. `Select_Filter_Expr` persists as a package-level variable in the interpreter between RUNs. This pattern removes all explicit seams between the three major subsystems; any cross-subsystem interaction becomes an implicit contract maintained by convention rather than type.
+~~The interpreter, evaluator, and table communicate entirely through package-level mutable state rather than explicit parameter passing. `BOG_Flag`/`EOG_Flag` live in `sdata-evaluator.adb` and are set by the interpreter's data step loop before each record — a dependency the evaluator's package spec does not declare. The BY variable list is duplicated: `Current_By_Vars` in the interpreter (line 59) and `Table_By_Vars` in the table, populated together on every `BY` statement but owned cleanly by neither. `Select_Filter_Expr` persists as a package-level variable in the interpreter between RUNs. This pattern removes all explicit seams between the three major subsystems; any cross-subsystem interaction becomes an implicit contract maintained by convention rather than type.~~
+
+*Fixed d2d40bc + 88def8c:* `Step_Context` (By_Vars, Deleted, BOG, EOG) is threaded through the entire data step chain; `Current_Record_Deleted` is eliminated; `BOG_Flag`/`EOG_Flag` are now declared in `SData.Evaluator.Nav_Fns` body — the only package that reads them — with writes routed through `Nav_Fns.Set_Boundary`. No evaluator-level globals remain.
 
 **🔴 Problem — Dual program buffer: two representations of the same data kept in sync**
 `src/sdata-interpreter.adb:56–171`

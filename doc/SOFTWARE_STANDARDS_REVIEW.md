@@ -50,7 +50,7 @@ The SQLite backing store for large tables (`ada_sqlite3`) is a justified complex
 
 Four direct dependencies, all justified, all maintained, no version-pinning mismatches. Dependency hygiene is **exemplary** for a project of this size. No npm-style dependency explosion.
 
-**Verdict:** The architectural foundations are sound. The two failing grades are (1) the global-state integration bus documented in `SKEPTIC_REVIEW.md` — still partially present despite the `Step_Context` refactoring — and (2) the monolithic parser procedures in `sdata-file_io.adb` that have never been decomposed.
+**Verdict:** The architectural foundations are sound. The two original failing grades — (1) the global-state integration bus, and (2) monolithic file-I/O parsers — are partially resolved. **Updated 88def8c:** The global-state bus is fully closed: `BOG_Flag`/`EOG_Flag` moved to `SData.Evaluator.Nav_Fns` body; no evaluator-level globals remain (see SKEPTIC_REVIEW item 4). **Updated ab4d5c8:** `Parse_CSV` decomposed into tokenizer + type-inference passes. `Parse_ODF` and `Parse_OOXML` remain monolithic.
 
 ---
 
@@ -181,7 +181,7 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 | BY-variable list duplication (interpreter + table) | Medium | 4 hours | Stable |
 | Column hash lookup per record | Low | 1 day | Stable |
 | ~~No CI/CD pipeline~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed ADR-012** |
-| Global interpreter state (remaining post-Step_Context) | Medium | 2–3 days | Shrinking |
+| ~~Global interpreter state (remaining post-Step_Context)~~ | ~~Medium~~ | ~~2–3 days~~ | **Fixed 88def8c — `BOG_Flag`/`EOG_Flag` moved to `Nav_Fns` body; no evaluator-level globals remain** |
 
 **Total estimated remediation: ~12–15 days. Interest rate: Stable.** The codebase is not actively accruing debt; it is maintaining its current level.
 
