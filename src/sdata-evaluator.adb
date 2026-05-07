@@ -401,8 +401,8 @@ package body SData.Evaluator is
                               return (Kind    => Val_Numeric,
                                       Num_Val => Float (L.Int_Val) / Float (R.Int_Val));
                            when Op_Pow =>
-                              return (Kind    => Val_Numeric,
-                                      Num_Val => Float (L.Int_Val) ** Float (R.Int_Val));
+                              return Numeric_Result_Checked
+                                (Float (L.Int_Val) ** Float (R.Int_Val));
                            when Op_Eq  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val = R.Int_Val  then 1 else 0));
                            when Op_Ne  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val /= R.Int_Val then 1 else 0));
                            when Op_Lt  => return (Kind => Val_Integer, Int_Val => (if L.Int_Val < R.Int_Val  then 1 else 0));
