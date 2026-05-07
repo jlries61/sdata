@@ -59,11 +59,6 @@ private
        Hash            => Ada.Strings.Hash,
        Equivalent_Keys => "=");
 
-   --  Per-record BY-group boundary indicators.  Written exclusively by
-   --  Set_Group_Boundary; read by the BOG/EOG handler families.
-   BOG_Flag : Boolean := False;
-   EOG_Flag : Boolean := False;
-
    --  Global dispatch table — populated during elaboration by each handler
    --  family's private child package.
    Dispatch_Table : Fn_Maps.Map;

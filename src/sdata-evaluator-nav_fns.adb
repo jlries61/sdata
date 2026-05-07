@@ -5,6 +5,17 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 package body SData.Evaluator.Nav_Fns is
 
+   --  BOG/EOG state is owned here: only Handle_BOG/Handle_EOG read it,
+   --  and only Set_Boundary (called from Set_Group_Boundary) writes it.
+   BOG_Flag : Boolean := False;
+   EOG_Flag : Boolean := False;
+
+   procedure Set_Boundary (BOG, EOG : Boolean) is
+   begin
+      BOG_Flag := BOG;
+      EOG_Flag := EOG;
+   end Set_Boundary;
+
    function Handle_Recno (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
    begin

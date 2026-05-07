@@ -62,8 +62,7 @@ package body SData.Evaluator is
 
    procedure Set_Group_Boundary (BOG, EOG : Boolean) is
    begin
-      BOG_Flag := BOG;
-      EOG_Flag := EOG;
+      Nav_Fns.Set_Boundary (BOG, EOG);
    end Set_Group_Boundary;
 
    function Convert_To_Float (V : Value) return Float is
