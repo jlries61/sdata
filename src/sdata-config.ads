@@ -33,7 +33,7 @@ package SData.Config is
    Print_Digits  : Natural := 5;
 
    --  Constraint limits
-   Max_Table_Rows  : Natural := 0;      -- 0 means no limit
+   Max_Table_Cells : Natural := 0;      -- 0 means no limit; unit is rows × columns
    Max_String_Len  : Natural := 0;      -- 0 means no limit
    Max_Temp_Vars   : Natural := 0;      -- 0 means no limit
    Disable_Shell      : Boolean := False;

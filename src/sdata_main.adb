@@ -302,7 +302,7 @@ begin
             if Idx < Argument_Count then
                Idx := Idx + 1;
                begin
-                  Max_Table_Rows := Natural'Value (Argument (Idx));
+                  Max_Table_Cells := Natural'Value (Argument (Idx));
                exception
                   when Constraint_Error =>
                      Put_Line_Error ("Error: argument to -m must be a non-negative integer");

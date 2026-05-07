@@ -172,9 +172,9 @@ package body SData.Table is
    -------------
    procedure Add_Row is
    begin
-      if SData.Config.Max_Table_Rows > 0 and then
+      if SData.Config.Max_Table_Cells > 0 and then
          (Table_Row_Count - Current_Segment_Start + 1)
-            * Natural (Data_Table.Length) >= SData.Config.Max_Table_Rows
+            * Natural (Data_Table.Length) >= SData.Config.Max_Table_Cells
       then
          Spill_To_Disk;
          Current_Segment_Start := Table_Row_Count + 1;
@@ -669,9 +669,9 @@ package body SData.Table is
 
    procedure Add_Output_Row is
    begin
-      if SData.Config.Max_Table_Rows > 0 and then
+      if SData.Config.Max_Table_Cells > 0 and then
          (Output_Table_Row_Count - Output_Segment_Start + 1)
-            * Natural (Output_Data_Table.Length) >= SData.Config.Max_Table_Rows
+            * Natural (Output_Data_Table.Length) >= SData.Config.Max_Table_Cells
       then
          Spill_Output_To_Disk;
          Output_Segment_Start := Output_Table_Row_Count + 1;
@@ -926,8 +926,8 @@ package body SData.Table is
          declare
             Col_Count : constant Positive := Positive'Max (1, Natural (Data_Table.Length));
             Limit   : constant Positive :=
-               (if SData.Config.Max_Table_Rows > 0
-                then Positive'Max (1, SData.Config.Max_Table_Rows / Col_Count)
+               (if SData.Config.Max_Table_Cells > 0
+                then Positive'Max (1, SData.Config.Max_Table_Cells / Col_Count)
                 else 1);
             S_Idx   : constant Natural  := (Row - 1) / Limit;
             S_Start : constant Positive := S_Idx * Limit + 1;

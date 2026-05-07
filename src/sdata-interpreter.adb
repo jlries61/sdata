@@ -1530,7 +1530,7 @@ package body SData.Interpreter is
 
             begin
                if Key = "" then
-                  Put_Line ("OPTIONS MAXINTAB "    & Ada.Strings.Fixed.Trim (SData.Config.Max_Table_Rows'Image, Ada.Strings.Both));
+                  Put_Line ("OPTIONS MAXINTAB "    & Ada.Strings.Fixed.Trim (SData.Config.Max_Table_Cells'Image, Ada.Strings.Both));
                   Put_Line ("OPTIONS MAXTEMPMEM "  & Ada.Strings.Fixed.Trim (SData.Config.Max_Temp_Vars'Image, Ada.Strings.Both));
                   Put_Line ("OPTIONS CSVDLM "      & Dlm_Display (SData.Config.Runtime.Options_CSVDLM (1 .. SData.Config.Runtime.Options_CSVDLM_Len)));
                   Put_Line ("OPTIONS HEADER "      & Bool_Display (SData.Config.Runtime.Options_Header));
@@ -1541,7 +1541,7 @@ package body SData.Interpreter is
                       else SData.Config.Runtime.Options_CHARSET (1 .. SData.Config.Runtime.Options_CHARSET_Len)));
                   Put_Line ("OPTIONS IEEE_DIVIDE " & Bool_Display (SData.Config.Runtime.IEEE_Divide));
                elsif Key = "MAXINTAB" then
-                  SData.Config.Max_Table_Rows := Natural'Value (Val);
+                  SData.Config.Max_Table_Cells := Natural'Value (Val);
                elsif Key = "MAXTEMPMEM" then
                   SData.Config.Max_Temp_Vars := Natural'Value (Val);
                elsif Key = "CSVDLM" then
