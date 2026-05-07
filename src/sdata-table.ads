@@ -94,6 +94,12 @@ package SData.Table is
    procedure Commit_Output_Table;
    function Output_Row_Count return Natural;
 
+   --  Position-indexed accessors using the pre-resolved cursor cache.
+   --  Col_Pos is 1-based column index matching Column_Order / Output_Column_Order.
+   --  O(1): no hash lookup, no Contains check.
+   function Get_Value_By_Col (Row : Positive; Col_Pos : Positive) return Value;
+   procedure Set_Output_Value_By_Col (Row : Positive; Col_Pos : Positive; Val : Value);
+
    procedure Set_Record_Explicitly_Written (State : Boolean);
    function Get_Record_Explicitly_Written return Boolean;
 
@@ -130,7 +136,17 @@ private
       Element_Type => Column,
       Hash => Ada.Strings.Hash,
       Equivalent_Keys => "=");
-      
+
+   --  Pre-resolved cursor cache for O(1) positional column access during the
+   --  data step hot path.  Parallel to Column_Order / Output_Column_Order;
+   --  rebuilt whenever the schema changes (Add_Column, Drop_Column, etc.).
+   package Cursor_Vectors is new Ada.Containers.Vectors
+     (Index_Type   => Positive,
+      Element_Type => Column_Maps.Cursor,
+      "="          => Column_Maps."=");
+   Column_Cursor_Cache : Cursor_Vectors.Vector;
+   Output_Cursor_Cache : Cursor_Vectors.Vector;
+
    --  The global data table state.
    Data_Table : Column_Maps.Map;
 

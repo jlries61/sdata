@@ -201,14 +201,13 @@ package body SData.Variables is
    -------------------------
    -- Load_PDV_From_Table --
    -------------------------
-   --  Loads table columns directly into the pre-allocated PDV_Vec slots;
-   --  no hash lookups needed — slot I always corresponds to column I.
+   --  Loads table columns into pre-allocated PDV_Vec slots via the cursor cache;
+   --  slot I corresponds to column I.  O(1) per column — no hash lookup.
    procedure Load_PDV_From_Table (Row : Positive) is
       C : constant Natural := SData.Table.Column_Count;
    begin
       for I in 1 .. C loop
-         PDV_Vec.Replace_Element
-           (I, SData.Table.Get_Value_Upper (Row, To_String (PDV_Names.Element (I))));
+         PDV_Vec.Replace_Element (I, SData.Table.Get_Value_By_Col (Row, I));
       end loop;
    end Load_PDV_From_Table;
 
@@ -297,8 +296,7 @@ package body SData.Variables is
          R : constant Positive := SData.Table.Output_Row_Count;
       begin
          for I in 1 .. Natural (PDV_Names.Length) loop
-            SData.Table.Set_Output_Value_Upper
-              (R, To_String (PDV_Names.Element (I)), PDV_Vec.Element (I));
+            SData.Table.Set_Output_Value_By_Col (R, I, PDV_Vec.Element (I));
          end loop;
       end;
    end Flush_PDV_To_Output;

@@ -19,6 +19,29 @@ package body SData.Table is
       Seg_End   := 0;
    end Clear_Fetch_Cache;
 
+   --  Rebuilds Column_Cursor_Cache to match Column_Order after any schema change.
+   --  Must be called after every Insert/Delete/Rename on Data_Table or after a
+   --  deep-copy assignment, since those operations may invalidate existing cursors.
+   procedure Rebuild_Column_Cache is
+   begin
+      Column_Cursor_Cache.Clear;
+      for I in 1 .. Natural (Column_Order.Length) loop
+         Column_Cursor_Cache.Append
+           (Data_Table.Find
+              (Ada.Strings.Unbounded.To_String (Column_Order.Element (I))));
+      end loop;
+   end Rebuild_Column_Cache;
+
+   procedure Rebuild_Output_Cache is
+   begin
+      Output_Cursor_Cache.Clear;
+      for I in 1 .. Natural (Output_Column_Order.Length) loop
+         Output_Cursor_Cache.Append
+           (Output_Data_Table.Find
+              (Ada.Strings.Unbounded.To_String (Output_Column_Order.Element (I))));
+      end loop;
+   end Rebuild_Output_Cache;
+
    procedure Spill_Output_To_Disk;
    procedure Spill_Table_To_Disk (T : aliased in out Column_Maps.Map; Table_Name : String; Start_Idx : Positive);
 
@@ -80,6 +103,7 @@ package body SData.Table is
       Logical_Record := 0;
       Clear_Index_Map;
       Current_Segment_Start := 1;
+      Rebuild_Column_Cache;
    end Clear;
 
    ----------------
@@ -105,8 +129,10 @@ package body SData.Table is
       Data_Table.Insert (Upper_Name, New_Col);
       Column_Order.Append (Ada.Strings.Unbounded.To_Unbounded_String (Upper_Name));
 
-      --  Invalidate the segment cache: the schema has changed.
+      --  Schema changed: invalidate segment cache and rebuild cursor cache.
+      --  Insert may have triggered a rehash, invalidating all prior cursors.
       Clear_Fetch_Cache;
+      Rebuild_Column_Cache;
    end Add_Column;
 
    ----------------
@@ -281,6 +307,8 @@ package body SData.Table is
                   exit;
                end if;
             end loop;
+            --  Insert may have triggered a rehash; rebuild cursor cache.
+            Rebuild_Column_Cache;
          end;
       end if;
    end Rename_Column;
@@ -293,13 +321,13 @@ package body SData.Table is
    begin
       if Data_Table.Contains (Upper_Name) then
          Data_Table.Delete (Upper_Name);
-         -- Update Order Vector
          for I in 1 .. Natural (Column_Order.Length) loop
             if Ada.Strings.Unbounded.To_String (Column_Order.Element (I)) = Upper_Name then
                Column_Order.Delete (I);
                exit;
             end if;
          end loop;
+         Rebuild_Column_Cache;
       end if;
    end Drop_Column;
 
@@ -617,6 +645,7 @@ package body SData.Table is
       if Store.Is_Active then
          Store.DB.Execute ("DROP TABLE IF EXISTS output_data");
       end if;
+      Rebuild_Output_Cache;
    end Initialize_Output_Table;
 
    procedure Add_Output_Column (Name : String; Col_Type : Column_Type) is
@@ -627,13 +656,15 @@ package body SData.Table is
       New_Col.Name := (others => ' ');
       New_Col.Name (1 .. Upper_Name'Length) := Upper_Name;
       New_Col.Typ := Col_Type;
-      
+
       for I in 1 .. Output_Table_Row_Count loop
          New_Col.Data.Append ((Kind => Val_Missing));
       end loop;
-      
+
       Output_Data_Table.Insert (Upper_Name, New_Col);
       Output_Column_Order.Append (Ada.Strings.Unbounded.To_Unbounded_String (Upper_Name));
+      --  Insert may have triggered a rehash; rebuild output cursor cache.
+      Rebuild_Output_Cache;
    end Add_Output_Column;
 
    procedure Add_Output_Row is
@@ -695,7 +726,10 @@ package body SData.Table is
          Data_Table := Output_Data_Table;
          Column_Order := Output_Column_Order;
          Table_Row_Count := Output_Table_Row_Count;
-         
+         --  Deep copy creates a new map; all prior Column_Cursor_Cache cursors are
+         --  invalid.  Rebuild immediately before any caller can use Get_Value_By_Col.
+         Rebuild_Column_Cache;
+
          if Store.Is_Active then
             Store.DB.Execute ("DROP TABLE IF EXISTS data");
             if Output_Spilled then
@@ -713,6 +747,50 @@ package body SData.Table is
    begin
       return Output_Table_Row_Count;
    end Output_Row_Count;
+
+   -----------------------
+   -- Get_Value_By_Col --
+   -----------------------
+   function Get_Value_By_Col (Row : Positive; Col_Pos : Positive) return Value is
+      Cur : constant Column_Maps.Cursor := Column_Cursor_Cache.Element (Col_Pos);
+   begin
+      if not Column_Maps.Has_Element (Cur) then
+         return (Kind => Val_Missing);
+      end if;
+      declare
+         Ref : constant Column_Maps.Constant_Reference_Type :=
+            Data_Table.Constant_Reference (Cur);
+         Len : constant Natural := Natural (Ref.Element.all.Data.Length);
+      begin
+         if Row >= Current_Segment_Start and then Row < Current_Segment_Start + Len then
+            return Ref.Element.all.Data.Element (Row - Current_Segment_Start + 1);
+         elsif Store.Is_Active then
+            return Fetch_From_Disk (Row, Column_Maps.Key (Cur));
+         else
+            return (Kind => Val_Missing);
+         end if;
+      end;
+   end Get_Value_By_Col;
+
+   ------------------------------
+   -- Set_Output_Value_By_Col --
+   ------------------------------
+   procedure Set_Output_Value_By_Col (Row : Positive; Col_Pos : Positive; Val : Value) is
+      Cur : constant Column_Maps.Cursor := Output_Cursor_Cache.Element (Col_Pos);
+   begin
+      if not Column_Maps.Has_Element (Cur) then
+         return;
+      end if;
+      declare
+         Ref : constant Column_Maps.Reference_Type :=
+            Output_Data_Table.Reference (Cur);
+         Col : Column renames Ref.Element.all;
+      begin
+         Col.Data.Replace_Element
+           (Row - Output_Segment_Start + 1,
+            Coerce_Value (Val, Col.Typ, Column_Maps.Key (Cur)));
+      end;
+   end Set_Output_Value_By_Col;
 
    procedure Set_Record_Explicitly_Written (State : Boolean) is
    begin
