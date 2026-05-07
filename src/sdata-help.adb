@@ -36,7 +36,7 @@ package body SData.Help is
       Put_Line ("  Conversion:  NUM, HEX, HEX$, OCT$, BIN$");
       Put_Line ("  Arrays:      LBOUND, UBOUND");
       Put_Line ("  Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, NEXT, NEXTC$, OBS, OBSC$");
-      Put_Line ("  Special:     MISSING, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,");
+      Put_Line ("  Special:     MISSING, INF, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,");
       Put_Line ("               FALSE, TRUE, ERR, ERL,");
       Put_Line ("               MAXINT, MININT, MAXNUM, MINNUM, MAXLVL");
       Put_Line ("  Aggregate:   SUM, MEAN, GMEAN, HMEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS");
@@ -488,6 +488,8 @@ package body SData.Help is
       Put_Line ("  OPTIONS SAVEOVERWRT YES|NO : Overwrite existing files on SAVE (default: YES)");
       Put_Line ("  OPTIONS TXTFMT AUTO|LF|CRLF|CR  : Line ending for CSV output (default: AUTO)");
       Put_Line ("  OPTIONS CHARSET name       : Character set label (stored, advisory only)");
+      Put_Line ("  OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)");
+      Put_Line ("                               0.0/0.0 always raises an error. Cleared by NEW.");
       Put_Line ("");
       Put_Line ("CLI flags (set at startup, not runtime):");
       Put_Line ("  --noshell            : Disable SYSTEM/SHELL; also disables -p");
@@ -745,6 +747,20 @@ package body SData.Help is
    -- ==========================================================================
 
    procedure Help_MISSING is begin Put_Line ("Function: MISSING(x)  ->  1 if x is missing, else 0"); end Help_MISSING;
+
+   procedure Help_INF is
+   begin
+      Put_Line ("Function: INF(x)  ->  1 if x is +Inf or -Inf, else 0");
+      Put_Line ("  Returns 0 for finite numeric values, missing values, and strings.");
+      Put_Line ("");
+      Put_Line ("  To test for positive infinity:  INF(x) AND x > 0");
+      Put_Line ("  To test for negative infinity:  INF(x) AND x < 0");
+      Put_Line ("  NOT INF(x) serves the role of FINITE() for non-missing values.");
+      Put_Line ("");
+      Put_Line ("  Inf arises from arithmetic overflow (MAXNUM() * 2.0) or from");
+      Put_Line ("  float division by zero when OPTIONS IEEE_DIVIDE YES is set.");
+      Put_Line ("  See also: MISSING, OPTIONS IEEE_DIVIDE");
+   end Help_INF;
 
    procedure Help_RAN is
    begin
@@ -1185,6 +1201,7 @@ package body SData.Help is
    K_OBS          : aliased constant String := "OBS";
    K_OBSCS        : aliased constant String := "OBSC$";
    K_MISSING      : aliased constant String := "MISSING";
+   K_INF          : aliased constant String := "INF";
    K_RAN          : aliased constant String := "RAN";
    K_RANDOM       : aliased constant String := "RANDOM";
    K_RND          : aliased constant String := "RND";
@@ -1401,6 +1418,7 @@ package body SData.Help is
       (K_OBSCS'Access,    Help_OBS'Access,      N, N),   --  alias
       --  Special functions
       (K_MISSING'Access,  Help_MISSING'Access,  N, F),
+      (K_INF'Access,      Help_INF'Access,      N, F),
       (K_RAN'Access,      Help_RAN'Access,      N, F),
       (K_RANDOM'Access,   Help_RAN'Access,      N, N),   --  alias
       (K_RND'Access,      Help_RAN'Access,      N, N),   --  BW BASIC alias

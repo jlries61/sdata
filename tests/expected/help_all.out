@@ -284,6 +284,8 @@ Sets a runtime option. Execution: Immediate -- takes effect at once.
   OPTIONS SAVEOVERWRT YES|NO : Overwrite existing files on SAVE (default: YES)
   OPTIONS TXTFMT AUTO|LF|CRLF|CR  : Line ending for CSV output (default: AUTO)
   OPTIONS CHARSET name       : Character set label (stored, advisory only)
+  OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)
+                               0.0/0.0 always raises an error. Cleared by NEW.
 
 CLI flags (set at startup, not runtime):
   --noshell            : Disable SYSTEM/SHELL; also disables -p
@@ -563,6 +565,17 @@ The variable name may be given unquoted: OBS(X, 3) is equivalent to OBS("X", 3).
 OBS returns a numeric value; OBSC$ returns a string value.
 
 Function: MISSING(x)  ->  1 if x is missing, else 0
+
+Function: INF(x)  ->  1 if x is +Inf or -Inf, else 0
+  Returns 0 for finite numeric values, missing values, and strings.
+
+  To test for positive infinity:  INF(x) AND x > 0
+  To test for negative infinity:  INF(x) AND x < 0
+  NOT INF(x) serves the role of FINITE() for non-missing values.
+
+  Inf arises from arithmetic overflow (MAXNUM() * 2.0) or from
+  float division by zero when OPTIONS IEEE_DIVIDE YES is set.
+  See also: MISSING, OPTIONS IEEE_DIVIDE
 
 Function: RAN() / RANDOM() / RND()  ->  uniform random number in [0, 1)
   Use RSEED n before calling to get a reproducible sequence.

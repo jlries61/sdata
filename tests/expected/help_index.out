@@ -24,7 +24,7 @@ Available Functions:
   Conversion:  NUM, HEX, HEX$, OCT$, BIN$
   Arrays:      LBOUND, UBOUND
   Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, NEXT, NEXTC$, OBS, OBSC$
-  Special:     MISSING, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,
+  Special:     MISSING, INF, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,
                FALSE, TRUE, ERR, ERL,
                MAXINT, MININT, MAXNUM, MINNUM, MAXLVL
   Aggregate:   SUM, MEAN, GMEAN, HMEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS
