@@ -138,31 +138,25 @@ package body SData.CSV is
       return T;
    end CSV_Unquote;
 
-   function Split_Indices (Line      : String;
-                            Delimiter : String;
-                            N_Fields  : out Natural) return Field_Array is
-      Res   : Field_Array;
-      Start : Integer := Line'First;
-      Count : Natural := 0;
-      DLen : constant Positive := Delimiter'Length;
+   procedure Split_Indices (Line      : String;
+                             Delimiter : String;
+                             Fields    : in out Field_Vectors.Vector) is
+      Start : Integer  := Line'First;
+      DLen  : constant Positive := Delimiter'Length;
    begin
-      N_Fields := 0;
-      if Line'Length = 0 then return Res; end if;
+      Fields.Clear;
+      if Line'Length = 0 then return; end if;
       loop
          declare
             Delim : constant Natural := CSV_Field_End (Line, Start, Delimiter);
          begin
-            Count := Count + 1;
-            if Count <= Max_Fields then
-               Res (Count).S := Start;
-               Res (Count).E := (if Delim > 0 then Delim - 1 else Line'Last);
-            end if;
+            Fields.Append
+               ((S => Start,
+                 E => (if Delim > 0 then Delim - 1 else Line'Last)));
             exit when Delim = 0;
             Start := Delim + DLen;
          end;
       end loop;
-      N_Fields := Count;
-      return Res;
    end Split_Indices;
 
 end SData.CSV;

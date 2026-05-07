@@ -60,8 +60,7 @@ procedure CSV_Unit_Test is
    end Check_Float;
 
    R  : Float;
-   N  : Natural;
-   FA : Field_Array;
+   FV : Field_Vectors.Vector;
 
 begin
    --  ── Try_Fast_Float ────────────────────────────────────────────────────
@@ -101,27 +100,27 @@ begin
    Check ("CUQ-4 single-quoted",  CSV_Unquote ("'world'"),         "world");
 
    --  ── Split_Indices ─────────────────────────────────────────────────────
-   FA := Split_Indices ("a,b,c", ",", N);
-   Check ("SI-1-count",  N,        3);
-   Check ("SI-1-f1.S",   FA(1).S,  1);
-   Check ("SI-1-f1.E",   FA(1).E,  1);
-   Check ("SI-1-f2.S",   FA(2).S,  3);
-   Check ("SI-1-f2.E",   FA(2).E,  3);
-   Check ("SI-1-f3.S",   FA(3).S,  5);
-   Check ("SI-1-f3.E",   FA(3).E,  5);
+   Split_Indices ("a,b,c", ",", FV);
+   Check ("SI-1-count",  Natural (FV.Length), 3);
+   Check ("SI-1-f1.S",   FV(1).S,  1);
+   Check ("SI-1-f1.E",   FV(1).E,  1);
+   Check ("SI-1-f2.S",   FV(2).S,  3);
+   Check ("SI-1-f2.E",   FV(2).E,  3);
+   Check ("SI-1-f3.S",   FV(3).S,  5);
+   Check ("SI-1-f3.E",   FV(3).E,  5);
 
-   FA := Split_Indices ("", ",", N);
-   Check ("SI-2 empty count", N, 0);
+   Split_Indices ("", ",", FV);
+   Check ("SI-2 empty count", Natural (FV.Length), 0);
 
    --  Input """a,b"",c""" is the Ada literal for the string: "a,b",c
    --  Positions: 1=" 2=a 3=, 4=b 5=" 6=, 7=c
    --  Field 1 = positions 1..5 (the quoted span); field 2 = position 7
-   FA := Split_Indices ("""a,b"",c", ",", N);
-   Check ("SI-3 quoted count", N,       2);
-   Check ("SI-3 f1.S",         FA(1).S, 1);
-   Check ("SI-3 f1.E",         FA(1).E, 5);
-   Check ("SI-3 f2.S",         FA(2).S, 7);
-   Check ("SI-3 f2.E",         FA(2).E, 7);
+   Split_Indices ("""a,b"",c", ",", FV);
+   Check ("SI-3 quoted count", Natural (FV.Length), 2);
+   Check ("SI-3 f1.S",         FV(1).S, 1);
+   Check ("SI-3 f1.E",         FV(1).E, 5);
+   Check ("SI-3 f2.S",         FV(2).S, 7);
+   Check ("SI-3 f2.E",         FV(2).E, 7);
 
    --  ── Summary ───────────────────────────────────────────────────────────
    New_Line;

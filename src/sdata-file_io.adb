@@ -284,13 +284,10 @@ package body SData.File_IO is
    -- CSV parse helpers --
    ----------------------
 
-   --  Practical upper bound on columns for type-inference buffers.
-   Max_CSV_Cols : constant := 4_096;
-
-   package Line_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
-
-   type Name_Array     is array (1 .. Max_CSV_Cols) of GNAT.Strings.String_Access;
-   type Col_Type_Array is array (1 .. Max_CSV_Cols) of Column_Type;
+   package Line_Vecs     is new Ada.Containers.Vectors (Positive, Unbounded_String);
+   package Col_Name_Vecs is new Ada.Containers.Vectors
+      (Positive, GNAT.Strings.String_Access);
+   package Col_Type_Vecs is new Ada.Containers.Vectors (Positive, Column_Type);
 
    procedure Split_Into_Lines (S : String; All_Lines : in out Line_Vecs.Vector) is
       Start : Natural := S'First;
@@ -441,8 +438,11 @@ package body SData.File_IO is
       Line_Buf  : Line_Buf_Access := new Line_Buf_T;
       Line_Last : Natural := 0;
 
+      Col_Names : Col_Name_Vecs.Vector;
+      Col_Types : Col_Type_Vecs.Vector;
+
       --  Process one CSV line with RFC-4180-style quote handling.
-      procedure Process_Line_Direct (Line : String; Names : String_List) is
+      procedure Process_Line_Direct (Line : String) is
          DLen        : constant Positive :=
             (if Delimiter'Length > 0 then Delimiter'Length else 1);
          Start       : Integer := Line'First;
@@ -464,7 +464,7 @@ package body SData.File_IO is
                   F   : constant String := CSV_Unquote (Raw);
                begin
                   Field_Count := Field_Count + 1;
-                  if Field_Count <= Names'Length then
+                  if Field_Count <= Natural (Col_Names.Length) then
                      if F = "" or else F = "." then
                         Val := (Kind => Val_Missing);
                      elsif Try_Fast_Float (F, Num) then
@@ -473,7 +473,7 @@ package body SData.File_IO is
                         Val := (Kind    => Val_String,
                                 Str_Val => To_Unbounded_String (F));
                      end if;
-                     Set_Value_Upper (Row_Count, Names (Field_Count).all, Val);
+                     Set_Value_Upper (Row_Count, Col_Names (Field_Count).all, Val);
                   end if;
                end;
                exit when Delim_Pos = 0;
@@ -493,93 +493,99 @@ package body SData.File_IO is
       Scan_Count  : Natural := 0;
       Header_Line : Unbounded_String;
 
-      N_Cols    : Natural         := 0;
-      Col_Names : Name_Array     := (others => null);
-      Col_Types : Col_Type_Array := (others => Col_Numeric);
-
       --  Pass 3 helper: scan up to NSCAN rows to determine column types and names.
-      --  Sets N_Cols, Col_Names(1..N_Cols), Col_Types(1..N_Cols).
+      --  Populates Col_Names and Col_Types vectors.
       procedure Infer_Column_Types
          (H_Str : String; Names_From_Header : Boolean)
       is
-         N_Hdr : Natural;
-         H_Idx : constant Field_Array :=
-            Split_Indices (H_Str, Delimiter, N_Hdr);
-         Col_Determined : array (1 .. N_Hdr) of Boolean := (others => False);
+         H_Fields : Field_Vectors.Vector;
+         N_Hdr    : Natural;
       begin
-         N_Cols    := N_Hdr;
-         Col_Types := (others => Col_Numeric);
-         Col_Names := (others => null);
+         Split_Indices (H_Str, Delimiter, H_Fields);
+         N_Hdr := Natural (H_Fields.Length);
 
-         --  Columns whose header already ends in "$" are forced character.
-         if Names_From_Header then
-            for I in 1 .. N_Hdr loop
-               declare
-                  Raw : constant String :=
-                     Trim (H_Str (H_Idx (I).S .. H_Idx (I).E), Ada.Strings.Both);
-               begin
-                  if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
-                     Col_Types (I)      := Col_String;
-                     Col_Determined (I) := True;
-                  end if;
-               end;
-            end loop;
-         end if;
+         Col_Types := Col_Type_Vecs.To_Vector
+            (Col_Numeric, Ada.Containers.Count_Type (N_Hdr));
+         Col_Names.Clear;
 
-         --  Scan data rows to determine remaining column types.
-         for R in 1 .. Scan_Count loop
-            declare
-               D_Str : constant String := To_String (Scan_Lines (R));
-               N_Fld : Natural;
-               D_Idx : constant Field_Array :=
-                  Split_Indices (D_Str, Delimiter, N_Fld);
-            begin
+         declare
+            Col_Determined : array (1 .. N_Hdr) of Boolean := (others => False);
+         begin
+            --  Columns whose header already ends in "$" are forced character.
+            if Names_From_Header then
                for I in 1 .. N_Hdr loop
-                  if not Col_Determined (I) and then I <= N_Fld then
-                     declare
-                        F : constant String :=
-                           CSV_Unquote (D_Str (D_Idx (I).S .. D_Idx (I).E));
-                     begin
-                        if F /= "" and then F /= "." then
-                           Col_Types (I) :=
-                              (if Is_Numeric_Field (F) then Col_Numeric
-                               else Col_String);
-                           Col_Determined (I) := True;
+                  declare
+                     Raw : constant String :=
+                        Trim (H_Str (H_Fields (I).S .. H_Fields (I).E),
+                              Ada.Strings.Both);
+                  begin
+                     if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
+                        Col_Types.Replace_Element (I, Col_String);
+                        Col_Determined (I) := True;
+                     end if;
+                  end;
+               end loop;
+            end if;
+
+            --  Scan data rows to determine remaining column types.
+            declare
+               D_Fields : Field_Vectors.Vector;
+            begin
+               for R in 1 .. Scan_Count loop
+                  declare
+                     D_Str : constant String := To_String (Scan_Lines (R));
+                  begin
+                     Split_Indices (D_Str, Delimiter, D_Fields);
+                     for I in 1 .. N_Hdr loop
+                        if not Col_Determined (I)
+                           and then I <= Natural (D_Fields.Length)
+                        then
+                           declare
+                              F : constant String :=
+                                 CSV_Unquote
+                                    (D_Str (D_Fields (I).S .. D_Fields (I).E));
+                           begin
+                              if F /= "" and then F /= "." then
+                                 Col_Types.Replace_Element
+                                    (I, (if Is_Numeric_Field (F) then Col_Numeric
+                                         else Col_String));
+                                 Col_Determined (I) := True;
+                              end if;
+                           end;
                         end if;
-                     end;
-                  end if;
+                     end loop;
+                  end;
                end loop;
             end;
-         end loop;
 
-         --  Build column names; append "$" to string columns that lack it.
-         for I in 1 .. N_Hdr loop
-            declare
-               Base_Name : constant String :=
-                  (if Names_From_Header
-                   then Safe_Name
-                           (CSV_Unquote (H_Str (H_Idx (I).S .. H_Idx (I).E)),
-                            "COL" & Trim (I'Img, Ada.Strings.Both))
-                   else "COL" & Trim (I'Img, Ada.Strings.Both));
-               Name : constant String :=
-                  (if Col_Types (I) = Col_String
-                      and then (Base_Name'Length = 0
-                                or else Base_Name (Base_Name'Last) /= '$')
-                   then Base_Name & "$"
-                   else Base_Name);
-            begin
-               Col_Names (I) := new String'(Name);
-            end;
-         end loop;
+            --  Build column names; append "$" to string columns that lack it.
+            for I in 1 .. N_Hdr loop
+               declare
+                  Base_Name : constant String :=
+                     (if Names_From_Header
+                      then Safe_Name
+                              (CSV_Unquote (H_Str (H_Fields (I).S .. H_Fields (I).E)),
+                               "COL" & Trim (I'Img, Ada.Strings.Both))
+                      else "COL" & Trim (I'Img, Ada.Strings.Both));
+                  Name : constant String :=
+                     (if Col_Types (I) = Col_String
+                         and then (Base_Name'Length = 0
+                                   or else Base_Name (Base_Name'Last) /= '$')
+                      then Base_Name & "$"
+                      else Base_Name);
+               begin
+                  Col_Names.Append (new String'(Name));
+               end;
+            end loop;
+         end;
       end Infer_Column_Types;
 
       --  Pass 4 helper: register columns, stream scan lines and remaining file rows.
       procedure Load_Data_Rows is
-         Names : String_List (1 .. N_Cols);
+         N : constant Natural := Natural (Col_Names.Length);
       begin
          Clear;
-         for I in 1 .. N_Cols loop
-            Names (I) := Col_Names (I);
+         for I in 1 .. N loop
             Add_Column (Col_Names (I).all, Col_Types (I));
          end loop;
 
@@ -591,7 +597,7 @@ package body SData.File_IO is
          --  Replay buffered scan rows.
          for R in 1 .. Scan_Count loop
             exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
-            Process_Line_Direct (To_String (Scan_Lines (R)), Names);
+            Process_Line_Direct (To_String (Scan_Lines (R)));
          end loop;
 
          --  Stream the remainder of the file.
@@ -599,23 +605,19 @@ package body SData.File_IO is
             while All_Lines_Idx < Natural (All_Lines.Length) loop
                exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
                All_Lines_Idx := All_Lines_Idx + 1;
-               Process_Line_Direct (To_String (All_Lines (All_Lines_Idx)), Names);
+               Process_Line_Direct (To_String (All_Lines (All_Lines_Idx)));
             end loop;
          else
             while not Ada.Text_IO.End_Of_File (File) loop
                exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
                Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
-               if Needs_ASCII_Chk then
-                  Validate_ASCII (Line_Buf (1 .. Line_Last));
-               end if;
-               Process_Line_Direct (Line_Buf (1 .. Line_Last), Names);
+               if Needs_ASCII_Chk then Validate_ASCII (Line_Buf (1 .. Line_Last)); end if;
+               Process_Line_Direct (Line_Buf (1 .. Line_Last));
             end loop;
          end if;
 
-         for I in Names'Range loop
-            Free (Names (I));
-            Col_Names (I) := null;
-         end loop;
+         for SA of Col_Names loop Free (SA); end loop;
+         Col_Names.Clear;
       end Load_Data_Rows;
 
    begin

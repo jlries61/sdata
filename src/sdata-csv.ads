@@ -1,8 +1,10 @@
+with Ada.Containers.Vectors;
+
 package SData.CSV is
 
-   Max_Fields : constant := 65_536;
-   type Field_Pair  is record S, E : Natural; end record;
-   type Field_Array is array (1 .. Max_Fields) of Field_Pair;
+   type Field_Pair is record S, E : Natural; end record;
+
+   package Field_Vectors is new Ada.Containers.Vectors (Positive, Field_Pair);
 
    function Try_Fast_Float   (S         : String;
                                Result    : out Float) return Boolean;
@@ -19,8 +21,8 @@ package SData.CSV is
 
    function CSV_Unquote      (Raw : String) return String;
 
-   function Split_Indices    (Line      : String;
+   procedure Split_Indices   (Line      : String;
                                Delimiter : String;
-                               N_Fields  : out Natural) return Field_Array;
+                               Fields    : in out Field_Vectors.Vector);
 
 end SData.CSV;
