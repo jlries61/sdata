@@ -4,10 +4,20 @@
 
 #ifdef _WIN32
 #  include <windows.h>
-#  include <shlobj.h>
 int sdata_is_system_account (void)
 {
-    return IsUserAnAdmin () != 0;
+    HANDLE token;
+    TOKEN_ELEVATION elev;
+    DWORD size;
+    BOOL elevated;
+
+    if (!OpenProcessToken (GetCurrentProcess (), TOKEN_QUERY, &token))
+        return 0;
+    elevated = GetTokenInformation (token, TokenElevation,
+                                    &elev, sizeof (elev), &size)
+               && elev.TokenIsElevated;
+    CloseHandle (token);
+    return elevated ? 1 : 0;
 }
 #else
 #  include <unistd.h>
