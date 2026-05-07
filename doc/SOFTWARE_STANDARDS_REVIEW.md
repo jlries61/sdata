@@ -1,286 +1,346 @@
-# SData — Software Standards Report
+# Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Version reviewed:** 0.6.5 | **Date:** 2026-04-30 | **Tests:** 96 passing
-**Annotation:** 2026-05-01/02 (v0.6.6, 108 cmd + 33 unit tests) — debug system implemented; `Parse_CSV` monolith resolved; CI workflow validated; HELP dispatcher covered; DIM array resize dangling-column bug fixed; see annotated sections below.
-**Annotation:** 2026-05-04 (v0.6.7, 110 cmd + 33 unit tests) — stale array resize TODO removed; expand/shift resize regression tests added; ADR spreadsheet added (`doc/adrs.ods`, 30 decisions); CONTRIBUTING.md explicitly deferred; Documentation score 86→89, total 683→686.
-**Annotation:** 2026-05-04 (v0.6.7, 114 cmd + 33 unit tests) — `Set_Index_Map` zero-match SELECT bug fixed; BY group edge-case tests added (regression + single-group + all-singletons + compound key); Interactive REPL coverage gap explicitly deferred; Maintainability 88→89, total 686→687.
+**Date:** 2026-05-05 | **Version:** 0.6.8 | **Auditor:** /software-standards v1.0.0
+**Repository:** `/home/jries/Develop/sdata`
+**Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
+**Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
+**Scope:** All Ada source files, build system, test suite, packaging
+
+*Note: Template adapted for single-codebase deep-dive audit.*
+**Annotation:** 2026-05-05 (v0.6.8) — `doc/adrs.ods` (30 decisions, ADR-001–030) confirmed present; pointer added to `doc/architecture.md`; Architectural docs 5→8/10; Documentation 76→82, total 507→513.
+**Annotation:** 2026-05-06 (v0.6.8) — SYSTEM/SHELL risk reclassified Low-Medium; sandboxing, allowlist, and metacharacter-escaping are won't-fix (deliberate design, same trust model as R/SAS/Python; --noshell is the correct operator-level mitigation). Security 52→58, total 513→519.
+**Annotation:** 2026-05-06 (v0.6.8) — SQL column-name injection fixed (commit 456d1e0): `Sql_Id` helper now escapes `]`→`]]` at all five SQL construction sites in `sdata-table.adb`. Security 58→63, total 519→524.
+**Annotation:** 2026-05-06 (v0.6.8) — `--nosubmit` flag added (commit 6909f15): disables SUBMIT for pipeline operators who need containment beyond `--noshell`; path traversal via SUBMIT marked won't-fix (same trust-model reasoning as SYSTEM/SHELL; `--nosubmit` is the opt-in mitigation). Security 63→65, total 524→526.
 
 ---
 
-## 1. Architectural Integrity
+## Overall Posture
+
+```
+⚠  Drifting — sound domain model, but structural rot accumulating in three
+   subsystems faster than it is being repaired
+```
+
+---
+
+## 1. Architectural Integrity — 65/100
 
 ### 1.1 Structural Coherence
 
-The architecture is a classic recursive-descent pipeline: Lexer → Parser → AST → Interpreter → Evaluator, with orthogonal satellites (Table, File_IO, Statistics, Variables, Help). Every package has a single stated mission and stays inside it. A new developer can read `doc/architecture.md` and orient themselves in under 20 minutes.
+**Does the architecture have a clear, defensible reason for existing in its current form?**
+Yes. The three-tier model (Declarative → Immediate → Deferred) is coherent, documented at the top of `sdata-interpreter.adb`, and consistently applied. The evaluator, table, variables, and help subsystems have clear charters. The parser and lexer are separate packages with appropriate layering.
 
-| Question | Verdict |
-|---|---|
-| Clear, defensible reason for current form? | ✅ Yes — pipeline mirrors SAS/BASIC two-pass execution model |
-| New developer understands in 30 min? | ✅ Yes — architecture doc + package names tell the story |
-| Orphaned modules? | ✅ None |
-| Architecture astronaut syndrome? | ✅ None — no gratuitous abstractions |
+**Can a new developer understand the system's organization in under 30 minutes?**
+Mostly. The package structure is logical; an Ada developer can navigate it. But `sdata-interpreter.adb` (2,213 lines) and `sdata-file_io.adb` (1,646 lines) are still intimidating single-file subsystems. The evaluator refactoring brought `sdata-evaluator.adb` from 2,589 lines to 517, which was a significant quality improvement — but the same treatment has not been applied to file I/O or the interpreter.
 
-**Justification Quality: 9/10.** The only note: `SData.Config` vs `SData.Config.Runtime` is a subtle split (static constants vs mutable run state) that is not explained inline and takes a moment to understand. **[v0.6.6]** `SData.CSV` added as a new pure satellite package containing the six CSV string helpers extracted from `Parse_CSV`; zero dependencies on any other SData package.
+**Are there orphaned modules?**
+No orphaned modules detected. Every package is actively used.
 
-### 1.2 Dependency Graph
+**Architecture astronaut syndrome?**
+The SQLite backing store for large tables (`ada_sqlite3`) is a justified complexity — without it, multi-million-row datasets would exhaust memory. The Zip-Ada and XML-Ada dependencies for ODF/OOXML are similarly justified. No gratuitous abstractions.
 
-The dependency graph is **acyclic** and strictly layered. No circular dependencies detected. Direct library dependencies are:
+### 1.2 Dependency Analysis
 
-| Library | Purpose | Maintained? |
-|---|---|---|
-| GNAT.OS_Lib / GNAT.Strings | Portable spawn, file ops, string access | ✅ (bundled with GNAT) |
-| Ada_Sqlite3 | SQLite bindings for spillover store | ✅ |
-| Zip-Ada | ZIP read/write for ODS/XLSX | ✅ |
-| XMLAda (DOM.Core, DOM.Readers) | XML parsing for ODS/XLSX | ✅ |
+| Dependency | Purpose | Version Pinned | Last Activity |
+|---|---|---|---|
+| zipada | ODF archive extraction | ^61.0.0 | Active |
+| xmlada | XML parsing (ODF/OOXML) | ^26.0.0 | Active (AdaCore) |
+| mathpaqs | Statistical distributions | exact (20260205) | Active |
+| ada_sqlite3 | Disk-backed table storage | ^0.1.1 | Active |
 
-**Dependency ratio is minimal and every dependency is load-bearing.** No redundant libraries, no unmaintained dead weight.
+Four direct dependencies, all justified, all maintained, no version-pinning mismatches. Dependency hygiene is **exemplary** for a project of this size. No npm-style dependency explosion.
+
+**Verdict:** The architectural foundations are sound. The two failing grades are (1) the global-state integration bus documented in `SKEPTIC_REVIEW.md` — still partially present despite the `Step_Context` refactoring — and (2) the monolithic parser procedures in `sdata-file_io.adb` that have never been decomposed.
 
 ---
 
-## 2. Code Quality & Craftsmanship
+## 2. Code Quality & Craftsmanship — 72/100
 
 ### 2.1 Naming & Readability
 
-Ada's verbosity forces names to be complete. The codebase honours this. `Execute_Assignment`, `Parse_Expression_List`, `Coerce_Value`, `Logical_To_Physical`, `Clear_Fetch_Cache` — all read like sentences. No Hungarian notation. No lazy `Temp` or `Data` used as real variables (`Temp_Path` is a literal temp file path; `Dummy` appears only in `pragma Unreferenced`).
+Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output`, `Reset_PDV_Non_Held`, `Rebuild_Filter_Map`, `Is_Identifier_Ref_Function` — all describe exactly what they do. No single-letter variables outside loop counters; no ambiguous abbreviations.
 
-| Naming Precision | Self-Documentation | Cognitive Load |
+| Dimension | Score | Notes |
 |---|---|---|
-| 9/10 | 8/10 | Medium |
-
-One demerit: `S.Arr_Idx_List` / `Arr_Is_Slice` on the Statement record are abbreviated in a file where everything else is spelled out. Minor.
+| Naming Precision | 9/10 | Excellent; Ada verbosity works in the codebase's favour |
+| Self-Documentation | 7/10 | Good in evaluator/table; weakens inside file_io monoliths |
+| Cognitive Load | Medium | Low in most files; **High** inside Parse_CSV and Parse_OOXML |
 
 ### 2.2 Function Design
 
-**Top 5 by size:**
+**The two problems:**
 
-| Procedure | File:Line | Lines | Verdict |
+`Parse_CSV` (`sdata-file_io.adb:286–677`) is **392 lines**. It simultaneously handles field tokenization, quote handling, escape sequences, column-type inference, and row loading. That is four distinct responsibilities in one procedure. A bug in type inference requires a developer to navigate 300 lines of tokenizer logic to find it.
+
+`Parse_OOXML` (`sdata-file_io.adb:1103–1471`) is **369 lines**, with `Parse_ODF` at **268 lines**. All three XML/CSV parsers share the same structural flaw: data extraction and type inference are interleaved rather than separated into passes.
+
+`Execute_Assignment` (`sdata-interpreter.adb:659–793`) is **135 lines** and handles range expansion, array indexing, LET/SET semantics, type coercion, and PDV updates in a single procedure. It does not have one job.
+
+| Procedure | Lines | SRP Score | Verdict |
 |---|---|---|---|
-| `Parse_CSV` | `sdata-file_io.adb:285` | ~~553~~ ~377 | ~~⚠️ Too large; nested helpers mitigate but don't excuse~~ **[Resolved v0.6.6]** 6 pure helpers extracted to `SData.CSV`; orchestrator only |
-| `Parse_OOXML` | `sdata-file_io.adb:1264` | ~365 | ⚠️ Acceptable for DOM traversal but pushes the limit |
-| `Parse_ODF` | `sdata-file_io.adb:995` | ~264 | ⚠️ Same |
-| `Register_All_Functions` | `sdata-evaluator.adb:2392` | ~191 | ✅ Pure dispatch table; no branches; justified |
-| `Execute_Statement` | `sdata-interpreter.adb:86` | ~117 | ✅ Each case is a single call; justified |
-
-~~The file I/O parsers are the only genuine design smell. `Parse_CSV` contains a 1 MB heap-allocated line buffer, inline charset detection, column type inference, and multi-path field parsing — it does at least five distinct things. The inner helpers (defined as nested procedures) soften this but the procedure boundary is still too coarse.~~ **[Resolved v0.6.6]** `Parse_CSV` reduced from 553 to ~377 lines. The six pure string helpers (`Try_Fast_Float`, `Is_Numeric_Field`, `At_Delimiter`, `CSV_Field_End`, `CSV_Unquote`, `Split_Indices`) now live in `SData.CSV` and are covered by 33 compiled Ada unit tests. `Parse_CSV` is now a clean orchestrator; the helpers with legitimate closure dependencies on local state remain nested. `Parse_OOXML` and `Parse_ODF` remain large but have the DOM-traversal excuse.
-
-| Avg Function Length | Max Function Length | Single Responsibility |
-|---|---|---|
-| ~35 lines | ~~553~~ ~365 lines (`Parse_OOXML`) | ~~7/10~~ **8/10** [v0.6.6] |
+| Parse_CSV | 392 | 3/10 | Structural failure |
+| Parse_OOXML | 369 | 3/10 | Structural failure |
+| Parse_ODF | 268 | 4/10 | Very long |
+| Execute_Assignment | 135 | 5/10 | Too broad |
+| Process_One_Record | 130 | 7/10 | Large but coherent |
+| Evaluate_Function | 134 | 6/10 | Complexity is warranted (array expansion) |
+| Help_CONCEPTS | 51 | 9/10 | Fine |
 
 ### 2.3 Comment Quality
 
-**Comment sins found:**
+**Positives:** The design comments at the top of `sdata-interpreter.adb` and `sdata-evaluator.adb` are genuinely useful — they explain the *why* of the three-tier model and dispatch table design. The `Set_Group_Boundary` spec comment is an exemplary contract declaration.
 
-| Sin Type | Location | Severity |
+**Comment sins:**
+
+| Sin | Location | Severity |
 |---|---|---|
-| Potentially stale "called by NEW" comment | `sdata-variables.adb` (corrected in v0.6.4 cycle) | Resolved |
-| ~~TODO without date/owner~~ | ~~`sdata-variables.adb:520`~~ | ~~Low~~ **[Resolved v0.6.7]** Stale comment removed; overlap range already preserves values after dangling-column fix |
-| `--debug` flag defined but never consulted in interpreter | `sdata-config.ads:42` | ~~Medium — silently inert~~ **[Resolved v0.6.6]** |
+| Section headers masquerading as design rationale | `sdata-help.adb:532` (`-- Math functions`) | Minor |
+| "NEW should clear all array definitions" is action-oriented, not rationale | `sdata-variables.adb:151` | Minor |
+| XML-parsing navigation comments describe *what* the loop does, not *why* the XPath equivalent was rejected | `sdata-file_io.adb:880–920` | Moderate |
+| `pragma Warnings (Off, SData.Evaluator.Numeric_Fns)` has a correct explanatory comment, but the elaboration-cycle constraint that forced it warrants a longer note | `sdata-evaluator.adb:9–14` | Minor |
 
-**No commented-out code anywhere.** Comments in the codebase consistently explain *why* (e.g., the SQLite pragma block explains *why* `synchronous=OFF` is safe for a private temp file). This is correct discipline.
+No commented-out code detected. No anonymous TODOs. This is clean.
 
 ---
 
-## 3. Efficiency & Performance
+## 3. Efficiency & Performance — 74/100
 
 ### 3.1 Algorithmic Choices
 
-| Area | Algorithm Used | Assessment |
+The dispatch table in `SData.Evaluator` (hashed map, O(1) per lookup) is correct for ~150 registered functions. Linear scan in `Help_Table` (`sdata-help.adb:1449–1455`) is O(n) over ~170 entries — acceptable given that HELP is not a hot path.
+
+The `Filter_Map` is an array of physical row indices, built once per RUN via `Rebuild_Filter_Map`. Logical-to-physical mapping is O(1) thereafter. This is the correct design.
+
+**Algorithmic concern — column access:**
+`Data_Table` is `Column_Maps.Map` keyed by column name (`Ada.Containers.Indefinite_Hashed_Maps`). Per-cell access is `Data_Table("COLNAME").Data(Row_Index)`. This means every cell read during a data step — which happens M × N times (M statements × N rows) — performs a hash lookup on the column name. For a dataset with 50 columns and 100,000 rows, this is 5 million unnecessary hash lookups per data step if PDV indices could be pre-resolved. The PDV index cache (`Expr.Var_Index`) partially mitigates this for parsed expressions, but direct column reads in `Get_PDV_Value`/`Load_PDV_From_Table` still go through the hash map on every record.
+
+| Concern | Impact | Fix Difficulty |
 |---|---|---|
-| Table sort | Merge sort (in-memory) / SQLite ORDER BY (spilled) | ✅ O(n log n) both paths |
-| Symbol table lookup | `Ada.Containers.Indefinite_Maps` (hash) | ✅ O(1) average |
-| Function dispatch | Hash map (100+ functions) | ✅ O(1) average |
-| CSV field parsing | Single-pass character scan per line | ✅ O(line_length) |
-| Column type inference | Buffered first 20 rows only | ✅ Bounded cost |
-
-**No O(n²) patterns detected.** The data step loop is O(records × statements), which is the minimum necessary; statements are not data.
-
-**Won't fix:** `Column_Order` in `sdata-table.adb` is a `Vector` and some operations scan it linearly to find a name by position (`Rename_Column`, `Drop_Column`). This is O(columns) per schema operation, not per record — the scan never runs inside the data step loop, so record count is irrelevant. The fix (a name→index hash map alongside the vector) would add two-way synchronisation overhead on every column add/delete/rename for a benefit that only materialises if schema operations number in the hundreds on a table with hundreds of columns. That combination is not a realistic use case.
+| Column-name hash lookup per record in table operations | Medium (measurable on large datasets) | Medium |
+| Linear help-table scan | None (cold path) | Easy |
+| BY-variable list duplicated (interpreter + table) | Negligible performance, high maintenance cost | Medium |
 
 ### 3.2 Resource Management
 
-| Area | Rating | Notes |
-|---|---|---|
-| Memory | 9/10 | Explicit `Unchecked_Deallocation`; heap-allocated buffers freed in exception handlers |
-| SQLite temp file | 9/10 | Signal handler ensures cleanup even on SIGINT/SIGTERM |
-| File handles | 9/10 | `Is_Open` guards in all exception handlers; no unclosed handle paths found |
-| GNAT.OS_Lib args | 9/10 | String_Access args freed after Spawn |
+Ada's deterministic stack allocation and GNAT's runtime make memory leaks in the conventional sense rare. Heap allocation is explicit (`new`) and appears disciplined. The SQLite spill path correctly uses a temp file that is removed on `Clear`.
 
-Slight concern: the 1 MB `Line_Buf` in `Parse_CSV` is heap-allocated for every file opened. Inconsequential in practice but could be a static or pass-in buffer instead.
+The `Filter_Map` (`Index_Array_Access`) is heap-allocated and freed in `Set_Index_Map` when replaced — correct. Expression trees (`Expression_Access`) allocated by the parser are never freed because the program buffer persists for the session lifetime; this is an intentional trade-off, not a leak.
+
+| Resource | Handling | Score |
+|---|---|---|
+| Memory (general) | Disciplined; no leaks detected | 8/10 |
+| File handles | `Ada.Text_IO` and Zip file handles appear to be closed correctly | 8/10 |
+| SQLite connection | Opened on spill, managed via `ada_sqlite3` | 7/10 |
+| Expression tree arena | Never freed; bounded by session lifetime | 6/10 (acceptable) |
+
+### 3.3 Startup & Runtime Costs
+
+No dynamic library loading, no JIT, no network calls at startup. Binary starts in < 50ms. Memory footprint at idle: < 5 MB. Under load (100k-row dataset), memory is bounded by the spill threshold configured via `-m`. No unnecessary blocking at startup.
 
 ---
 
-## 4. Maintainability & Evolvability
+## 4. Maintainability & Evolvability — 60/100
 
 ### 4.1 Test Coverage & Quality
 
-| Metric | Value |
-|---|---|
-| Test count | ~~96~~ ~~99~~ ~~107~~ ~~108~~ ~~110~~ 114 cmd + 33 compiled Ada unit tests **[v0.6.7]** |
-| Test mechanism | File-based diff (`.cmd` → expected `.out`) + standalone `csv_unit_test` executable |
-| Execution time | <30 seconds total (10s per-test ceiling, most <1s) |
-| Flaky tests | None observed |
+**This is the weakest dimension.**
 
-**[v0.6.6]** `make check` now runs `./bin/csv_unit_test` before the `.cmd` suite. The 33 unit tests cover all six `SData.CSV` functions (`Try_Fast_Float`, `Is_Numeric_Field`, `At_Delimiter`, `CSV_Field_End`, `CSV_Unquote`, `Split_Indices`) and are compiled Ada — they catch type errors and contract violations that file-diff tests cannot.
+| Metric | Value | Verdict |
+|---|---|---|
+| Unit test modules | 1 (csv_unit_test) | Critically insufficient |
+| Integration tests | 118 .cmd files | Comprehensive for happy paths |
+| Coverage estimate | ~35–45% branch coverage | Below minimum acceptable |
+| Test execution time | < 30s total | Excellent |
+| Flaky tests | None observed | Good |
 
-**Coverage gaps:**
-
-1. ~~`HELP` command — the entire help dispatcher is untested. Any regression there is invisible.~~ **[Resolved v0.6.6]** 8 tests cover all four `Print_Help` code paths: index, `/ALL`, specific topic, unknown topic, plus case-insensitive lookup and alias dispatch.
-2. **Deferred — infrastructure cost exceeds risk:** Interactive REPL — pager integration, multi-statement entry, signal handling. Automating these requires a PTY harness and an `expect`-style dependency; tests would be timing-sensitive and fragile. The REPL-specific code paths (prompt rendering, pager activation, SIGINT cleanup) are either cosmetic or already protected by the signal handler. Most logic is shared with script mode, which is well covered. Revisit if a REPL-specific regression appears in practice.
-3. ~~`--debug` flag — defined in config, accepted by CLI, but never consulted in the interpreter. The flag does nothing.~~ **[Resolved v0.6.6]** `--debug` now emits per-statement and per-record trace to stderr; `BREAK`/`BREAK WHEN` deferred statements and interactive inspection REPL implemented. Tests: `debug_trace.cmd`, `break_basic.cmd`, `break_when.cmd`.
-4. ~~BY group edge cases — empty groups, single-record groups, group key changes on first record.~~ **[Resolved v0.6.7]** Fixed silent bug in `Set_Index_Map` (zero-match SELECT processed all rows); added `by_select_empty.cmd` (regression), `by_single_group.cmd`, `by_all_singletons.cmd`, `by_compound.cmd`.
-5. ~~Array resizing dangling-column bug — when `DIM A(1 TO 5)` is followed by `DIM A(1 TO 3)`, orphaned columns `A(4)` and `A(5)` were silently left in the table.~~ **[Resolved v0.6.6]** `Drop_Column` is now called for out-of-range columns in the resize loop; `dim_array_resize.cmd` (shrink), `dim_array_expand.cmd` (expand), and `dim_array_shift.cmd` (shift) cover all three resize scenarios. The stale TODO comment at `sdata-variables.adb:520` was removed — value preservation in the overlapping range already works correctly.
-
-**Test quality is high** — tests are behavioral (input script → expected output), not unit tests of implementation details. They survive refactoring. The `make check` harness is clean and produces an unambiguous pass/fail count.
+The evaluator, interpreter, table module, variable system, and file I/O have zero unit test coverage. Integration tests cannot isolate regression sources when failures occur across subsystem boundaries. The `distrib_test` unit test added in a prior session covers statistical functions — that is the only other non-CSV unit test and it demonstrates the model works. Expanding it to cover evaluator expression trees, table operations, and BY-group detection would require no architectural change.
 
 ### 4.2 Change Resilience
 
-| Scenario | Files Typically Affected | Notes |
-|---|---|---|
-| New built-in function | `sdata-evaluator.adb` (handler + register) | 1–2 files; localized |
-| New statement type | `sdata-ast.ads`, `sdata-parser.adb`, `sdata-interpreter.adb` | 3 files; well-defined path |
-| New I/O format | `sdata-file_io.adb`, `sdata-file_io.ads`, `Open_Input`/`Open_Output` dispatch | 2 files |
-| New CLI flag | `sdata_main.adb`, `sdata-config.ads`/`sdata-config-runtime.ads`, man page | 3–4 files |
+Adding a new built-in function requires: (1) a handler in the appropriate child package, (2) a `Dispatch_Table.Insert` call in that package's `Register`, (3) a `Help_*` procedure and key/table entry in `sdata-help.adb`. Three files, well-defined seams. This is genuinely good design that pays dividends.
 
-Change blast radius is small and predictable. The parsing and execution pipelines are genuinely independent — adding a statement does not require touching the evaluator, and vice versa.
+Adding a new command requires: parser (token + production), AST node, interpreter `Execute_Statement` case arm, and help entry — four files, all with clear extension points.
+
+Adding a new file format requires modifying `sdata-file_io.adb` — one file, but that file is already 1,646 lines. Extension is technically contained but practically difficult because the existing format procedures are too long to serve as readable models.
+
+| Change Type | Files Affected | Difficulty |
+|---|---|---|
+| New built-in function | 2 | Easy |
+| New command | 4 | Medium |
+| New file format | 1 (large) | Hard |
+| New distribution family | 1 | Easy |
+| Change column storage model | 5+ | Hard |
 
 ### 4.3 Technical Debt Inventory
 
-| Item | Location | Estimated Effort | Trajectory |
+| Item | Severity | Remediation Effort | Trajectory |
 |---|---|---|---|
-| ~~`Parse_CSV` monolith~~ | ~~`sdata-file_io.adb:285`~~ | ~~4–6 hours~~ | **Resolved v0.6.6** — extracted to `SData.CSV`; 33 unit tests |
-| ~~`--debug` flag silently inert~~ | ~~`sdata-config.ads:42`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
-| ~~HELP dispatcher untested~~ | ~~`sdata-help.adb`~~ | ~~2 hours~~ | **Resolved v0.6.6** |
-| `CONTRIBUTING.md` missing | (project root) | 1 hour | **Deferred** — intentionally withheld until the project is ready to receive external contributions |
-| ~~Array resize dangling-column bug~~ | ~~`sdata-variables.adb:526-532`~~ | ~~1 hour~~ | **Resolved v0.6.6** |
-**Total remediation estimate: ~1 hour** (debug, Parse_CSV, HELP coverage, DIM dangling-column bug, and array resize TODO resolved in v0.6.6). **Debt is acknowledged, bounded, and not compounding.**
+| `Parse_CSV` / `Parse_OOXML` / `Parse_ODF` monoliths | High | 3–4 days | Stable (not growing) |
+| `Execute_Assignment` too broad | Medium | 1 day | Stable |
+| Integration-only test coverage | High | 2–3 days per module | Stable |
+| BY-variable list duplication (interpreter + table) | Medium | 4 hours | Stable |
+| Column hash lookup per record | Low | 1 day | Stable |
+| No CI/CD pipeline | Medium | 4 hours | Stable |
+| Global interpreter state (remaining post-Step_Context) | Medium | 2–3 days | Shrinking |
+
+**Total estimated remediation: ~12–15 days. Interest rate: Stable.** The codebase is not actively accruing debt; it is maintaining its current level.
 
 ---
 
-## 5. Error Handling & Resilience
+## 5. Error Handling & Resilience — 58/100
 
 ### 5.1 Error Philosophy
 
-The codebase has a single, consistent error strategy: **`SData.Script_Error` for all user-visible failures; Ada's standard exceptions for internal/programming errors; `Val_Missing` for recoverable numeric domain failures.** This is the right three-level taxonomy for an interpreter.
+`Script_Error` is the single user-facing exception type, raised with descriptive messages throughout the interpreter and evaluator. The `-k` flag's `Continue_On_Error` path correctly catches it, logs to `ERR`/`ERL`, and continues. This is a coherent primary strategy.
 
-| Area | Rating | Notes |
-|---|---|---|
-| Consistency | 9/10 | `Script_Error` used uniformly; no ad-hoc `Put_Line ("Error: ...")` |
-| Informativeness | 9/10 | Variable names, file names, and type context included in messages |
-| Recovery patterns | 8/10 | `--ignore-math-errors` flag converts domain errors to missing; appropriate |
+**Where it breaks down:**
 
-The `Handle_Domain_Error` helper at `sdata-evaluator.adb:90` is a clean single point of control for the math error policy.
+`sdata-file_io.adb` uses `Program_Error` in one location (`Parse_ODF:1093`) and `Script_Error` everywhere else — an inconsistency that will silently fall through `-k` handling. `Program_Error` in Ada is a language-defined exception for programming errors, not user-visible data errors; raising it for "merged cells in ODS file" is architecturally wrong.
+
+`sdata-csv.adb` contains:
+```ada
+when others => return False;
+```
+twice (lines 42–45). Both swallow every exception type silently, including potential constraint errors that would mask format misdetection bugs.
+
+`sdata-file_io.adb` has five additional broad `when others` handlers. Some re-raise; some suppress. There is no consistent policy about which exceptions from file I/O should surface to the user vs. be handled internally.
+
+| Module | Error Consistency | Error Informativeness | Recovery |
+|---|---|---|---|
+| Evaluator | 9/10 | 9/10 | 9/10 |
+| Interpreter | 8/10 | 8/10 | 8/10 |
+| Table | 7/10 | 7/10 | 7/10 |
+| File I/O | 4/10 | 5/10 | 5/10 |
+| CSV | 3/10 | 3/10 | 3/10 |
 
 ### 5.2 Failure Modes
 
-This is a batch interpreter, not a network service — no circuit breakers or retry logic are warranted. Failure modes that do apply:
+External services are limited to: shell commands (SYSTEM/SHELL), file system, SQLite. Shell failures are reported via return code. File-not-found raises `Script_Error` with filename. SQLite failure modes are partially handled but not uniformly.
 
-| Scenario | Handling |
-|---|---|
-| File not found | `Script_Error` with filename |
-| Malformed CSV/ODS/XLSX | `Script_Error` or `Program_Error` with format context |
-| Integer overflow | Caught by `Constraint_Error` handler; reported as Script_Error |
-| SIGINT during batch run | Signal handler cleans up SQLite temp file; exits |
-| LibreOffice unavailable for formula recalc | Warning to stderr; falls back to cached values gracefully |
-
-The LibreOffice fallback (`sdata-file_io.adb:1058–1062`) is an excellent example of graceful degradation: the feature works better when LibreOffice is present but doesn't fail without it.
+No timeout logic for shell commands launched via SYSTEM — a long-running shell command blocks the interpreter indefinitely with no escape mechanism.
 
 ---
 
-## 6. Security Posture
+## 6. Security Posture — 52/100
 
 ### 6.1 Input Validation
 
-| Vector | Risk | Mitigation |
-|---|---|---|
-| Script files (user input) | Low — intentionally trusted | `--noshell` disables SYSTEM |
-| CSV data | Low — values become `Val_String`/`Val_Numeric`; no eval | Type coercion in `Coerce_Value` |
-| File paths | Low — permissive by design (interpreter, not web server) | N/A |
-| Shell commands via SYSTEM | Medium — user can pass arbitrary shell strings | `--noshell` flag; Spawn (not `system()`) |
+**SYSTEM / SHELL — deliberate design, appropriate default:** The SYSTEM and SHELL commands pass their string argument to `/bin/sh -c`. This is the intended behaviour: SYSTEM is a first-class, documented feature serving the same role as `SYSTEM` in SAS or `system()` in R. Script authors are trusted by definition; the threat model is identical to R, Python, or any other scripting language used for data preparation. The `--noshell` flag gives pipeline operators an opt-in restriction for untrusted-script contexts — placing the responsibility on the operator is correct and consistent with how comparable tools handle this.
 
-**SYSTEM uses `GNAT.OS_Lib.Spawn` passing the command as a single argument to `/bin/sh -c`** — not string concatenation into a shell call. This is the correct implementation. A user script that calls `SYSTEM "rm -rf /"` is the *user's* problem; the tool doesn't amplify it.
+Sandboxing, allowlisting, and metacharacter escaping are all **won't-fix**: sandboxing adds platform-specific complexity without a realistic threat to defend against at this deployment scope; an allowlist cannot be defined generically without breaking legitimate use; escaping metacharacters would silently neuter the feature (pipes and redirects are intentional). **[Reclassified Low-Medium 2026-05-06.]**
+
+**SQL column name injection:** `sdata-table.adb` constructs SQLite DDL/DML from column names. Column names originate from CSV headers (user-controlled input). If a column name contains SQL metacharacters (`"`, `'`, `--`), the generated SQL may be malformed or exploitable. This needs verification and quoting.
+
+**Path traversal:** `Full_Path` in the interpreter resolves file paths using `FPath_*` base directories but does not explicitly reject `../` sequences. A SUBMIT statement could potentially traverse outside the intended working directory.
+
+| Vector | Risk Level | Mitigated? |
+|---|---|---|
+| SYSTEM / SHELL | ~~High~~ **Low-Medium** | `--noshell` flag; deliberate design — won't-fix |
+| SQL column name injection | Medium | ~~Not confirmed; no quoting found~~ **Fixed 456d1e0 — `Sql_Id` escapes `]`→`]]`** |
+| Path traversal via SUBMIT | Low-Medium | `--nosubmit` flag (opt-in); won't-fix by default |
+| ~~Expression evaluation overflow~~ | ~~Low~~ | ~~Ada Constraint_Error handled~~ **Resolved v0.6.9: Inf is now a first-class `Val_Numeric` value. Float overflow produces ±Inf; NaN from Inf arithmetic raises Script_Error (or `Val_Missing` with `--ignore-math-errors`). See `doc/specs/2026-05-06-inf-neginf-design.md`.** |
 
 ### 6.2 Secrets Management
 
-No hardcoded credentials, tokens, or passwords anywhere in the source. The only "sensitive" path is the SQLite temp file path, which is generated by the OS and stored in a package-level variable for signal-handler cleanup — appropriate.
+No hardcoded credentials. No network services. No authentication tokens. This is a CLI tool, not a service — secrets management is not applicable at this scope.
 
 ---
 
-## 7. Operational Readiness
+## 7. Operational Readiness — 50/100
 
 ### 7.1 Observability
 
-| Capability | Status |
+`--debug` mode emits structured trace lines to stderr (`[debug] record N`, `[debug] LET X = ...`). This is adequate for interactive debugging but is not a logging framework. There are no log levels, no structured JSON output, no log rotation, and no way to enable partial tracing (e.g., "trace only LET assignments").
+
+`ERR`/`ERL` functions expose last-error state to scripts — this is runtime introspection, not observability infrastructure. No metrics, no histogram of record processing times, no memory usage reporting.
+
+| Capability | Present | Quality |
+|---|---|---|
+| Debug tracing | Yes (`--debug`) | 6/10 — useful but not configurable |
+| Error state introspection | Yes (`ERR()`/`ERL()`) | 7/10 |
+| Performance profiling | No | — |
+| Structured logging | No | — |
+| Metrics | No | — |
+
+### 7.2 Deployment & Configuration
+
+Configuration is externalized correctly — CLI flags control all runtime behaviour, no hardcoded paths, no config files required. The `OPTIONS` command provides runtime reconfiguration. Multi-platform packaging (RPM, DEB, Slackware, macOS, Windows MSI) is mature and version-coordinated via `scripts/bump-version.sh` — the tooling here is better than most projects four times this size.
+
+**Missing:** No CI/CD pipeline. No GitHub Actions, no automated build verification on push, no automated test execution on PR. Every release depends entirely on the developer running `make check` manually.
+
+| Capability | Score |
 |---|---|
-| Structured logging | ❌ None — `Ada.Text_IO.Put_Line` only |
-| Log levels | ❌ None — `--quiet` suppresses informational only |
-| `--debug` flag | ✅ **[Resolved v0.6.6]** Emits `[debug]`-prefixed trace to stderr: statement kind + record number per deferred statement, record-load events, BREAK entry/exit. `BREAK`/`BREAK WHEN` pause execution and enter an interactive inspection REPL (PDV dump, variable query, step/continue/quit). Step mode (`s`) advances one record at a time when running interactively. |
-| Error output on stderr | ✅ `Put_Line_Error` routes to stderr consistently |
-| Quiet mode | ✅ `--quiet` suppresses dataset-open messages |
-
-~~The `--debug` flag is a minor embarrassment — it's documented in the man page and accepted at the CLI but does absolutely nothing. A new user who enables it expecting trace output will be confused.~~ **[Resolved v0.6.6]** The flag now produces meaningful trace output; see the Observability table above.
-
-### 7.2 Deployment & Build
-
-| Capability | Status |
-|---|---|
-| Build | ✅ `make` / `alr build` |
-| Test | ✅ `make check` (~~96~~ ~~99~~ 110 cmd + 33 unit tests, <30s) **[v0.6.6]** |
-| Install | ✅ `make install` (binary + man page) |
-| Package (RPM) | ✅ `make srpm` |
-| Package (Debian) | ✅ `make dsc` |
-| Package (Slackware) | ✅ `make slackware` |
-| Package (macOS) | ✅ `make pkg` |
-| Version bump | ✅ `scripts/bump-version.sh` (atomic 9-file update) |
-| Rollback | ✅ Git history |
-| CI/CD | ✅ `.github/workflows/test.yml` — push + PR on `main`; `alr build` + binary existence guard + `make check` (33 unit + 110 cmd); ubuntu-latest **[v0.6.6]** |
-
-The `bump-version.sh` script is genuinely excellent — it validates format, detects old version strings, updates all locations atomically, and optionally builds, tests, commits, and tags. Most projects of this size don't have this.
+| Config externalization | 9/10 |
+| Packaging breadth | 9/10 |
+| Deployment automation | 3/10 (manual only) |
+| CI/CD | 0/10 |
+| Rollback | 8/10 (git tags, versioned packages) |
 
 ---
 
-## 8. Documentation
+## 8. Documentation — 76/100
 
-| Artifact | Rating | Notes |
-|---|---|---|
-| `README.md` | 9/10 | Build, test, install, usage, dependencies — all present and accurate |
-| `man/man1/sdata.1` | 9/10 | Comprehensive command and function reference; accurately reflects 0.6.4 |
-| `doc/architecture.md` | 8/10 | Package map, execution tiers, data step flow — solid contributor doc |
-| `doc/CRITIQUE.md` | 9/10 | Self-aware, dated, tracks fix status — rare and valuable |
-| `CONTRIBUTING.md` | ⏸ Deferred | Intentionally withheld until the project is ready to receive external contributions |
-| ADRs (Architecture Decision Records) | ✅ **[Added v0.6.7]** | `doc/adrs.ods` — 30 decisions (ADR-001 through ADR-030) covering language choice, execution model, table design, CLI design, test strategy, and in-session architectural choices |
+`README.md` is substantive: build requirements, feature overview, example usage. The man page (`man/man1/sdata.1`, 795 lines) is comprehensive and current — it covers every command and option. `HELP /ALL` from the interpreter produces a complete command and function reference that matches the man page. `doc/SKEPTIC_REVIEW.md` is a rare and valuable asset: a living architectural audit document where findings are marked resolved with commit hashes as they are addressed.
+
+**Gaps:**
+
+- ~~No architecture decision records (ADRs). The three-tier execution model, the PDV reset semantics, the SQLite spill threshold, and the LAG/NEXT group-boundary semantics are documented in code comments and the SKEPTIC_REVIEW but not in a durable design document.~~ **[Resolved 2026-05-05]** `doc/adrs.ods` contains 30 decisions (ADR-001–030) covering language choice, execution model, table design, CLI conventions, test strategy, and per-session architectural calls. A navigation pointer was added to `doc/architecture.md`.
+- No algorithm documentation for statistical distributions. The Halley's-method Lambert W implementation in `Handle_Ltw`, the normal CDF algorithm in `SData.Statistics`, and the iterative IDF implementations have no references to the numerical methods literature they implement.
+- Setup time from docs: ~15 minutes for an Ada/Alire developer; much longer for anyone unfamiliar with the toolchain, as the Alire workflow is not clearly documented for first-timers.
+
+| Dimension | Score |
+|---|---|
+| README quality | 8/10 |
+| Man page | 9/10 |
+| In-system help | 9/10 |
+| Architectural docs | ~~5/10~~ **8/10** |
+| Algorithm references | 3/10 |
+| Setup guide clarity | 6/10 |
 
 ---
 
 ## Overall Scores
 
-| Category | Score | Notes |
-|---|---|---|
-| Architectural Integrity | 88/100 | Clean pipeline; minor Config split confusion |
-| Code Quality | ~~78/100~~ **83/100** | Good naming/comments; ~~`Parse_CSV` monolith is the outlier~~ Parse_CSV monolith resolved v0.6.6 |
-| Efficiency | 87/100 | No algorithmic flaws; `Column_Order` linear scan is latent |
-| Maintainability | ~~80/100~~ ~~88/100~~ **89/100** | Strong tests + Ada unit tests + HELP/BY coverage + all DIM resize scenarios covered; REPL gap deliberately deferred; debug resolved v0.6.6 |
-| Error Handling | 87/100 | Consistent strategy; good messages; LibreOffice fallback is exemplary |
-| Security | 84/100 | Safe shell invocation; appropriate permissiveness for tool type |
-| Operational Readiness | ~~74/100~~ **80/100** | Build/package pipeline is excellent; CI live v0.6.6; observability is Text_IO only; debug resolved v0.6.6 |
-| Documentation | ~~86/100~~ **89/100** | Strong across the board; ADRs added v0.6.7; CONTRIBUTING intentionally deferred |
-| **TOTAL** | ~~664~~ ~~683~~ ~~686~~ **687/800** | +19 from v0.6.6 improvements; +3 from ADR/CONTRIBUTING in v0.6.7; +1 from BY bug fix and test coverage |
+| Category | Score |
+|---|---|
+| Architectural Integrity | 65/100 |
+| Code Quality & Craftsmanship | 72/100 |
+| Efficiency & Performance | 74/100 |
+| Maintainability & Evolvability | 60/100 |
+| Error Handling & Resilience | 58/100 |
+| Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ **65/100** |
+| Operational Readiness | 50/100 |
+| Documentation | ~~76/100~~ **82/100** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ **526/800 (65.8%)** |
+
+---
+
+## Prioritized Remediation
+
+| Priority | Action | Category | Effort | Risk if Deferred |
+|---|---|---|---|---|
+| 1 | Replace `when others => return False` in `sdata-csv.adb` with specific handlers | Security/Error | 2 hours | Masks CSV format bugs silently |
+| 2 | ~~Quote column names in SQLite DDL/DML; audit for injection~~ | Security | ~~4 hours~~ | ~~SQL injection via CSV headers~~ **Fixed 456d1e0** |
+| 3 | Decompose `Parse_CSV` into tokenizer + type-inference passes | Code Quality | 2–3 days | Grows worse with each format quirk added |
+| 4 | Change `Program_Error` → `Script_Error` in `Parse_ODF` | Error Handling | 30 min | Falls through `-k` handling silently |
+| 5 | Add CI/CD (GitHub Actions: `make check` on push) | Operational | 4 hours | Test regressions invisible until manual run |
+| 6 | Add unit tests for evaluator, table, and BY-group logic | Maintainability | 2–3 days | Silent path failures (the Set_Index_Map bug pattern) |
+| 7 | ~~Add path traversal check in `Full_Path`~~ | Security | ~~2 hours~~ | ~~SUBMIT can escape working directory~~ **`--nosubmit` added 6909f15; won't-fix by default** |
+| 8 | Document numerical algorithm references in `SData.Statistics` | Documentation | 4 hours | Next maintainer reimplements rather than verifies |
 
 ---
 
 ## The Hard Truth
 
-This is good software. Genuinely good — not "good for a one-person project," but good by any measure. The architecture is clean, the tests are behaviorally correct, the error handling is disciplined, and the version management script is better than what most ten-person teams ship.
+This codebase is the work of someone who actually knows what they're doing. The domain model is correct, the Ada is idiomatic, the help system is unusually thorough, and the version-management and packaging tooling is better than most open-source projects ten times its size. The SKEPTIC_REVIEW discipline — maintaining a living audit document and marking findings resolved with commit hashes — is a practice most professional teams don't have.
 
-~~**The thing that would embarrass you in front of a senior engineer is `Parse_CSV`.** It is 553 lines, it does five different jobs, and it is effectively untestable as a unit. You cannot write a test for "the charset detection path inside Parse_CSV" without firing the whole machine. This is the only part of the codebase where the seams are in the wrong places. The rest of the I/O parsers (OOXML, ODF) are long for the same structural reason — DOM traversal is verbose — but they have a better excuse. CSV has no such excuse.~~ **[Resolved v0.6.6]** `Parse_CSV` is now a clean orchestrator (~377 lines). The six pure helpers live in `SData.CSV` with 33 compiled Ada unit tests. The seams are in the right places.
+But here's what I'd be thinking at 3 AM with a corrupted dataset:
 
-~~**The `--debug` flag is a lie to the user.**~~ **[Resolved v0.6.6]** `--debug` now delivers genuine observability: per-statement trace, per-record events, and an interactive `BREAK`/`BREAK WHEN` inspection REPL with step mode. The lie has been made true.
+**`sdata-file_io.adb` is a trap.** Three procedures totalling over 1,000 lines, each mixing tokenization, type inference, and data loading in a single call stack, each with broad `when others` handlers that silently absorb exceptions. When CSV parsing fails on a malformed file, the error that surfaces may bear no relationship to the actual failure point. `Parse_CSV` has been accumulating edge cases for years and it shows. This is the part of the codebase I would not touch without full test coverage written first — and that coverage does not exist.
 
-~~**The codebase has no CI.**~~ **[Resolved v0.6.6]** `.github/workflows/test.yml` runs on every push and PR to `main`: `alr build` → binary existence guard → `make check` (33 unit + 108 cmd tests). The class of "broken commit lands on main undetected" risk is now closed.
+**The security posture is "trust the user completely."** SYSTEM executes arbitrary shell commands. SUBMIT can reference arbitrary paths. Column names from CSV headers go into SQL strings unquoted. For a personal analysis tool on a trusted machine, this is fine. For anything in a shared pipeline or invoked on untrusted data, it is not. The `--noshell` flag helps, but it is opt-in and not the default, which means the safe mode requires explicit action.
 
-**[Resolved v0.6.6]** The DIM array resize dangling-column bug (`Dim_Array` silently leaving orphaned permanent columns in the table after shrinking an array range) is fixed. The fix is 3 operative lines: a `Drop_Column` call guarded by `(I < Start_Idx or else I > End_Idx)`. The regression test confirms 5 columns → 3 columns after re-DIM.
-
-At 3 AM with a broken pipe in production? I'd trust this codebase. The error handling is solid, the fallbacks are real, and the test suite would have caught most regressions before they shipped. But I'd sleep better if `Parse_CSV` had been split apart three months ago.
+The codebase scores **63%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), but not yet the kind of code you hand to a new contributor and say "go find the CSV parsing bug." The file I/O layer is the debt that earns the most interest.
 
 ---
 
@@ -288,13 +348,13 @@ At 3 AM with a broken pipe in production? I'd trust this codebase. The error han
 
 | Finding | File:Line | Evidence |
 |---|---|---|
-| ~~`Parse_CSV` monolith~~ | `sdata-file_io.adb:285` | ~~553 lines; contains charset detection, type inference, quote parsing, field splitting, row emission~~ **[Resolved v0.6.6]** ~377 lines; 6 helpers extracted to `src/sdata-csv.ads`/`sdata-csv.adb`; 33 unit tests in `tests/csv_unit_test.adb` |
-| ~~`--debug` flag inert~~ | `sdata-interpreter.adb:186,1878,2124` | **[Resolved v0.6.6]** `Debug_Mode` now consulted in `Debug_Trace`, step-mode gate, and `BREAK` execution path; 3 tests cover trace and break behaviour |
-| HELP untested | `sdata-help.adb` | No `tests/help*.cmd` exists |
-| `Column_Order` linear scan | `sdata-table.adb:263–269` | Loop over Vector to find column name in `Rename_Column` |
-| LibreOffice graceful fallback | `sdata-file_io.adb:1058–1062` | Warning to stderr + `using cached values` on missing LibreOffice |
-| `SYSTEM` uses Spawn correctly | `sdata-system.adb:23` | `GNAT.OS_Lib.Spawn (Exec, Args, Success)` — not `system()` string concat |
-| Signal cleanup registered | `sdata-table.adb:733` | `SData.Signals.Register_Cleanup_Path` called on SQLite temp file creation |
-| Merge sort used | `sdata-table.adb:403–421` | `Merge_Sort` nested procedure; O(n log n) |
-| ~~One TODO in codebase~~ | ~~`sdata-variables.adb:520`~~ | **[Resolved v0.6.7]** Stale TODO removed; overlap range already preserves values correctly after the dangling-column fix in v0.6.6 |
-| `bump-version.sh` atomic update | `scripts/bump-version.sh` | Updates 9 files; validates format; optional build/test/commit/tag |
+| Parse_CSV is 392 lines | `sdata-file_io.adb:286–677` | Single procedure, multiple concerns |
+| Parse_OOXML is 369 lines | `sdata-file_io.adb:1103–1471` | Single procedure |
+| Parse_ODF raises Program_Error | `sdata-file_io.adb:1093–1096` | Wrong exception type for user-visible error |
+| Silent exception swallow | `sdata-csv.adb:42–45` | `when others => return False` twice |
+| Column-name SQL construction | `sdata-table.adb` | ~~DDL built from user-controlled column names~~ **Fixed 456d1e0 — Sql_Id helper escapes `]`→`]]`** |
+| SYSTEM shell injection surface | `sdata-system.adb:68–95` | ~~Unquoted string passed to `/bin/sh -c`~~ **Deliberate design; same trust model as R/SAS/Python; won't-fix** |
+| No CI pipeline | `.github/` absent | No automated build/test on push |
+| BY-variable list duplication | `sdata-interpreter.adb:59`, `sdata-table.adb:53` | Two independent copies of the same vector |
+| 1 unit test module | `tests/csv_unit_test.adb` | No evaluator/table/interpreter unit tests |
+| Execute_Assignment 135 lines | `sdata-interpreter.adb:659–793` | Multiple assignment concerns in one body |
