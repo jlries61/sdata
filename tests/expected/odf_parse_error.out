@@ -1,0 +1,3 @@
+Error: Failed to parse ODS file "tests/data/bad.ods": Bad (or no) end-of-central-directory zip-headers.adb:464
+continued after error
+RUN complete. 1 records and 0 variables processed.

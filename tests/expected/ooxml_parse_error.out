@@ -1,0 +1,3 @@
+Error: Failed to parse OOXML file "tests/data/bad.xlsx": Bad (or no) end-of-central-directory zip-headers.adb:464
+continued after error
+RUN complete. 1 records and 0 variables processed.
