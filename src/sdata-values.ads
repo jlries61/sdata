@@ -5,6 +5,7 @@
 with Ada.Strings.Unbounded;
 
 package SData.Values is
+   pragma Elaborate_Body;
 
    --  Kind of data stored in a Value record.
    type Value_Kind is (Val_Numeric, Val_Integer, Val_String, Val_Missing);
@@ -30,6 +31,11 @@ package SData.Values is
    --  Returns True for IEEE 754 positive or negative infinity.
    --  Returns False for finite values, Missing, and NaN.
    function Is_Inf (F : Float) return Boolean;
+
+   --  IEEE 754 infinity sentinels produced at package elaboration.
+   --  Use these wherever +Inf or -Inf must be produced at runtime.
+   Pos_Inf : Float;
+   Neg_Inf : Float;
 
    --  Like To_String, but respects global precision settings for Floats.
    function To_String_Formatted (V : Value) return String;

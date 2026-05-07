@@ -151,4 +151,13 @@ package body SData.Values is
       return False;
    end "<";
 
+begin
+   --  Float'Last * 2.0 must be computed at runtime (mutable variable) to
+   --  avoid the static-expression Constraint_Error GNAT raises at compile time.
+   declare
+      Big : Float := Float'Last;
+   begin
+      Pos_Inf :=  Big * 2.0;
+      Neg_Inf := -(Big * 2.0);
+   end;
 end SData.Values;

@@ -2,6 +2,7 @@ with Ada.Characters.Handling;
 with Ada.Strings;
 with Ada.Strings.Fixed;     use Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with SData.Values;
 
 package body SData.CSV is
 
@@ -23,18 +24,10 @@ package body SData.CSV is
    begin
       for K in T'Range loop TU (K) := Ada.Characters.Handling.To_Upper (T (K)); end loop;
       if TU = "INF" or else TU = "+INF" or else TU = "INFINITY" or else TU = "+INFINITY" then
-         declare
-            Big : Float := Float'Last;  --  non-constant: forces runtime overflow
-         begin
-            Result := Big * 2.0;  --  +Inf via IEEE 754 overflow
-         end;
+         Result := SData.Values.Pos_Inf;
          return True;
       elsif TU = "-INF" or else TU = "-INFINITY" then
-         declare
-            Big : Float := Float'Last;
-         begin
-            Result := -(Big * 2.0);  --  -Inf via IEEE 754 overflow
-         end;
+         Result := SData.Values.Neg_Inf;
          return True;
       end if;
       if I > T'Last then return False; end if;
