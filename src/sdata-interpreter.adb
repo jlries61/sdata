@@ -758,6 +758,16 @@ package body SData.Interpreter is
                end if;
             end if;
          end;
+         if Result.Kind = Val_Numeric and then Is_Inf (Result.Num_Val)
+            and then Expected = Val_Integer
+         then
+            if SData.Config.Ignore_Math_Errors then
+               Put_Line_Error ("Warning: Cannot convert Inf to integer.");
+               Result := (Kind => Val_Missing);
+            else
+               raise Script_Error with "Cannot convert Inf to integer.";
+            end if;
+         end if;
          if Result.Kind /= Val_Missing then
             if Expected = Val_Integer and Result.Kind /= Val_Integer then
                Result := (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Convert_To_Float(Result))));
