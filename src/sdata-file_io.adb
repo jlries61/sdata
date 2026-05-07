@@ -292,6 +292,30 @@ package body SData.File_IO is
    type Name_Array     is array (1 .. Max_CSV_Cols) of GNAT.Strings.String_Access;
    type Col_Type_Array is array (1 .. Max_CSV_Cols) of Column_Type;
 
+   procedure Split_Into_Lines (S : String; All_Lines : in out Line_Vecs.Vector) is
+      Start : Natural := S'First;
+      I     : Natural := S'First;
+   begin
+      while I <= S'Last loop
+         if S (I) = ASCII.LF then
+            declare
+               E : Natural := I - 1;
+            begin
+               if E >= Start and then S (E) = ASCII.CR then
+                  E := E - 1;
+               end if;
+               All_Lines.Append (To_Unbounded_String
+                  (if E >= Start then S (Start .. E) else ""));
+            end;
+            Start := I + 1;
+         end if;
+         I := I + 1;
+      end loop;
+      if Start <= S'Last then
+         All_Lines.Append (To_Unbounded_String (S (Start .. S'Last)));
+      end if;
+   end Split_Into_Lines;
+
    ---------------
    -- Parse_CSV --
    ---------------
@@ -323,30 +347,6 @@ package body SData.File_IO is
             end if;
          end loop;
       end Validate_ASCII;
-
-      procedure Split_Into_Lines (S : String) is
-         Start : Natural := S'First;
-         I     : Natural := S'First;
-      begin
-         while I <= S'Last loop
-            if S (I) = ASCII.LF then
-               declare
-                  E : Natural := I - 1;
-               begin
-                  if E >= Start and then S (E) = ASCII.CR then
-                     E := E - 1;
-                  end if;
-                  All_Lines.Append (To_Unbounded_String
-                     (if E >= Start then S (Start .. E) else ""));
-               end;
-               Start := I + 1;
-            end if;
-            I := I + 1;
-         end loop;
-         if Start <= S'Last then
-            All_Lines.Append (To_Unbounded_String (S (Start .. S'Last)));
-         end if;
-      end Split_Into_Lines;
 
       --  Single heap-allocated line buffer shared for the entire parse.
       --  1 MB handles all real-world CSV lines; lines longer than this
@@ -554,7 +554,7 @@ package body SData.File_IO is
                then
                   Start_At := UTF8'First + 3;
                end if;
-               Split_Into_Lines (UTF8 (Start_At .. UTF8'Last));
+               Split_Into_Lines (UTF8 (Start_At .. UTF8'Last), All_Lines);
                Is_Buffered := True;
             end;
          exception
