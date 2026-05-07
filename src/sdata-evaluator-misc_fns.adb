@@ -27,6 +27,21 @@ package body SData.Evaluator.Misc_Fns is
       end;
    end Handle_Missing;
 
+   function Handle_Inf_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
+      pragma Unreferenced (Name);
+   begin
+      if Integer (Vals.Length) < 1 then return (Kind => Val_Integer, Int_Val => 0); end if;
+      declare
+         V : constant Value := Vals.Element (1);
+      begin
+         if V.Kind = Val_Numeric and then SData.Values.Is_Inf (V.Num_Val) then
+            return (Kind => Val_Integer, Int_Val => 1);
+         else
+            return (Kind => Val_Integer, Int_Val => 0);
+         end if;
+      end;
+   end Handle_Inf_Fn;
+
    function Handle_False (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
    begin
@@ -329,6 +344,7 @@ package body SData.Evaluator.Misc_Fns is
    procedure Register is
    begin
       Dispatch_Table.Insert ("MISSING", Handle_Missing'Access);
+      Dispatch_Table.Insert ("INF",     Handle_Inf_Fn'Access);
       Dispatch_Table.Insert ("FALSE",   Handle_False'Access);
       Dispatch_Table.Insert ("TRUE",    Handle_True'Access);
       Dispatch_Table.Insert ("DATE$",   Handle_Date'Access);
