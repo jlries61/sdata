@@ -481,6 +481,20 @@ package body SData.Variables is
                   SData.Table.Add_Column (Var_Name, Typ);
                end;
             end if;
+            --  Keep PDV aligned with Data_Table. Add_Column just grew the input
+            --  table; if this element was never assigned via LET its PDV slot
+            --  won't exist, causing Load_PDV_From_Table to walk off PDV_Names.
+            if not Arr_Def.Is_Temporary then
+               declare
+                  Upper : constant String := To_Upper (Var_Name);
+               begin
+                  if not PDV_Index.Contains (Upper) then
+                     PDV_Names.Append (To_Unbounded_String (Upper));
+                     PDV_Vec.Append ((Kind => Val_Missing));
+                     PDV_Index.Insert (Upper, Positive (PDV_Names.Length));
+                  end if;
+               end;
+            end if;
          end;
       end loop;
    end Create_Real_Elements;
