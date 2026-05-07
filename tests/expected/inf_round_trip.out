@@ -1,0 +1,11 @@
+Dataset opened: tests/data/inf_values.csv
+Dataset saved: tests/data/inf_output.csv
+RUN complete. 3 records and 3 variables processed.
+Dataset opened: tests/data/inf_output.csv
+Inf
+1
+Inf
+1
+Inf
+1
+RUN complete. 3 records and 3 variables processed.

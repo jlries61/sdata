@@ -806,7 +806,11 @@ package body SData.File_IO is
                   Val : constant Value := Get_Value_Upper (R, Column_Name (C));
                begin
                   if Val.Kind = Val_Numeric then
-                     Write_String (Trim (Val.Num_Val'Img, Ada.Strings.Both));
+                     if Is_Inf (Val.Num_Val) then
+                        Write_String (if Val.Num_Val > 0.0 then "Inf" else "-Inf");
+                     else
+                        Write_String (Trim (Val.Num_Val'Img, Ada.Strings.Both));
+                     end if;
                   elsif Val.Kind = Val_Integer then
                      Write_String (Trim (Val.Int_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_String then
@@ -865,9 +869,17 @@ package body SData.File_IO is
                end;
             elsif Length (P_List) > 0 then
                declare
-                  S : constant String := Get_Text (Item (P_List, 0));
+                  S  : constant String := Get_Text (Item (P_List, 0));
+                  SU : constant String := To_Upper (S);
                begin
                   Free (P_List);
+                  if SU = "INF" or else SU = "+INF"
+                     or else SU = "INFINITY" or else SU = "+INFINITY"
+                  then
+                     return (Kind => Val_Numeric, Num_Val => Pos_Inf);
+                  elsif SU = "-INF" or else SU = "-INFINITY" then
+                     return (Kind => Val_Numeric, Num_Val => Neg_Inf);
+                  end if;
                   return (Kind => Val_String, Str_Val => To_Unbounded_String (S));
                end;
             end if;
@@ -1272,7 +1284,20 @@ package body SData.File_IO is
                         end if;
                      end;
                   elsif T_Attr = "str" then
-                     return (Kind => Val_String, Str_Val => To_Unbounded_String (Val_Str));
+                     declare
+                        SU : constant String := To_Upper (Val_Str);
+                     begin
+                        if SU = "INF" or else SU = "+INF"
+                           or else SU = "INFINITY" or else SU = "+INFINITY"
+                        then
+                           Free (V_List); Free (IS_List);
+                           return (Kind => Val_Numeric, Num_Val => Pos_Inf);
+                        elsif SU = "-INF" or else SU = "-INFINITY" then
+                           Free (V_List); Free (IS_List);
+                           return (Kind => Val_Numeric, Num_Val => Neg_Inf);
+                        end if;
+                        return (Kind => Val_String, Str_Val => To_Unbounded_String (Val_Str));
+                     end;
                   else
                      begin return (Kind => Val_Numeric, Num_Val => Float'Value (Val_Str)); exception when Constraint_Error => null; end;
                   end if;
@@ -1282,9 +1307,20 @@ package body SData.File_IO is
                   T_Nodes : Node_List := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (IS_List, 0)), "t");
                begin
                   if Length (T_Nodes) > 0 then
-                     declare S : constant String := Get_Text (Item (T_Nodes, 0));
-                     begin Free (T_Nodes); Free (V_List); Free (IS_List);
-                           return (Kind => Val_String, Str_Val => To_Unbounded_String (S)); end;
+                     declare
+                        S  : constant String := Get_Text (Item (T_Nodes, 0));
+                        SU : constant String := To_Upper (S);
+                     begin
+                        Free (T_Nodes); Free (V_List); Free (IS_List);
+                        if SU = "INF" or else SU = "+INF"
+                           or else SU = "INFINITY" or else SU = "+INFINITY"
+                        then
+                           return (Kind => Val_Numeric, Num_Val => Pos_Inf);
+                        elsif SU = "-INF" or else SU = "-INFINITY" then
+                           return (Kind => Val_Numeric, Num_Val => Neg_Inf);
+                        end if;
+                        return (Kind => Val_String, Str_Val => To_Unbounded_String (S));
+                     end;
                   end if;
                   Free (T_Nodes);
                end;
@@ -1546,7 +1582,18 @@ package body SData.File_IO is
                begin
                   case V.Kind is
                      when Val_Numeric =>
-                        Append (S1, "<c r=""" & Ref & """><v>" & Trim (V.Num_Val'Img, Ada.Strings.Both) & "</v></c>");
+                        if Is_Inf (V.Num_Val) then
+                           declare
+                              Img : constant String :=
+                                 (if V.Num_Val > 0.0 then "Inf" else "-Inf");
+                           begin
+                              Append (S1, "<c r=""" & Ref &
+                                 """ t=""inlineStr""><is><t>" & Img & "</t></is></c>");
+                           end;
+                        else
+                           Append (S1, "<c r=""" & Ref & """><v>" &
+                              Trim (V.Num_Val'Img, Ada.Strings.Both) & "</v></c>");
+                        end if;
                      when Val_Integer =>
                         Append (S1, "<c r=""" & Ref & """><v>" & Trim (V.Int_Val'Img, Ada.Strings.Both) & "</v></c>");
                      when Val_String =>
@@ -1621,8 +1668,20 @@ package body SData.File_IO is
                begin
                   case V.Kind is
                      when Val_Numeric =>
-                        Append (S1, "<table:table-cell office:value-type=""float"" office:value=""" & Trim (V.Num_Val'Img, Ada.Strings.Both) & """>" &
-                                "<text:p>" & Trim (V.Num_Val'Img, Ada.Strings.Both) & "</text:p></table:table-cell>");
+                        if Is_Inf (V.Num_Val) then
+                           declare
+                              Img : constant String :=
+                                 (if V.Num_Val > 0.0 then "Inf" else "-Inf");
+                           begin
+                              Append (S1, "<table:table-cell office:value-type=""string"">" &
+                                          "<text:p>" & Img & "</text:p></table:table-cell>");
+                           end;
+                        else
+                           Append (S1, "<table:table-cell office:value-type=""float"" office:value=""" &
+                                   Trim (V.Num_Val'Img, Ada.Strings.Both) & """>" &
+                                   "<text:p>" & Trim (V.Num_Val'Img, Ada.Strings.Both) &
+                                   "</text:p></table:table-cell>");
+                        end if;
                      when Val_Integer =>
                         Append (S1, "<table:table-cell office:value-type=""float"" office:value=""" & Trim (V.Int_Val'Img, Ada.Strings.Both) & """>" &
                                 "<text:p>" & Trim (V.Int_Val'Img, Ada.Strings.Both) & "</text:p></table:table-cell>");
