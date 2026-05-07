@@ -52,7 +52,7 @@ package body SData.CSV is
                   Result := Float'Value (T);
                   return True;
                exception
-                  when others => return False;
+                  when Constraint_Error => return False;
                end;
             when others => return False;
          end case;
