@@ -44,6 +44,7 @@ that might relitigate a settled question.
 | ADR-032 | Add --nosubmit flag to disable SUBMIT command | 2026-05-06 | Accepted |
 | ADR-033 | Use a C stub for privilege detection rather than florist_blady | 2026-05-06 | Accepted |
 | ADR-034 | Measure MAXINTAB / -m in cells (rows × columns), not rows | 2026-05-07 | Accepted |
+| ADR-035 | Adopt IEEE 754 infinity as a first-class evaluator value | 2026-05-07 | Accepted |
 
 ---
 
@@ -409,6 +410,23 @@ that might relitigate a settled question.
 **Decision:** Redefine the unit of MAXINTAB / `-m` as cells (rows × columns). Both spill checks — in `Add_Row` for the input table and in `Add_Output_Row` for the output table — now compare `rows_in_current_segment × column_count` against the threshold. `Fetch_From_Disk` derives the equivalent rows-per-segment for cache-page alignment as `threshold / column_count` (floored at 1), preserving consistent segment boundaries between write and read paths. The variable name `Max_Table_Rows` is retained in the source to minimize churn; the semantics are recorded here and in the help strings. Default remains 0 (unlimited, no automatic spill). A practical guideline: 1 000 000 cells ≈ 25–32 MB at typical cell sizes; 10 000 000 cells ≈ 250–320 MB.
 
 **Consequences:** The threshold is now proportional to actual memory consumption regardless of dataset width. The default of 0 preserves existing behavior for all users who have not set the option. The one-to-one correspondence between write-segment size and read-segment size is maintained because both derive rows-per-segment from the same formula. Column count is stable during the row-adding phase for both the input and output tables (columns are finalized before rows are appended in all parsers and in `Flush_PDV_To_Output`), so the divisor does not change within a single spill calculation.
+
+---
+
+### ADR-035: Adopt IEEE 754 infinity as a first-class evaluator value
+**Date:** 2026-05-07 | **Status:** Accepted
+
+**Context:** The evaluator treated divide-by-zero and arithmetic overflow as fatal runtime errors. Scripts that divided by a denominator that could be zero in some records had to guard every such expression with an IF check, making data-cleaning code verbose. SAS — the primary design reference — propagates IEEE 754 infinity rather than halting, and provides a missing-value propagation model that does not require defensive guards at every arithmetic site.
+
+**Decision:** Treat IEEE 754 positive and negative infinity as first-class values in the SData runtime:
+
+- `Pos_Inf` and `Neg_Inf` constants are initialized via a local `Big : Float := Float'Last` followed by `Big * 2.0` at package elaboration of `SData.Values`. Initializing directly as a constant causes GNAT to evaluate the expression at compile time and raise `Constraint_Error`; deferring to a local non-constant variable produces the IEEE overflow at runtime, yielding the correct bit-pattern. A targeted `pragma Warnings (Off/On, "could be declared constant")` suppresses the resulting GNAT `-gnatwk` warning.
+- An `INF()` built-in function returns `Pos_Inf`; negation (`-INF()`) gives `Neg_Inf`.
+- `OPTIONS IEEE_DIVIDE ON` (the default) routes division by zero to `Pos_Inf` or `Neg_Inf` based on the sign of the numerator; `OPTIONS IEEE_DIVIDE OFF` restores the original fatal-error behavior.
+- Infinity propagates through arithmetic and transcendental functions (e.g. `FLOOR(Inf) = Inf`, `SQRT(Inf) = Inf`).
+- Integer assignment is a firewall: assigning an infinite value to an integer column raises a runtime error. Real (floating-point) columns accept and store infinity without restriction.
+
+**Consequences:** Scripts can perform division and exponential operations without defensive IF guards when propagation is acceptable. The initialize-via-runtime-overflow technique is GNAT-specific but is the only way to generate IEEE infinity in Ada without compiler-generated Constraint_Error; it is isolated to a two-line block in `SData.Values`. The INTEGER firewall prevents silent data corruption in downstream integer arithmetic while leaving the propagation path open for real-valued computations.
 
 ---
 
