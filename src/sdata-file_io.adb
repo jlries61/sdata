@@ -316,6 +316,52 @@ package body SData.File_IO is
       end if;
    end Split_Into_Lines;
 
+   procedure Load_As_UTF16
+      (File_Name   : String;
+       Scheme      : Ada.Strings.UTF_Encoding.Encoding_Scheme;
+       All_Lines   : in out Line_Vecs.Vector;
+       Is_Buffered : out Boolean)
+   is
+      F    : Ada.Streams.Stream_IO.File_Type;
+      Sz   : constant Ada.Directories.File_Size :=
+         Ada.Directories.Size (File_Name);
+      Buf  : Ada.Streams.Stream_Element_Array
+         (1 .. Ada.Streams.Stream_Element_Offset (Sz));
+      Last : Ada.Streams.Stream_Element_Offset;
+      Raw  : String (1 .. Natural (Sz));
+   begin
+      Is_Buffered := False;
+      Ada.Streams.Stream_IO.Open
+         (F, Ada.Streams.Stream_IO.In_File, File_Name);
+      Ada.Streams.Stream_IO.Read (F, Buf, Last);
+      Ada.Streams.Stream_IO.Close (F);
+      for I in 1 .. Natural (Last) loop
+         Raw (I) :=
+            Character'Val (Buf (Ada.Streams.Stream_Element_Offset (I)));
+      end loop;
+      declare
+         UTF8     : constant String :=
+            Ada.Strings.UTF_Encoding.Conversions.Convert
+               (Raw (1 .. Natural (Last)), Scheme,
+                Ada.Strings.UTF_Encoding.UTF_8);
+         Start_At : Natural := UTF8'First;
+      begin
+         if UTF8'Length >= 3
+            and then UTF8 (UTF8'First .. UTF8'First + 2) = BOM_8
+         then
+            Start_At := UTF8'First + 3;
+         end if;
+         Split_Into_Lines (UTF8 (Start_At .. UTF8'Last), All_Lines);
+         Is_Buffered := True;
+      end;
+   exception
+      when others =>
+         if Ada.Streams.Stream_IO.Is_Open (F) then
+            Ada.Streams.Stream_IO.Close (F);
+         end if;
+         raise;
+   end Load_As_UTF16;
+
    ---------------
    -- Parse_CSV --
    ---------------
@@ -523,48 +569,6 @@ package body SData.File_IO is
          use Ada.Streams;
          UC : constant String := To_Upper (Trim (Charset, Ada.Strings.Both));
 
-         procedure Load_As_UTF16
-            (Scheme : Ada.Strings.UTF_Encoding.Encoding_Scheme)
-         is
-            F    : Ada.Streams.Stream_IO.File_Type;
-            Sz   : constant Ada.Directories.File_Size :=
-               Ada.Directories.Size (File_Name);
-            Buf  : Ada.Streams.Stream_Element_Array
-               (1 .. Ada.Streams.Stream_Element_Offset (Sz));
-            Last : Ada.Streams.Stream_Element_Offset;
-            Raw  : String (1 .. Natural (Sz));
-         begin
-            Ada.Streams.Stream_IO.Open
-               (F, Ada.Streams.Stream_IO.In_File, File_Name);
-            Ada.Streams.Stream_IO.Read (F, Buf, Last);
-            Ada.Streams.Stream_IO.Close (F);
-            for I in 1 .. Natural (Last) loop
-               Raw (I) :=
-                  Character'Val (Buf (Ada.Streams.Stream_Element_Offset (I)));
-            end loop;
-            declare
-               UTF8     : constant String :=
-                  Ada.Strings.UTF_Encoding.Conversions.Convert
-                     (Raw (1 .. Natural (Last)), Scheme,
-                      Ada.Strings.UTF_Encoding.UTF_8);
-               Start_At : Natural := UTF8'First;
-            begin
-               if UTF8'Length >= 3
-                  and then UTF8 (UTF8'First .. UTF8'First + 2) = BOM_8
-               then
-                  Start_At := UTF8'First + 3;
-               end if;
-               Split_Into_Lines (UTF8 (Start_At .. UTF8'Last), All_Lines);
-               Is_Buffered := True;
-            end;
-         exception
-            when others =>
-               if Ada.Streams.Stream_IO.Is_Open (F) then
-                  Ada.Streams.Stream_IO.Close (F);
-               end if;
-               raise;
-         end Load_As_UTF16;
-
          procedure Detect_And_Load is
             F      : Ada.Streams.Stream_IO.File_Type;
             Detect : Ada.Streams.Stream_Element_Array (1 .. 4);
@@ -577,11 +581,13 @@ package body SData.File_IO is
             if Last >= 2
                and then Detect (1) = 16#FF# and then Detect (2) = 16#FE#
             then
-               Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16LE);
+               Load_As_UTF16 (File_Name, Ada.Strings.UTF_Encoding.UTF_16LE,
+                              All_Lines, Is_Buffered);
             elsif Last >= 2
                and then Detect (1) = 16#FE# and then Detect (2) = 16#FF#
             then
-               Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16BE);
+               Load_As_UTF16 (File_Name, Ada.Strings.UTF_Encoding.UTF_16BE,
+                              All_Lines, Is_Buffered);
             end if;
          exception
             when others =>
@@ -593,9 +599,11 @@ package body SData.File_IO is
 
       begin
          if UC = "UTF-16" or else UC = "UTF-16LE" then
-            Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16LE);
+            Load_As_UTF16 (File_Name, Ada.Strings.UTF_Encoding.UTF_16LE,
+                           All_Lines, Is_Buffered);
          elsif UC = "UTF-16BE" then
-            Load_As_UTF16 (Ada.Strings.UTF_Encoding.UTF_16BE);
+            Load_As_UTF16 (File_Name, Ada.Strings.UTF_Encoding.UTF_16BE,
+                           All_Lines, Is_Buffered);
          elsif UC = "" or else UC = "AUTO" then
             Detect_And_Load;
          elsif UC = "ASCII" then
