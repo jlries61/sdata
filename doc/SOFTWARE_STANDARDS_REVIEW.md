@@ -64,7 +64,7 @@ Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output
 |---|---|---|
 | Naming Precision | 9/10 | Excellent; Ada verbosity works in the codebase's favour |
 | Self-Documentation | 7/10 | Good in evaluator/table; weakens inside file_io monoliths |
-| Cognitive Load | Medium | Low in most files; **High** inside Parse_CSV and Parse_OOXML |
+| Cognitive Load | Medium | Low in evaluator (hidden state eliminated), interpreter (Step_Context explicit); **Medium** in Parse_CSV (passes now separated: `Process_Line_Direct` → `Infer_Column_Types` → `Load_Data_Rows`); **High** in Parse_OOXML (389 lines, still monolithic) and Parse_ODF (272 lines) |
 
 ### 2.2 Function Design
 
@@ -78,11 +78,11 @@ Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output
 
 | Procedure | Lines | SRP Score | Verdict |
 |---|---|---|---|
-| Parse_CSV | 392 | 3/10 | Structural failure |
-| Parse_OOXML | 369 | 3/10 | Structural failure |
-| Parse_ODF | 268 | 4/10 | Very long |
-| Execute_Assignment | 135 | 5/10 | Too broad |
-| Process_One_Record | 130 | 7/10 | Large but coherent |
+| Parse_CSV | ~~392~~ 326 | ~~3/10~~ 6/10 | ~~Structural failure~~ Passes separated (ab4d5c8): tokenizer → type inference → load |
+| Parse_OOXML | ~~369~~ 389 | 3/10 | Structural failure — grew slightly; still monolithic |
+| Parse_ODF | ~~268~~ 272 | 4/10 | Very long; unchanged |
+| Execute_Assignment | ~~135~~ 155 | 5/10 | Too broad; grew slightly |
+| Process_One_Record | ~~130~~ 129 | 7/10 | Large but coherent |
 | Evaluate_Function | 134 | 6/10 | Complexity is warranted (array expansion) |
 | Help_CONCEPTS | 51 | 9/10 | Fine |
 
