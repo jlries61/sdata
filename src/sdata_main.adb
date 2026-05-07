@@ -175,6 +175,17 @@ procedure SData_Main is
    Idx          : Positive := 1;
    Pager_Cmd    : Unbounded_String := Null_Unbounded_String;
 begin
+   --  Enforce --noshell and --nosubmit when running as root / SYSTEM.
+   --  Done first so the restriction applies regardless of how sdata is invoked.
+   if SData.System.Running_As_System_Account then
+      if not Disable_Shell or else not Disable_Submit then
+         Put_Line_Error ("Warning: Running as root/SYSTEM; "
+                         & "--noshell and --nosubmit enforced.");
+      end if;
+      Disable_Shell  := True;
+      Disable_Submit := True;
+   end if;
+
    --  Initial argument check.
    if Argument_Count = 0 then
       Run_REPL;
@@ -387,16 +398,6 @@ begin
       end;
       Idx := Idx + 1;
    end loop;
-
-   --  Enforce --noshell and --nosubmit when running as root / SYSTEM.
-   if SData.System.Running_As_System_Account then
-      if not Disable_Shell or else not Disable_Submit then
-         Put_Line_Error ("Warning: Running as root/SYSTEM; "
-                         & "--noshell and --nosubmit enforced.");
-      end if;
-      Disable_Shell  := True;
-      Disable_Submit := True;
-   end if;
 
    --  Validate -p / --noshell interaction.
    if Length (Pager_Cmd) > 0 and then Disable_Shell then
