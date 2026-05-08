@@ -1,3 +1,9 @@
+sdata (0.6.10-1) unstable; urgency=medium
+
+  * Expand unit tests (csv_unit_test 71 tests, sdata_unit_test 98 tests); fix NRN() normal distribution bug; add SYSTEM as immediate command; annotate standards review.
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 07 May 2026 18:01:27 -0700
+
 sdata (0.6.9-1) unstable; urgency=medium
 
   * Add Inf/-Inf support: first-class IEEE 754 infinity, INF() function, OPTIONS IEEE_DIVIDE, NaN detection, full CSV/ODF/OOXML round-trip.
