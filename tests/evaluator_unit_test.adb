@@ -239,7 +239,62 @@ begin
 
    Put_Line ("");
 
-   -- (test sections added by Tasks 3-6)
+   Put_Line ("--- NF: Trigonometric Functions ---");
+
+   --  NF-25: SIN(0.0) = 0.0
+   Check_Num ("NF-25: SIN(0.0) = 0.0", F1 ("SIN", 0.0), 0.0);
+
+   --  NF-26: COS(0.0) = 1.0
+   Check_Num ("NF-26: COS(0.0) = 1.0", F1 ("COS", 0.0), 1.0);
+
+   --  NF-27: TAN(0.0) = 0.0
+   Check_Num ("NF-27: TAN(0.0) = 0.0", F1 ("TAN", 0.0), 0.0);
+
+   --  NF-28: ATN(1.0) = π/4
+   Check_Num ("NF-28: ATN(1.0) = pi/4",
+              F1 ("ATN", 1.0), Float (Ada.Numerics.Pi) / 4.0);
+
+   --  NF-29: ARCTAN is an alias for ATN
+   Check_Num ("NF-29: ARCTAN(1.0) = pi/4",
+              F1 ("ARCTAN", 1.0), Float (Ada.Numerics.Pi) / 4.0);
+
+   --  NF-30: ATAN2(1.0, 1.0) = π/4
+   Check_Num ("NF-30: ATAN2(1.0, 1.0) = pi/4",
+              F2 ("ATAN2", 1.0, 1.0), Float (Ada.Numerics.Pi) / 4.0);
+
+   --  NF-31: ARCSIN(1.0) = π/2
+   Check_Num ("NF-31: ARCSIN(1.0) = pi/2",
+              F1 ("ARCSIN", 1.0), Float (Ada.Numerics.Pi) / 2.0);
+
+   --  NF-32: ARCSIN domain error (|x| > 1)
+   Check ("NF-32: ARCSIN(2.0) raises domain error",
+          Raises ("ARCSIN", (1 => (Kind => Val_Numeric, Num_Val => 2.0))), True);
+
+   --  NF-33: ARCCOS(0.0) = π/2
+   Check_Num ("NF-33: ARCCOS(0.0) = pi/2",
+              F1 ("ARCCOS", 0.0), Float (Ada.Numerics.Pi) / 2.0);
+
+   --  NF-34: ARCCOS domain error (|x| > 1)
+   Check ("NF-34: ARCCOS(2.0) raises domain error",
+          Raises ("ARCCOS", (1 => (Kind => Val_Numeric, Num_Val => 2.0))), True);
+
+   --  NF-35: DEG(π) = 180.0
+   Check_Num ("NF-35: DEG(pi) = 180.0",
+              F1 ("DEG", Float (Ada.Numerics.Pi)), 180.0, 0.001);
+
+   --  NF-36: RAD(180.0) = π
+   Check_Num ("NF-36: RAD(180.0) = pi",
+              F1 ("RAD", 180.0), Float (Ada.Numerics.Pi), 0.0001);
+
+   --  NF-37: SIND(90.0) = 1.0
+   Check_Num ("NF-37: SIND(90.0) = 1.0", F1 ("SIND", 90.0), 1.0);
+
+   --  NF-38: COSD(0.0) = 1.0
+   Check_Num ("NF-38: COSD(0.0) = 1.0", F1 ("COSD", 0.0), 1.0);
+
+   Put_Line ("");
+
+   -- (test sections added by Tasks 4-6)
 
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
