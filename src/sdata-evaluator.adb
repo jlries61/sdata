@@ -77,8 +77,9 @@ package body SData.Evaluator is
    end Set_Group_Boundary;
 
    function Call_Function (Name : String; Args : Value_Array) return Value is
+      UC     : constant String := To_Upper (Name);
       Vals   : Value_Vectors.Vector;
-      Cursor : constant Fn_Maps.Cursor := Dispatch_Table.Find (Name);
+      Cursor : constant Fn_Maps.Cursor := Dispatch_Table.Find (UC);
    begin
       for A of Args loop
          Vals.Append (A);
@@ -86,7 +87,7 @@ package body SData.Evaluator is
       if not Fn_Maps.Has_Element (Cursor) then
          raise Script_Error with "Call_Function: unknown function '" & Name & "'";
       end if;
-      return Fn_Maps.Element (Cursor).all (Name, Vals);
+      return Fn_Maps.Element (Cursor).all (UC, Vals);
    end Call_Function;
 
    function Convert_To_Float (V : Value) return Float is

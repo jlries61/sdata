@@ -4,11 +4,11 @@
 
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
-with Ada.Numerics;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData.Values;          use SData.Values;
 with SData.Evaluator;       use SData.Evaluator;
 with SData.Statistics;
+pragma Warnings (Off, SData.Statistics);
 
 procedure Evaluator_Unit_Test is
    Passed : Natural := 0;
