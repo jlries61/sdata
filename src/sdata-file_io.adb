@@ -1369,7 +1369,6 @@ package body SData.File_IO is
                      declare
                         Inf : constant Value := Detect_Inf (Val_Str);
                      begin
-                        Free (V_List); Free (IS_List);
                         if Inf.Kind /= Val_Missing then return Inf; end if;
                         return (Kind => Val_String, Str_Val => To_Unbounded_String (Val_Str));
                      end;
