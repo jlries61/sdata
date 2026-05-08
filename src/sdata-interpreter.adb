@@ -81,7 +81,7 @@ package body SData.Interpreter is
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
-         Stmt_PROGRAM_DELETE | Stmt_OPTIONS;
+         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
