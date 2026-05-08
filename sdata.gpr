@@ -9,7 +9,7 @@ project SData is
    for Source_Dirs use ("src/**", "tests");
    for Object_Dir use "obj";
    for Exec_Dir use "bin";
-   for Main use ("sdata_main.adb", "csv_unit_test.adb", "sdata_unit_test.adb");
+   for Main use ("sdata_main.adb", "csv_unit_test.adb", "sdata_unit_test.adb", "evaluator_unit_test.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use ("-gnat2012", "-gnatwa", "-gnatwl", "-gnatwu", "-g", "-O2");
@@ -20,5 +20,6 @@ project SData is
       for Executable ("sdata_main.adb")      use "sdata";
       for Executable ("csv_unit_test.adb")  use "csv_unit_test";
       for Executable ("sdata_unit_test.adb") use "sdata_unit_test";
+      for Executable ("evaluator_unit_test.adb") use "evaluator_unit_test";
    end Builder;
 end SData;

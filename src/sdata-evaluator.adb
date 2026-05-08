@@ -76,6 +76,19 @@ package body SData.Evaluator is
       Nav_Fns.Set_Boundary (BOG, EOG);
    end Set_Group_Boundary;
 
+   function Call_Function (Name : String; Args : Value_Array) return Value is
+      Vals   : Value_Vectors.Vector;
+      Cursor : constant Fn_Maps.Cursor := Dispatch_Table.Find (Name);
+   begin
+      for A of Args loop
+         Vals.Append (A);
+      end loop;
+      if not Fn_Maps.Has_Element (Cursor) then
+         raise Script_Error with "Call_Function: unknown function '" & Name & "'";
+      end if;
+      return Fn_Maps.Element (Cursor).all (Name, Vals);
+   end Call_Function;
+
    function Convert_To_Float (V : Value) return Float is
    begin
       case V.Kind is

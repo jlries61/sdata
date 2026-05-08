@@ -38,6 +38,12 @@ package SData.Evaluator is
    --  call in a data step.
    procedure Set_Group_Boundary (BOG, EOG : Boolean);
 
+   --  Thin shim for unit tests: call a registered function by name with
+   --  pre-evaluated arguments.  Raises SData.Script_Error if Name is not in
+   --  the dispatch table.
+   type Value_Array is array (Positive range <>) of Value;
+   function Call_Function (Name : String; Args : Value_Array) return Value;
+
 private
 
    --  Type infrastructure shared by the parent body and all private child
