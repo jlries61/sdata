@@ -29,6 +29,11 @@ with Input_Sources.File;
 
 package body SData.File_IO is
 
+   --  Shared column-name vector type used by Parse_ODF and Parse_OOXML.
+   package Name_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
+
+   type Column_Type_Array is array (Positive range <>) of Column_Type;
+
    --  Helper for DOM node traversal
    function Get_Text (N : DOM.Core.Node) return String is
       use DOM.Core;
@@ -46,6 +51,38 @@ package body SData.File_IO is
       end loop;
       return To_String (Res);
    end Get_Text;
+
+   --  Returns Pos_Inf, Neg_Inf, or Val_Missing for INF-variant strings.
+   --  Used by both Parse_ODF and Parse_OOXML Get_Cell_Value helpers.
+   function Detect_Inf (S : String) return Value is
+      SU : constant String := To_Upper (S);
+   begin
+      if SU = "INF" or else SU = "+INF"
+         or else SU = "INFINITY" or else SU = "+INFINITY"
+      then
+         return (Kind => Val_Numeric, Num_Val => Pos_Inf);
+      elsif SU = "-INF" or else SU = "-INFINITY" then
+         return (Kind => Val_Numeric, Num_Val => Neg_Inf);
+      end if;
+      return (Kind => Val_Missing);
+   end Detect_Inf;
+
+   --  Forces Col_String for any column whose name ends in '$'.
+   --  Shared by Parse_ODF and Parse_OOXML type-inference phases.
+   procedure Apply_Dollar_Override
+      (Col_Name_Vec : Name_Vecs.Vector;
+       Col_Types    : in out Column_Type_Array) is
+   begin
+      for I in 1 .. Natural (Col_Name_Vec.Length) loop
+         declare
+            Raw : constant String := To_String (Col_Name_Vec (I));
+         begin
+            if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
+               Col_Types (I) := Col_String;
+            end if;
+         end;
+      end loop;
+   end Apply_Dollar_Override;
 
    ---------------
    -- Safe_Name --
@@ -897,7 +934,6 @@ package body SData.File_IO is
       Temp_XML : constant String := File_Name & ".content.xml";
 
       procedure Load_Content (Zip_Info : Zip.Zip_Info) is
-         package Name_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
          Reader : DOM.Readers.Tree_Reader;
          Input  : Input_Sources.File.File_Input;
          Doc    : DOM.Core.Document;
@@ -922,17 +958,11 @@ package body SData.File_IO is
                end;
             elsif Length (P_List) > 0 then
                declare
-                  S  : constant String := Get_Text (Item (P_List, 0));
-                  SU : constant String := To_Upper (S);
+                  S   : constant String := Get_Text (Item (P_List, 0));
+                  Inf : constant Value  := Detect_Inf (S);
                begin
                   Free (P_List);
-                  if SU = "INF" or else SU = "+INF"
-                     or else SU = "INFINITY" or else SU = "+INFINITY"
-                  then
-                     return (Kind => Val_Numeric, Num_Val => Pos_Inf);
-                  elsif SU = "-INF" or else SU = "-INFINITY" then
-                     return (Kind => Val_Numeric, Num_Val => Neg_Inf);
-                  end if;
+                  if Inf.Kind /= Val_Missing then return Inf; end if;
                   return (Kind => Val_String, Str_Val => To_Unbounded_String (S));
                end;
             end if;
@@ -1315,7 +1345,6 @@ package body SData.File_IO is
          Rows, Cells : Node_List;
          Success : Boolean;
          Col_Count : Natural := 0;
-         package Name_Vecs is new Ada.Containers.Vectors (Positive, Unbounded_String);
 
          function Get_Cell_Value (Cell_Node : Node) return Value is
             T_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell_Node), "t");
@@ -1338,17 +1367,10 @@ package body SData.File_IO is
                      end;
                   elsif T_Attr = "str" then
                      declare
-                        SU : constant String := To_Upper (Val_Str);
+                        Inf : constant Value := Detect_Inf (Val_Str);
                      begin
-                        if SU = "INF" or else SU = "+INF"
-                           or else SU = "INFINITY" or else SU = "+INFINITY"
-                        then
-                           Free (V_List); Free (IS_List);
-                           return (Kind => Val_Numeric, Num_Val => Pos_Inf);
-                        elsif SU = "-INF" or else SU = "-INFINITY" then
-                           Free (V_List); Free (IS_List);
-                           return (Kind => Val_Numeric, Num_Val => Neg_Inf);
-                        end if;
+                        Free (V_List); Free (IS_List);
+                        if Inf.Kind /= Val_Missing then return Inf; end if;
                         return (Kind => Val_String, Str_Val => To_Unbounded_String (Val_Str));
                      end;
                   else
@@ -1361,17 +1383,11 @@ package body SData.File_IO is
                begin
                   if Length (T_Nodes) > 0 then
                      declare
-                        S  : constant String := Get_Text (Item (T_Nodes, 0));
-                        SU : constant String := To_Upper (S);
+                        S   : constant String := Get_Text (Item (T_Nodes, 0));
+                        Inf : constant Value  := Detect_Inf (S);
                      begin
                         Free (T_Nodes); Free (V_List); Free (IS_List);
-                        if SU = "INF" or else SU = "+INF"
-                           or else SU = "INFINITY" or else SU = "+INFINITY"
-                        then
-                           return (Kind => Val_Numeric, Num_Val => Pos_Inf);
-                        elsif SU = "-INF" or else SU = "-INFINITY" then
-                           return (Kind => Val_Numeric, Num_Val => Neg_Inf);
-                        end if;
+                        if Inf.Kind /= Val_Missing then return Inf; end if;
                         return (Kind => Val_String, Str_Val => To_Unbounded_String (S));
                      end;
                   end if;
