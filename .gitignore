@@ -23,6 +23,9 @@ tests/data/test1_output.csv
 CHASX.DAT
 CHASX*.CSV
 
+# SSD working directory (see .ssd/README.md)
+.ssd/
+
 # Other temp files
 *.swp
 *~
