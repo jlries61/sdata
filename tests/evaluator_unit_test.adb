@@ -365,7 +365,120 @@ begin
 
    Put_Line ("");
 
-   -- (test sections added by Tasks 5-6)
+   Put_Line ("--- MF: Miscellaneous Functions ---");
+
+   --  MF-01: MISSING of Val_Missing → 1
+   Check_Int ("MF-01: MISSING(missing) = 1",
+              Call_Function ("MISSING",
+                 (1 => (Kind => Val_Missing))), 1);
+
+   --  MF-02: MISSING of a numeric → 0
+   Check_Int ("MF-02: MISSING(3.0) = 0",
+              Call_Function ("MISSING",
+                 (1 => (Kind => Val_Numeric, Num_Val => 3.0))), 0);
+
+   --  MF-03: MISSING of empty string → 1
+   Check_Int ("MF-03: MISSING('') = 1",
+              Call_Function ("MISSING",
+                 (1 => (Kind => Val_String,
+                         Str_Val => To_Unbounded_String ("")))), 1);
+
+   --  MF-04: INF(+Inf) = 1
+   Check_Int ("MF-04: INF(+Inf) = 1",
+              Call_Function ("INF",
+                 (1 => (Kind => Val_Numeric, Num_Val => Pos_Inf))), 1);
+
+   --  MF-05: INF(-Inf) = 1
+   Check_Int ("MF-05: INF(-Inf) = 1",
+              Call_Function ("INF",
+                 (1 => (Kind => Val_Numeric, Num_Val => Neg_Inf))), 1);
+
+   --  MF-06: INF(1.0) = 0
+   Check_Int ("MF-06: INF(1.0) = 0",
+              Call_Function ("INF",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0))), 0);
+
+   --  MF-07: TRUE() = 1
+   Check_Int ("MF-07: TRUE() = 1", F0 ("TRUE"), 1);
+
+   --  MF-08: FALSE() = 0
+   Check_Int ("MF-08: FALSE() = 0", F0 ("FALSE"), 0);
+
+   --  MF-09: PI() = Ada.Numerics.Pi (exact)
+   Check_Num ("MF-09: PI() = pi",
+              F0 ("PI"), Float (Ada.Numerics.Pi), 0.000001);
+
+   --  MF-10: NUM("3.14") → 3.14
+   Check_Num ("MF-10: NUM('3.14') = 3.14",
+              FS1 ("NUM", "3.14"), 3.14, 0.001);
+
+   --  MF-11: NUM("abc") → Val_Missing (parse error)
+   Check_Missing ("MF-11: NUM('abc') = missing", FS1 ("NUM", "abc"));
+
+   --  MF-12: TRUNCATE(3.567, 2) = 3.56 (truncate, not round)
+   Check_Num ("MF-12: TRUNCATE(3.567, 2) = 3.56", F2 ("TRUNCATE", 3.567, 2.0), 3.56);
+
+   --  MF-13: TRUNCATE(3.567, -1) → Val_Missing (negative places)
+   Check_Missing ("MF-13: TRUNCATE(3.567, -1) = missing",
+                  F2 ("TRUNCATE", 3.567, -1.0));
+
+   --  MF-14: INDEX("hello world", "world") = 7
+   Check_Int ("MF-14: INDEX('hello world', 'world') = 7",
+              FS2 ("INDEX", "hello world", "world"), 7);
+
+   --  MF-15: INDEX("hello", "xyz") = 0 (not found)
+   Check_Int ("MF-15: INDEX('hello', 'xyz') = 0",
+              FS2 ("INDEX", "hello", "xyz"), 0);
+
+   --  MF-16: INDEX("hello", "") = 1 (empty needle)
+   Check_Int ("MF-16: INDEX('hello', '') = 1",
+              FS2 ("INDEX", "hello", ""), 1);
+
+   --  MF-17: MATCH("hello world", "world", 1) = 7
+   V := Call_Function ("MATCH",
+           (1 => (Kind => Val_String, Str_Val => To_Unbounded_String ("hello world")),
+            2 => (Kind => Val_String, Str_Val => To_Unbounded_String ("world")),
+            3 => (Kind => Val_Numeric, Num_Val => 1.0)));
+   Check_Int ("MF-17: MATCH('hello world','world',1) = 7", V, 7);
+
+   --  MF-18: MATCH starting past the match returns 0
+   V := Call_Function ("MATCH",
+           (1 => (Kind => Val_String, Str_Val => To_Unbounded_String ("hello world")),
+            2 => (Kind => Val_String, Str_Val => To_Unbounded_String ("hello")),
+            3 => (Kind => Val_Numeric, Num_Val => 3.0)));
+   Check_Int ("MF-18: MATCH('hello world','hello',3) = 0", V, 0);
+
+   --  MF-19: LTW(0.0) = 0.0 (W(0) = 0 by definition)
+   Check_Num ("MF-19: LTW(0.0) = 0.0", F1 ("LTW", 0.0), 0.0, 0.000001);
+
+   --  MF-20: LTW(e) ≈ 1.0 (W(e) = 1 because 1*e^1 = e)
+   Check_Num ("MF-20: LTW(e) = 1.0", F1 ("LTW", Ada.Numerics.e), 1.0, 0.0001);
+
+   --  MF-21: LTW domain error (x < -1/e ≈ -0.3679)
+   Check ("MF-21: LTW(-1.0) raises domain error",
+          Raises ("LTW", (1 => (Kind => Val_Numeric, Num_Val => -1.0))), True);
+
+   --  MF-22: MAXINT() = Integer'Last
+   Check_Int ("MF-22: MAXINT() = Integer'Last", F0 ("MAXINT"), Integer'Last);
+
+   --  MF-23: MININT() = Integer'First
+   Check_Int ("MF-23: MININT() = Integer'First", F0 ("MININT"), Integer'First);
+
+   --  MF-24: MINNUM() > 0.0 (smallest positive float)
+   V := F0 ("MINNUM");
+   Check ("MF-24: MINNUM() > 0.0", V.Kind = Val_Numeric and V.Num_Val > 0.0, True);
+
+   --  MF-25: LBOUND for unknown array → Val_Missing
+   Check_Missing ("MF-25: LBOUND('NONEXISTENT') = missing",
+                  FS1 ("LBOUND", "NONEXISTENT"));
+
+   --  MF-26: ERR() returns Val_Integer (value depends on runtime state)
+   V := F0 ("ERR");
+   Check ("MF-26: ERR() returns Val_Integer", V.Kind = Val_Integer, True);
+
+   Put_Line ("");
+
+   -- (test sections added by Task 6)
 
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
