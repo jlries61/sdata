@@ -294,7 +294,78 @@ begin
 
    Put_Line ("");
 
-   -- (test sections added by Tasks 4-6)
+   Put_Line ("--- DF: Distribution Functions ---");
+
+   --  DF-01: ZDF(0.0) = 1/sqrt(2π) ≈ 0.39894
+   Check_Num ("DF-01: ZDF(0.0) = 0.39894", F1 ("ZDF", 0.0), 0.39894, 0.0001);
+
+   --  DF-02: ZCF(0.0) = 0.5 (symmetry of standard normal)
+   Check_Num ("DF-02: ZCF(0.0) = 0.5", F1 ("ZCF", 0.0), 0.5, 0.0001);
+
+   --  DF-03: ZIF(0.5) = 0.0 (inverse of ZCF)
+   Check_Num ("DF-03: ZIF(0.5) = 0.0", F1 ("ZIF", 0.5), 0.0, 0.001);
+
+   --  DF-04: ZIF(0.975) ≈ 1.96 (standard 95% two-tailed critical value)
+   Check_Num ("DF-04: ZIF(0.975) = 1.96", F1 ("ZIF", 0.975), 1.96, 0.01);
+
+   --  DF-05: ZDF with 3 args (shifted normal): ZDF(10.0, 10.0, 2.0) = 0.19947
+   Check_Num ("DF-05: ZDF(10.0, 10.0, 2.0) = 0.19947",
+              F3 ("ZDF", 10.0, 10.0, 2.0), 0.19947, 0.0001);
+
+   --  DF-06: ZDF with exactly 2 args raises an error (not a valid call)
+   Check ("DF-06: ZDF(x, mu) with 2 args raises error",
+          Raises ("ZDF",
+                  (1 => (Kind => Val_Numeric, Num_Val => 0.0),
+                   2 => (Kind => Val_Numeric, Num_Val => 0.0))), True);
+
+   --  DF-07: ZCF with 3 args: ZCF(10.0, 10.0, 2.0) = 0.5
+   Check_Num ("DF-07: ZCF(10.0, 10.0, 2.0) = 0.5",
+              F3 ("ZCF", 10.0, 10.0, 2.0), 0.5, 0.0001);
+
+   --  DF-08: ZCF with exactly 2 args raises an error
+   Check ("DF-08: ZCF(x, mu) with 2 args raises error",
+          Raises ("ZCF",
+                  (1 => (Kind => Val_Numeric, Num_Val => 0.0),
+                   2 => (Kind => Val_Numeric, Num_Val => 0.0))), True);
+
+   --  DF-09: LCF(0.0) = 0.5 (logistic CDF = sigmoid; sigmoid(0) = 0.5)
+   Check_Num ("DF-09: LCF(0.0) = 0.5", F1 ("LCF", 0.0), 0.5, 0.0001);
+
+   --  DF-10: LIF(0.5) = 0.0 (logit(0.5) = ln(0.5/0.5) = ln(1) = 0)
+   Check_Num ("DF-10: LIF(0.5) = 0.0", F1 ("LIF", 0.5), 0.0, 0.001);
+
+   --  DF-11: LIF domain error — p must be strictly in (0, 1)
+   Check ("DF-11: LIF(0.0) raises domain error",
+          Raises ("LIF", (1 => (Kind => Val_Numeric, Num_Val => 0.0))), True);
+   Check ("DF-12: LIF(1.0) raises domain error",
+          Raises ("LIF", (1 => (Kind => Val_Numeric, Num_Val => 1.0))), True);
+
+   --  DF-13: NRN(10.0, 2.0) returns Val_Numeric (regression: was calling BRN)
+   SData.Statistics.Set_Seed (42);
+   V := F2 ("NRN", 10.0, 2.0);
+   Check ("DF-13: NRN(10,2) returns Val_Numeric", V.Kind = Val_Numeric, True);
+   --  Exact value with seed 42:
+   Check_Num ("DF-13b: NRN(10,2) seed-42 value", V, 11.39017, 0.0001);
+
+   --  DF-14: URN(0, 1) returns a value in [0.0, 1.0)
+   SData.Statistics.Set_Seed (42);
+   V := F2 ("URN", 0.0, 1.0);
+   Check ("DF-14: URN(0,1) returns Val_Numeric", V.Kind = Val_Numeric, True);
+   Check ("DF-14b: URN(0,1) in [0,1)", V.Num_Val >= 0.0 and V.Num_Val < 1.0, True);
+
+   --  DF-15: ZRN() with no args returns Val_Numeric
+   SData.Statistics.Set_Seed (42);
+   V := F0 ("ZRN");
+   Check ("DF-15: ZRN() returns Val_Numeric", V.Kind = Val_Numeric, True);
+
+   --  DF-16: RAN() returns value in [0.0, 1.0)
+   SData.Statistics.Set_Seed (42);
+   V := F0 ("RAN");
+   Check ("DF-16: RAN() in [0,1)", V.Num_Val >= 0.0 and V.Num_Val < 1.0, True);
+
+   Put_Line ("");
+
+   -- (test sections added by Tasks 5-6)
 
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
