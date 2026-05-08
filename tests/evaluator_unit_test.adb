@@ -478,7 +478,149 @@ begin
 
    Put_Line ("");
 
-   -- (test sections added by Task 6)
+   Put_Line ("--- AF: Aggregate Functions ---");
+
+   --  AF-01: SUM(1, 2, 3) = 6.0
+   Check_Num ("AF-01: SUM(1,2,3) = 6.0",
+              Call_Function ("SUM",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 2.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 3.0))), 6.0);
+
+   --  AF-02: SUM with no args → Val_Missing
+   Check_Missing ("AF-02: SUM() = missing",
+                  Call_Function ("SUM", (1 .. 0 => (Kind => Val_Missing))));
+
+   --  AF-03: SUM skips missing values: SUM(1, missing, 3) = 4.0
+   Check_Num ("AF-03: SUM(1,missing,3) = 4.0",
+              Call_Function ("SUM",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Missing),
+                  3 => (Kind => Val_Numeric, Num_Val => 3.0))), 4.0);
+
+   --  AF-04: MEAN(2, 4, 6) = 4.0
+   Check_Num ("AF-04: MEAN(2,4,6) = 4.0",
+              Call_Function ("MEAN",
+                 (1 => (Kind => Val_Numeric, Num_Val => 2.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 4.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 6.0))), 4.0);
+
+   --  AF-05: MEAN with no args → Val_Missing
+   Check_Missing ("AF-05: MEAN() = missing",
+                  Call_Function ("MEAN", (1 .. 0 => (Kind => Val_Missing))));
+
+   --  AF-06: VAR(1,2,3,4,5) = 2.5 (sample variance)
+   Check_Num ("AF-06: VAR(1,2,3,4,5) = 2.5",
+              Call_Function ("VAR",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 2.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 3.0),
+                  4 => (Kind => Val_Numeric, Num_Val => 4.0),
+                  5 => (Kind => Val_Numeric, Num_Val => 5.0))), 2.5, 0.0001);
+
+   --  AF-07: VAR with a single value → Val_Missing (N < 2)
+   Check_Missing ("AF-07: VAR(single) = missing",
+                  Call_Function ("VAR",
+                     (1 => (Kind => Val_Numeric, Num_Val => 5.0))));
+
+   --  AF-08: STD(1,2,3,4,5) ≈ 1.5811 (sample stddev = sqrt(2.5))
+   Check_Num ("AF-08: STD(1,2,3,4,5) = 1.5811",
+              Call_Function ("STD",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 2.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 3.0),
+                  4 => (Kind => Val_Numeric, Num_Val => 4.0),
+                  5 => (Kind => Val_Numeric, Num_Val => 5.0))), 1.5811, 0.0001);
+
+   --  AF-09: MIN(3, 1, 4, 1, 5) = 1.0
+   Check_Num ("AF-09: MIN(3,1,4,1,5) = 1.0",
+              Call_Function ("MIN",
+                 (1 => (Kind => Val_Numeric, Num_Val => 3.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 4.0),
+                  4 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  5 => (Kind => Val_Numeric, Num_Val => 5.0))), 1.0);
+
+   --  AF-10: MAX(3, 1, 4, 1, 5) = 5.0
+   Check_Num ("AF-10: MAX(3,1,4,1,5) = 5.0",
+              Call_Function ("MAX",
+                 (1 => (Kind => Val_Numeric, Num_Val => 3.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 4.0),
+                  4 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  5 => (Kind => Val_Numeric, Num_Val => 5.0))), 5.0);
+
+   --  AF-11: N(1, missing, 3) = 2 (count non-missing)
+   Check_Int ("AF-11: N(1,missing,3) = 2",
+              Call_Function ("N",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Missing),
+                  3 => (Kind => Val_Numeric, Num_Val => 3.0))), 2);
+
+   --  AF-12: NMISS(1, missing, missing, 3) = 2
+   Check_Int ("AF-12: NMISS(1,missing,missing,3) = 2",
+              Call_Function ("NMISS",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Missing),
+                  3 => (Kind => Val_Missing),
+                  4 => (Kind => Val_Numeric, Num_Val => 3.0))), 2);
+
+   --  AF-13: MEDIAN(1,2,3,4,5) = 3.0 (odd count: middle element)
+   Check_Num ("AF-13: MEDIAN(1,2,3,4,5) = 3.0",
+              Call_Function ("MEDIAN",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 2.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 3.0),
+                  4 => (Kind => Val_Numeric, Num_Val => 4.0),
+                  5 => (Kind => Val_Numeric, Num_Val => 5.0))), 3.0);
+
+   --  AF-14: MEDIAN(1,2,3,4) = 2.5 (even count: avg of two middle values)
+   Check_Num ("AF-14: MEDIAN(1,2,3,4) = 2.5",
+              Call_Function ("MEDIAN",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 2.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 3.0),
+                  4 => (Kind => Val_Numeric, Num_Val => 4.0))), 2.5);
+
+   --  AF-15: MEDIAN unsorted input: MEDIAN(5,3,1,4,2) = 3.0
+   Check_Num ("AF-15: MEDIAN(5,3,1,4,2) = 3.0",
+              Call_Function ("MEDIAN",
+                 (1 => (Kind => Val_Numeric, Num_Val => 5.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 3.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  4 => (Kind => Val_Numeric, Num_Val => 4.0),
+                  5 => (Kind => Val_Numeric, Num_Val => 2.0))), 3.0);
+
+   --  AF-16: GMEAN(1, 4, 16) = 4.0 (exp(mean(ln(1),ln(4),ln(16))))
+   Check_Num ("AF-16: GMEAN(1,4,16) = 4.0",
+              Call_Function ("GMEAN",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 4.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 16.0))), 4.0, 0.0001);
+
+   --  AF-17: GMEAN with a zero value → Val_Missing (ln(0) undefined)
+   Check_Missing ("AF-17: GMEAN(1,0,4) = missing",
+                  Call_Function ("GMEAN",
+                     (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                      2 => (Kind => Val_Numeric, Num_Val => 0.0),
+                      3 => (Kind => Val_Numeric, Num_Val => 4.0))));
+
+   --  AF-18: HMEAN(1, 2, 4) = 12/7 ≈ 1.7143 (N / Σ(1/x))
+   Check_Num ("AF-18: HMEAN(1,2,4) = 1.7143",
+              Call_Function ("HMEAN",
+                 (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                  2 => (Kind => Val_Numeric, Num_Val => 2.0),
+                  3 => (Kind => Val_Numeric, Num_Val => 4.0))),
+              12.0 / 7.0, 0.0001);
+
+   --  AF-19: HMEAN with a zero value → Val_Missing (1/0 undefined)
+   Check_Missing ("AF-19: HMEAN(1,0,4) = missing",
+                  Call_Function ("HMEAN",
+                     (1 => (Kind => Val_Numeric, Num_Val => 1.0),
+                      2 => (Kind => Val_Numeric, Num_Val => 0.0),
+                      3 => (Kind => Val_Numeric, Num_Val => 4.0))));
+
+   Put_Line ("");
 
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
