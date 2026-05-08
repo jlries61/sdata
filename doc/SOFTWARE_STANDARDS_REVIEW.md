@@ -11,6 +11,7 @@
 **Annotation:** 2026-05-06 (v0.6.8) — SYSTEM/SHELL risk reclassified Low-Medium; sandboxing, allowlist, and metacharacter-escaping are won't-fix (deliberate design, same trust model as R/SAS/Python; --noshell is the correct operator-level mitigation). Security 52→58, total 513→519.
 **Annotation:** 2026-05-06 (v0.6.8) — SQL column-name injection fixed (commit 456d1e0): `Sql_Id` helper now escapes `]`→`]]` at all five SQL construction sites in `sdata-table.adb`. Security 58→63, total 519→524.
 **Annotation:** 2026-05-06 (v0.6.8) — `--nosubmit` flag added (commit 6909f15): disables SUBMIT for pipeline operators who need containment beyond `--noshell`; path traversal via SUBMIT marked won't-fix (same trust-model reasoning as SYSTEM/SHELL; `--nosubmit` is the opt-in mitigation). Security 63→65, total 524→526.
+**Annotation:** 2026-05-07 (v0.6.9) — Unit test suite substantially expanded (commits 60ad1d9, 48c8c18, 5ead7cd): `csv_unit_test` extended to 71 tests (edge cases for all five `SData.CSV` functions); `sdata_unit_test` extended to 98 tests adding coverage of `SData.Variables` (temp symbols, permanent PDV slots, `Load_PDV_From_Table` roundtrip, hold/reset, `Flush_PDV_To_Output` pipeline). Table and variable system no longer have zero unit coverage. §4.1 metrics and prose updated; §4.3 debt item partially resolved; §4 score 60→65.
 **Annotation:** 2026-05-07 (v0.6.9) — BY-variable list duplication eliminated (commit 9460375): `Current_By_Vars`, `Ctx.By_Vars`, and `By_Group_Names` package instantiation removed from the interpreter; `SData.Table` is now the sole source of truth. `By_Var_Count`/`By_Var_Name(I)` accessors added to `SData.Table`. `Group_Flags` rewritten to use `In_Same_Group` directly; REPEAT edge case (empty input table → one implicit group) handled explicitly. Also in this session: column cursor cache added (`Get_Value_By_Col`/`Set_Output_Value_By_Col`) eliminating per-row hash lookups in the data step hot path; `Max_Table_Rows` renamed `Max_Table_Cells` and default set to 50 000 000. §3.1 BY-variable concern and §4.3 debt item marked resolved.
 
 ---
@@ -139,7 +140,7 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 ---
 
-## 4. Maintainability & Evolvability — 60/100
+## 4. Maintainability & Evolvability — ~~60~~ 65/100
 
 ### 4.1 Test Coverage & Quality
 
@@ -147,13 +148,13 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 | Metric | Value | Verdict |
 |---|---|---|
-| Unit test modules | 1 (csv_unit_test) | Critically insufficient |
-| Integration tests | 118 .cmd files | Comprehensive for happy paths |
-| Coverage estimate | ~35–45% branch coverage | Below minimum acceptable |
+| Unit test modules | ~~1 (csv_unit_test)~~ **2 (csv_unit_test: 71 tests; sdata_unit_test: 98 tests)** | ~~Critically insufficient~~ **Adequate for hot path** |
+| Integration tests | ~~118~~ **131** .cmd files | Comprehensive for happy paths |
+| Coverage estimate | ~~~35–45%~~ **~45–55%** branch coverage | ~~Below minimum acceptable~~ **Improving; evaluator and file I/O remain uncovered** |
 | Test execution time | < 30s total | Excellent |
 | Flaky tests | None observed | Good |
 
-The evaluator, interpreter, table module, variable system, and file I/O have zero unit test coverage. Integration tests cannot isolate regression sources when failures occur across subsystem boundaries. The `distrib_test` unit test added in a prior session covers statistical functions — that is the only other non-CSV unit test and it demonstrates the model works. Expanding it to cover evaluator expression trees, table operations, and BY-group detection would require no architectural change.
+~~The evaluator, interpreter, table module, variable system, and file I/O have zero unit test coverage.~~ **Updated 2026-05-07 (commits 60ad1d9, 48c8c18, 5ead7cd):** `csv_unit_test` now covers all five `SData.CSV` functions with 71 tests including edge cases (INF, signs, embedded delimiters, two-char delimiters, empty fields). `sdata_unit_test` adds 98 tests covering the full `SData.Variables` hot path: temporary symbols, permanent PDV slots, `Load_PDV_From_Table` roundtrip, hold/reset semantics, and `Flush_PDV_To_Output` pipeline. The table module and variable system no longer have zero unit coverage. Evaluator expression trees, file I/O parsers, and interpreter control flow remain integration-only. Integration tests cannot isolate regression sources when failures occur across those subsystem boundaries; adding unit tests there would require no architectural change.
 
 ### 4.2 Change Resilience
 
@@ -177,7 +178,7 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 |---|---|---|---|
 | `Parse_CSV` / `Parse_OOXML` / `Parse_ODF` monoliths | High | 3–4 days | Stable (not growing) |
 | `Execute_Assignment` too broad | Medium | 1 day | Stable |
-| Integration-only test coverage | High | 2–3 days per module | Stable |
+| Integration-only test coverage | ~~High~~ **Medium** | 2–3 days per module | **Partially resolved 2026-05-07** — Variables and CSV now have unit coverage; evaluator, interpreter, and file I/O remain integration-only |
 | ~~BY-variable list duplication (interpreter + table)~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed 9460375** |
 | ~~Column hash lookup per record~~ | ~~Low~~ | ~~1 day~~ | **Fixed 415714a** |
 | ~~No CI/CD pipeline~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed ADR-012** |
@@ -306,12 +307,12 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Architectural Integrity | 65/100 |
 | Code Quality & Craftsmanship | 72/100 |
 | Efficiency & Performance | ~~74/100~~ **78/100** |
-| Maintainability & Evolvability | 60/100 |
+| Maintainability & Evolvability | ~~60/100~~ **65/100** |
 | Error Handling & Resilience | 58/100 |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ **65/100** |
 | Operational Readiness | 50/100 |
 | Documentation | ~~76/100~~ **82/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ **530/800 (66.3%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ **535/800 (66.9%)** |
 
 ---
 
