@@ -409,8 +409,8 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Binomial_RN (Convert_To_Float (Vals.Element (1)),
-                                                       Convert_To_Float (Vals.Element (2))));
+      return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
+                                                      Convert_To_Float (Vals.Element (2))));
    end Handle_NRN;
 
    function Handle_URN (Name : String; Vals : Value_Vectors.Vector) return Value is
