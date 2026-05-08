@@ -937,9 +937,8 @@ package body SData.File_IO is
          Reader : DOM.Readers.Tree_Reader;
          Input  : Input_Sources.File.File_Input;
          Doc    : DOM.Core.Document;
-         Tables, Rows, Cells : Node_List;
+         Tables, Rows : Node_List;
          Success : Boolean;
-         Col_Count : Natural := 0;
 
          function Get_Cell_Value (Cell_Node : Node) return Value is
             Val_Type : constant String := Get_Attribute (DOM.Core.Element (Cell_Node), "office:value-type");
@@ -970,6 +969,183 @@ package body SData.File_IO is
             return (Kind => Val_Missing);
          end Get_Cell_Value;
 
+         --  Phase 1: collect column names from the header row.
+         --  Raises SData.Script_Error for merged cells.
+         procedure Collect_ODF_Headers
+            (Row0         : DOM.Core.Node;
+             Col_Name_Vec : in out Name_Vecs.Vector) is
+            Cells : DOM.Core.Node_List :=
+               Get_Elements_By_Tag_Name (DOM.Core.Element (Row0), "table:table-cell");
+         begin
+            for I in 0 .. Length (Cells) - 1 loop
+               declare
+                  Cell        : constant DOM.Core.Node := Item (Cells, I);
+                  Col_Spanned : constant String :=
+                     Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-spanned");
+                  Row_Spanned : constant String :=
+                     Get_Attribute (DOM.Core.Element (Cell), "table:number-rows-spanned");
+               begin
+                  if (Col_Spanned /= "" and then Positive'Value (Col_Spanned) > 1) or else
+                     (Row_Spanned /= "" and then Positive'Value (Row_Spanned) > 1)
+                  then
+                     Free (Cells);
+                     raise SData.Script_Error
+                        with "ODS file contains merged cells, which are not supported.";
+                  end if;
+                  declare
+                     Repeat_Attr  : constant String :=
+                        Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
+                     Repeat_Count : constant Positive :=
+                        (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
+                     P_Nodes      : DOM.Core.Node_List :=
+                        Get_Elements_By_Tag_Name (DOM.Core.Element (Cell), "text:p");
+                     Base_Name    : constant String :=
+                        (if Length (P_Nodes) > 0 then Get_Text (Item (P_Nodes, 0)) else "");
+                  begin
+                     Free (P_Nodes);
+                     for K in 1 .. Repeat_Count loop
+                        exit when Base_Name = "" and K > 1;
+                        declare
+                           Idx_Num    : constant Natural :=
+                              Natural (Col_Name_Vec.Length) + 1;
+                           Idx        : constant String :=
+                              Trim (Idx_Num'Img, Ada.Strings.Both);
+                           Final_Name : constant String :=
+                              (if Base_Name = "" then "COL" & Idx
+                               else Base_Name &
+                                  (if Repeat_Count > 1
+                                   then "_" & Trim (K'Img, Ada.Strings.Both)
+                                   else ""));
+                        begin
+                           Col_Name_Vec.Append
+                              (To_Unbounded_String (Safe_Name (Final_Name, "COL" & Idx)));
+                        end;
+                     end loop;
+                  end;
+               end;
+            end loop;
+            Free (Cells);
+         end Collect_ODF_Headers;
+
+         --  Phase 2: infer column types from first data row; create columns.
+         procedure Infer_And_Create_ODF_Schema
+            (Col_Name_Vec : Name_Vecs.Vector;
+             Row1_Present : Boolean;
+             Row1         : DOM.Core.Node) is
+            N         : constant Natural := Natural (Col_Name_Vec.Length);
+            Col_Types : Column_Type_Array (1 .. N) := (others => Col_Numeric);
+         begin
+            Apply_Dollar_Override (Col_Name_Vec, Col_Types);
+            if Row1_Present then
+               declare
+                  Data_Cells : DOM.Core.Node_List :=
+                     Get_Elements_By_Tag_Name
+                        (DOM.Core.Element (Row1), "table:table-cell");
+                  Col_Idx : Natural := 0;
+               begin
+                  for J in 0 .. Length (Data_Cells) - 1 loop
+                     Col_Idx := Col_Idx + 1;
+                     exit when Col_Idx > N;
+                     if Get_Cell_Value (Item (Data_Cells, J)).Kind = Val_String then
+                        Col_Types (Col_Idx) := Col_String;
+                     end if;
+                  end loop;
+                  Free (Data_Cells);
+               end;
+            end if;
+            for I in 1 .. N loop
+               declare
+                  Raw_Name   : constant String := To_String (Col_Name_Vec (I));
+                  Final_Name : constant String :=
+                     (if Col_Types (I) = Col_String
+                         and then (Raw_Name'Length = 0
+                                   or else Raw_Name (Raw_Name'Last) /= '$')
+                      then Raw_Name & "$"
+                      else Raw_Name);
+               begin
+                  Add_Column (Final_Name, Col_Types (I));
+               end;
+            end loop;
+         end Infer_And_Create_ODF_Schema;
+
+         --  Phase 3: load data rows (index 1 .. N-1 in the Rows node list).
+         procedure Load_ODF_Data_Rows
+            (Rows      : DOM.Core.Node_List;
+             Col_Count : Natural) is
+            Rows_To_Skip : Natural := Skip_Rows;
+            Rows_Written : Natural := 0;
+         begin
+            for I in 1 .. Length (Rows) - 1 loop
+               declare
+                  Row_Node         : constant DOM.Core.Node := Item (Rows, I);
+                  Row_Repeat_Attr  : constant String :=
+                     Get_Attribute (DOM.Core.Element (Row_Node),
+                                    "table:number-rows-repeated");
+                  Row_Repeat_Count : constant Positive :=
+                     (if Row_Repeat_Attr = "" then 1
+                      else Positive'Value (Row_Repeat_Attr));
+               begin
+                  exit when Row_Repeat_Count > 1000;
+                  exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+                  for R_Count in 1 .. Row_Repeat_Count loop
+                     pragma Warnings (Off, R_Count);
+                     if Rows_To_Skip > 0 then
+                        Rows_To_Skip := Rows_To_Skip - 1;
+                     else
+                        exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+                        Rows_Written := Rows_Written + 1;
+                        Add_Row;
+                        declare
+                           Cells   : DOM.Core.Node_List :=
+                              Get_Elements_By_Tag_Name
+                                 (DOM.Core.Element (Row_Node), "table:table-cell");
+                           Col_Idx : Positive := 1;
+                        begin
+                           for J in 0 .. Length (Cells) - 1 loop
+                              declare
+                                 Cell         : constant DOM.Core.Node :=
+                                    Item (Cells, J);
+                                 Repeat_Attr  : constant String :=
+                                    Get_Attribute (DOM.Core.Element (Cell),
+                                                   "table:number-columns-repeated");
+                                 Repeat_Count : constant Positive :=
+                                    (if Repeat_Attr = "" then 1
+                                     else Positive'Value (Repeat_Attr));
+                                 Val : constant Value := Get_Cell_Value (Cell);
+                              begin
+                                 for K in 1 .. Repeat_Count loop
+                                    pragma Warnings (Off, K);
+                                    if Col_Idx <= Col_Count then
+                                       if Val.Kind /= Val_Missing then
+                                          begin
+                                             Set_Value (Row_Count,
+                                                        Column_Name (Col_Idx), Val);
+                                          exception
+                                             when E : others =>
+                                                if not SData.Config.Quiet_Mode then
+                                                   Put_Line_Error
+                                                      ("Warning: ODF import skipped cell at row" &
+                                                       Row_Count'Image &
+                                                       ", column """ &
+                                                       Column_Name (Col_Idx) & """: " &
+                                                       Ada.Exceptions.Exception_Message (E));
+                                                end if;
+                                          end;
+                                       end if;
+                                       Col_Idx := Col_Idx + 1;
+                                    end if;
+                                 end loop;
+                              end;
+                              exit when Col_Idx > Col_Count;
+                           end loop;
+                           Free (Cells);
+                        end;
+                     end if;
+                  end loop;
+               end;
+            end loop;
+         end Load_ODF_Data_Rows;
+
       begin
          UnZip.Extract (from => Zip_Info, what => "content.xml", rename => Temp_XML);
 
@@ -979,10 +1155,9 @@ package body SData.File_IO is
             declare
                Converted : constant String :=
                   Convert_Via_LibreOffice (File_Name, ODF);
-               OK        : Boolean;
+               OK : Boolean;
             begin
                if Converted /= "" then
-                  --  Re-entered via the converted xlsx; clean up and return.
                   GNAT.OS_Lib.Delete_File (Temp_XML, OK);
                   DOM.Readers.Free (Reader);
                   Parse_OOXML (Converted);
@@ -990,8 +1165,9 @@ package body SData.File_IO is
                   return;
                end if;
                if not SData.Config.Quiet_Mode then
-                  Put_Line_Error ("Warning: formula cells found in ODS file but LibreOffice " &
-                     "is not available; using cached values.");
+                  Put_Line_Error
+                     ("Warning: formula cells found in ODS file but LibreOffice " &
+                      "is not available; using cached values.");
                end if;
             end;
          end if;
@@ -1007,172 +1183,35 @@ package body SData.File_IO is
             raise SData.Script_Error with "No tables found in ODS file";
          end if;
 
-         --  Select the target table: by name if Sheet_Name is non-empty,
-         --  otherwise use the first table found.
          declare
-            Target_Idx : Natural := 0; -- 0-based index into Tables
+            Target_Idx : Natural := 0;
          begin
             if Sheet_Name /= "" then
                for T in 0 .. Length (Tables) - 1 loop
-                  if Get_Attribute (DOM.Core.Element (Item (Tables, T)), "table:name") = Sheet_Name then
+                  if Get_Attribute (DOM.Core.Element (Item (Tables, T)),
+                                    "table:name") = Sheet_Name
+                  then
                      Target_Idx := T;
                      exit;
                   end if;
                end loop;
-               --  If name not found, fall back silently to first sheet (index 0).
             end if;
-            Rows := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Tables, Target_Idx)), "table:table-row");
+            Rows := Get_Elements_By_Tag_Name
+               (DOM.Core.Element (Item (Tables, Target_Idx)), "table:table-row");
          end;
          Clear;
 
          if Length (Rows) > 0 then
-            --  Collect column names from header row, infer types from first
-            --  data row, then create columns with the correct types.
             declare
                Col_Name_Vec : Name_Vecs.Vector;
             begin
-            Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 0)), "table:table-cell");
-            for I in 0 .. Length (Cells) - 1 loop
-               declare
-                  Cell : constant Node := Item (Cells, I);
-                  Col_Spanned : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-spanned");
-                  Row_Spanned : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-rows-spanned");
-               begin
-                  if (Col_Spanned /= "" and then Positive'Value (Col_Spanned) > 1) or else
-                     (Row_Spanned /= "" and then Positive'Value (Row_Spanned) > 1) then
-                     Free (Cells); DOM.Readers.Free (Reader);
-                     raise SData.Script_Error with "ODS file contains merged cells, which are not supported.";
-                  end if;
-
-                  declare
-                     Repeat_Attr   : constant String   := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
-                  Repeat_Count  : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
-                  P_Nodes_Local : Node_List := Get_Elements_By_Tag_Name (DOM.Core.Element (Cell), "text:p");
-                  Base_Name     : constant String   := (if Length (P_Nodes_Local) > 0 then Get_Text (Item (P_Nodes_Local, 0)) else "");
-               begin
-                  Free (P_Nodes_Local);
-                  for K in 1 .. Repeat_Count loop
-                     exit when Base_Name = "" and K > 1;
-                     declare
-                        Idx_Num    : constant Natural := Natural (Col_Name_Vec.Length) + 1;
-                        Idx        : constant String := Trim (Idx_Num'Img, Ada.Strings.Both);
-                        Final_Name : constant String := (if Base_Name = "" then "COL" & Idx
-                                                         else Base_Name & (if Repeat_Count > 1 then "_" & Trim (K'Img, Ada.Strings.Both) else ""));
-                     begin
-                        Col_Name_Vec.Append (To_Unbounded_String (Safe_Name (Final_Name, "COL" & Idx)));
-                     end;
-                  end loop;
-               end;
+               Collect_ODF_Headers (Item (Rows, 0), Col_Name_Vec);
+               Infer_And_Create_ODF_Schema
+                  (Col_Name_Vec,
+                   Row1_Present => Length (Rows) > 1,
+                   Row1         => Item (Rows, 1));
+               Load_ODF_Data_Rows (Rows, Col_Count => Column_Count);
             end;
-            end loop;
-            Free (Cells);
-
-            --  Infer column types from the first data row using ODF's explicit
-            --  office:value-type attribute.  Default to Col_Numeric; switch to
-            --  Col_String only when a cell value is non-numeric.
-            declare
-               N         : constant Natural := Positive (Col_Name_Vec.Length);
-               Col_Types : array (1 .. N) of Column_Type := (others => Col_Numeric);
-               Data_Cells : Node_List;
-               Col_Idx    : Natural := 0;
-            begin
-               --  Per spec: column names already ending in "$" are forced character.
-               for I in 1 .. N loop
-                  declare
-                     Raw : constant String := To_String (Col_Name_Vec (I));
-                  begin
-                     if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
-                        Col_Types (I) := Col_String;
-                     end if;
-                  end;
-               end loop;
-               if Length (Rows) > 1 then
-                  Data_Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 1)), "table:table-cell");
-                  for J in 0 .. Length (Data_Cells) - 1 loop
-                     Col_Idx := Col_Idx + 1;
-                     exit when Col_Idx > N;
-                     declare V : constant Value := Get_Cell_Value (Item (Data_Cells, J)); begin
-                        if V.Kind = Val_String then Col_Types (Col_Idx) := Col_String; end if;
-                     end;
-                  end loop;
-                  Free (Data_Cells);
-               end if;
-               for I in 1 .. N loop
-                  declare
-                     Raw_Name  : constant String := To_String (Col_Name_Vec (I));
-                     Final_Name : constant String :=
-                        (if Col_Types (I) = Col_String
-                            and then (Raw_Name'Length = 0
-                                      or else Raw_Name (Raw_Name'Last) /= '$')
-                         then Raw_Name & "$"
-                         else Raw_Name);
-                  begin
-                     Add_Column (Final_Name, Col_Types (I));
-                  end;
-               end loop;
-            end;
-            Col_Count := Column_Count;
-
-            -- Data Rows
-            declare
-               Rows_To_Skip : Natural := Skip_Rows;
-               Rows_Written : Natural := 0;
-            begin
-               for I in 1 .. Length (Rows) - 1 loop
-                  declare
-                     Row_Node : constant Node := Item (Rows, I);
-                     Row_Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Row_Node), "table:number-rows-repeated");
-                     Row_Repeat_Count : constant Positive := (if Row_Repeat_Attr = "" then 1 else Positive'Value (Row_Repeat_Attr));
-                  begin
-                     exit when Row_Repeat_Count > 1000;
-                     exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
-                     for R_Count in 1 .. Row_Repeat_Count loop
-                        if Rows_To_Skip > 0 then
-                           Rows_To_Skip := Rows_To_Skip - 1;
-                        else
-                           exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
-                           Rows_Written := Rows_Written + 1;
-                           Add_Row;
-                           Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Row_Node), "table:table-cell");
-                           declare
-                              Col_Idx : Positive := 1;
-                           begin
-                              for J in 0 .. Length (Cells) - 1 loop
-                                 declare
-                                    Cell : constant Node := Item (Cells, J);
-                                    Repeat_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell), "table:number-columns-repeated");
-                                    Repeat_Count : constant Positive := (if Repeat_Attr = "" then 1 else Positive'Value (Repeat_Attr));
-                                    Val : constant Value := Get_Cell_Value (Cell);
-                                 begin
-                                    for K in 1 .. Repeat_Count loop
-                                       if Col_Idx <= Col_Count then
-                                          if Val.Kind /= Val_Missing then
-                                             begin
-                                                Set_Value (Row_Count, Column_Name (Col_Idx), Val);
-                                             exception
-                                                when E : others =>
-                                                   if not SData.Config.Quiet_Mode then
-                                                      Put_Line_Error ("Warning: ODF import skipped cell at row" &
-                                                         Row_Count'Image & ", column """ &
-                                                         Column_Name (Col_Idx) & """: " &
-                                                         Ada.Exceptions.Exception_Message (E));
-                                                   end if;
-                                             end;
-                                          end if;
-                                          Col_Idx := Col_Idx + 1;
-                                       end if;
-                                    end loop;
-                                 end;
-                                 exit when Col_Idx > Col_Count;
-                              end loop;
-                           end;
-                           Free (Cells);
-                        end if;
-                     end loop;
-                  end;
-               end loop;
-            end;
-         end;
          end if;
 
          Free (Rows);
