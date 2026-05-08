@@ -4,6 +4,7 @@
 
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
+with Ada.Numerics;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData.Values;          use SData.Values;
 with SData.Evaluator;       use SData.Evaluator;
@@ -157,7 +158,88 @@ begin
    Put_Line ("=== Evaluator Unit Tests ===");
    Put_Line ("");
 
-   -- (test sections added by Tasks 2-6)
+   Put_Line ("--- NF: Numeric Math Functions ---");
+
+   --  NF-01: ABS of negative float
+   Check_Num ("NF-01: ABS(-3.5) = 3.5", F1 ("ABS", -3.5), 3.5);
+
+   --  NF-02: ABS of negative integer preserves integer kind
+   V := Call_Function ("ABS", (1 => (Kind => Val_Integer, Int_Val => -7)));
+   Check_Int ("NF-02: ABS(-7) = 7 as integer", V, 7);
+
+   --  NF-03: ABS(0.0) = 0.0
+   Check_Num ("NF-03: ABS(0.0) = 0.0", F1 ("ABS", 0.0), 0.0);
+
+   --  NF-04: LOG(1.0) = 0.0
+   Check_Num ("NF-04: LOG(1.0) = 0.0", F1 ("LOG", 1.0), 0.0);
+
+   --  NF-05: LN(e) = 1.0 (alias check)
+   Check_Num ("NF-05: LN(e) = 1.0", F1 ("LN", Ada.Numerics.e), 1.0);
+
+   --  NF-06: LOG of negative raises domain error
+   Check ("NF-06: LOG(-1.0) raises domain error",
+          Raises ("LOG", (1 => (Kind => Val_Numeric, Num_Val => -1.0))), True);
+
+   --  NF-07: LOG10(100.0) = 2.0
+   Check_Num ("NF-07: LOG10(100.0) = 2.0", F1 ("LOG10", 100.0), 2.0);
+
+   --  NF-08: LOG2(8.0) = 3.0
+   Check_Num ("NF-08: LOG2(8.0) = 3.0", F1 ("LOG2", 8.0), 3.0);
+
+   --  NF-09: EXP(0.0) = 1.0
+   Check_Num ("NF-09: EXP(0.0) = 1.0", F1 ("EXP", 0.0), 1.0);
+
+   --  NF-10: EXP(1.0) = e
+   Check_Num ("NF-10: EXP(1.0) = e", F1 ("EXP", 1.0), Ada.Numerics.e, 0.0001);
+
+   --  NF-11: SQRT(9.0) = 3.0
+   Check_Num ("NF-11: SQRT(9.0) = 3.0", F1 ("SQRT", 9.0), 3.0);
+
+   --  NF-12: SQRT of negative raises domain error
+   Check ("NF-12: SQRT(-1.0) raises domain error",
+          Raises ("SQRT", (1 => (Kind => Val_Numeric, Num_Val => -1.0))), True);
+
+   --  NF-13: ROUND(3.567, 2) = 3.57
+   Check_Num ("NF-13: ROUND(3.567, 2) = 3.57", F2 ("ROUND", 3.567, 2.0), 3.57);
+
+   --  NF-14: ROUND(3.5) with default 0 decimals = 4.0
+   Check_Num ("NF-14: ROUND(3.5) = 4.0", F1 ("ROUND", 3.5), 4.0);
+
+   --  NF-15: CEIL(3.1) = 4.0
+   Check_Num ("NF-15: CEIL(3.1) = 4.0", F1 ("CEIL", 3.1), 4.0);
+
+   --  NF-16: FLOOR(3.9) = 3.0
+   Check_Num ("NF-16: FLOOR(3.9) = 3.0", F1 ("FLOOR", 3.9), 3.0);
+
+   --  NF-17: INT is an alias for FLOOR
+   Check_Num ("NF-17: INT(3.9) = 3.0", F1 ("INT", 3.9), 3.0);
+
+   --  NF-18: FIX truncates toward zero (differs from FLOOR for negatives)
+   Check_Num ("NF-18: FIX(-2.7) = -2.0", F1 ("FIX", -2.7), -2.0);
+
+   --  NF-19: FP returns fractional part
+   Check_Num ("NF-19: FP(3.7) = 0.7", F1 ("FP", 3.7), 0.7);
+
+   --  NF-20: MOD(7.0, 3.0) = 1.0
+   Check_Num ("NF-20: MOD(7.0, 3.0) = 1.0", F2 ("MOD", 7.0, 3.0), 1.0);
+
+   --  NF-21: MOD with zero divisor raises domain error
+   Check ("NF-21: MOD(x, 0.0) raises domain error",
+          Raises ("MOD", (1 => (Kind => Val_Numeric, Num_Val => 5.0),
+                          2 => (Kind => Val_Numeric, Num_Val => 0.0))), True);
+
+   --  NF-22: SGN(-5.0) = -1 as integer
+   Check_Int ("NF-22: SGN(-5.0) = -1", F1 ("SGN", -5.0), -1);
+
+   --  NF-23: SGN(0.0) = 0 as integer
+   Check_Int ("NF-23: SGN(0.0) = 0", F1 ("SGN", 0.0), 0);
+
+   --  NF-24: SGN(3.0) = 1 as integer
+   Check_Int ("NF-24: SGN(3.0) = 1", F1 ("SGN", 3.0), 1);
+
+   Put_Line ("");
+
+   -- (test sections added by Tasks 3-6)
 
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
