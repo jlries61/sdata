@@ -1385,9 +1385,8 @@ package body SData.File_IO is
          Reader : DOM.Readers.Tree_Reader;
          Input  : Input_Sources.File.File_Input;
          Doc    : DOM.Core.Document;
-         Rows, Cells : Node_List;
+         Rows    : Node_List;
          Success : Boolean;
-         Col_Count : Natural := 0;
 
          function Get_Cell_Value (Cell_Node : Node) return Value is
             T_Attr : constant String := Get_Attribute (DOM.Core.Element (Cell_Node), "t");
@@ -1440,11 +1439,122 @@ package body SData.File_IO is
             return (Kind => Val_Missing);
          end Get_Cell_Value;
 
+         --  Phase 1: collect column names from the OOXML header row.
+         procedure Collect_OOXML_Headers
+            (Row0         : DOM.Core.Node;
+             Col_Name_Vec : in out Name_Vecs.Vector) is
+            Cells : DOM.Core.Node_List :=
+               Get_Elements_By_Tag_Name (DOM.Core.Element (Row0), "c");
+         begin
+            for I in 0 .. Length (Cells) - 1 loop
+               declare
+                  V   : constant Value  := Get_Cell_Value (Item (Cells, I));
+                  Idx : constant String :=
+                     Trim (Integer (I + 1)'Img, Ada.Strings.Both);
+                  Nam : constant String :=
+                     (if V.Kind = Val_String
+                      then SData.Values.To_String (V)
+                      else "COL" & Idx);
+               begin
+                  Col_Name_Vec.Append
+                     (To_Unbounded_String (Safe_Name (Nam, "COL" & Idx)));
+               end;
+            end loop;
+            Free (Cells);
+         end Collect_OOXML_Headers;
+
+         --  Phase 2: infer column types from first data row; create columns.
+         procedure Infer_And_Create_OOXML_Schema
+            (Col_Name_Vec : Name_Vecs.Vector;
+             Row1_Present : Boolean;
+             Row1         : DOM.Core.Node) is
+            N         : constant Natural := Natural (Col_Name_Vec.Length);
+            Col_Types : Column_Type_Array (1 .. N) := (others => Col_Numeric);
+         begin
+            Apply_Dollar_Override (Col_Name_Vec, Col_Types);
+            if Row1_Present then
+               declare
+                  Data_Cells : DOM.Core.Node_List :=
+                     Get_Elements_By_Tag_Name (DOM.Core.Element (Row1), "c");
+                  Col_Idx : Natural := 0;
+               begin
+                  for J in 0 .. Length (Data_Cells) - 1 loop
+                     Col_Idx := Col_Idx + 1;
+                     exit when Col_Idx > N;
+                     if Get_Cell_Value (Item (Data_Cells, J)).Kind = Val_String then
+                        Col_Types (Col_Idx) := Col_String;
+                     end if;
+                  end loop;
+                  Free (Data_Cells);
+               end;
+            end if;
+            for I in 1 .. N loop
+               declare
+                  Raw_Name   : constant String := To_String (Col_Name_Vec (I));
+                  Final_Name : constant String :=
+                     (if Col_Types (I) = Col_String
+                         and then (Raw_Name'Length = 0
+                                   or else Raw_Name (Raw_Name'Last) /= '$')
+                      then Raw_Name & "$"
+                      else Raw_Name);
+               begin
+                  Add_Column (Final_Name, Col_Types (I));
+               end;
+            end loop;
+         end Infer_And_Create_OOXML_Schema;
+
+         --  Phase 3: load data rows into the table.
+         procedure Load_OOXML_Data_Rows
+            (Rows      : DOM.Core.Node_List;
+             Col_Count : Natural) is
+            Rows_To_Skip : Natural := Skip_Rows;
+            Rows_Written : Natural := 0;
+         begin
+            for I in 1 .. Length (Rows) - 1 loop
+               exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+               if Rows_To_Skip > 0 then
+                  Rows_To_Skip := Rows_To_Skip - 1;
+               else
+                  Rows_Written := Rows_Written + 1;
+                  Add_Row;
+                  declare
+                     Cells : DOM.Core.Node_List :=
+                        Get_Elements_By_Tag_Name
+                           (DOM.Core.Element (Item (Rows, I)), "c");
+                  begin
+                     for J in 0 .. Length (Cells) - 1 loop
+                        if J < Col_Count then
+                           declare
+                              V : constant Value :=
+                                 Get_Cell_Value (Item (Cells, J));
+                           begin
+                              if V.Kind /= Val_Missing then
+                                 Set_Value (Row_Count,
+                                            Column_Name (J + 1), V);
+                              end if;
+                           exception
+                              when E : others =>
+                                 if not SData.Config.Quiet_Mode then
+                                    Put_Line_Error
+                                       ("Warning: OOXML import skipped cell at row" &
+                                        Row_Count'Image &
+                                        ", column """ &
+                                        Column_Name (J + 1) & """: " &
+                                        Ada.Exceptions.Exception_Message (E));
+                                 end if;
+                           end;
+                        end if;
+                     end loop;
+                     Free (Cells);
+                  end;
+               end if;
+            end loop;
+         end Load_OOXML_Data_Rows;
+
       begin
          UnZip.Extract (from => Zip_Info, what => Sheet_XML_Path, rename => Temp_Sheet);
 
          --  Formula detection: scan for <f> elements.
-         --  If found, try LibreOffice to recalculate before parsing.
          if Has_Formulas_XML (Temp_Sheet, Is_ODF => False) then
             declare
                Converted : constant String :=
@@ -1452,7 +1562,6 @@ package body SData.File_IO is
                OK : Boolean;
             begin
                if Converted /= "" then
-                  --  Re-enter via converted ODS (formulas recalculated).
                   GNAT.OS_Lib.Delete_File (Temp_Sheet, OK);
                   DOM.Readers.Free (Reader);
                   Parse_ODF (Converted);
@@ -1460,8 +1569,9 @@ package body SData.File_IO is
                   return;
                end if;
                if not SData.Config.Quiet_Mode then
-                  Put_Line_Error ("Warning: formula cells found in XLSX file but LibreOffice " &
-                     "is not available; using cached values.");
+                  Put_Line_Error
+                     ("Warning: formula cells found in XLSX file but LibreOffice " &
+                      "is not available; using cached values.");
                end if;
             end;
          end if;
@@ -1472,12 +1582,14 @@ package body SData.File_IO is
          Input_Sources.File.Close (Input);
 
          declare
-            Merged : Node_List := DOM.Core.Documents.Get_Elements_By_Tag_Name (Doc, "mergeCells");
+            Merged : DOM.Core.Node_List :=
+               DOM.Core.Documents.Get_Elements_By_Tag_Name (Doc, "mergeCells");
          begin
             if Length (Merged) > 0 then
                Free (Merged);
                DOM.Readers.Free (Reader);
-               raise SData.Script_Error with "XLSX file contains merged cells, which are not supported.";
+               raise SData.Script_Error
+                  with "XLSX file contains merged cells, which are not supported.";
             end if;
             Free (Merged);
          end;
@@ -1486,111 +1598,25 @@ package body SData.File_IO is
          Clear;
 
          if Length (Rows) > 0 then
-            --  Collect column names from header row, infer types from first
-            --  data row, then create columns with the correct types.
             declare
                Col_Name_Vec : Name_Vecs.Vector;
             begin
-               Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 0)), "c");
-               for I in 0 .. Length (Cells) - 1 loop
-                  declare
-                     V    : constant Value  := Get_Cell_Value (Item (Cells, I));
-                     Idx  : constant String := Trim (Integer (I + 1)'Img, Ada.Strings.Both);
-                     Name : constant String := (if V.Kind = Val_String
-                                                then SData.Values.To_String (V)
-                                                else "COL" & Idx);
-                  begin
-                     Col_Name_Vec.Append (To_Unbounded_String (Safe_Name (Name, "COL" & Idx)));
-                  end;
-               end loop;
-               Free (Cells);
-
-               --  Infer column types from the first data row.
-               declare
-                  N          : constant Natural := Natural (Col_Name_Vec.Length);
-                  Col_Types  : array (1 .. N) of Column_Type := (others => Col_Numeric);
-                  Data_Cells : Node_List;
-                  Col_Idx    : Natural := 0;
-               begin
-                  --  Per spec: column names already ending in "$" are forced character.
-                  for I in 1 .. N loop
-                     declare
-                        Raw : constant String := To_String (Col_Name_Vec (I));
-                     begin
-                        if Raw'Length > 0 and then Raw (Raw'Last) = '$' then
-                           Col_Types (I) := Col_String;
-                        end if;
-                     end;
-                  end loop;
-                  if Length (Rows) > 1 then
-                     Data_Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, 1)), "c");
-                     for J in 0 .. Length (Data_Cells) - 1 loop
-                        Col_Idx := Col_Idx + 1;
-                        exit when Col_Idx > N;
-                        declare V : constant Value := Get_Cell_Value (Item (Data_Cells, J)); begin
-                           if V.Kind = Val_String then Col_Types (Col_Idx) := Col_String; end if;
-                        end;
-                     end loop;
-                     Free (Data_Cells);
-                  end if;
-                  for I in 1 .. N loop
-                     declare
-                        Raw_Name  : constant String := To_String (Col_Name_Vec (I));
-                        Final_Name : constant String :=
-                           (if Col_Types (I) = Col_String
-                               and then (Raw_Name'Length = 0
-                                         or else Raw_Name (Raw_Name'Last) /= '$')
-                            then Raw_Name & "$"
-                            else Raw_Name);
-                     begin
-                        Add_Column (Final_Name, Col_Types (I));
-                     end;
-                  end loop;
-               end;
-            end;
-            Col_Count := Column_Count;
-
-            -- Data Rows
-            declare
-               Rows_To_Skip : Natural := Skip_Rows;
-               Rows_Written : Natural := 0;
-            begin
-               for I in 1 .. Length (Rows) - 1 loop
-                  exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
-                  if Rows_To_Skip > 0 then
-                     Rows_To_Skip := Rows_To_Skip - 1;
-                  else
-                     Rows_Written := Rows_Written + 1;
-                     Add_Row;
-                     Cells := Get_Elements_By_Tag_Name (DOM.Core.Element (Item (Rows, I)), "c");
-                     for J in 0 .. Length (Cells) - 1 loop
-                        if J < Col_Count then
-                           declare
-                              V : constant Value := Get_Cell_Value (Item (Cells, J));
-                           begin
-                              if V.Kind /= Val_Missing then
-                                 Set_Value (Row_Count, Column_Name (J + 1), V);
-                              end if;
-                           exception
-                              when E : others =>
-                                 if not SData.Config.Quiet_Mode then
-                                    Put_Line_Error ("Warning: OOXML import skipped cell at row" &
-                                       Row_Count'Image & ", column """ &
-                                       Column_Name (J + 1) & """: " &
-                                       Ada.Exceptions.Exception_Message (E));
-                                 end if;
-                           end;
-                        end if;
-                     end loop;
-                     Free (Cells);
-                  end if;
-               end loop;
+               Collect_OOXML_Headers (Item (Rows, 0), Col_Name_Vec);
+               Infer_And_Create_OOXML_Schema
+                  (Col_Name_Vec,
+                   Row1_Present => Length (Rows) > 1,
+                   Row1         => Item (Rows, 1));
+               Load_OOXML_Data_Rows (Rows, Col_Count => Column_Count);
             end;
          end if;
 
          Free (Rows);
          DOM.Readers.Free (Reader);
          GNAT.OS_Lib.Delete_File (Temp_Sheet, Success);
+      exception
+         when others =>
+            DOM.Readers.Free (Reader);
+            raise;
       end Load_Sheet;
 
       Zip_Info : Zip.Zip_Info;
