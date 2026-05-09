@@ -69,6 +69,11 @@ check: build
 	 if [ $$? -ne 0 ]; then \
 	   echo "Unit tests FAILED"; exit 1; \
 	 fi
+	@[ -x bin/file_io_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
+	@$(TIMEOUT) 30 ./bin/file_io_unit_test; \
+	 if [ $$? -ne 0 ]; then \
+	   echo "Unit tests FAILED"; exit 1; \
+	 fi
 	@echo ""
 	@echo "Running tests..."
 	@failures=0; failed_list=""; total=0; \
