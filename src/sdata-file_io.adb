@@ -1218,6 +1218,10 @@ package body SData.File_IO is
          Free (Tables);
          DOM.Readers.Free (Reader);
          GNAT.OS_Lib.Delete_File (Temp_XML, Success);
+      exception
+         when others =>
+            DOM.Readers.Free (Reader);
+            raise;
       end Load_Content;
 
       Zip_Info : Zip.Zip_Info;
