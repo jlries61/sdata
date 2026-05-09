@@ -1,4 +1,3 @@
-SData version 0.6.10
 Available Commands:
   Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, DISPLAY
   Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME

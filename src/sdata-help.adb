@@ -10,7 +10,6 @@ package body SData.Help is
 
    procedure Help_Index is
    begin
-      Put_Line ("SData version " & SData.Config.Version_Str);
       Put_Line ("Available Commands:");
       Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, DISPLAY");
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
