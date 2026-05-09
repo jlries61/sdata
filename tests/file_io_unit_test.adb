@@ -141,8 +141,81 @@ begin
    Check_Float ("PC-24 max_rows=2 row2 VAL1", V.Num_Val, 4.0);
 
    ---------------------------------------------------------------------------
-   --  Parse_ODF tests  (PO-01 .. PO-23)  — added in Task 3
+   --  Parse_ODF tests  (PO-01 .. PO-23)
    ---------------------------------------------------------------------------
+
+   --  PO-01..PO-09: basic load of tests/data/sample.ods
+   --  Contents: ID (numeric), NAME$ (string), SALARY (numeric); 3 rows.
+   --  Row 1: ID=1, NAME$="Alice", SALARY=50000
+   --  Row 2: ID=2, NAME$="Bob",   SALARY=60000
+   --  Row 3: ID=3, NAME$="Charlie", SALARY=70000
+   Parse_ODF ("tests/data/sample.ods");
+   Check ("PO-01 col count",           Column_Count,    3);
+   Check ("PO-02 row count",           Row_Count,       3);
+   Check ("PO-03 col 1 name",          Column_Name (1), "ID");
+   Check ("PO-04 col 2 name",          Column_Name (2), "NAME$");
+   Check ("PO-05 col 3 name",          Column_Name (3), "SALARY");
+   V := Get_Value (1, "ID");
+   Check_Float ("PO-06 row1 ID",          V.Num_Val, 1.0);
+   V := Get_Value (2, "NAME$");
+   Check      ("PO-07 row2 NAME$ kind",   V.Kind = Val_String, True);
+   Check      ("PO-08 row2 NAME$ value",  To_String (V.Str_Val), "Bob");
+   V := Get_Value (3, "SALARY");
+   Check_Float ("PO-09 row3 SALARY",      V.Num_Val, 70000.0);
+
+   --  PO-10..PO-13: INF values in tests/data/inf_values.ods
+   --  Contents: X,Y,Z; row 1 = Pos_Inf, Neg_Inf, 1.5
+   Parse_ODF ("tests/data/inf_values.ods");
+   V := Get_Value (1, "X");
+   Check ("PO-10 INF row1 X kind",    V.Kind = Val_Numeric, True);
+   Check ("PO-11 INF row1 X Pos_Inf",
+          Is_Inf (V.Num_Val) and then V.Num_Val > 0.0, True);
+   V := Get_Value (1, "Y");
+   Check ("PO-12 INF row1 Y Neg_Inf",
+          Is_Inf (V.Num_Val) and then V.Num_Val < 0.0, True);
+   V := Get_Value (2, "Z");
+   Check_Float ("PO-13 INF row2 Z normal", V.Num_Val, 2.5);
+
+   --  PO-14..PO-17: sheet selection — "Scores" sheet
+   --  Contents: ID (numeric), NAME$ (string), SCORE (numeric); 2 rows.
+   --  Row 1: ID=1, NAME$="Alice", SCORE=95
+   Parse_ODF ("tests/data/multi_sheet.ods", Sheet_Name => "Scores");
+   Check ("PO-14 Scores col count",      Column_Count, 3);
+   Check ("PO-15 Scores row count",      Row_Count,    2);
+   V := Get_Value (1, "NAME$");
+   Check ("PO-16 Scores row1 NAME$",     To_String (V.Str_Val), "Alice");
+   V := Get_Value (1, "SCORE");
+   Check_Float ("PO-17 Scores row1 SCORE", V.Num_Val, 95.0);
+
+   --  PO-18..PO-19: sheet selection — "Metadata" sheet
+   --  Contents: KEY$ (string), VALUE$ (string); 2 rows.
+   --  Row 1: KEY$="Version", VALUE$="1.0"
+   Parse_ODF ("tests/data/multi_sheet.ods", Sheet_Name => "Metadata");
+   Check ("PO-18 Metadata col count",       Column_Count, 2);
+   V := Get_Value (1, "KEY$");
+   Check ("PO-19 Metadata row1 KEY$",       To_String (V.Str_Val), "Version");
+
+   --  PO-20..PO-21: Skip_Rows=1 skips Alice; row 1 becomes Bob
+   Parse_ODF ("tests/data/sample.ods", Skip_Rows => 1);
+   Check ("PO-20 skip_rows=1 row count",   Row_Count, 2);
+   V := Get_Value (1, "NAME$");
+   Check ("PO-21 skip_rows=1 row1 NAME$",  To_String (V.Str_Val), "Bob");
+
+   --  PO-22: Max_Rows=2 limits result to first two data rows
+   Parse_ODF ("tests/data/sample.ods", Max_Rows => 2);
+   Check ("PO-22 max_rows=2 row count",    Row_Count, 2);
+
+   --  PO-23: corrupt zip file raises SData.Script_Error
+   declare
+      Raised : Boolean := False;
+   begin
+      Parse_ODF ("tests/data/bad.ods");
+      Check ("PO-23 bad ODS raises Script_Error", Raised, True);
+   exception
+      when SData.Script_Error =>
+         Raised := True;
+         Check ("PO-23 bad ODS raises Script_Error", Raised, True);
+   end;
 
    ---------------------------------------------------------------------------
    --  Parse_OOXML tests  (PX-01 .. PX-23)  — added in Task 4
