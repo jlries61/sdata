@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.6.10
+Version:        0.6.11
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -52,6 +52,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Fri May 08 2026 John L. Ries <john@theyarnbard.com> - 0.6.11-1
+- Refactor Parse_ODF/Parse_OOXML; remove version from HELP output
+
 * Thu May 07 2026 John L. Ries <john@theyarnbard.com> - 0.6.10-1
 - Expand unit tests (csv_unit_test 71 tests, sdata_unit_test 98 tests); fix NRN() normal distribution bug; add SYSTEM as immediate command; annotate standards review.
 

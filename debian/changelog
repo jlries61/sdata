@@ -1,3 +1,9 @@
+sdata (0.6.11-1) unstable; urgency=medium
+
+  * Refactor Parse_ODF/Parse_OOXML; remove version from HELP output
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 08 May 2026 22:53:03 -0700
+
 sdata (0.6.10-1) unstable; urgency=medium
 
   * Expand unit tests (csv_unit_test 71 tests, sdata_unit_test 98 tests); fix NRN() normal distribution bug; add SYSTEM as immediate command; annotate standards review.
