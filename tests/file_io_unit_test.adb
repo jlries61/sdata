@@ -213,8 +213,7 @@ begin
       Check ("PO-23 bad ODS raises Script_Error", Raised, True);
    exception
       when SData.Script_Error =>
-         Raised := True;
-         Check ("PO-23 bad ODS raises Script_Error", Raised, True);
+         Check ("PO-23 bad ODS raises Script_Error", True, True);
    end;
 
    ---------------------------------------------------------------------------
@@ -282,8 +281,7 @@ begin
       Check ("PX-23 bad XLSX raises Script_Error", Raised, True);
    exception
       when SData.Script_Error =>
-         Raised := True;
-         Check ("PX-23 bad XLSX raises Script_Error", Raised, True);
+         Check ("PX-23 bad XLSX raises Script_Error", True, True);
    end;
 
    ---------------------------------------------------------------------------
