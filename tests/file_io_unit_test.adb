@@ -218,8 +218,73 @@ begin
    end;
 
    ---------------------------------------------------------------------------
-   --  Parse_OOXML tests  (PX-01 .. PX-23)  — added in Task 4
+   --  Parse_OOXML tests  (PX-01 .. PX-23)
    ---------------------------------------------------------------------------
+
+   --  PX-01..PX-09: basic load of tests/data/sample.xlsx
+   --  Same schema as sample.ods: ID (numeric), NAME$ (string), SALARY (numeric); 3 rows.
+   Parse_OOXML ("tests/data/sample.xlsx");
+   Check ("PX-01 col count",           Column_Count,    3);
+   Check ("PX-02 row count",           Row_Count,       3);
+   Check ("PX-03 col 1 name",          Column_Name (1), "ID");
+   Check ("PX-04 col 2 name",          Column_Name (2), "NAME$");
+   Check ("PX-05 col 3 name",          Column_Name (3), "SALARY");
+   V := Get_Value (1, "ID");
+   Check_Float ("PX-06 row1 ID",          V.Num_Val, 1.0);
+   V := Get_Value (2, "NAME$");
+   Check      ("PX-07 row2 NAME$ kind",   V.Kind = Val_String, True);
+   Check      ("PX-08 row2 NAME$ value",  To_String (V.Str_Val), "Bob");
+   V := Get_Value (3, "SALARY");
+   Check_Float ("PX-09 row3 SALARY",      V.Num_Val, 70000.0);
+
+   --  PX-10..PX-13: INF values in tests/data/inf_values.xlsx
+   Parse_OOXML ("tests/data/inf_values.xlsx");
+   V := Get_Value (1, "X");
+   Check ("PX-10 INF row1 X kind",    V.Kind = Val_Numeric, True);
+   Check ("PX-11 INF row1 X Pos_Inf",
+          Is_Inf (V.Num_Val) and then V.Num_Val > 0.0, True);
+   V := Get_Value (1, "Y");
+   Check ("PX-12 INF row1 Y Neg_Inf",
+          Is_Inf (V.Num_Val) and then V.Num_Val < 0.0, True);
+   V := Get_Value (2, "Z");
+   Check_Float ("PX-13 INF row2 Z normal", V.Num_Val, 2.5);
+
+   --  PX-14..PX-17: sheet selection — "Scores" sheet
+   Parse_OOXML ("tests/data/multi_sheet.xlsx", Sheet_Name => "Scores");
+   Check ("PX-14 Scores col count",      Column_Count, 3);
+   Check ("PX-15 Scores row count",      Row_Count,    2);
+   V := Get_Value (1, "NAME$");
+   Check ("PX-16 Scores row1 NAME$",     To_String (V.Str_Val), "Alice");
+   V := Get_Value (1, "SCORE");
+   Check_Float ("PX-17 Scores row1 SCORE", V.Num_Val, 95.0);
+
+   --  PX-18..PX-19: sheet selection — "Metadata" sheet
+   Parse_OOXML ("tests/data/multi_sheet.xlsx", Sheet_Name => "Metadata");
+   Check ("PX-18 Metadata col count",       Column_Count, 2);
+   V := Get_Value (1, "KEY$");
+   Check ("PX-19 Metadata row1 KEY$",       To_String (V.Str_Val), "Version");
+
+   --  PX-20..PX-21: Skip_Rows=1 skips Alice; row 1 becomes Bob
+   Parse_OOXML ("tests/data/sample.xlsx", Skip_Rows => 1);
+   Check ("PX-20 skip_rows=1 row count",   Row_Count, 2);
+   V := Get_Value (1, "NAME$");
+   Check ("PX-21 skip_rows=1 row1 NAME$",  To_String (V.Str_Val), "Bob");
+
+   --  PX-22: Max_Rows=2 limits result to first two data rows
+   Parse_OOXML ("tests/data/sample.xlsx", Max_Rows => 2);
+   Check ("PX-22 max_rows=2 row count",    Row_Count, 2);
+
+   --  PX-23: corrupt zip file raises SData.Script_Error
+   declare
+      Raised : Boolean := False;
+   begin
+      Parse_OOXML ("tests/data/bad.xlsx");
+      Check ("PX-23 bad XLSX raises Script_Error", Raised, True);
+   exception
+      when SData.Script_Error =>
+         Raised := True;
+         Check ("PX-23 bad XLSX raises Script_Error", Raised, True);
+   end;
 
    ---------------------------------------------------------------------------
    --  Summary
