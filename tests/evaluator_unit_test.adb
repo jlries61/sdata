@@ -10,6 +10,9 @@ with SData.Values;          use SData.Values;
 with SData.Evaluator;       use SData.Evaluator;
 with SData.Statistics;
 pragma Warnings (Off, SData.Statistics);
+with SData.AST;       use SData.AST;
+with SData.Parser;
+with SData.Variables; use SData.Variables;
 
 procedure Evaluator_Unit_Test is
    Passed : Natural := 0;
@@ -150,6 +153,31 @@ procedure Evaluator_Unit_Test is
          (1 => (Kind => Val_String, Str_Val => To_Unbounded_String (A)),
           2 => (Kind => Val_String, Str_Val => To_Unbounded_String (B))));
    end FS2;
+
+   function Eval (S : String) return Value is
+      Ctx  : SData.Parser.Parser_Context;
+      Prog : Statement_Access;
+      V    : Value;
+   begin
+      SData.Parser.Initialize (Ctx, "LET _R = " & S);
+      Prog := SData.Parser.Parse_Program (Ctx);
+      V := Evaluate (Prog.Expr);
+      Free_Program (Prog);
+      return V;
+   exception
+      when others =>
+         Free_Program (Prog);
+         raise;
+   end Eval;
+
+   function Raises_Expr (S : String) return Boolean is
+      V : Value;
+   begin
+      V := Eval (S);
+      return V.Kind = Val_Missing;
+   exception
+      when others => return True;
+   end Raises_Expr;
 
    V : Value;
 
@@ -621,6 +649,60 @@ begin
                       3 => (Kind => Val_Numeric, Num_Val => 4.0))));
 
    Put_Line ("");
+
+   ---------------------------------------------------------------------------
+   --  Expression evaluator tests (EV-01 .. EV-16): Literals and arithmetic
+   ---------------------------------------------------------------------------
+
+   Put_Line ("--- EV: Expression Evaluator Tests ---");
+
+   --  EV-01: Integer literal
+   Check_Int ("EV-01: integer literal 1", Eval ("1"), 1);
+
+   --  EV-02: Float literal
+   Check_Num ("EV-02: float literal 1.5", Eval ("1.5"), 1.5);
+
+   --  EV-03: String literal
+   Check_Str ("EV-03: string literal ""hello""", Eval ("""hello"""), "hello");
+
+   --  EV-04: Integer addition -> Val_Integer
+   Check_Int ("EV-04: 2 + 3 = 5 (Val_Integer)", Eval ("2 + 3"), 5);
+
+   --  EV-05: Integer subtraction -> Val_Integer
+   Check_Int ("EV-05: 7 - 2 = 5 (Val_Integer)", Eval ("7 - 2"), 5);
+
+   --  EV-06: Integer multiplication -> Val_Integer
+   Check_Int ("EV-06: 3 * 4 = 12 (Val_Integer)", Eval ("3 * 4"), 12);
+
+   --  EV-07: Integer / integer always yields Val_Numeric (not integer division)
+   Check_Num ("EV-07: 7 / 2 = 3.5 (Val_Numeric)", Eval ("7 / 2"), 3.5);
+
+   --  EV-08: Integer ^ integer always yields Val_Numeric
+   Check_Num ("EV-08: 2 ^ 3 = 8.0 (Val_Numeric)", Eval ("2 ^ 3"), 8.0);
+
+   --  EV-09: Float operand promotes result to Val_Numeric
+   Check_Num ("EV-09: 1.5 + 0.5 = 2.0 (Val_Numeric)", Eval ("1.5 + 0.5"), 2.0);
+
+   --  EV-10: Operator precedence: * binds tighter than +
+   Check_Int ("EV-10: 2 + 3 * 4 = 14", Eval ("2 + 3 * 4"), 14);
+
+   --  EV-11: Parentheses override precedence
+   Check_Int ("EV-11: (2 + 3) * 4 = 20", Eval ("(2 + 3) * 4"), 20);
+
+   --  EV-12: Unary minus on integer -> Val_Integer
+   Check_Int ("EV-12: -5 (Val_Integer)", Eval ("-5"), -5);
+
+   --  EV-13: Unary minus on float -> Val_Numeric
+   Check_Num ("EV-13: -1.5 (Val_Numeric)", Eval ("-1.5"), -1.5);
+
+   --  EV-14: Left-associative subtraction: 10 - 3 - 2 = 5 (not 10 - (3-2) = 9)
+   Check_Int ("EV-14: 10 - 3 - 2 = 5", Eval ("10 - 3 - 2"), 5);
+
+   --  EV-15: Mixed integer + float -> Val_Numeric
+   Check_Num ("EV-15: 2 + 3.0 = 5.0 (Val_Numeric)", Eval ("2 + 3.0"), 5.0);
+
+   --  EV-16: 6 / 2 is still Val_Numeric (integer operands, division always float)
+   Check_Num ("EV-16: 6 / 2 = 3.0 (Val_Numeric)", Eval ("6 / 2"), 3.0);
 
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
