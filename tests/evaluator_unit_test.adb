@@ -704,6 +704,58 @@ begin
    --  EV-16: 6 / 2 is still Val_Numeric (integer operands, division always float)
    Check_Num ("EV-16: 6 / 2 = 3.0 (Val_Numeric)", Eval ("6 / 2"), 3.0);
 
+   ---------------------------------------------------------------------------
+   --  EV-17 .. EV-32: Comparison and boolean operators
+   ---------------------------------------------------------------------------
+
+   --  EV-17: Equal — true
+   Check_Int ("EV-17: 3 = 3 -> 1", Eval ("3 = 3"), 1);
+
+   --  EV-18: Equal — false
+   Check_Int ("EV-18: 3 = 4 -> 0", Eval ("3 = 4"), 0);
+
+   --  EV-19: Not-equal — true
+   Check_Int ("EV-19: 3 <> 4 -> 1", Eval ("3 <> 4"), 1);
+
+   --  EV-20: Less-than — true
+   Check_Int ("EV-20: 3 < 4 -> 1", Eval ("3 < 4"), 1);
+
+   --  EV-21: Less-than-or-equal — equal case
+   Check_Int ("EV-21: 3 <= 3 -> 1", Eval ("3 <= 3"), 1);
+
+   --  EV-22: Greater-than — true
+   Check_Int ("EV-22: 4 > 3 -> 1", Eval ("4 > 3"), 1);
+
+   --  EV-23: Greater-than-or-equal — false
+   Check_Int ("EV-23: 3 >= 4 -> 0", Eval ("3 >= 4"), 0);
+
+   --  EV-24: AND — both true -> 1
+   Check_Int ("EV-24: 1 AND 1 -> 1", Eval ("1 AND 1"), 1);
+
+   --  EV-25: AND — one false -> 0
+   Check_Int ("EV-25: 1 AND 0 -> 0", Eval ("1 AND 0"), 0);
+
+   --  EV-26: OR — one true -> 1
+   Check_Int ("EV-26: 0 OR 1 -> 1", Eval ("0 OR 1"), 1);
+
+   --  EV-27: OR — both false -> 0
+   Check_Int ("EV-27: 0 OR 0 -> 0", Eval ("0 OR 0"), 0);
+
+   --  EV-28: XOR — both same -> 0
+   Check_Int ("EV-28: 1 XOR 1 -> 0", Eval ("1 XOR 1"), 0);
+
+   --  EV-29: XOR — different -> 1
+   Check_Int ("EV-29: 1 XOR 0 -> 1", Eval ("1 XOR 0"), 1);
+
+   --  EV-30: NOT on non-zero -> 0
+   Check_Int ("EV-30: NOT 1 -> 0", Eval ("NOT 1"), 0);
+
+   --  EV-31: NOT on zero -> 1
+   Check_Int ("EV-31: NOT 0 -> 1", Eval ("NOT 0"), 1);
+
+   --  EV-32: Compound boolean: (3 < 2) OR (5 > 4) -> 1
+   Check_Int ("EV-32: (3 < 2) OR (5 > 4) -> 1", Eval ("(3 < 2) OR (5 > 4)"), 1);
+
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
    if Failed > 0 then
