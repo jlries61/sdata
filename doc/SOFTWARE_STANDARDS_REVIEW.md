@@ -14,6 +14,7 @@
 **Annotation:** 2026-05-07 (v0.6.9) — Unit test suite substantially expanded (commits 60ad1d9, 48c8c18, 5ead7cd): `csv_unit_test` extended to 71 tests (edge cases for all five `SData.CSV` functions); `sdata_unit_test` extended to 98 tests adding coverage of `SData.Variables` (temp symbols, permanent PDV slots, `Load_PDV_From_Table` roundtrip, hold/reset, `Flush_PDV_To_Output` pipeline). Table and variable system no longer have zero unit coverage. §4.1 metrics and prose updated; §4.3 debt item partially resolved; §4 score 60→65.
 **Annotation:** 2026-05-07 (v0.6.9) — BY-variable list duplication eliminated (commit 9460375): `Current_By_Vars`, `Ctx.By_Vars`, and `By_Group_Names` package instantiation removed from the interpreter; `SData.Table` is now the sole source of truth. `By_Var_Count`/`By_Var_Name(I)` accessors added to `SData.Table`. `Group_Flags` rewritten to use `In_Same_Group` directly; REPEAT edge case (empty input table → one implicit group) handled explicitly. Also in this session: column cursor cache added (`Get_Value_By_Col`/`Set_Output_Value_By_Col`) eliminating per-row hash lookups in the data step hot path; `Max_Table_Rows` renamed `Max_Table_Cells` and default set to 50 000 000. §3.1 BY-variable concern and §4.3 debt item marked resolved.
 **Annotation:** 2026-05-09 (v0.6.11) — `Parse_ODF Load_Content` and `Parse_OOXML Load_Sheet` each decomposed into three named sub-procedures (`Collect_*_Headers` → `Infer_And_Create_*_Schema` → `Load_*_Data_Rows`); double-free and Reader-leak bugs fixed in the OOXML parser as part of the same work (commits 3a883ff, 7320963, 781d56f). `file_io_unit_test` added: 70 unit tests covering `Parse_CSV` (24), `Parse_ODF` (23), and `Parse_OOXML` (23) — INF values, sheet selection, Skip_Rows, Max_Rows, and error paths; two binary fixtures committed (`inf_values.ods`, `inf_values.xlsx`) (commits 69bbdb4–f0bc211). §5 updated to reflect prior-session fixes (9c7771f: `Program_Error`→`Script_Error`; 07b065b: silent CSV swallowing eliminated) that had not been annotated in §5. Summary-table baseline corrected: §1 (65→72) and §2 (72→75) improvements from prior sessions were reflected in section headers but not in the totals table; corrected baseline 545. §2 score 75→77; §4 score 65→68; §5 score 58→63; total 545+10 = **555/800 (69.4%)**.
+**Annotation:** 2026-05-09 (v0.6.11) — `evaluator_unit_test` extended from 101 to 146 tests (commits 74d8af07, 4aa18ce, 4da4b3d): 45 new tests (EV-01..EV-45) cover the `SData.Evaluator.Evaluate` expression-tree path — integer/float/string literals, all arithmetic operators and their type-promotion rules (Int/Int→Val_Numeric, Int^Int→Val_Numeric, mixed→Val_Numeric), operator precedence and parentheses, all six comparison operators, AND/OR/XOR/NOT, string concatenation and string comparisons, variable references (integer, float, missing propagation), function calls embedded in expressions, division-by-zero error handling, and TRUE/FALSE/NOT TRUE language constants. `Eval(S)` + `Raises_Expr(S)` helpers added using `SData.Parser.Parse_Program("LET _R = " & S)` as the parse entry point. Remaining evaluator gaps: float-branch comparison path, `IF()` lazy-evaluation semantics, string ordering operators. §4 score 68→**70**; total 555+2 = **557/800 (69.6%)**.
 
 ---
 
@@ -141,7 +142,7 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 ---
 
-## 4. Maintainability & Evolvability — ~~60~~ ~~65~~ 68/100
+## 4. Maintainability & Evolvability — ~~60~~ ~~65~~ ~~68~~ **70/100**
 
 ### 4.1 Test Coverage & Quality
 
@@ -149,15 +150,17 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 | Metric | Value | Verdict |
 |---|---|---|
-| Unit test modules | ~~1 (csv_unit_test)~~ ~~2 (csv_unit_test: 71; sdata_unit_test: 98)~~ **3 (+ file_io_unit_test: 70)** | ~~Critically insufficient~~ **Good; all three parsers now covered** |
+| Unit test modules | ~~1 (csv_unit_test)~~ ~~2 (csv_unit_test: 71; sdata_unit_test: 98)~~ ~~3 (+ file_io_unit_test: 70)~~ **4 (+ evaluator_unit_test: 146)** | ~~Critically insufficient~~ **Good; all three parsers and the expression evaluator now covered** |
 | Integration tests | ~~118~~ **128** .cmd files | Comprehensive for happy paths |
-| Coverage estimate | ~~~35–45%~~ ~~**~45–55%**~~ **~55–65%** branch coverage | ~~Below minimum acceptable~~ **Improving; evaluator and interpreter remain integration-only** |
+| Coverage estimate | ~~~35–45%~~ ~~**~45–55%**~~ ~~**~55–65%**~~ **~65–70%** branch coverage | ~~Below minimum acceptable~~ **Improving; interpreter control flow remains integration-only** |
 | Test execution time | < 30s total | Excellent |
 | Flaky tests | None observed | Good |
 
 ~~The evaluator, interpreter, table module, variable system, and file I/O have zero unit test coverage.~~ **Updated 2026-05-07 (commits 60ad1d9, 48c8c18, 5ead7cd):** `csv_unit_test` now covers all five `SData.CSV` functions with 71 tests including edge cases (INF, signs, embedded delimiters, two-char delimiters, empty fields). `sdata_unit_test` adds 98 tests covering the full `SData.Variables` hot path: temporary symbols, permanent PDV slots, `Load_PDV_From_Table` roundtrip, hold/reset semantics, and `Flush_PDV_To_Output` pipeline. The table module and variable system no longer have zero unit coverage. Evaluator expression trees, file I/O parsers, and interpreter control flow remain integration-only. Integration tests cannot isolate regression sources when failures occur across those subsystem boundaries; adding unit tests there would require no architectural change.
 
 **Updated 2026-05-09 (commits 69bbdb4–f0bc211):** `file_io_unit_test` adds 70 tests covering `Parse_CSV` (24), `Parse_ODF` (23), and `Parse_OOXML` (23) — basic loading, INF values, sheet selection, Skip_Rows, Max_Rows, and corrupt-file error paths. Two new binary fixtures committed (`inf_values.ods`, `inf_values.xlsx`). File I/O parsers no longer have zero unit coverage. Evaluator expression trees and interpreter control flow remain integration-only.
+
+**Updated 2026-05-09 (commits 74d8af07, 4aa18ce, 4da4b3d):** `evaluator_unit_test` extended from 101 to 146 tests via 45 new EV-series assertions. The new tests exercise `SData.Evaluator.Evaluate` directly (not via `Call_Function`): all literal types, all arithmetic operators (with type-promotion rules), operator precedence and parentheses, all comparison and boolean operators, string concatenation and comparison, variable references (integer, float, missing), functions embedded in arithmetic expressions, division-by-zero error handling, and TRUE/FALSE/NOT TRUE constants. Evaluator expression-tree path is no longer integration-only. Remaining gaps: float-operand comparison branch (e.g., `1.5 < 2.5`), `IF()` three-argument lazy evaluation, and string ordering operators (`<`, `<=`, `>`, `>=`). Interpreter control flow remains integration-only.
 
 ### 4.2 Change Resilience
 
@@ -181,7 +184,7 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 |---|---|---|---|
 | `Parse_CSV` / `Parse_OOXML` / `Parse_ODF` monoliths | ~~High~~ **Medium** | 3–4 days | ~~Stable (not growing)~~ **Improving — `Load_Content`/`Load_Sheet` decomposed in v0.6.11 (7320963, 781d56f)** |
 | `Execute_Assignment` too broad | Medium | 1 day | Stable |
-| Integration-only test coverage | ~~High~~ **Low-Medium** | 2–3 days per module | ~~**Partially resolved 2026-05-07**~~ **Substantially resolved 2026-05-09** — Variables, CSV, and all three file I/O parsers now have unit coverage (file_io_unit_test, 70 tests, 69bbdb4–f0bc211); evaluator and interpreter remain integration-only |
+| Integration-only test coverage | ~~High~~ **Low** | 2–3 days per module | ~~**Partially resolved 2026-05-07**~~ ~~**Substantially resolved 2026-05-09**~~ **Largely resolved 2026-05-09** — Variables, CSV, all three file I/O parsers, and evaluator expression trees now have unit coverage; interpreter control flow is the only major remaining gap |
 | ~~BY-variable list duplication (interpreter + table)~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed 9460375** |
 | ~~Column hash lookup per record~~ | ~~Low~~ | ~~1 day~~ | **Fixed 415714a** |
 | ~~No CI/CD pipeline~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed ADR-012** |
@@ -308,12 +311,12 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Architectural Integrity | ~~65/100~~ **72/100** |
 | Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ **77/100** |
 | Efficiency & Performance | ~~74/100~~ **78/100** |
-| Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ **68/100** |
+| Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ **70/100** |
 | Error Handling & Resilience | ~~58/100~~ **63/100** |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ **65/100** |
 | Operational Readiness | 50/100 |
 | Documentation | ~~76/100~~ **82/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ **555/800 (69.4%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ **557/800 (69.6%)** |
 
 ---
 
@@ -342,7 +345,7 @@ But here's what I'd be thinking at 3 AM with a corrupted dataset:
 
 **The security posture is "trust the user completely."** SYSTEM executes arbitrary shell commands. SUBMIT can reference arbitrary paths. Column names from CSV headers go into SQL strings unquoted. For a personal analysis tool on a trusted machine, this is fine. For anything in a shared pipeline or invoked on untrusted data, it is not. The `--noshell` flag helps, but it is opt-in and not the default, which means the safe mode requires explicit action.
 
-The codebase scores **63%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), but not yet the kind of code you hand to a new contributor and say "go find the CSV parsing bug." The file I/O layer is the debt that earns the most interest.
+The codebase scores **~~63%~~ 70%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to defensible: four test modules covering the CSV tokenizer, variable/PDV pipeline, all three file I/O parsers, and now the expression evaluator. The remaining gap is interpreter control flow, which is the largest untested subsystem and the one most likely to hide subtle regressions. That is the next natural target.
 
 ---
 
@@ -358,5 +361,5 @@ The codebase scores **63%** — solidly competent, clearly improving (the SKEPTI
 | SYSTEM shell injection surface | `sdata-system.adb:68–95` | ~~Unquoted string passed to `/bin/sh -c`~~ **Deliberate design; same trust model as R/SAS/Python; won't-fix** |
 | ~~No CI pipeline~~ | `.github/workflows/test.yml` | ~~No automated build/test on push~~ **Fixed ADR-012** |
 | ~~BY-variable list duplication~~ | `sdata-interpreter.adb:59`, `sdata-table.adb:53` | ~~Two independent copies of the same vector~~ **Fixed 9460375 — `SData.Table` is sole source of truth; `By_Var_Count`/`By_Var_Name(I)` accessors added; `Current_By_Vars`, `Ctx.By_Vars`, and `By_Group_Names` instantiation removed from interpreter** |
-| 1 unit test module | `tests/csv_unit_test.adb` | No evaluator/table/interpreter unit tests |
+| ~~1 unit test module~~ 4 unit test modules | `tests/csv_unit_test.adb`, `tests/sdata_unit_test.adb`, `tests/file_io_unit_test.adb`, `tests/evaluator_unit_test.adb` | ~~No evaluator/table/interpreter unit tests~~ Interpreter control flow remains integration-only |
 | Execute_Assignment 135 lines | `sdata-interpreter.adb:659–793` | Multiple assignment concerns in one body |
