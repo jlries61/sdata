@@ -14,6 +14,7 @@
 **Annotation:** 2026-05-07 (v0.6.9) — Unit test suite substantially expanded (commits 60ad1d9, 48c8c18, 5ead7cd): `csv_unit_test` extended to 71 tests (edge cases for all five `SData.CSV` functions); `sdata_unit_test` extended to 98 tests adding coverage of `SData.Variables` (temp symbols, permanent PDV slots, `Load_PDV_From_Table` roundtrip, hold/reset, `Flush_PDV_To_Output` pipeline). Table and variable system no longer have zero unit coverage. §4.1 metrics and prose updated; §4.3 debt item partially resolved; §4 score 60→65.
 **Annotation:** 2026-05-07 (v0.6.9) — BY-variable list duplication eliminated (commit 9460375): `Current_By_Vars`, `Ctx.By_Vars`, and `By_Group_Names` package instantiation removed from the interpreter; `SData.Table` is now the sole source of truth. `By_Var_Count`/`By_Var_Name(I)` accessors added to `SData.Table`. `Group_Flags` rewritten to use `In_Same_Group` directly; REPEAT edge case (empty input table → one implicit group) handled explicitly. Also in this session: column cursor cache added (`Get_Value_By_Col`/`Set_Output_Value_By_Col`) eliminating per-row hash lookups in the data step hot path; `Max_Table_Rows` renamed `Max_Table_Cells` and default set to 50 000 000. §3.1 BY-variable concern and §4.3 debt item marked resolved.
 **Annotation:** 2026-05-09 (v0.6.11) — `Parse_ODF Load_Content` and `Parse_OOXML Load_Sheet` each decomposed into three named sub-procedures (`Collect_*_Headers` → `Infer_And_Create_*_Schema` → `Load_*_Data_Rows`); double-free and Reader-leak bugs fixed in the OOXML parser as part of the same work (commits 3a883ff, 7320963, 781d56f). `file_io_unit_test` added: 70 unit tests covering `Parse_CSV` (24), `Parse_ODF` (23), and `Parse_OOXML` (23) — INF values, sheet selection, Skip_Rows, Max_Rows, and error paths; two binary fixtures committed (`inf_values.ods`, `inf_values.xlsx`) (commits 69bbdb4–f0bc211). §5 updated to reflect prior-session fixes (9c7771f: `Program_Error`→`Script_Error`; 07b065b: silent CSV swallowing eliminated) that had not been annotated in §5. Summary-table baseline corrected: §1 (65→72) and §2 (72→75) improvements from prior sessions were reflected in section headers but not in the totals table; corrected baseline 545. §2 score 75→77; §4 score 65→68; §5 score 58→63; total 545+10 = **555/800 (69.4%)**.
+**Annotation:** 2026-05-09 (v0.6.11) — Operational Readiness score corrected: CI/CD pipeline was resolved by ADR-012 (`.github/workflows/test.yml` runs `alr build` + `make check` on every push and PR; ADR-018 guards against missing executables) but the §7 overall score of 50/100 was never updated at that time. Corrected to 62/100: deployment sub-scores are now 8–9/10 across the board; observability sub-scores remain limited (no structured logging, no metrics — inherent in a CLI batch processor, not a defect). §7 score 50→**62**; total 557+12 = **569/800 (71.1%)**.
 **Annotation:** 2026-05-09 (v0.6.11) — `evaluator_unit_test` extended from 101 to 146 tests (commits 74d8af07, 4aa18ce, 4da4b3d): 45 new tests (EV-01..EV-45) cover the `SData.Evaluator.Evaluate` expression-tree path — integer/float/string literals, all arithmetic operators and their type-promotion rules (Int/Int→Val_Numeric, Int^Int→Val_Numeric, mixed→Val_Numeric), operator precedence and parentheses, all six comparison operators, AND/OR/XOR/NOT, string concatenation and string comparisons, variable references (integer, float, missing propagation), function calls embedded in expressions, division-by-zero error handling, and TRUE/FALSE/NOT TRUE language constants. `Eval(S)` + `Raises_Expr(S)` helpers added using `SData.Parser.Parse_Program("LET _R = " & S)` as the parse entry point. Remaining evaluator gaps: float-branch comparison path, `IF()` lazy-evaluation semantics, string ordering operators. §4 score 68→**70**; total 555+2 = **557/800 (69.6%)**.
 
 ---
@@ -251,7 +252,7 @@ No hardcoded credentials. No network services. No authentication tokens. This is
 
 ---
 
-## 7. Operational Readiness — 50/100
+## 7. Operational Readiness — ~~50~~ **62/100**
 
 ### 7.1 Observability
 
@@ -314,9 +315,9 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ **70/100** |
 | Error Handling & Resilience | ~~58/100~~ **63/100** |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ **65/100** |
-| Operational Readiness | 50/100 |
+| Operational Readiness | ~~50/100~~ **62/100** |
 | Documentation | ~~76/100~~ **82/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ **557/800 (69.6%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ **569/800 (71.1%)** |
 
 ---
 
@@ -345,7 +346,7 @@ But here's what I'd be thinking at 3 AM with a corrupted dataset:
 
 **The security posture is "trust the user completely."** SYSTEM executes arbitrary shell commands. SUBMIT can reference arbitrary paths. Column names from CSV headers go into SQL strings unquoted. For a personal analysis tool on a trusted machine, this is fine. For anything in a shared pipeline or invoked on untrusted data, it is not. The `--noshell` flag helps, but it is opt-in and not the default, which means the safe mode requires explicit action.
 
-The codebase scores **~~63%~~ 70%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to defensible: four test modules covering the CSV tokenizer, variable/PDV pipeline, all three file I/O parsers, and now the expression evaluator. The remaining gap is interpreter control flow, which is the largest untested subsystem and the one most likely to hide subtle regressions. That is the next natural target.
+The codebase scores **~~63%~~ ~~70%~~ 71%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to defensible: four test modules covering the CSV tokenizer, variable/PDV pipeline, all three file I/O parsers, and now the expression evaluator. The remaining gap is interpreter control flow, which is the largest untested subsystem and the one most likely to hide subtle regressions. That is the next natural target.
 
 ---
 
