@@ -756,6 +756,60 @@ begin
    --  EV-32: Compound boolean: (3 < 2) OR (5 > 4) -> 1
    Check_Int ("EV-32: (3 < 2) OR (5 > 4) -> 1", Eval ("(3 < 2) OR (5 > 4)"), 1);
 
+   ---------------------------------------------------------------------------
+   --  EV-33 .. EV-45: Strings, variable refs, functions in expressions,
+   --  error cases, language constants
+   ---------------------------------------------------------------------------
+
+   --  EV-33: String concatenation via Op_Add
+   Check_Str ("EV-33: ""hello"" + "" world""",
+              Eval ("""hello"" + "" world"""), "hello world");
+
+   --  EV-34: String equality — true
+   Check_Int ("EV-34: ""abc"" = ""abc"" -> 1", Eval ("""abc"" = ""abc"""), 1);
+
+   --  EV-35: String inequality — true
+   Check_Int ("EV-35: ""abc"" <> ""xyz"" -> 1", Eval ("""abc"" <> ""xyz"""), 1);
+
+   --  EV-36: Variable reference — integer arithmetic
+   --  Sets a temp var X=5 so that Eval("X + 1") can resolve it.
+   Set_Temporary ("X", (Kind => Val_Integer, Int_Val => 5));
+   Check_Int ("EV-36: X + 1 (X=5) -> 6", Eval ("X + 1"), 6);
+   Clear_Temporary;
+
+   --  EV-37: Variable reference — float arithmetic
+   Set_Temporary ("Y", (Kind => Val_Numeric, Num_Val => 2.5));
+   Check_Num ("EV-37: Y * 2 (Y=2.5) -> 5.0", Eval ("Y * 2"), 5.0);
+   Clear_Temporary;
+
+   --  EV-38: Missing value propagates through binary op
+   Set_Temporary ("M", (Kind => Val_Missing));
+   Check_Missing ("EV-38: M + 5 (M=missing) -> missing", Eval ("M + 5"));
+   Clear_Temporary;
+
+   --  EV-39: Missing value propagates through comparison
+   Set_Temporary ("M", (Kind => Val_Missing));
+   Check_Missing ("EV-39: M = 0 (M=missing) -> missing", Eval ("M = 0"));
+   Clear_Temporary;
+
+   --  EV-40: Function call result used in arithmetic expression
+   Check_Num ("EV-40: SQRT(9.0) + 1.0 = 4.0", Eval ("SQRT(9.0) + 1.0"), 4.0);
+
+   --  EV-41: ABS returns Val_Integer for integer argument; multiply stays integer
+   Check_Int ("EV-41: ABS(-3) * 2 = 6", Eval ("ABS(-3) * 2"), 6);
+
+   --  EV-42: Integer division by zero raises Script_Error
+   Check ("EV-42: 1 / 0 raises or missing", Raises_Expr ("1 / 0"), True);
+
+   --  EV-43: TRUE constant (zero-arg function fallback) -> Val_Integer 1
+   Check_Int ("EV-43: TRUE -> 1", Eval ("TRUE"), 1);
+
+   --  EV-44: FALSE constant -> Val_Integer 0
+   Check_Int ("EV-44: FALSE -> 0", Eval ("FALSE"), 0);
+
+   --  EV-45: NOT TRUE -> Val_Integer 0
+   Check_Int ("EV-45: NOT TRUE -> 0", Eval ("NOT TRUE"), 0);
+
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
    if Failed > 0 then
