@@ -13,6 +13,7 @@
 **Annotation:** 2026-05-06 (v0.6.8) — `--nosubmit` flag added (commit 6909f15): disables SUBMIT for pipeline operators who need containment beyond `--noshell`; path traversal via SUBMIT marked won't-fix (same trust-model reasoning as SYSTEM/SHELL; `--nosubmit` is the opt-in mitigation). Security 63→65, total 524→526.
 **Annotation:** 2026-05-07 (v0.6.9) — Unit test suite substantially expanded (commits 60ad1d9, 48c8c18, 5ead7cd): `csv_unit_test` extended to 71 tests (edge cases for all five `SData.CSV` functions); `sdata_unit_test` extended to 98 tests adding coverage of `SData.Variables` (temp symbols, permanent PDV slots, `Load_PDV_From_Table` roundtrip, hold/reset, `Flush_PDV_To_Output` pipeline). Table and variable system no longer have zero unit coverage. §4.1 metrics and prose updated; §4.3 debt item partially resolved; §4 score 60→65.
 **Annotation:** 2026-05-07 (v0.6.9) — BY-variable list duplication eliminated (commit 9460375): `Current_By_Vars`, `Ctx.By_Vars`, and `By_Group_Names` package instantiation removed from the interpreter; `SData.Table` is now the sole source of truth. `By_Var_Count`/`By_Var_Name(I)` accessors added to `SData.Table`. `Group_Flags` rewritten to use `In_Same_Group` directly; REPEAT edge case (empty input table → one implicit group) handled explicitly. Also in this session: column cursor cache added (`Get_Value_By_Col`/`Set_Output_Value_By_Col`) eliminating per-row hash lookups in the data step hot path; `Max_Table_Rows` renamed `Max_Table_Cells` and default set to 50 000 000. §3.1 BY-variable concern and §4.3 debt item marked resolved.
+**Annotation:** 2026-05-09 (v0.6.11) — `Parse_ODF Load_Content` and `Parse_OOXML Load_Sheet` each decomposed into three named sub-procedures (`Collect_*_Headers` → `Infer_And_Create_*_Schema` → `Load_*_Data_Rows`); double-free and Reader-leak bugs fixed in the OOXML parser as part of the same work (commits 3a883ff, 7320963, 781d56f). `file_io_unit_test` added: 70 unit tests covering `Parse_CSV` (24), `Parse_ODF` (23), and `Parse_OOXML` (23) — INF values, sheet selection, Skip_Rows, Max_Rows, and error paths; two binary fixtures committed (`inf_values.ods`, `inf_values.xlsx`) (commits 69bbdb4–f0bc211). §5 updated to reflect prior-session fixes (9c7771f: `Program_Error`→`Script_Error`; 07b065b: silent CSV swallowing eliminated) that had not been annotated in §5. Summary-table baseline corrected: §1 (65→72) and §2 (72→75) improvements from prior sessions were reflected in section headers but not in the totals table; corrected baseline 545. §2 score 75→77; §4 score 65→68; §5 score 58→63; total 545+10 = **555/800 (69.4%)**.
 
 ---
 
@@ -52,11 +53,11 @@ The SQLite backing store for large tables (`ada_sqlite3`) is a justified complex
 
 Four direct dependencies, all justified, all maintained, no version-pinning mismatches. Dependency hygiene is **exemplary** for a project of this size. No npm-style dependency explosion.
 
-**Verdict:** The architectural foundations are sound. The two original failing grades — (1) the global-state integration bus, and (2) monolithic file-I/O parsers — are partially resolved. **Updated 88def8c:** The global-state bus is fully closed: `BOG_Flag`/`EOG_Flag` moved to `SData.Evaluator.Nav_Fns` body; no evaluator-level globals remain (see SKEPTIC_REVIEW item 4). **Updated ab4d5c8:** `Parse_CSV` decomposed into tokenizer + type-inference passes. `Parse_ODF` and `Parse_OOXML` remain monolithic.
+**Verdict:** The architectural foundations are sound. The two original failing grades — (1) the global-state integration bus, and (2) monolithic file-I/O parsers — are now both substantially resolved. **Updated 88def8c:** The global-state bus is fully closed: `BOG_Flag`/`EOG_Flag` moved to `SData.Evaluator.Nav_Fns` body; no evaluator-level globals remain (see SKEPTIC_REVIEW item 4). **Updated ab4d5c8:** `Parse_CSV` decomposed into tokenizer + type-inference passes. **Updated 7320963/781d56f (v0.6.11):** `Parse_ODF Load_Content` and `Parse_OOXML Load_Sheet` each decomposed into three named sub-procedures; data extraction and type inference are now separated in both XML parsers. Exception-safety also improved: `DOM.Readers.Free (Reader)` added to orchestrator-level exception handler for both parsers.
 
 ---
 
-## 2. Code Quality & Craftsmanship — ~~72~~ 75/100
+## 2. Code Quality & Craftsmanship — ~~72~~ ~~75~~ 77/100
 
 ### 2.1 Naming & Readability
 
@@ -66,7 +67,7 @@ Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output
 |---|---|---|
 | Naming Precision | 9/10 | Excellent; Ada verbosity works in the codebase's favour |
 | Self-Documentation | ~~7/10~~ 7.5/10 | Evaluator improved (algorithm references, elaboration note); variable comment rewritten as rationale; file_io monoliths still weaken it |
-| Cognitive Load | Medium | Low in evaluator (hidden state eliminated), interpreter (Step_Context explicit); **Medium** in Parse_CSV (passes now separated: `Process_Line_Direct` → `Infer_Column_Types` → `Load_Data_Rows`); **High** in Parse_OOXML (389 lines, still monolithic) and Parse_ODF (272 lines) |
+| Cognitive Load | Medium | Low in evaluator (hidden state eliminated), interpreter (Step_Context explicit); **Medium** in Parse_CSV (passes now separated: `Process_Line_Direct` → `Infer_Column_Types` → `Load_Data_Rows`); ~~**High** in Parse_OOXML (389 lines, still monolithic) and Parse_ODF (272 lines)~~ **Medium** in Parse_OOXML and Parse_ODF — `Load_Content`/`Load_Sheet` decomposed into three named phases each (7320963, 781d56f) |
 
 ### 2.2 Function Design
 
@@ -74,15 +75,15 @@ Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output
 
 **Remaining problems:**
 
-`Parse_OOXML` (`sdata-file_io.adb:1163–1552`) is **389 lines** (grew from 369). `Parse_ODF` (`sdata-file_io.adb:886–1158`) is **272 lines**. Both XML parsers retain the original structural flaw: data extraction and type inference are interleaved rather than separated into passes.
+~~`Parse_OOXML` (`sdata-file_io.adb:1163–1552`) is **389 lines** (grew from 369). `Parse_ODF` (`sdata-file_io.adb:886–1158`) is **272 lines**. Both XML parsers retain the original structural flaw: data extraction and type inference are interleaved rather than separated into passes.~~ **Resolved 7320963/781d56f (v0.6.11):** `Load_Content` (Parse_ODF) and `Load_Sheet` (Parse_OOXML) each decomposed into three named sub-procedures: `Collect_*_Headers` → `Infer_And_Create_*_Schema` → `Load_*_Data_Rows`. Data extraction and type inference are now separated. Exception-safety also improved: `DOM.Readers.Free (Reader)` called in orchestrator-level `exception when others` handler for both parsers.
 
 `Execute_Assignment` (`sdata-interpreter.adb:659–814`) is **155 lines** (grew from 135) and handles range expansion, array indexing, LET/SET semantics, type coercion, and PDV updates in a single procedure. It does not have one job.
 
 | Procedure | Lines | SRP Score | Verdict |
 |---|---|---|---|
 | Parse_CSV | ~~392~~ 326 | ~~3/10~~ 6/10 | ~~Structural failure~~ Passes separated (ab4d5c8): tokenizer → type inference → load |
-| Parse_OOXML | ~~369~~ 389 | 3/10 | Structural failure — grew slightly; still monolithic |
-| Parse_ODF | ~~268~~ 272 | 4/10 | Very long; unchanged |
+| Parse_OOXML | ~~369~~ 389 | ~~3/10~~ **6/10** | ~~Structural failure — grew slightly; still monolithic~~ **Load_Sheet decomposed 781d56f: Collect → Infer → Load** |
+| Parse_ODF | ~~268~~ 272 | ~~4/10~~ **6/10** | ~~Very long; unchanged~~ **Load_Content decomposed 7320963: Collect → Infer → Load** |
 | Execute_Assignment | ~~135~~ 155 | 5/10 | Too broad; grew slightly |
 | Process_One_Record | ~~130~~ 129 | 7/10 | Large but coherent |
 | Evaluate_Function | 134 | 6/10 | Complexity is warranted (array expansion) |
@@ -140,7 +141,7 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 ---
 
-## 4. Maintainability & Evolvability — ~~60~~ 65/100
+## 4. Maintainability & Evolvability — ~~60~~ ~~65~~ 68/100
 
 ### 4.1 Test Coverage & Quality
 
@@ -148,13 +149,15 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 | Metric | Value | Verdict |
 |---|---|---|
-| Unit test modules | ~~1 (csv_unit_test)~~ **2 (csv_unit_test: 71 tests; sdata_unit_test: 98 tests)** | ~~Critically insufficient~~ **Adequate for hot path** |
-| Integration tests | ~~118~~ **131** .cmd files | Comprehensive for happy paths |
-| Coverage estimate | ~~~35–45%~~ **~45–55%** branch coverage | ~~Below minimum acceptable~~ **Improving; evaluator and file I/O remain uncovered** |
+| Unit test modules | ~~1 (csv_unit_test)~~ ~~2 (csv_unit_test: 71; sdata_unit_test: 98)~~ **3 (+ file_io_unit_test: 70)** | ~~Critically insufficient~~ **Good; all three parsers now covered** |
+| Integration tests | ~~118~~ **128** .cmd files | Comprehensive for happy paths |
+| Coverage estimate | ~~~35–45%~~ ~~**~45–55%**~~ **~55–65%** branch coverage | ~~Below minimum acceptable~~ **Improving; evaluator and interpreter remain integration-only** |
 | Test execution time | < 30s total | Excellent |
 | Flaky tests | None observed | Good |
 
 ~~The evaluator, interpreter, table module, variable system, and file I/O have zero unit test coverage.~~ **Updated 2026-05-07 (commits 60ad1d9, 48c8c18, 5ead7cd):** `csv_unit_test` now covers all five `SData.CSV` functions with 71 tests including edge cases (INF, signs, embedded delimiters, two-char delimiters, empty fields). `sdata_unit_test` adds 98 tests covering the full `SData.Variables` hot path: temporary symbols, permanent PDV slots, `Load_PDV_From_Table` roundtrip, hold/reset semantics, and `Flush_PDV_To_Output` pipeline. The table module and variable system no longer have zero unit coverage. Evaluator expression trees, file I/O parsers, and interpreter control flow remain integration-only. Integration tests cannot isolate regression sources when failures occur across those subsystem boundaries; adding unit tests there would require no architectural change.
+
+**Updated 2026-05-09 (commits 69bbdb4–f0bc211):** `file_io_unit_test` adds 70 tests covering `Parse_CSV` (24), `Parse_ODF` (23), and `Parse_OOXML` (23) — basic loading, INF values, sheet selection, Skip_Rows, Max_Rows, and corrupt-file error paths. Two new binary fixtures committed (`inf_values.ods`, `inf_values.xlsx`). File I/O parsers no longer have zero unit coverage. Evaluator expression trees and interpreter control flow remain integration-only.
 
 ### 4.2 Change Resilience
 
@@ -176,9 +179,9 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 
 | Item | Severity | Remediation Effort | Trajectory |
 |---|---|---|---|
-| `Parse_CSV` / `Parse_OOXML` / `Parse_ODF` monoliths | High | 3–4 days | Stable (not growing) |
+| `Parse_CSV` / `Parse_OOXML` / `Parse_ODF` monoliths | ~~High~~ **Medium** | 3–4 days | ~~Stable (not growing)~~ **Improving — `Load_Content`/`Load_Sheet` decomposed in v0.6.11 (7320963, 781d56f)** |
 | `Execute_Assignment` too broad | Medium | 1 day | Stable |
-| Integration-only test coverage | ~~High~~ **Medium** | 2–3 days per module | **Partially resolved 2026-05-07** — Variables and CSV now have unit coverage; evaluator, interpreter, and file I/O remain integration-only |
+| Integration-only test coverage | ~~High~~ **Low-Medium** | 2–3 days per module | ~~**Partially resolved 2026-05-07**~~ **Substantially resolved 2026-05-09** — Variables, CSV, and all three file I/O parsers now have unit coverage (file_io_unit_test, 70 tests, 69bbdb4–f0bc211); evaluator and interpreter remain integration-only |
 | ~~BY-variable list duplication (interpreter + table)~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed 9460375** |
 | ~~Column hash lookup per record~~ | ~~Low~~ | ~~1 day~~ | **Fixed 415714a** |
 | ~~No CI/CD pipeline~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed ADR-012** |
@@ -188,31 +191,29 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 
 ---
 
-## 5. Error Handling & Resilience — 58/100
+## 5. Error Handling & Resilience — ~~58~~ 63/100
 
 ### 5.1 Error Philosophy
 
 `Script_Error` is the single user-facing exception type, raised with descriptive messages throughout the interpreter and evaluator. The `-k` flag's `Continue_On_Error` path correctly catches it, logs to `ERR`/`ERL`, and continues. This is a coherent primary strategy.
 
-**Where it breaks down:**
+**Where it broke down (resolved):**
 
-`sdata-file_io.adb` uses `Program_Error` in one location (`Parse_ODF:1093`) and `Script_Error` everywhere else — an inconsistency that will silently fall through `-k` handling. `Program_Error` in Ada is a language-defined exception for programming errors, not user-visible data errors; raising it for "merged cells in ODS file" is architecturally wrong.
+~~`sdata-file_io.adb` uses `Program_Error` in one location (`Parse_ODF:1093`) and `Script_Error` everywhere else — an inconsistency that will silently fall through `-k` handling. `Program_Error` in Ada is a language-defined exception for programming errors, not user-visible data errors; raising it for "merged cells in ODS file" is architecturally wrong.~~ **Fixed 9c7771f:** `Program_Error` replaced with `Script_Error` in both `Parse_ODF` and `Parse_OOXML`. All parser exception raises are now `-k`-compatible.
 
-`sdata-csv.adb` contains:
-```ada
-when others => return False;
-```
-twice (lines 42–45). Both swallow every exception type silently, including potential constraint errors that would mask format misdetection bugs.
+~~`sdata-csv.adb` contains `when others => return False;` twice (lines 42–45). Both swallow every exception type silently, including potential constraint errors that would mask format misdetection bugs.~~ **Fixed 07b065b:** Replaced with specific exception handlers; silent swallowing eliminated.
 
-`sdata-file_io.adb` has five additional broad `when others` handlers. Some re-raise; some suppress. There is no consistent policy about which exceptions from file I/O should surface to the user vs. be handled internally.
+**Remaining concern:**
+
+`sdata-file_io.adb` has broad `when others` handlers at several points. Those that re-raise are correct; those that suppress are still inconsistent with the project's error philosophy. No uniform policy exists about which file I/O exceptions should surface vs. be handled internally. **Partially improved v0.6.11 (7320963, 781d56f):** orchestrator-level `exception when others => DOM.Readers.Free (Reader); raise;` added to both `Load_Content` and `Load_Sheet` — these now always re-raise after cleanup, eliminating one class of silent suppression on the XML parser error paths.
 
 | Module | Error Consistency | Error Informativeness | Recovery |
 |---|---|---|---|
 | Evaluator | 9/10 | 9/10 | 9/10 |
 | Interpreter | 8/10 | 8/10 | 8/10 |
 | Table | 7/10 | 7/10 | 7/10 |
-| File I/O | 4/10 | 5/10 | 5/10 |
-| CSV | 3/10 | 3/10 | 3/10 |
+| File I/O | ~~4/10~~ **6/10** | ~~5/10~~ **6/10** | ~~5/10~~ **6/10** |
+| CSV | ~~3/10~~ **6/10** | ~~3/10~~ **5/10** | ~~3/10~~ **5/10** |
 
 ### 5.2 Failure Modes
 
@@ -304,15 +305,15 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 
 | Category | Score |
 |---|---|
-| Architectural Integrity | 65/100 |
-| Code Quality & Craftsmanship | 72/100 |
+| Architectural Integrity | ~~65/100~~ **72/100** |
+| Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ **77/100** |
 | Efficiency & Performance | ~~74/100~~ **78/100** |
-| Maintainability & Evolvability | ~~60/100~~ **65/100** |
-| Error Handling & Resilience | 58/100 |
+| Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ **68/100** |
+| Error Handling & Resilience | ~~58/100~~ **63/100** |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ **65/100** |
 | Operational Readiness | 50/100 |
 | Documentation | ~~76/100~~ **82/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ **535/800 (66.9%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ **555/800 (69.4%)** |
 
 ---
 
@@ -337,7 +338,7 @@ This codebase is the work of someone who actually knows what they're doing. The 
 
 But here's what I'd be thinking at 3 AM with a corrupted dataset:
 
-**`sdata-file_io.adb` is a trap.** Three procedures totalling over 1,000 lines, each mixing tokenization, type inference, and data loading in a single call stack, each with broad `when others` handlers that silently absorb exceptions. When CSV parsing fails on a malformed file, the error that surfaces may bear no relationship to the actual failure point. `Parse_CSV` has been accumulating edge cases for years and it shows. This is the part of the codebase I would not touch without full test coverage written first — and that coverage does not exist.
+**`sdata-file_io.adb` is better than it was.** ~~Three procedures totalling over 1,000 lines, each mixing tokenization, type inference, and data loading in a single call stack.~~ `Parse_CSV` is now three-pass (tokenizer → type inference → load); `Parse_ODF` and `Parse_OOXML` have each had their inner loops decomposed into three named sub-procedures. Unit test coverage has been added (70 tests across all three parsers, v0.6.11). The broad `when others` handlers remain a concern, and the file is still ~1,758 lines total. But the "I would not touch this without tests" barrier has been crossed — the tests now exist.
 
 **The security posture is "trust the user completely."** SYSTEM executes arbitrary shell commands. SUBMIT can reference arbitrary paths. Column names from CSV headers go into SQL strings unquoted. For a personal analysis tool on a trusted machine, this is fine. For anything in a shared pipeline or invoked on untrusted data, it is not. The `--noshell` flag helps, but it is opt-in and not the default, which means the safe mode requires explicit action.
 
