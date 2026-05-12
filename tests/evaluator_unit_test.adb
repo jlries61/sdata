@@ -30,18 +30,6 @@ procedure Evaluator_Unit_Test is
       end if;
    end Check;
 
-   procedure Check (Name : String; Got, Expected : Integer) is
-   begin
-      if Got = Expected then
-         Put_Line ("PASS: " & Name);
-         Passed := Passed + 1;
-      else
-         Put_Line ("FAIL: " & Name
-            & "  got=" & Got'Image & "  expected=" & Expected'Image);
-         Failed := Failed + 1;
-      end if;
-   end Check;
-
    procedure Check_Num (Name : String; V : Value; Expected : Float;
                         Tol : Float := 0.001) is
    begin

@@ -1,5 +1,4 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
-with SData.Config;
 with SData.IO;                use SData.IO;
 
 package body SData.Help is

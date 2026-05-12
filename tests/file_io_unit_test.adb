@@ -209,11 +209,13 @@ begin
    declare
       Raised : Boolean := False;
    begin
-      Parse_ODF ("tests/data/bad.ods");
+      begin
+         Parse_ODF ("tests/data/bad.ods");
+      exception
+         when SData.Script_Error =>
+            Raised := True;
+      end;
       Check ("PO-23 bad ODS raises Script_Error", Raised, True);
-   exception
-      when SData.Script_Error =>
-         Check ("PO-23 bad ODS raises Script_Error", True, True);
    end;
 
    ---------------------------------------------------------------------------
@@ -277,11 +279,13 @@ begin
    declare
       Raised : Boolean := False;
    begin
-      Parse_OOXML ("tests/data/bad.xlsx");
+      begin
+         Parse_OOXML ("tests/data/bad.xlsx");
+      exception
+         when SData.Script_Error =>
+            Raised := True;
+      end;
       Check ("PX-23 bad XLSX raises Script_Error", Raised, True);
-   exception
-      when SData.Script_Error =>
-         Check ("PX-23 bad XLSX raises Script_Error", True, True);
    end;
 
    ---------------------------------------------------------------------------
