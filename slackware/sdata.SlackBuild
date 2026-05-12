@@ -64,6 +64,10 @@ mkdir -p obj bin
 # Build from within the obj directory so that all .o and .ali files
 # (including spec-only packages) land there automatically.
 cd obj
+
+# gnatmake only drives the Ada front-end; compile the C helper manually.
+gcc $SLKCFLAGS -c ../src/sdata_privilege.c -o sdata_privilege.o
+
 gnatmake \
   ../src/sdata_main.adb \
   -o ../bin/sdata \
@@ -78,7 +82,7 @@ gnatmake \
   -aI"../$SQLITE3_DIR/src" \
   -aI"../$SQLITE3_DIR/config" \
   -cargs -gnat2012 -gnatwa -gnatwl -gnatwu -g $SLKCFLAGS \
-  -largs -lsqlite3
+  -largs sdata_privilege.o -lsqlite3
 cd ..
 
 # Install to the staging directory
