@@ -21,6 +21,7 @@
 **Annotation:** 2026-05-12 (v0.6.11) — `sdata-file_io.adb` `when others` exception handlers made specific: (1) `Float'Value` failure in ODF `Get_Cell_Value` → `when Constraint_Error` (was `when others`); (2) `UnZip.Extract` for `xl/workbook.xml` and `xl/_rels/workbook.xml.rels` → `when Zip.Entry_name_not_found` (lets corrupt-entry/unsupported-compression exceptions propagate to outer `Script_Error` wrapper); (3) `UnZip.Extract` for `xl/sharedStrings.xml` → `when Zip.Entry_name_not_found` with comment documenting it is optional in OOXML. `Has_Formulas_XML` (probe function) retains `when others → return False` — any I/O failure here is a safe no-conversion fallback. Safety-net test `PX-24` added: OOXML with no `workbook.xml` falls back to `sheet1.xml` correctly. §5 score 63→**65**; total 579+2 = **581/800 (72.6%)**.
 **Annotation:** 2026-05-12 (v0.6.11) — §6 Security Posture score recalculated from full current state: SQL injection fixed (456d1e0), overflow resolved (v0.6.9), SYSTEM/SHELL reclassified Low-Medium (deliberate design, --noshell opt-in), path traversal mitigated (--nosubmit opt-in). No network exposure, no auth, no hardcoded secrets, Ada runtime bounds-checking. Remaining concerns: --noshell/--nosubmit are opt-in (not default), no fuzzing/SAST, no formal threat model, broad `when others` in file_io. Section header corrected from stale "52" to current score; SQL injection and path traversal prose updated to remove stale "needs fixing" language. §6 score 65→**70**; total 574+5 = **579/800 (72.4%)**.
 **Annotation:** 2026-05-12 (v0.6.11) — `Execute_Assignment` (155 lines) decomposed into three focused pieces: `Execute_Array_Assignment` (private procedure: array existence check, LET/SET ownership rules, slice/list/single-index dispatch), `Coerce_For_Scalar` (private function: type-kind check, Inf guard, integer promotion, string truncation), and a trimmed coordinator `Execute_Assignment` (~25 lines: evaluate, early %-name Inf guard, dispatch). `interpreter_unit_test` extended from 37 to 48 tests: IC-35..IC-41 add array-assignment coverage (single-index, slice, list, SET on temp array, LET on temp array → error, SET on permanent → error, undefined array → error). §4 score 73→**75**; total 572+2 = **574/800 (71.8%)**.
+**Annotation:** 2026-05-13 (v0.6.12) — ADR-037 implemented: configurable SYSTEM/SHELL timeout (commits 2d57654, 3ca764f). `OPTIONS SHELLTIMEOUT n` sets the per-run timeout in seconds (reset by NEW); `--shell-timeout=N` sets the batch-mode default at startup (300 s default when a filename is given, 0 in interactive mode). Implementation uses `GNAT.OS_Lib.Non_Blocking_Spawn` + `Non_Blocking_Wait_Process` + `Kill` in a 0.5-second poll loop — no external tool dependency (`timeout(1)`, PowerShell). Kills the child and raises `Script_Error` with a descriptive message on expiry. CI pipeline improved: Alire package cache added (`actions/cache@v4`, keyed on `alire.toml` hash); `apt-get update` hardened with `-o Acquire::Languages=none --no-install-recommends`. §5.2 concern (indefinite blocking on SYSTEM) resolved; §5 score 65→**68**. §7 score 62→**65** (runtime + CLI timeout configuration; CI caching). Total 591+3+3 = **597/800 (74.6%)**.
 **Annotation:** 2026-05-12 (v0.6.12) — `sdata-file_io.adb` (1,758 lines) fully decomposed into five focused child packages: `SData.File_IO` (parent, ~110 lines — `Open_Input`/`Open_Output` + `Save_Refused` exception), `SData.File_IO.Helpers` (private child, ~175 lines — shared utilities: `Get_Text`, `Detect_Inf`, `Apply_Dollar_Override`, `Safe_Name`, `Col_To_Letters`, `Escape_XML`, `Has_Formulas_XML`, `Convert_Via_LibreOffice`), `SData.File_IO.CSV` (~510 lines), `SData.File_IO.ODF` (~430 lines), `SData.File_IO.OOXML` (~440 lines). Each format package contains only its own parse and write logic; `Helpers` is a `private` child, invisible outside the hierarchy (Ada language guarantee; commit cc8560f). Also: `interpreter_unit_test` count corrected to 48 (IC-01..IC-41; file committed as part of v0.6.12). §1 score 72→**75** (file_io monolith fully resolved; `sdata-interpreter.adb` remains the sole large-file concern); §2 score 77→**79** (cognitive load: all file_io monoliths gone; self-doc note updated); §4 score 75→**77** (change resilience: "New file format" difficulty Hard→Medium; debt item resolved); total 584+3+2+2 = **591/800 (73.9%)**.
 
 ---
@@ -201,7 +202,7 @@ Adding a new command requires: parser (token + production), AST node, interprete
 
 ---
 
-## 5. Error Handling & Resilience — ~~58~~ ~~63~~ **65/100**
+## 5. Error Handling & Resilience — ~~58~~ ~~63~~ ~~65~~ **68/100**
 
 ### 5.1 Error Philosophy
 
@@ -229,7 +230,7 @@ Adding a new command requires: parser (token + production), AST node, interprete
 
 External services are limited to: shell commands (SYSTEM/SHELL), file system, SQLite. Shell failures are reported via return code. File-not-found raises `Script_Error` with filename. SQLite failure modes are partially handled but not uniformly.
 
-No timeout logic for shell commands launched via SYSTEM — a long-running shell command blocks the interpreter indefinitely with no escape mechanism.
+~~No timeout logic for shell commands launched via SYSTEM — a long-running shell command blocks the interpreter indefinitely with no escape mechanism.~~ **Resolved ADR-037 (2d57654, 3ca764f):** `OPTIONS SHELLTIMEOUT n` and `--shell-timeout=N` provide runtime and startup timeout control. Implementation is fully Ada-native: `GNAT.OS_Lib.Non_Blocking_Spawn` + 0.5-second poll loop + `Kill` + `Wait_Process` to reap. Default is 300 s in batch mode, 0 (unlimited) in interactive mode. No external tool dependency.
 
 ---
 
@@ -260,7 +261,7 @@ No hardcoded credentials. No network services. No authentication tokens. This is
 
 ---
 
-## 7. Operational Readiness — ~~50~~ **62/100**
+## 7. Operational Readiness — ~~50~~ ~~62~~ **65/100**
 
 ### 7.1 Observability
 
@@ -287,7 +288,7 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Config externalization | 9/10 |
 | Packaging breadth | 9/10 |
 | Deployment automation | 8/10 |
-| CI/CD | 9/10 |
+| CI/CD | 9/10 — Alire package cache added (actions/cache@v4); apt hardened with `-o Acquire::Languages=none --no-install-recommends` |
 | Rollback | 8/10 (git tags, versioned packages) |
 
 ---
@@ -321,11 +322,11 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ ~~77/100~~ **79/100** |
 | Efficiency & Performance | ~~74/100~~ **78/100** |
 | Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ ~~73/100~~ ~~75/100~~ **77/100** |
-| Error Handling & Resilience | ~~58/100~~ ~~63/100~~ **65/100** |
+| Error Handling & Resilience | ~~58/100~~ ~~63/100~~ ~~65/100~~ **68/100** |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ ~~65/100~~ **70/100** |
-| Operational Readiness | ~~50/100~~ **62/100** |
+| Operational Readiness | ~~50/100~~ ~~62/100~~ **65/100** |
 | Documentation | ~~76/100~~ ~~82/100~~ **85/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ **591/800 (73.9%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ ~~591/800 (73.9%)~~ **597/800 (74.6%)** |
 
 ---
 
@@ -354,7 +355,7 @@ But here's what I'd be thinking at 3 AM with a corrupted dataset:
 
 **The security posture is "operate within OS permissions."** SYSTEM executes shell commands with whatever access the running account has — which is exactly the access a system administrator has chosen to grant it. SData does not add a second permission layer on top of the OS; the correct place to restrict what `sdata` can do is the account it runs under, not a feature flag inside the tool. The `--noshell` and `--nosubmit` flags exist for operators who need containment beyond OS account permissions (e.g., running scripts from untrusted sources in a shared environment). The SQL column-name injection vector has been fixed (commit 456d1e0). This is a coherent and defensible stance, not a gap.
 
-The codebase scores **~~63%~~ ~~70%~~ ~~71%~~ ~~71.5%~~ ~~71.8%~~ ~~72.4%~~ ~~72.6%~~ ~~73.0%~~ 73.9%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to good: five test modules (48 interpreter tests, 146 evaluator tests, 70 file I/O tests, 98 variable/PDV tests, 71 CSV tests) covering all major subsystems via the full parse→Execute→variable-inspect cycle. `Execute_Assignment` — formerly the primary structural gap at 155 lines — has been decomposed into three focused pieces. ~~The main remaining structural concern is `sdata-interpreter.adb` and `sdata-file_io.adb` as large single files~~ The main remaining structural concern is `sdata-interpreter.adb` (~2,269 lines); `sdata-file_io.adb` is fully decomposed as of v0.6.12.
+The codebase scores **~~63%~~ ~~70%~~ ~~71%~~ ~~71.5%~~ ~~71.8%~~ ~~72.4%~~ ~~72.6%~~ ~~73.0%~~ ~~73.9%~~ 74.6%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to good: five test modules (48 interpreter tests, 146 evaluator tests, 70 file I/O tests, 98 variable/PDV tests, 71 CSV tests) covering all major subsystems via the full parse→Execute→variable-inspect cycle. `Execute_Assignment` — formerly the primary structural gap at 155 lines — has been decomposed into three focused pieces. ~~The main remaining structural concern is `sdata-interpreter.adb` and `sdata-file_io.adb` as large single files~~ The main remaining structural concern is `sdata-interpreter.adb` (~2,269 lines); `sdata-file_io.adb` is fully decomposed as of v0.6.12.
 
 ---
 
@@ -368,7 +369,7 @@ The codebase scores **~~63%~~ ~~70%~~ ~~71%~~ ~~71.5%~~ ~~71.8%~~ ~~72.4%~~ ~~72
 | Parse_ODF raises Program_Error | `sdata-file_io.adb:1093–1096` | Wrong exception type for user-visible error |
 | Silent exception swallow | `sdata-csv.adb:42–45` | `when others => return False` twice |
 | Column-name SQL construction | `sdata-table.adb` | ~~DDL built from user-controlled column names~~ **Fixed 456d1e0 — Sql_Id helper escapes `]`→`]]`** |
-| SYSTEM shell injection surface | `sdata-system.adb:68–95` | ~~Unquoted string passed to `/bin/sh -c`~~ **Deliberate design; same trust model as R/SAS/Python; won't-fix** |
+| SYSTEM shell injection surface | `sdata-system.adb` | ~~Unquoted string passed to `/bin/sh -c`~~ **Deliberate design; same trust model as R/SAS/Python; won't-fix. ADR-037: timeout added — `OPTIONS SHELLTIMEOUT` / `--shell-timeout=N`; Ada-native poll loop (2d57654).** |
 | ~~No CI pipeline~~ | `.github/workflows/test.yml` | ~~No automated build/test on push~~ **Fixed ADR-012** |
 | ~~BY-variable list duplication~~ | `sdata-interpreter.adb:59`, `sdata-table.adb:53` | ~~Two independent copies of the same vector~~ **Fixed 9460375 — `SData.Table` is sole source of truth; `By_Var_Count`/`By_Var_Name(I)` accessors added; `Current_By_Vars`, `Ctx.By_Vars`, and `By_Group_Names` instantiation removed from interpreter** |
 | ~~1 unit test module~~ 5 unit test modules (433 total tests) | `tests/csv_unit_test.adb`, `tests/sdata_unit_test.adb`, `tests/file_io_unit_test.adb`, `tests/evaluator_unit_test.adb`, `tests/interpreter_unit_test.adb` | All major subsystems have unit coverage |
