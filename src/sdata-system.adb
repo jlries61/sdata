@@ -118,7 +118,7 @@ package body SData.System is
                         Success := False;
                      else
                         loop
-                           delay 1.0;
+                           delay 0.5;
                            GNAT.OS_Lib.Non_Blocking_Wait_Process (Done, OK);
                            exit when Done = Pid;
                            if Clock - Start >= Limit then
