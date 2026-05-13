@@ -37,25 +37,4 @@ package SData.File_IO is
                           Allow_Overwrite : Boolean := True;
                           Charset         : String  := "");
 
-   --  Individual parsers and writers for supported formats.
-   procedure Parse_CSV   (File_Name   : String;
-                          Delimiter   : String  := ",";
-                          Read_Header : Boolean := True;
-                          Charset     : String  := "";
-                          Skip_Rows   : Natural := 0;
-                          Max_Rows    : Natural := 0;
-                          Nscan_Rows  : Natural := 0);
-   procedure Parse_ODF   (File_Name : String; Sheet_Name : String := "";
-                          Skip_Rows : Natural := 0; Max_Rows : Natural := 0);
-   procedure Parse_OOXML (File_Name : String; Sheet_Name : String := "";
-                          Skip_Rows : Natural := 0; Max_Rows : Natural := 0);
-
-   procedure Write_CSV   (File_Name       : String;
-                          Delimiter       : String  := ",";
-                          Write_Header    : Boolean := True;
-                          Allow_Overwrite : Boolean := True;
-                          Charset         : String  := "");
-   procedure Write_ODF   (File_Name : String; Sheet_Name : String := "Sheet1");
-   procedure Write_OOXML (File_Name : String; Sheet_Name : String := "Sheet1");
-
 end SData.File_IO;

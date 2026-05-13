@@ -10,7 +10,10 @@ with SData;
 with SData.Config;
 with SData.Table;           use SData.Table;
 with SData.Values;          use SData.Values;
-with SData.File_IO;         use SData.File_IO;
+with SData.File_IO;
+with SData.File_IO.CSV;     use SData.File_IO.CSV;
+with SData.File_IO.ODF;     use SData.File_IO.ODF;
+with SData.File_IO.OOXML;   use SData.File_IO.OOXML;
 
 procedure File_IO_Unit_Test is
    Passed : Natural := 0;
@@ -287,6 +290,17 @@ begin
       end;
       Check ("PX-23 bad XLSX raises Script_Error", Raised, True);
    end;
+
+   --  PX-24: OOXML file with no workbook.xml falls back to sheet1.xml.
+   --  Exercises the Zip.Entry_name_not_found suppression path in
+   --  Find_Sheet_XML_Path (lines 1269, 1314 of sdata-file_io.adb).
+   SData.Table.Clear;
+   Parse_OOXML ("tests/data/no_workbook.xlsx");
+   Check ("PX-24 no-workbook xlsx row count", Row_Count, 1);
+   Check ("PX-24 no-workbook xlsx A1 = 77",
+          Integer (SData.Table.Get_Value (1, "A").Num_Val), 77);
+   Check ("PX-24 no-workbook xlsx B1 = 88",
+          Integer (SData.Table.Get_Value (1, "B").Num_Val), 88);
 
    ---------------------------------------------------------------------------
    --  Summary

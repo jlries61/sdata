@@ -100,7 +100,9 @@ package body SData.Interpreter is
    --  Forward declarations for internal logic.
    procedure Execute_Statement    (Stmt : Statement_Access; Ctx : in out Step_Context);
    procedure Execute_List         (List : Statement_Access; Ctx : in out Step_Context; Boundary : Statement_Access := null);
-   procedure Execute_Assignment   (Stmt : Statement_Access);
+   procedure Execute_Assignment      (Stmt : Statement_Access);
+   procedure Execute_Array_Assignment (Stmt : Statement_Access; Var_Name : String; Result : Value);
+   function  Coerce_For_Scalar       (Var_Name : String; Raw : Value) return Value;
    procedure Execute_Print        (Stmt : Statement_Access);
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context);
    procedure Execute_Metadata        (Stmt : Statement_Access);
@@ -649,11 +651,151 @@ package body SData.Interpreter is
       end;
    end Full_Path;
 
-   --  LET / SET — variable assignment with type coercion and clen enforcement.
+   --  Array assignment: single-index, slice (Lo:Hi), or list (i,j,k).
+   --  Ownership rules (LET/SET vs permanent/temporary) are checked here.
+   procedure Execute_Array_Assignment
+     (Stmt     : Statement_Access;
+      Var_Name : String;
+      Result   : Value)
+   is
+      Prefix : constant String := (if Stmt.Kind = Stmt_LET then "LET " else "SET ");
+   begin
+      if not Has_Array (Var_Name) then
+         raise Script_Error with "Array """ & Var_Name & """ is not defined";
+      end if;
+      if Stmt.Kind = Stmt_LET and then Is_Temporary_Array (Var_Name) then
+         raise Script_Error with
+           "LET statement cannot modify individual elements of temporary array """ & Var_Name & """";
+      elsif Stmt.Kind = Stmt_SET and then not Is_Temporary_Array (Var_Name) then
+         raise Script_Error with
+           "SET statement cannot modify individual elements of permanent or virtual array """ & Var_Name & """";
+      end if;
+
+      if Stmt.Arr_Idx_List /= null then
+         if Stmt.Arr_Is_Slice then
+            --  Range assignment: ARR(Lo:Hi) = value
+            declare
+               Lo_Val : constant Value := Evaluate (Stmt.Arr_Idx_List.Expr);
+               Hi_Val : constant Value := Evaluate (Stmt.Arr_Idx_List.Next.Expr);
+               Lo, Hi : Integer;
+            begin
+               if Lo_Val.Kind = Val_Integer then Lo := Lo_Val.Int_Val;
+               elsif Lo_Val.Kind = Val_Numeric then Lo := Integer (Float'Floor (Lo_Val.Num_Val));
+               else raise Script_Error with "Array slice lower bound for """ & Var_Name & """ must be numeric";
+               end if;
+               if Hi_Val.Kind = Val_Integer then Hi := Hi_Val.Int_Val;
+               elsif Hi_Val.Kind = Val_Numeric then Hi := Integer (Float'Floor (Hi_Val.Num_Val));
+               else raise Script_Error with "Array slice upper bound for """ & Var_Name & """ must be numeric";
+               end if;
+               for I in Lo .. Hi loop
+                  Set_Array_Element (Var_Name, I, Result);
+               end loop;
+               Debug_Trace (Prefix & Var_Name & "("
+                            & Ada.Strings.Fixed.Trim (Integer'Image (Lo), Ada.Strings.Both)
+                            & ":"
+                            & Ada.Strings.Fixed.Trim (Integer'Image (Hi), Ada.Strings.Both)
+                            & ") = " & Debug_Value (Result));
+            end;
+         else
+            --  List assignment: ARR(1,3,5) = value
+            declare
+               Node    : Expression_List := Stmt.Arr_Idx_List;
+               Idx_Val : Value;
+               Idx     : Integer;
+            begin
+               while Node /= null loop
+                  Idx_Val := Evaluate (Node.Expr);
+                  if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
+                  elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
+                  else raise Script_Error with "Array index for """ & Var_Name & """ must be numeric";
+                  end if;
+                  Set_Array_Element (Var_Name, Idx, Result);
+                  Node := Node.Next;
+               end loop;
+               Debug_Trace (Prefix & Var_Name & "(...) = " & Debug_Value (Result));
+            end;
+         end if;
+      else
+         --  Single-index assignment: ARR(I) = value
+         declare
+            Idx_Val : constant Value := Evaluate (Stmt.Arr_Idx);
+            Idx     : Integer;
+         begin
+            if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
+            elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
+            else
+               raise Script_Error with "Array index for """ & Var_Name
+                  & """ must be numeric, not "
+                  & (if Idx_Val.Kind = Val_Missing then "missing" else "a string");
+            end if;
+            Set_Array_Element (Var_Name, Idx, Result);
+            Debug_Trace (Prefix & Var_Name & "("
+                         & Ada.Strings.Fixed.Trim (Integer'Image (Idx), Ada.Strings.Both)
+                         & ") = " & Debug_Value (Result));
+         end;
+      end if;
+   end Execute_Array_Assignment;
+
+   --  Type compatibility check, Inf guard, and numeric promotion for scalar
+   --  assignment.  Returns the coerced value ready to store, or Val_Missing
+   --  when Inf→integer conversion is configured to warn rather than raise.
+   function Coerce_For_Scalar (Var_Name : String; Raw : Value) return Value is
+      Expected      : constant Value_Kind := Get_Expected_Kind (Var_Name);
+      Existing_Kind : constant Value_Kind := Get_Type (Var_Name);
+      Result        : Value := Raw;
+   begin
+      if Existing_Kind /= Val_Missing then
+         if Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
+            raise SData.Table.Type_Mismatch_Error with
+              "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+         end if;
+         if Existing_Kind = Val_String and Result.Kind /= Val_String then
+            raise SData.Table.Type_Mismatch_Error with
+              "Cannot assign numeric to string variable " & Var_Name;
+         elsif Existing_Kind /= Val_String and Result.Kind = Val_String then
+            raise SData.Table.Type_Mismatch_Error with
+              "Cannot assign string to numeric variable " & Var_Name;
+         end if;
+      end if;
+      if Result.Kind = Val_Numeric and then Is_Inf (Result.Num_Val)
+         and then Expected = Val_Integer
+      then
+         if SData.Config.Ignore_Math_Errors then
+            Put_Line_Error ("Warning: Cannot convert Inf to integer.");
+            return (Kind => Val_Missing);
+         else
+            raise Script_Error with "Cannot convert Inf to integer.";
+         end if;
+      end if;
+      if Result.Kind /= Val_Missing then
+         if Expected = Val_Integer and Result.Kind /= Val_Integer then
+            Result := (Kind    => Val_Integer,
+                       Int_Val => Integer (Float'Truncation (Convert_To_Float (Result))));
+         elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
+            Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
+         elsif Expected /= Result.Kind
+            and not (Expected = Val_Numeric and Result.Kind = Val_Integer)
+         then
+            raise SData.Table.Type_Mismatch_Error with
+              "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+         end if;
+      end if;
+      if Result.Kind = Val_String
+         and then SData.Config.Max_String_Len > 0
+         and then Length (Result.Str_Val) > SData.Config.Max_String_Len
+      then
+         Put_Line_Error ("Warning: String truncated to "
+                         & Integer'Image (SData.Config.Max_String_Len) & " characters.");
+         Result.Str_Val :=
+           To_Unbounded_String (Slice (Result.Str_Val, 1, SData.Config.Max_String_Len));
+      end if;
+      return Result;
+   end Coerce_For_Scalar;
+
+   --  LET / SET — evaluate, guard Inf for %-names, then dispatch.
    procedure Execute_Assignment (Stmt : Statement_Access) is
       Var_Name_Str : constant String := Stmt.Var_Name (1 .. Stmt.Var_Len);
-      Expected     : Value_Kind;
-      Result       : Value;  --  Initialised in body so exceptions are caught below
+      Result       : Value;
    begin
       Result := Evaluate (Stmt.Expr);
       if Var_Name_Str'Length > 0
@@ -669,128 +811,9 @@ package body SData.Interpreter is
          end if;
       end if;
       if Stmt.Is_Array then
-         --  Check if the array exists first.
-         if not Has_Array (Var_Name_Str) then
-            raise Script_Error with "Array """ & Var_Name_Str & """ is not defined";
-         end if;
-
-         --  Enforce design rules for array modifications:
-         --  "LET statement may not modify individual elements of temporary array."
-         --  "SET statement may not modify individual elements of virtual or permanent array."
-         if Stmt.Kind = Stmt_LET and then Is_Temporary_Array (Var_Name_Str) then
-            raise Script_Error with "LET statement cannot modify individual elements of temporary array """ & Var_Name_Str & """";
-         elsif Stmt.Kind = Stmt_SET and then not Is_Temporary_Array (Var_Name_Str) then
-            raise Script_Error with "SET statement cannot modify individual elements of permanent or virtual array """ & Var_Name_Str & """";
-         end if;
-
-         if Stmt.Arr_Idx_List /= null then
-            if Stmt.Arr_Is_Slice then
-               --  Range assignment: ARR(Lo:Hi) = value
-               declare
-                  Lo_Val : constant Value := Evaluate (Stmt.Arr_Idx_List.Expr);
-                  Hi_Val : constant Value := Evaluate (Stmt.Arr_Idx_List.Next.Expr);
-                  Lo, Hi : Integer;
-               begin
-                  if Lo_Val.Kind = Val_Integer then Lo := Lo_Val.Int_Val;
-                  elsif Lo_Val.Kind = Val_Numeric then Lo := Integer (Float'Floor (Lo_Val.Num_Val));
-                  else raise Script_Error with "Array slice lower bound for """ & Var_Name_Str & """ must be numeric";
-                  end if;
-                  if Hi_Val.Kind = Val_Integer then Hi := Hi_Val.Int_Val;
-                  elsif Hi_Val.Kind = Val_Numeric then Hi := Integer (Float'Floor (Hi_Val.Num_Val));
-                  else raise Script_Error with "Array slice upper bound for """ & Var_Name_Str & """ must be numeric";
-                  end if;
-                  for I in Lo .. Hi loop
-                     Set_Array_Element (Var_Name_Str, I, Result);
-                  end loop;
-                  Debug_Trace ((if Stmt.Kind = Stmt_LET then "LET " else "SET ")
-                               & Var_Name_Str & "("
-                               & Ada.Strings.Fixed.Trim (Integer'Image (Lo), Ada.Strings.Both)
-                               & ":"
-                               & Ada.Strings.Fixed.Trim (Integer'Image (Hi), Ada.Strings.Both)
-                               & ") = " & Debug_Value (Result));
-               end;
-            else
-               --  List assignment: ARR(1,3,5) = value
-               declare
-                  Node : Expression_List := Stmt.Arr_Idx_List;
-                  Idx_Val : Value;
-                  Idx     : Integer;
-               begin
-                  while Node /= null loop
-                     Idx_Val := Evaluate (Node.Expr);
-                     if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
-                     elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
-                     else raise Script_Error with "Array index for """ & Var_Name_Str & """ must be numeric";
-                     end if;
-                     Set_Array_Element (Var_Name_Str, Idx, Result);
-                     Node := Node.Next;
-                  end loop;
-                  Debug_Trace ((if Stmt.Kind = Stmt_LET then "LET " else "SET ")
-                               & Var_Name_Str & "(...) = " & Debug_Value (Result));
-               end;
-            end if;
-         else
-            declare
-               Idx_Val : constant Value := Evaluate (Stmt.Arr_Idx);
-               Idx : Integer;
-            begin
-               if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
-               elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
-               else
-                  raise Script_Error with "Array index for """ & Var_Name_Str &
-                     """ must be numeric, not " &
-                     (if Idx_Val.Kind = Val_Missing then "missing" else "a string");
-               end if;
-               Set_Array_Element (Var_Name_Str, Idx, Result);
-               Debug_Trace ((if Stmt.Kind = Stmt_LET then "LET " else "SET ")
-                            & Var_Name_Str & "("
-                            & Ada.Strings.Fixed.Trim (Integer'Image (Idx), Ada.Strings.Both)
-                            & ") = " & Debug_Value (Result));
-            end;
-         end if;
+         Execute_Array_Assignment (Stmt, Var_Name_Str, Result);
       else
-         Expected := Get_Expected_Kind (Var_Name_Str);
-         declare
-            Existing_Kind : constant Value_Kind := Get_Type (Var_Name_Str);
-         begin
-            if Existing_Kind /= Val_Missing then
-               if Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
-                  raise SData.Table.Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
-               end if;
-               if Existing_Kind = Val_String and Result.Kind /= Val_String then
-                  raise SData.Table.Type_Mismatch_Error with "Cannot assign numeric to string variable " & Var_Name_Str;
-               elsif Existing_Kind /= Val_String and Result.Kind = Val_String then
-                  raise SData.Table.Type_Mismatch_Error with "Cannot assign string to numeric variable " & Var_Name_Str;
-               end if;
-            end if;
-         end;
-         if Result.Kind = Val_Numeric and then Is_Inf (Result.Num_Val)
-            and then Expected = Val_Integer
-         then
-            if SData.Config.Ignore_Math_Errors then
-               Put_Line_Error ("Warning: Cannot convert Inf to integer.");
-               Result := (Kind => Val_Missing);
-            else
-               raise Script_Error with "Cannot convert Inf to integer.";
-            end if;
-         end if;
-         if Result.Kind /= Val_Missing then
-            if Expected = Val_Integer and Result.Kind /= Val_Integer then
-               Result := (Kind => Val_Integer, Int_Val => Integer (Float'Truncation (Convert_To_Float(Result))));
-            elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
-               Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
-            elsif Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
-               raise SData.Table.Type_Mismatch_Error with "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
-            end if;
-         end if;
-         if Result.Kind = Val_String and then
-            SData.Config.Max_String_Len > 0 and then
-            Length (Result.Str_Val) > SData.Config.Max_String_Len
-         then
-            Put_Line_Error ("Warning: String truncated to " &
-                      Integer'Image (SData.Config.Max_String_Len) & " characters.");
-            Result.Str_Val := To_Unbounded_String (Slice (Result.Str_Val, 1, SData.Config.Max_String_Len));
-         end if;
+         Result := Coerce_For_Scalar (Var_Name_Str, Result);
          if Stmt.Kind = Stmt_LET then
             Set_Permanent (Var_Name_Str, Result);
          else
@@ -801,10 +824,12 @@ package body SData.Interpreter is
       end if;
    exception
       when E : SData.Table.Type_Mismatch_Error =>
-         raise Script_Error with "Type mismatch for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
+         raise Script_Error with "Type mismatch for variable " & Var_Name_Str
+           & ": " & Ada.Exceptions.Exception_Message (E);
       when Script_Error => raise;
       when E : others =>
-         raise Script_Error with "Assignment failed for variable " & Var_Name_Str & ": " & Ada.Exceptions.Exception_Message (E);
+         raise Script_Error with "Assignment failed for variable " & Var_Name_Str
+           & ": " & Ada.Exceptions.Exception_Message (E);
    end Execute_Assignment;
 
    --  PRINT — format and emit expression list or bare column dump.
@@ -2198,9 +2223,11 @@ package body SData.Interpreter is
                             & " records, "
                             & VC (VC'First + 1 .. VC'Last)
                             & " variables");
-               Put_Line ("RUN complete. " &
-                         RC (RC'First + 1 .. RC'Last) & " records and " &
-                         VC (VC'First + 1 .. VC'Last) & " variables processed.");
+               if not SData.Config.Quiet_Mode then
+                  Put_Line ("RUN complete. " &
+                            RC (RC'First + 1 .. RC'Last) & " records and " &
+                            VC (VC'First + 1 .. VC'Last) & " variables processed.");
+               end if;
             end;
             Step_Start := Current.Next;
          elsif Current.Kind /= Stmt_LET and then Current.Kind /= Stmt_SET
