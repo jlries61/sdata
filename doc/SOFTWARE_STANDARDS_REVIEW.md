@@ -21,6 +21,7 @@
 **Annotation:** 2026-05-12 (v0.6.11) — `sdata-file_io.adb` `when others` exception handlers made specific: (1) `Float'Value` failure in ODF `Get_Cell_Value` → `when Constraint_Error` (was `when others`); (2) `UnZip.Extract` for `xl/workbook.xml` and `xl/_rels/workbook.xml.rels` → `when Zip.Entry_name_not_found` (lets corrupt-entry/unsupported-compression exceptions propagate to outer `Script_Error` wrapper); (3) `UnZip.Extract` for `xl/sharedStrings.xml` → `when Zip.Entry_name_not_found` with comment documenting it is optional in OOXML. `Has_Formulas_XML` (probe function) retains `when others → return False` — any I/O failure here is a safe no-conversion fallback. Safety-net test `PX-24` added: OOXML with no `workbook.xml` falls back to `sheet1.xml` correctly. §5 score 63→**65**; total 579+2 = **581/800 (72.6%)**.
 **Annotation:** 2026-05-12 (v0.6.11) — §6 Security Posture score recalculated from full current state: SQL injection fixed (456d1e0), overflow resolved (v0.6.9), SYSTEM/SHELL reclassified Low-Medium (deliberate design, --noshell opt-in), path traversal mitigated (--nosubmit opt-in). No network exposure, no auth, no hardcoded secrets, Ada runtime bounds-checking. Remaining concerns: --noshell/--nosubmit are opt-in (not default), no fuzzing/SAST, no formal threat model, broad `when others` in file_io. Section header corrected from stale "52" to current score; SQL injection and path traversal prose updated to remove stale "needs fixing" language. §6 score 65→**70**; total 574+5 = **579/800 (72.4%)**.
 **Annotation:** 2026-05-12 (v0.6.11) — `Execute_Assignment` (155 lines) decomposed into three focused pieces: `Execute_Array_Assignment` (private procedure: array existence check, LET/SET ownership rules, slice/list/single-index dispatch), `Coerce_For_Scalar` (private function: type-kind check, Inf guard, integer promotion, string truncation), and a trimmed coordinator `Execute_Assignment` (~25 lines: evaluate, early %-name Inf guard, dispatch). `interpreter_unit_test` extended from 37 to 48 tests: IC-35..IC-41 add array-assignment coverage (single-index, slice, list, SET on temp array, LET on temp array → error, SET on permanent → error, undefined array → error). §4 score 73→**75**; total 572+2 = **574/800 (71.8%)**.
+**Annotation:** 2026-05-12 (v0.6.12) — `sdata-file_io.adb` (1,758 lines) fully decomposed into five focused child packages: `SData.File_IO` (parent, ~110 lines — `Open_Input`/`Open_Output` + `Save_Refused` exception), `SData.File_IO.Helpers` (private child, ~175 lines — shared utilities: `Get_Text`, `Detect_Inf`, `Apply_Dollar_Override`, `Safe_Name`, `Col_To_Letters`, `Escape_XML`, `Has_Formulas_XML`, `Convert_Via_LibreOffice`), `SData.File_IO.CSV` (~510 lines), `SData.File_IO.ODF` (~430 lines), `SData.File_IO.OOXML` (~440 lines). Each format package contains only its own parse and write logic; `Helpers` is a `private` child, invisible outside the hierarchy (Ada language guarantee; commit cc8560f). Also: `interpreter_unit_test` count corrected to 48 (IC-01..IC-41; file committed as part of v0.6.12). §1 score 72→**75** (file_io monolith fully resolved; `sdata-interpreter.adb` remains the sole large-file concern); §2 score 77→**79** (cognitive load: all file_io monoliths gone; self-doc note updated); §4 score 75→**77** (change resilience: "New file format" difficulty Hard→Medium; debt item resolved); total 584+3+2+2 = **591/800 (73.9%)**.
 
 ---
 
@@ -33,7 +34,7 @@
 
 ---
 
-## 1. Architectural Integrity — ~~65~~ 72/100
+## 1. Architectural Integrity — ~~65~~ ~~72~~ 75/100
 
 ### 1.1 Structural Coherence
 
@@ -41,7 +42,7 @@
 Yes. The three-tier model (Declarative → Immediate → Deferred) is coherent, documented at the top of `sdata-interpreter.adb`, and consistently applied. The evaluator, table, variables, and help subsystems have clear charters. The parser and lexer are separate packages with appropriate layering.
 
 **Can a new developer understand the system's organization in under 30 minutes?**
-Mostly. The package structure is logical; an Ada developer can navigate it. But `sdata-interpreter.adb` (~~2,213~~ 2,269 lines) and `sdata-file_io.adb` (~~1,646~~ 1,758 lines) are still intimidating single-file subsystems. The evaluator refactoring brought `sdata-evaluator.adb` from 2,589 lines to ~~517~~ 543 lines, which was a significant quality improvement — but the same treatment has not been applied to file I/O or the interpreter.
+Mostly. The package structure is logical; an Ada developer can navigate it. `sdata-interpreter.adb` (~~2,213~~ 2,269 lines) remains the sole intimidating single-file subsystem. ~~`sdata-file_io.adb` (~~1,646~~ 1,758 lines) is still an intimidating single-file subsystem~~ — **Resolved v0.6.12 (cc8560f):** `sdata-file_io.adb` fully decomposed into `SData.File_IO` (~110 lines), `SData.File_IO.Helpers` (private child, ~175 lines), `SData.File_IO.CSV` (~510 lines), `SData.File_IO.ODF` (~430 lines), and `SData.File_IO.OOXML` (~440 lines). The evaluator refactoring brought `sdata-evaluator.adb` from 2,589 lines to ~~517~~ 543 lines — and the same treatment has now been applied to file I/O. The interpreter is the remaining large-file concern.
 
 **Are there orphaned modules?**
 No orphaned modules detected. Every package is actively used.
@@ -60,11 +61,11 @@ The SQLite backing store for large tables (`ada_sqlite3`) is a justified complex
 
 Four direct dependencies, all justified, all maintained, no version-pinning mismatches. Dependency hygiene is **exemplary** for a project of this size. No npm-style dependency explosion.
 
-**Verdict:** The architectural foundations are sound. The two original failing grades — (1) the global-state integration bus, and (2) monolithic file-I/O parsers — are now both substantially resolved. **Updated 88def8c:** The global-state bus is fully closed: `BOG_Flag`/`EOG_Flag` moved to `SData.Evaluator.Nav_Fns` body; no evaluator-level globals remain (see SKEPTIC_REVIEW item 4). **Updated ab4d5c8:** `Parse_CSV` decomposed into tokenizer + type-inference passes. **Updated 7320963/781d56f (v0.6.11):** `Parse_ODF Load_Content` and `Parse_OOXML Load_Sheet` each decomposed into three named sub-procedures; data extraction and type inference are now separated in both XML parsers. Exception-safety also improved: `DOM.Readers.Free (Reader)` added to orchestrator-level exception handler for both parsers.
+**Verdict:** The architectural foundations are sound. The two original failing grades — (1) the global-state integration bus, and (2) monolithic file-I/O parsers — are now both fully resolved. **Updated 88def8c:** The global-state bus is fully closed: `BOG_Flag`/`EOG_Flag` moved to `SData.Evaluator.Nav_Fns` body; no evaluator-level globals remain (see SKEPTIC_REVIEW item 4). **Updated ab4d5c8:** `Parse_CSV` decomposed into tokenizer + type-inference passes. **Updated 7320963/781d56f (v0.6.11):** `Parse_ODF Load_Content` and `Parse_OOXML Load_Sheet` each decomposed into three named sub-procedures; data extraction and type inference are now separated in both XML parsers. Exception-safety also improved: `DOM.Readers.Free (Reader)` added to orchestrator-level exception handler for both parsers. **Fully resolved v0.6.12 (cc8560f):** `sdata-file_io.adb` decomposed into five focused child packages — each format is now its own module; `Helpers` is a `private` child invisible outside the hierarchy.
 
 ---
 
-## 2. Code Quality & Craftsmanship — ~~72~~ ~~75~~ 77/100
+## 2. Code Quality & Craftsmanship — ~~72~~ ~~75~~ ~~77~~ 79/100
 
 ### 2.1 Naming & Readability
 
@@ -73,24 +74,24 @@ Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output
 | Dimension | Score | Notes |
 |---|---|---|
 | Naming Precision | 9/10 | Excellent; Ada verbosity works in the codebase's favour |
-| Self-Documentation | ~~7/10~~ 7.5/10 | Evaluator improved (algorithm references, elaboration note); variable comment rewritten as rationale; file_io monoliths still weaken it |
-| Cognitive Load | Medium | Low in evaluator (hidden state eliminated), interpreter (Step_Context explicit); **Medium** in Parse_CSV (passes now separated: `Process_Line_Direct` → `Infer_Column_Types` → `Load_Data_Rows`); ~~**High** in Parse_OOXML (389 lines, still monolithic) and Parse_ODF (272 lines)~~ **Medium** in Parse_OOXML and Parse_ODF — `Load_Content`/`Load_Sheet` decomposed into three named phases each (7320963, 781d56f) |
+| Self-Documentation | ~~7/10~~ ~~7.5/10~~ 8/10 | Evaluator improved (algorithm references, elaboration note); variable comment rewritten as rationale; ~~file_io monoliths still weaken it~~ **file_io decomposed into focused packages (v0.6.12)** |
+| Cognitive Load | ~~Medium~~ **Low-Medium** | Low in evaluator (hidden state eliminated), interpreter (Step_Context explicit); **Medium** in Parse_CSV (passes now separated: `Process_Line_Direct` → `Infer_Column_Types` → `Load_Data_Rows`); ~~**High** in Parse_OOXML (389 lines, still monolithic) and Parse_ODF (272 lines)~~ ~~**Medium** in Parse_OOXML and Parse_ODF — `Load_Content`/`Load_Sheet` decomposed into three named phases each (7320963, 781d56f)~~ **Low-Medium** — all three format parsers now in dedicated packages; each ≤510 lines and handles one format only (v0.6.12, cc8560f) |
 
 ### 2.2 Function Design
 
-**Resolved — Parse_CSV** (`sdata-file_io.adb:399–725`, now **326 lines**, commit ab4d5c8): ~~`Parse_CSV` simultaneously handles field tokenization, quote handling, escape sequences, column-type inference, and row loading.~~ Decomposed into three nested procedures with clean interfaces: `Process_Line_Direct` (tokenizer pass), `Infer_Column_Types` (type-inference pass), `Load_Data_Rows` (data-loading pass). Responsibilities are now separated; a bug in type inference no longer requires navigating tokenizer logic.
+**Resolved — Parse_CSV** (now `sdata-file_io-csv.adb`, ~510 lines, commits ab4d5c8, cc8560f): ~~`Parse_CSV` simultaneously handles field tokenization, quote handling, escape sequences, column-type inference, and row loading.~~ Decomposed into three nested procedures with clean interfaces: `Process_Line_Direct` (tokenizer pass), `Infer_Column_Types` (type-inference pass), `Load_Data_Rows` (data-loading pass). **v0.6.12:** Moved to its own package `SData.File_IO.CSV`; all CSV logic (parse + write) is now self-contained.
 
 **Remaining problems:**
 
-~~`Parse_OOXML` (`sdata-file_io.adb:1163–1552`) is **389 lines** (grew from 369). `Parse_ODF` (`sdata-file_io.adb:886–1158`) is **272 lines**. Both XML parsers retain the original structural flaw: data extraction and type inference are interleaved rather than separated into passes.~~ **Resolved 7320963/781d56f (v0.6.11):** `Load_Content` (Parse_ODF) and `Load_Sheet` (Parse_OOXML) each decomposed into three named sub-procedures: `Collect_*_Headers` → `Infer_And_Create_*_Schema` → `Load_*_Data_Rows`. Data extraction and type inference are now separated. Exception-safety also improved: `DOM.Readers.Free (Reader)` called in orchestrator-level `exception when others` handler for both parsers.
+~~`Parse_OOXML` (`sdata-file_io.adb:1163–1552`) is **389 lines** (grew from 369). `Parse_ODF` (`sdata-file_io.adb:886–1158`) is **272 lines**. Both XML parsers retain the original structural flaw: data extraction and type inference are interleaved rather than separated into passes.~~ **Resolved 7320963/781d56f (v0.6.11):** `Load_Content` (Parse_ODF) and `Load_Sheet` (Parse_OOXML) each decomposed into three named sub-procedures: `Collect_*_Headers` → `Infer_And_Create_*_Schema` → `Load_*_Data_Rows`. Data extraction and type inference are now separated. Exception-safety also improved: `DOM.Readers.Free (Reader)` called in orchestrator-level `exception when others` handler for both parsers. **Further resolved v0.6.12 (cc8560f):** Moved to `SData.File_IO.ODF` and `SData.File_IO.OOXML` respectively.
 
-`Execute_Assignment` (`sdata-interpreter.adb:659–814`) is **155 lines** (grew from 135) and handles range expansion, array indexing, LET/SET semantics, type coercion, and PDV updates in a single procedure. It does not have one job.
+~~`Execute_Assignment` (`sdata-interpreter.adb:659–814`) is **155 lines** (grew from 135) and handles range expansion, array indexing, LET/SET semantics, type coercion, and PDV updates in a single procedure. It does not have one job.~~ **Resolved 2026-05-12:** Decomposed into `Execute_Array_Assignment` + `Coerce_For_Scalar` + 25-line coordinator.
 
 | Procedure | Lines | SRP Score | Verdict |
 |---|---|---|---|
-| Parse_CSV | ~~392~~ 326 | ~~3/10~~ 6/10 | ~~Structural failure~~ Passes separated (ab4d5c8): tokenizer → type inference → load |
-| Parse_OOXML | ~~369~~ 389 | ~~3/10~~ **6/10** | ~~Structural failure — grew slightly; still monolithic~~ **Load_Sheet decomposed 781d56f: Collect → Infer → Load** |
-| Parse_ODF | ~~268~~ 272 | ~~4/10~~ **6/10** | ~~Very long; unchanged~~ **Load_Content decomposed 7320963: Collect → Infer → Load** |
+| Parse_CSV | ~~392~~ ~~326~~ own pkg ~510 | ~~3/10~~ ~~6/10~~ **7/10** | ~~Structural failure~~ ~~Passes separated (ab4d5c8)~~ **Moved to `SData.File_IO.CSV` (cc8560f); CSV-only module** |
+| Parse_OOXML | ~~369~~ ~~389~~ own pkg ~440 | ~~3/10~~ ~~**6/10**~~ **7/10** | ~~Structural failure~~ ~~Load_Sheet decomposed 781d56f~~ **Moved to `SData.File_IO.OOXML` (cc8560f); OOXML-only module** |
+| Parse_ODF | ~~268~~ ~~272~~ own pkg ~430 | ~~4/10~~ ~~**6/10**~~ **7/10** | ~~Very long; unchanged~~ ~~Load_Content decomposed 7320963~~ **Moved to `SData.File_IO.ODF` (cc8560f); ODF-only module** |
 | ~~Execute_Assignment~~ | ~~135~~ ~~155~~ | ~~5/10~~ | ~~Too broad; grew slightly~~ **Decomposed into coordinator + `Execute_Array_Assignment` + `Coerce_For_Scalar`** |
 | Process_One_Record | ~~130~~ 129 | 7/10 | Large but coherent |
 | Evaluate_Function | 134 | 6/10 | Complexity is warranted (array expansion) |
@@ -148,7 +149,7 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 ---
 
-## 4. Maintainability & Evolvability — ~~60~~ ~~65~~ ~~68~~ ~~70~~ ~~73~~ **75/100**
+## 4. Maintainability & Evolvability — ~~60~~ ~~65~~ ~~68~~ ~~70~~ ~~73~~ ~~75~~ **77/100**
 
 ### 4.1 Test Coverage & Quality
 
@@ -156,7 +157,7 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 | Metric | Value | Verdict |
 |---|---|---|
-| Unit test modules | ~~1 (csv_unit_test)~~ ~~2 (csv_unit_test: 71; sdata_unit_test: 98)~~ ~~3 (+ file_io_unit_test: 70)~~ ~~4 (+ evaluator_unit_test: 146)~~ **5 (+ interpreter_unit_test: 37)** | **Good; CSV tokenizer, PDV/Variables, all three file I/O parsers, expression evaluator, and interpreter control flow now covered** |
+| Unit test modules | ~~1 (csv_unit_test)~~ ~~2 (csv_unit_test: 71; sdata_unit_test: 98)~~ ~~3 (+ file_io_unit_test: 70)~~ ~~4 (+ evaluator_unit_test: 146)~~ **5 (+ interpreter_unit_test: 48)** | **Good; CSV tokenizer, PDV/Variables, all three file I/O parsers, expression evaluator, and interpreter control flow now covered** |
 | Integration tests | ~~118~~ **128** .cmd files | Comprehensive for happy paths |
 | Coverage estimate | ~~~35–45%~~ ~~**~45–55%**~~ ~~**~55–65%**~~ ~~**~65–70%**~~ **~70–75%** branch coverage | **Interpreter control flow (IF/ELSE/ELSEIF, FOR, WHILE, REPEAT/UNTIL, BREAK, SELECT/CASE) now unit-covered** |
 | Test execution time | < 30s total | Excellent |
@@ -174,13 +175,13 @@ Adding a new built-in function requires: (1) a handler in the appropriate child 
 
 Adding a new command requires: parser (token + production), AST node, interpreter `Execute_Statement` case arm, and help entry — four files, all with clear extension points.
 
-Adding a new file format requires modifying `sdata-file_io.adb` — one file, but that file is already 1,646 lines. Extension is technically contained but practically difficult because the existing format procedures are too long to serve as readable models.
+~~Adding a new file format requires modifying `sdata-file_io.adb` — one file, but that file is already 1,646 lines. Extension is technically contained but practically difficult because the existing format procedures are too long to serve as readable models.~~ **v0.6.12:** Adding a new file format now means adding `SData.File_IO.<Fmt>.ads` and `.adb` plus a case arm in `Open_Input`/`Open_Output`. The existing CSV/ODF/OOXML packages serve as clear, single-purpose models. Difficulty is now Medium.
 
 | Change Type | Files Affected | Difficulty |
 |---|---|---|
 | New built-in function | 2 | Easy |
 | New command | 4 | Medium |
-| New file format | 1 (large) | Hard |
+| New file format | ~~1 (large)~~ 3 new files | ~~Hard~~ **Medium** |
 | New distribution family | 1 | Easy |
 | Change column storage model | 5+ | Hard |
 
@@ -188,7 +189,7 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 
 | Item | Severity | Remediation Effort | Trajectory |
 |---|---|---|---|
-| `Parse_CSV` / `Parse_OOXML` / `Parse_ODF` monoliths | ~~High~~ **Medium** | 3–4 days | ~~Stable (not growing)~~ **Improving — `Load_Content`/`Load_Sheet` decomposed in v0.6.11 (7320963, 781d56f)** |
+| ~~`Parse_CSV` / `Parse_OOXML` / `Parse_ODF` monoliths~~ | ~~High~~ ~~Medium~~ | ~~3–4 days~~ | ~~Stable~~ ~~**Improving — decomposed in v0.6.11**~~ **Resolved v0.6.12 (cc8560f) — each format is now its own focused package** |
 | ~~`Execute_Assignment` too broad~~ | ~~Medium~~ | ~~1 day~~ | **Resolved — decomposed into `Execute_Array_Assignment` + `Coerce_For_Scalar` + 25-line coordinator** |
 | Integration-only test coverage | ~~High~~ **Resolved** | 2–3 days per module | ~~**Partially resolved 2026-05-07**~~ ~~**Substantially resolved 2026-05-09**~~ ~~**Largely resolved 2026-05-09**~~ **Resolved 2026-05-12** — Variables, CSV, all three file I/O parsers, evaluator expression trees, and interpreter control flow all have unit coverage |
 | ~~BY-variable list duplication (interpreter + table)~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed 9460375** |
@@ -251,7 +252,7 @@ Sandboxing, allowlisting, and metacharacter escaping are all **won't-fix**: sand
 | Path traversal via SUBMIT | **Low-Medium** | `--nosubmit` flag (opt-in); won't-fix by default |
 | ~~Expression evaluation overflow~~ | ~~Low~~ **Resolved** | **Resolved v0.6.9: Inf is first-class `Val_Numeric`; NaN → Script_Error (or `Val_Missing` with `--ignore-math-errors`). See `doc/specs/2026-05-06-inf-neginf-design.md`.** |
 
-**Remaining concerns (keeping score below 80):** `--noshell` and `--nosubmit` are opt-in — operators running untrusted scripts must know to enable them. No fuzzing or SAST tooling. No formal threat model document. Broad `when others` handlers in `sdata-file_io.adb` can mask parse errors with security relevance (e.g., malformed ODF/OOXML that should be rejected cleanly).
+**Remaining concerns (keeping score below 80):** `--noshell` and `--nosubmit` are opt-in — operators running untrusted scripts must know to enable them. No fuzzing or SAST tooling. No formal threat model document. ~~Broad `when others` handlers in `sdata-file_io.adb` can mask parse errors with security relevance~~ — resolved 2026-05-12: all suppressing handlers are now specific exception types with documented rationale.
 
 ### 6.2 Secrets Management
 
@@ -316,15 +317,15 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 
 | Category | Score |
 |---|---|
-| Architectural Integrity | ~~65/100~~ **72/100** |
-| Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ **77/100** |
+| Architectural Integrity | ~~65/100~~ ~~72/100~~ **75/100** |
+| Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ ~~77/100~~ **79/100** |
 | Efficiency & Performance | ~~74/100~~ **78/100** |
-| Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ ~~73/100~~ **75/100** |
+| Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ ~~73/100~~ ~~75/100~~ **77/100** |
 | Error Handling & Resilience | ~~58/100~~ ~~63/100~~ **65/100** |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ ~~65/100~~ **70/100** |
 | Operational Readiness | ~~50/100~~ **62/100** |
 | Documentation | ~~76/100~~ ~~82/100~~ **85/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ **584/800 (73.0%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ **591/800 (73.9%)** |
 
 ---
 
@@ -349,11 +350,11 @@ This codebase is the work of someone who actually knows what they're doing. The 
 
 But here's what I'd be thinking at 3 AM with a corrupted dataset:
 
-**`sdata-file_io.adb` is better than it was.** ~~Three procedures totalling over 1,000 lines, each mixing tokenization, type inference, and data loading in a single call stack.~~ `Parse_CSV` is now three-pass (tokenizer → type inference → load); `Parse_ODF` and `Parse_OOXML` have each had their inner loops decomposed into three named sub-procedures. Unit test coverage has been added (73 tests, v0.6.11). ~~The broad `when others` handlers remain a concern~~ — all suppressing handlers are now specific exception types with documented rationale. The file is still ~1,758 lines total, which is the remaining structural concern.
+**`sdata-file_io.adb` is resolved.** ~~Three procedures totalling over 1,000 lines, each mixing tokenization, type inference, and data loading in a single call stack.~~ `Parse_CSV` was made three-pass (tokenizer → type inference → load) in v0.6.11; `Parse_ODF` and `Parse_OOXML` had their inner loops decomposed into three named sub-procedures. **v0.6.12 (cc8560f):** The 1,758-line file is gone — replaced by five focused packages (parent ~110 lines, Helpers private ~175, CSV ~510, ODF ~430, OOXML ~440). Unit test coverage added (70 tests, v0.6.11). All suppressing handlers are specific exception types with documented rationale. The remaining structural concern is `sdata-interpreter.adb` (~2,269 lines) — which has the same treatment available to it when the time comes.
 
 **The security posture is "operate within OS permissions."** SYSTEM executes shell commands with whatever access the running account has — which is exactly the access a system administrator has chosen to grant it. SData does not add a second permission layer on top of the OS; the correct place to restrict what `sdata` can do is the account it runs under, not a feature flag inside the tool. The `--noshell` and `--nosubmit` flags exist for operators who need containment beyond OS account permissions (e.g., running scripts from untrusted sources in a shared environment). The SQL column-name injection vector has been fixed (commit 456d1e0). This is a coherent and defensible stance, not a gap.
 
-The codebase scores **~~63%~~ ~~70%~~ ~~71%~~ ~~71.5%~~ ~~71.8%~~ ~~72.4%~~ ~~72.6%~~ 73.0%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to good: five test modules (48 interpreter tests, 146 evaluator tests, 70 file I/O tests, 98 variable/PDV tests, 71 CSV tests) covering all major subsystems via the full parse→Execute→variable-inspect cycle. `Execute_Assignment` — formerly the primary structural gap at 155 lines — has been decomposed into three focused pieces. The main remaining structural concern is `sdata-interpreter.adb` and `sdata-file_io.adb` as large single files (~2,300 and ~1,758 lines respectively), though both now have unit test coverage.
+The codebase scores **~~63%~~ ~~70%~~ ~~71%~~ ~~71.5%~~ ~~71.8%~~ ~~72.4%~~ ~~72.6%~~ ~~73.0%~~ 73.9%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to good: five test modules (48 interpreter tests, 146 evaluator tests, 70 file I/O tests, 98 variable/PDV tests, 71 CSV tests) covering all major subsystems via the full parse→Execute→variable-inspect cycle. `Execute_Assignment` — formerly the primary structural gap at 155 lines — has been decomposed into three focused pieces. ~~The main remaining structural concern is `sdata-interpreter.adb` and `sdata-file_io.adb` as large single files~~ The main remaining structural concern is `sdata-interpreter.adb` (~2,269 lines); `sdata-file_io.adb` is fully decomposed as of v0.6.12.
 
 ---
 
@@ -361,8 +362,9 @@ The codebase scores **~~63%~~ ~~70%~~ ~~71%~~ ~~71.5%~~ ~~71.8%~~ ~~72.4%~~ ~~72
 
 | Finding | File:Line | Evidence |
 |---|---|---|
-| Parse_CSV is 392 lines | `sdata-file_io.adb:286–677` | Single procedure, multiple concerns |
-| Parse_OOXML is 369 lines | `sdata-file_io.adb:1103–1471` | Single procedure |
+| ~~Parse_CSV is 392 lines~~ | ~~`sdata-file_io.adb:286–677`~~ | ~~Single procedure, multiple concerns~~ **Resolved v0.6.12 (cc8560f) — `SData.File_IO.CSV` package** |
+| ~~Parse_OOXML is 369 lines~~ | ~~`sdata-file_io.adb:1103–1471`~~ | ~~Single procedure~~ **Resolved v0.6.12 (cc8560f) — `SData.File_IO.OOXML` package** |
+| `sdata-file_io.adb` 1,758 lines monolith | `src/sdata-file_io*.adb` | **Resolved v0.6.12 (cc8560f) — decomposed into parent (~110) + Helpers (~175) + CSV (~510) + ODF (~430) + OOXML (~440)** |
 | Parse_ODF raises Program_Error | `sdata-file_io.adb:1093–1096` | Wrong exception type for user-visible error |
 | Silent exception swallow | `sdata-csv.adb:42–45` | `when others => return False` twice |
 | Column-name SQL construction | `sdata-table.adb` | ~~DDL built from user-controlled column names~~ **Fixed 456d1e0 — Sql_Id helper escapes `]`→`]]`** |
