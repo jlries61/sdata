@@ -117,6 +117,10 @@ package body SData.Help is
       Put_Line ("Command: SYSTEM ""command""");
       Put_Line ("Executes an external shell command. Disabled by --noshell.");
       Put_Line ("Uses /bin/sh on POSIX systems to avoid profile script side-effects.");
+      Put_Line ("A timeout is applied when OPTIONS SHELLTIMEOUT > 0 (requires timeout(1) on PATH).");
+      Put_Line ("If the command exceeds the timeout, Script_Error is raised.");
+      Put_Line ("Default timeout: 300 s in batch mode, 0 (unlimited) in interactive mode.");
+      Put_Line ("Override at startup with --shell-timeout=N; override at runtime with OPTIONS SHELLTIMEOUT N.");
       Put_Line ("Execution: Immediate -- the shell command is launched at once.");
    end Help_SYSTEM;
 
@@ -489,8 +493,10 @@ package body SData.Help is
       Put_Line ("  OPTIONS CHARSET name       : Character set label (stored, advisory only)");
       Put_Line ("  OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)");
       Put_Line ("                               0.0/0.0 always raises an error. Cleared by NEW.");
+      Put_Line ("  OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.");
       Put_Line ("");
       Put_Line ("CLI flags (set at startup, not runtime):");
+      Put_Line ("  --shell-timeout=N    : SYSTEM/SHELL timeout in seconds (0 = unlimited; default 300 in batch)");
       Put_Line ("  --noshell            : Disable SYSTEM/SHELL; also disables -p");
       Put_Line ("  --nosubmit           : Disable SUBMIT");
       Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
