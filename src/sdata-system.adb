@@ -100,6 +100,24 @@ package body SData.System is
             declare
                Shell_Arg : constant String :=
                   (if Posix then "-c" else "/c");
+
+               --  Escape a string for embedding in a PowerShell single-quoted
+               --  string literal (replace each ' with '').
+               function Escape_PS (S : String) return String is
+                  Result : String (1 .. S'Length * 2);
+                  Pos    : Natural := 0;
+               begin
+                  for Ch of S loop
+                     if Ch = ''' then
+                        Pos := Pos + 1; Result (Pos) := ''';
+                        Pos := Pos + 1; Result (Pos) := ''';
+                     else
+                        Pos := Pos + 1; Result (Pos) := Ch;
+                     end if;
+                  end loop;
+                  return Result (1 .. Pos);
+               end Escape_PS;
+
             begin
                if Timeout_Val > 0 and then not Is_Windows then
                   declare
@@ -136,6 +154,67 @@ package body SData.System is
                            Args : GNAT.OS_Lib.Argument_List :=
                               (new String'(Shell_Arg),
                                new String'(Command));
+                        begin
+                           Exit_Code :=
+                              GNAT.OS_Lib.Spawn (Path.all, Args);
+                           for I in Args'Range loop
+                              Free (Args (I));
+                           end loop;
+                        end;
+                     end if;
+                  end;
+               elsif Timeout_Val > 0 then
+                  --  Windows: wrap via PowerShell so we can kill on expiry.
+                  --  Try pwsh (PS 7+) first, then powershell (PS 5.x).
+                  declare
+                     PS_Path : GNAT.OS_Lib.String_Access :=
+                        GNAT.OS_Lib.Locate_Exec_On_Path ("pwsh");
+                  begin
+                     if PS_Path = null then
+                        PS_Path :=
+                           GNAT.OS_Lib.Locate_Exec_On_Path ("powershell");
+                     end if;
+                     if PS_Path /= null then
+                        declare
+                           T_Ms_Img : constant String :=
+                              Natural'Image (Timeout_Val * 1_000);
+                           T_Ms_Str : constant String :=
+                              T_Ms_Img (T_Ms_Img'First + 1 .. T_Ms_Img'Last);
+                           PS_Script : constant String :=
+                              "$p = Start-Process '"
+                              & Escape_PS (Path.all)
+                              & "' -ArgumentList '"
+                              & Shell_Arg
+                              & "', '"
+                              & Escape_PS (Command)
+                              & "' -PassThru -NoNewWindow;"
+                              & " if (-not $p.WaitForExit("
+                              & T_Ms_Str
+                              & ")) { Stop-Process -Id $p.Id -Force; exit 124 }"
+                              & " else { exit $p.ExitCode }";
+                           PS_Args : GNAT.OS_Lib.Argument_List :=
+                              (new String'("-NonInteractive"),
+                               new String'("-Command"),
+                               new String'(PS_Script));
+                        begin
+                           Exit_Code :=
+                              GNAT.OS_Lib.Spawn (PS_Path.all, PS_Args);
+                           for I in PS_Args'Range loop
+                              Free (PS_Args (I));
+                           end loop;
+                        end;
+                        Free (PS_Path);
+                     else
+                        if not Timeout_Warned then
+                           Ada.Text_IO.Put_Line
+                              (Ada.Text_IO.Standard_Error,
+                               "Warning: 'powershell' not found on PATH; "
+                               & "SHELLTIMEOUT has no effect.");
+                           Timeout_Warned := True;
+                        end if;
+                        declare
+                           Args : GNAT.OS_Lib.Argument_List :=
+                              (new String'(Shell_Arg), new String'(Command));
                         begin
                            Exit_Code :=
                               GNAT.OS_Lib.Spawn (Path.all, Args);
