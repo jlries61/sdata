@@ -9,7 +9,7 @@ with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData.Config;
 with SData.Config.Runtime;
-with SData.Table;           use SData.Table;
+with SData.Table;
 with SData.Values;          use SData.Values;
 with SData.Variables;
 with SData.AST;             use SData.AST;
