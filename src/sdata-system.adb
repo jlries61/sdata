@@ -1,13 +1,12 @@
 with Ada.Environment_Variables;
-with Ada.Text_IO;
+with Ada.Real_Time;
 with GNAT.OS_Lib; use GNAT.OS_Lib;
 with Interfaces.C; use type Interfaces.C.int;
 with SData.Config.Runtime;
 
 package body SData.System is
 
-   Is_Windows    : constant Boolean := GNAT.OS_Lib.Directory_Separator = '\';
-   Timeout_Warned : Boolean := False;
+   Is_Windows : constant Boolean := GNAT.OS_Lib.Directory_Separator = '\';
 
    function C_Is_System_Account return Interfaces.C.int;
    pragma Import (C, C_Is_System_Account, "sdata_is_system_account");
@@ -92,160 +91,60 @@ package body SData.System is
          declare
             Timeout_Val : constant Natural :=
                SData.Config.Runtime.Options_Shell_Timeout;
-            Path      : GNAT.OS_Lib.String_Access;
-            Posix     : Boolean;
-            Exit_Code : Integer;
+            Path  : GNAT.OS_Lib.String_Access;
+            Posix : Boolean;
          begin
             Resolve_Shell (Path, Posix);
             declare
                Shell_Arg : constant String :=
                   (if Posix then "-c" else "/c");
-
-               --  Escape a string for embedding in a PowerShell single-quoted
-               --  string literal (replace each ' with '').
-               function Escape_PS (S : String) return String is
-                  Result : String (1 .. S'Length * 2);
-                  Pos    : Natural := 0;
-               begin
-                  for Ch of S loop
-                     if Ch = ''' then
-                        Pos := Pos + 1; Result (Pos) := ''';
-                        Pos := Pos + 1; Result (Pos) := ''';
-                     else
-                        Pos := Pos + 1; Result (Pos) := Ch;
-                     end if;
-                  end loop;
-                  return Result (1 .. Pos);
-               end Escape_PS;
-
+               Args : GNAT.OS_Lib.Argument_List :=
+                  (new String'(Shell_Arg), new String'(Command));
             begin
-               if Timeout_Val > 0 and then not Is_Windows then
+               if Timeout_Val > 0 then
+                  --  Non-blocking spawn with a 1-second poll loop.
+                  --  Kill the child and raise Script_Error if the limit expires.
                   declare
-                     TO_Path : GNAT.OS_Lib.String_Access :=
-                        GNAT.OS_Lib.Locate_Exec_On_Path ("timeout");
+                     use Ada.Real_Time;
+                     Pid   : constant GNAT.OS_Lib.Process_Id :=
+                        GNAT.OS_Lib.Non_Blocking_Spawn (Path.all, Args);
+                     Start : constant Time      := Clock;
+                     Limit : constant Time_Span := Seconds (Timeout_Val);
+                     Done  : GNAT.OS_Lib.Process_Id;
+                     OK    : Boolean;
                   begin
-                     if TO_Path /= null then
-                        declare
-                           T_Img : constant String := Timeout_Val'Image;
-                           T_Str : constant String :=
-                              T_Img (T_Img'First + 1 .. T_Img'Last);
-                           Args : GNAT.OS_Lib.Argument_List :=
-                              (new String'(T_Str),
-                               new String'(Path.all),
-                               new String'(Shell_Arg),
-                               new String'(Command));
-                        begin
-                           Exit_Code :=
-                              GNAT.OS_Lib.Spawn (TO_Path.all, Args);
-                           for I in Args'Range loop
-                              Free (Args (I));
-                           end loop;
-                        end;
-                        Free (TO_Path);
+                     for I in Args'Range loop Free (Args (I)); end loop;
+                     if Pid = GNAT.OS_Lib.Invalid_Pid then
+                        Success := False;
                      else
-                        if not Timeout_Warned then
-                           Ada.Text_IO.Put_Line
-                              (Ada.Text_IO.Standard_Error,
-                               "Warning: 'timeout' not found on PATH; "
-                               & "SHELLTIMEOUT has no effect.");
-                           Timeout_Warned := True;
-                        end if;
-                        declare
-                           Args : GNAT.OS_Lib.Argument_List :=
-                              (new String'(Shell_Arg),
-                               new String'(Command));
-                        begin
-                           Exit_Code :=
-                              GNAT.OS_Lib.Spawn (Path.all, Args);
-                           for I in Args'Range loop
-                              Free (Args (I));
-                           end loop;
-                        end;
-                     end if;
-                  end;
-               elsif Timeout_Val > 0 then
-                  --  Windows: wrap via PowerShell so we can kill on expiry.
-                  --  Try pwsh (PS 7+) first, then powershell (PS 5.x).
-                  declare
-                     PS_Path : GNAT.OS_Lib.String_Access :=
-                        GNAT.OS_Lib.Locate_Exec_On_Path ("pwsh");
-                  begin
-                     if PS_Path = null then
-                        PS_Path :=
-                           GNAT.OS_Lib.Locate_Exec_On_Path ("powershell");
-                     end if;
-                     if PS_Path /= null then
-                        declare
-                           T_Ms_Img : constant String :=
-                              Natural'Image (Timeout_Val * 1_000);
-                           T_Ms_Str : constant String :=
-                              T_Ms_Img (T_Ms_Img'First + 1 .. T_Ms_Img'Last);
-                           PS_Script : constant String :=
-                              "$p = Start-Process '"
-                              & Escape_PS (Path.all)
-                              & "' -ArgumentList '"
-                              & Shell_Arg
-                              & "', '"
-                              & Escape_PS (Command)
-                              & "' -PassThru -NoNewWindow;"
-                              & " if (-not $p.WaitForExit("
-                              & T_Ms_Str
-                              & ")) { Stop-Process -Id $p.Id -Force; exit 124 }"
-                              & " else { exit $p.ExitCode }";
-                           PS_Args : GNAT.OS_Lib.Argument_List :=
-                              (new String'("-NonInteractive"),
-                               new String'("-Command"),
-                               new String'(PS_Script));
-                        begin
-                           Exit_Code :=
-                              GNAT.OS_Lib.Spawn (PS_Path.all, PS_Args);
-                           for I in PS_Args'Range loop
-                              Free (PS_Args (I));
-                           end loop;
-                        end;
-                        Free (PS_Path);
-                     else
-                        if not Timeout_Warned then
-                           Ada.Text_IO.Put_Line
-                              (Ada.Text_IO.Standard_Error,
-                               "Warning: 'powershell' not found on PATH; "
-                               & "SHELLTIMEOUT has no effect.");
-                           Timeout_Warned := True;
-                        end if;
-                        declare
-                           Args : GNAT.OS_Lib.Argument_List :=
-                              (new String'(Shell_Arg), new String'(Command));
-                        begin
-                           Exit_Code :=
-                              GNAT.OS_Lib.Spawn (Path.all, Args);
-                           for I in Args'Range loop
-                              Free (Args (I));
-                           end loop;
-                        end;
+                        loop
+                           delay 1.0;
+                           GNAT.OS_Lib.Non_Blocking_Wait_Process (Done, OK);
+                           exit when Done = Pid;
+                           if Clock - Start >= Limit then
+                              GNAT.OS_Lib.Kill (Pid);
+                              GNAT.OS_Lib.Wait_Process (Done, OK);
+                              declare
+                                 T_Img : constant String := Timeout_Val'Image;
+                                 T_Str : constant String :=
+                                    T_Img (T_Img'First + 1 .. T_Img'Last);
+                              begin
+                                 raise Script_Error with
+                                    "SYSTEM command timed out after "
+                                    & T_Str & " seconds";
+                              end;
+                           end if;
+                        end loop;
+                        Success := OK;
                      end if;
                   end;
                else
-                  declare
-                     Args : GNAT.OS_Lib.Argument_List :=
-                        (new String'(Shell_Arg), new String'(Command));
-                  begin
-                     Exit_Code := GNAT.OS_Lib.Spawn (Path.all, Args);
-                     for I in Args'Range loop Free (Args (I)); end loop;
-                  end;
+                  --  No timeout: block until the child exits.
+                  GNAT.OS_Lib.Spawn (Path.all, Args, Success);
+                  for I in Args'Range loop Free (Args (I)); end loop;
                end if;
             end;
             Free (Path);
-            if Exit_Code = 124 then
-               declare
-                  T_Img : constant String := Timeout_Val'Image;
-                  T_Str : constant String :=
-                     T_Img (T_Img'First + 1 .. T_Img'Last);
-               begin
-                  raise Script_Error with
-                     "SYSTEM command timed out after " & T_Str & " seconds";
-               end;
-            end if;
-            Success := (Exit_Code = 0);
          end;
       end if;
    end Shell_Execute;
