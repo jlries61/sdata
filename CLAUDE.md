@@ -60,10 +60,35 @@ tests/
   *.cmd                       -- integration test scripts
 doc/
   SOFTWARE_STANDARDS_REVIEW.md  -- living standards audit (annotated)
-  adrs.ods                    -- 30 ADRs (ADR-001–030)
-  architecture.md             -- pointer to ADR spreadsheet
+  adrs.md                     -- 30 ADRs (ADR-001–030)
+  architecture.md             -- pointer to ADR document
   specs/                      -- design specs for completed features
 ```
+
+## Reference Documents
+
+**Design document** — `doc/design.odt`
+
+Open in LibreOffice, or convert to plain text for in-session reading:
+
+```bash
+soffice --headless --convert-to txt doc/design.odt   # writes design.txt
+```
+
+Contains the authoritative language spec, data model, command reference, built-in
+functions, and BY-group semantics. Consult it before implementing or modifying any
+language-visible behaviour.
+
+**Architecture Decision Records** — `doc/adrs.md`
+
+Markdown; read directly. Documents all 30 ADRs (ADR-001–030) with rationale and
+status. Check for a relevant ADR before proposing a design change.
+
+**Man page** — `man/man1/sdata.1`
+
+Groff source; read directly. LANGUAGE OVERVIEW (line 138) and FUNCTIONS (line 379)
+cover statements, expressions, and built-in functions concisely. Faster to scan
+than design.odt when design.txt is not pre-generated.
 
 ## Docs Convention
 

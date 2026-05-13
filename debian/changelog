@@ -1,3 +1,9 @@
+sdata (0.6.12-1) unstable; urgency=medium
+
+  * refactor: decompose sdata-file_io.adb into child packages; fix broad when-others handlers; add Execute_Assignment unit tests (IC-35..IC-41)
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 12 May 2026 21:47:21 -0700
+
 sdata (0.6.11-1) unstable; urgency=medium
 
   * Refactor Parse_ODF/Parse_OOXML; remove version from HELP output

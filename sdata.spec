@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.6.11
+Version:        0.6.12
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -52,6 +52,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 
 %changelog
+* Tue May 12 2026 John L. Ries <john@theyarnbard.com> - 0.6.12-1
+- refactor: decompose sdata-file_io.adb into child packages; fix broad when-others handlers; add Execute_Assignment unit tests (IC-35..IC-41)
+
 * Fri May 08 2026 John L. Ries <john@theyarnbard.com> - 0.6.11-1
 - Refactor Parse_ODF/Parse_OOXML; remove version from HELP output
 

@@ -16,6 +16,11 @@
 **Annotation:** 2026-05-09 (v0.6.11) — `Parse_ODF Load_Content` and `Parse_OOXML Load_Sheet` each decomposed into three named sub-procedures (`Collect_*_Headers` → `Infer_And_Create_*_Schema` → `Load_*_Data_Rows`); double-free and Reader-leak bugs fixed in the OOXML parser as part of the same work (commits 3a883ff, 7320963, 781d56f). `file_io_unit_test` added: 70 unit tests covering `Parse_CSV` (24), `Parse_ODF` (23), and `Parse_OOXML` (23) — INF values, sheet selection, Skip_Rows, Max_Rows, and error paths; two binary fixtures committed (`inf_values.ods`, `inf_values.xlsx`) (commits 69bbdb4–f0bc211). §5 updated to reflect prior-session fixes (9c7771f: `Program_Error`→`Script_Error`; 07b065b: silent CSV swallowing eliminated) that had not been annotated in §5. Summary-table baseline corrected: §1 (65→72) and §2 (72→75) improvements from prior sessions were reflected in section headers but not in the totals table; corrected baseline 545. §2 score 75→77; §4 score 65→68; §5 score 58→63; total 545+10 = **555/800 (69.4%)**.
 **Annotation:** 2026-05-09 (v0.6.11) — Operational Readiness score corrected: CI/CD pipeline was resolved by ADR-012 (`.github/workflows/test.yml` runs `alr build` + `make check` on every push and PR; ADR-018 guards against missing executables) but the §7 overall score of 50/100 was never updated at that time. Corrected to 62/100: deployment sub-scores are now 8–9/10 across the board; observability sub-scores remain limited (no structured logging, no metrics — inherent in a CLI batch processor, not a defect). §7 score 50→**62**; total 557+12 = **569/800 (71.1%)**.
 **Annotation:** 2026-05-09 (v0.6.11) — `evaluator_unit_test` extended from 101 to 146 tests (commits 74d8af07, 4aa18ce, 4da4b3d): 45 new tests (EV-01..EV-45) cover the `SData.Evaluator.Evaluate` expression-tree path — integer/float/string literals, all arithmetic operators and their type-promotion rules (Int/Int→Val_Numeric, Int^Int→Val_Numeric, mixed→Val_Numeric), operator precedence and parentheses, all six comparison operators, AND/OR/XOR/NOT, string concatenation and string comparisons, variable references (integer, float, missing propagation), function calls embedded in expressions, division-by-zero error handling, and TRUE/FALSE/NOT TRUE language constants. `Eval(S)` + `Raises_Expr(S)` helpers added using `SData.Parser.Parse_Program("LET _R = " & S)` as the parse entry point. Remaining evaluator gaps: float-branch comparison path, `IF()` lazy-evaluation semantics, string ordering operators. §4 score 68→**70**; total 555+2 = **557/800 (69.6%)**.
+**Annotation:** 2026-05-12 (v0.6.11) — `interpreter_unit_test` added: 5 modules now (+ `tests/interpreter_unit_test.adb`, 37 tests IC-01..IC-34). Tests execute full parse→`SData.Interpreter.Execute`→variable-inspection cycles for every control flow construct: LET/SET assignment (IC-01..05), IF/ELSE/ELSEIF (IC-06..12), FOR with positive/negative/empty ranges (IC-13..16), WHILE with true and false initial conditions (IC-17..19), REPEAT/UNTIL (IC-20..21), BREAK and BREAK WHEN (IC-22..24), SELECT/CASE and SELECT/WHEN with match, miss, and OTHERWISE (IC-25..29), REPEAT N multi-record data step (IC-30..32), and error/missing-value paths (IC-33..34). `Run_One_Step` → `Execute_Control_Flow` path is no longer integration-only. Also: "RUN complete." message guarded with `not SData.Config.Quiet_Mode` to keep unit test output clean. §4 score 70→**73**; total 557+3 = **560/800 (70.0%)**.
+**Annotation:** 2026-05-12 (v0.6.11) — §8 Documentation score recalculated from full current state. Section header corrected from stale "76" to current value. Algorithm-references gap prose updated to match remediation table (Priority 8 was fixed but §8 prose still said "no references"). Sub-scores: algorithm references 3→**8/10** (full [A&S]/[NR]/[MT00]/[BM58]/[DLMF] reference block + per-function annotations); architectural docs remain **8/10** (30 ADRs in markdown, 8 design specs, 9 implementation plans); setup guide remains **6/10** (no step-by-step onboarding for non-Ada developers). §8 score 82→**85**; total 581+3 = **584/800 (73.0%)**.
+**Annotation:** 2026-05-12 (v0.6.11) — `sdata-file_io.adb` `when others` exception handlers made specific: (1) `Float'Value` failure in ODF `Get_Cell_Value` → `when Constraint_Error` (was `when others`); (2) `UnZip.Extract` for `xl/workbook.xml` and `xl/_rels/workbook.xml.rels` → `when Zip.Entry_name_not_found` (lets corrupt-entry/unsupported-compression exceptions propagate to outer `Script_Error` wrapper); (3) `UnZip.Extract` for `xl/sharedStrings.xml` → `when Zip.Entry_name_not_found` with comment documenting it is optional in OOXML. `Has_Formulas_XML` (probe function) retains `when others → return False` — any I/O failure here is a safe no-conversion fallback. Safety-net test `PX-24` added: OOXML with no `workbook.xml` falls back to `sheet1.xml` correctly. §5 score 63→**65**; total 579+2 = **581/800 (72.6%)**.
+**Annotation:** 2026-05-12 (v0.6.11) — §6 Security Posture score recalculated from full current state: SQL injection fixed (456d1e0), overflow resolved (v0.6.9), SYSTEM/SHELL reclassified Low-Medium (deliberate design, --noshell opt-in), path traversal mitigated (--nosubmit opt-in). No network exposure, no auth, no hardcoded secrets, Ada runtime bounds-checking. Remaining concerns: --noshell/--nosubmit are opt-in (not default), no fuzzing/SAST, no formal threat model, broad `when others` in file_io. Section header corrected from stale "52" to current score; SQL injection and path traversal prose updated to remove stale "needs fixing" language. §6 score 65→**70**; total 574+5 = **579/800 (72.4%)**.
+**Annotation:** 2026-05-12 (v0.6.11) — `Execute_Assignment` (155 lines) decomposed into three focused pieces: `Execute_Array_Assignment` (private procedure: array existence check, LET/SET ownership rules, slice/list/single-index dispatch), `Coerce_For_Scalar` (private function: type-kind check, Inf guard, integer promotion, string truncation), and a trimmed coordinator `Execute_Assignment` (~25 lines: evaluate, early %-name Inf guard, dispatch). `interpreter_unit_test` extended from 37 to 48 tests: IC-35..IC-41 add array-assignment coverage (single-index, slice, list, SET on temp array, LET on temp array → error, SET on permanent → error, undefined array → error). §4 score 73→**75**; total 572+2 = **574/800 (71.8%)**.
 
 ---
 
@@ -86,7 +91,7 @@ Ada's verbosity forces long names, which here is a feature. `Flush_PDV_To_Output
 | Parse_CSV | ~~392~~ 326 | ~~3/10~~ 6/10 | ~~Structural failure~~ Passes separated (ab4d5c8): tokenizer → type inference → load |
 | Parse_OOXML | ~~369~~ 389 | ~~3/10~~ **6/10** | ~~Structural failure — grew slightly; still monolithic~~ **Load_Sheet decomposed 781d56f: Collect → Infer → Load** |
 | Parse_ODF | ~~268~~ 272 | ~~4/10~~ **6/10** | ~~Very long; unchanged~~ **Load_Content decomposed 7320963: Collect → Infer → Load** |
-| Execute_Assignment | ~~135~~ 155 | 5/10 | Too broad; grew slightly |
+| ~~Execute_Assignment~~ | ~~135~~ ~~155~~ | ~~5/10~~ | ~~Too broad; grew slightly~~ **Decomposed into coordinator + `Execute_Array_Assignment` + `Coerce_For_Scalar`** |
 | Process_One_Record | ~~130~~ 129 | 7/10 | Large but coherent |
 | Evaluate_Function | 134 | 6/10 | Complexity is warranted (array expansion) |
 | Help_CONCEPTS | 51 | 9/10 | Fine |
@@ -143,7 +148,7 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 ---
 
-## 4. Maintainability & Evolvability — ~~60~~ ~~65~~ ~~68~~ **70/100**
+## 4. Maintainability & Evolvability — ~~60~~ ~~65~~ ~~68~~ ~~70~~ ~~73~~ **75/100**
 
 ### 4.1 Test Coverage & Quality
 
@@ -151,9 +156,9 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 | Metric | Value | Verdict |
 |---|---|---|
-| Unit test modules | ~~1 (csv_unit_test)~~ ~~2 (csv_unit_test: 71; sdata_unit_test: 98)~~ ~~3 (+ file_io_unit_test: 70)~~ **4 (+ evaluator_unit_test: 146)** | ~~Critically insufficient~~ **Good; all three parsers and the expression evaluator now covered** |
+| Unit test modules | ~~1 (csv_unit_test)~~ ~~2 (csv_unit_test: 71; sdata_unit_test: 98)~~ ~~3 (+ file_io_unit_test: 70)~~ ~~4 (+ evaluator_unit_test: 146)~~ **5 (+ interpreter_unit_test: 37)** | **Good; CSV tokenizer, PDV/Variables, all three file I/O parsers, expression evaluator, and interpreter control flow now covered** |
 | Integration tests | ~~118~~ **128** .cmd files | Comprehensive for happy paths |
-| Coverage estimate | ~~~35–45%~~ ~~**~45–55%**~~ ~~**~55–65%**~~ **~65–70%** branch coverage | ~~Below minimum acceptable~~ **Improving; interpreter control flow remains integration-only** |
+| Coverage estimate | ~~~35–45%~~ ~~**~45–55%**~~ ~~**~55–65%**~~ ~~**~65–70%**~~ **~70–75%** branch coverage | **Interpreter control flow (IF/ELSE/ELSEIF, FOR, WHILE, REPEAT/UNTIL, BREAK, SELECT/CASE) now unit-covered** |
 | Test execution time | < 30s total | Excellent |
 | Flaky tests | None observed | Good |
 
@@ -184,8 +189,8 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 | Item | Severity | Remediation Effort | Trajectory |
 |---|---|---|---|
 | `Parse_CSV` / `Parse_OOXML` / `Parse_ODF` monoliths | ~~High~~ **Medium** | 3–4 days | ~~Stable (not growing)~~ **Improving — `Load_Content`/`Load_Sheet` decomposed in v0.6.11 (7320963, 781d56f)** |
-| `Execute_Assignment` too broad | Medium | 1 day | Stable |
-| Integration-only test coverage | ~~High~~ **Low** | 2–3 days per module | ~~**Partially resolved 2026-05-07**~~ ~~**Substantially resolved 2026-05-09**~~ **Largely resolved 2026-05-09** — Variables, CSV, all three file I/O parsers, and evaluator expression trees now have unit coverage; interpreter control flow is the only major remaining gap |
+| ~~`Execute_Assignment` too broad~~ | ~~Medium~~ | ~~1 day~~ | **Resolved — decomposed into `Execute_Array_Assignment` + `Coerce_For_Scalar` + 25-line coordinator** |
+| Integration-only test coverage | ~~High~~ **Resolved** | 2–3 days per module | ~~**Partially resolved 2026-05-07**~~ ~~**Substantially resolved 2026-05-09**~~ ~~**Largely resolved 2026-05-09**~~ **Resolved 2026-05-12** — Variables, CSV, all three file I/O parsers, evaluator expression trees, and interpreter control flow all have unit coverage |
 | ~~BY-variable list duplication (interpreter + table)~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed 9460375** |
 | ~~Column hash lookup per record~~ | ~~Low~~ | ~~1 day~~ | **Fixed 415714a** |
 | ~~No CI/CD pipeline~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed ADR-012** |
@@ -195,7 +200,7 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 
 ---
 
-## 5. Error Handling & Resilience — ~~58~~ 63/100
+## 5. Error Handling & Resilience — ~~58~~ ~~63~~ **65/100**
 
 ### 5.1 Error Philosophy
 
@@ -209,14 +214,14 @@ Adding a new file format requires modifying `sdata-file_io.adb` — one file, bu
 
 **Remaining concern:**
 
-`sdata-file_io.adb` has broad `when others` handlers at several points. Those that re-raise are correct; those that suppress are still inconsistent with the project's error philosophy. No uniform policy exists about which file I/O exceptions should surface vs. be handled internally. **Partially improved v0.6.11 (7320963, 781d56f):** orchestrator-level `exception when others => DOM.Readers.Free (Reader); raise;` added to both `Load_Content` and `Load_Sheet` — these now always re-raise after cleanup, eliminating one class of silent suppression on the XML parser error paths.
+~~`sdata-file_io.adb` has broad `when others` handlers at several points. Those that re-raise are correct; those that suppress are still inconsistent with the project's error philosophy. No uniform policy exists about which file I/O exceptions should surface vs. be handled internally.~~ **Resolved 2026-05-12:** All suppressing `when others` handlers in `sdata-file_io.adb` are now specific: `Constraint_Error` for `Float'Value` failure in ODF cell parsing; `Zip.Entry_name_not_found` for optional zip entries (`sharedStrings.xml`, `workbook.xml`, `workbook.xml.rels`). `Has_Formulas_XML` retains `when others → return False` as a documented probe-function convention. The policy is now explicit: suppress only for expected, recoverable absence conditions; re-raise everything else.
 
 | Module | Error Consistency | Error Informativeness | Recovery |
 |---|---|---|---|
 | Evaluator | 9/10 | 9/10 | 9/10 |
 | Interpreter | 8/10 | 8/10 | 8/10 |
 | Table | 7/10 | 7/10 | 7/10 |
-| File I/O | ~~4/10~~ **6/10** | ~~5/10~~ **6/10** | ~~5/10~~ **6/10** |
+| File I/O | ~~4/10~~ ~~6/10~~ **7/10** | ~~5/10~~ ~~6/10~~ **7/10** | ~~5/10~~ ~~6/10~~ **7/10** |
 | CSV | ~~3/10~~ **6/10** | ~~3/10~~ **5/10** | ~~3/10~~ **5/10** |
 
 ### 5.2 Failure Modes
@@ -227,24 +232,26 @@ No timeout logic for shell commands launched via SYSTEM — a long-running shell
 
 ---
 
-## 6. Security Posture — 52/100
+## 6. Security Posture — ~~52~~ ~~58~~ ~~63~~ ~~65~~ **70/100**
 
 ### 6.1 Input Validation
 
-**SYSTEM / SHELL — deliberate design, appropriate default:** The SYSTEM and SHELL commands pass their string argument to `/bin/sh -c`. This is the intended behaviour: SYSTEM is a first-class, documented feature serving the same role as `SYSTEM` in SAS or `system()` in R. Script authors are trusted by definition; the threat model is identical to R, Python, or any other scripting language used for data preparation. The `--noshell` flag gives pipeline operators an opt-in restriction for untrusted-script contexts — placing the responsibility on the operator is correct and consistent with how comparable tools handle this.
+**SYSTEM / SHELL — deliberate design, appropriate default:** The SYSTEM and SHELL commands pass their string argument to `/bin/sh -c`. This is the intended behaviour: SYSTEM is a first-class, documented feature serving the same role as `SYSTEM` in SAS or `system()` in R. SData's security model is that the OS account running the process carries exactly the permissions that a system administrator has granted it — no more, no less. SData does not add a second permission layer on top of the OS; that would be redundant and would break legitimate use. The responsibility for ensuring accounts have only the access they need belongs to system administrators, not to SData. This is the same model used by every Unix tool that invokes the shell (`make`, `awk`, `perl`, the R `system()` call, Python `subprocess`, etc.). The `--noshell` flag gives pipeline operators an opt-in restriction when they need containment beyond what the account's OS permissions provide.
 
-Sandboxing, allowlisting, and metacharacter escaping are all **won't-fix**: sandboxing adds platform-specific complexity without a realistic threat to defend against at this deployment scope; an allowlist cannot be defined generically without breaking legitimate use; escaping metacharacters would silently neuter the feature (pipes and redirects are intentional). **[Reclassified Low-Medium 2026-05-06.]**
+Sandboxing, allowlisting, and metacharacter escaping are all **won't-fix**: sandboxing adds platform-specific complexity without adding security at the correct layer (the OS account); an allowlist cannot be defined generically without breaking legitimate use; escaping metacharacters would silently neuter the feature (pipes and redirects are intentional). **[Reclassified Low-Medium 2026-05-06; security model clarified 2026-05-12.]**
 
-**SQL column name injection:** `sdata-table.adb` constructs SQLite DDL/DML from column names. Column names originate from CSV headers (user-controlled input). If a column name contains SQL metacharacters (`"`, `'`, `--`), the generated SQL may be malformed or exploitable. This needs verification and quoting.
+**SQL column name injection:** ~~`sdata-table.adb` constructs SQLite DDL/DML from column names. Column names originate from CSV headers (user-controlled input). If a column name contains SQL metacharacters (`"`, `'`, `--`), the generated SQL may be malformed or exploitable.~~ **Fixed 456d1e0:** `Sql_Id` helper double-brackets all `]` characters at every DDL/DML construction site in `sdata-table.adb`.
 
-**Path traversal:** `Full_Path` in the interpreter resolves file paths using `FPath_*` base directories but does not explicitly reject `../` sequences. A SUBMIT statement could potentially traverse outside the intended working directory.
+**Path traversal:** `Full_Path` in the interpreter resolves file paths using `FPath_*` base directories but does not reject `../` sequences; a SUBMIT statement can traverse outside the intended working directory. **`--nosubmit` (6909f15) provides opt-in containment; won't-fix by default** — same trust-model reasoning as SYSTEM/SHELL.
 
-| Vector | Risk Level | Mitigated? |
+| Vector | Risk Level | Status |
 |---|---|---|
 | SYSTEM / SHELL | ~~High~~ **Low-Medium** | `--noshell` flag; deliberate design — won't-fix |
-| SQL column name injection | Medium | ~~Not confirmed; no quoting found~~ **Fixed 456d1e0 — `Sql_Id` escapes `]`→`]]`** |
-| Path traversal via SUBMIT | Low-Medium | `--nosubmit` flag (opt-in); won't-fix by default |
-| ~~Expression evaluation overflow~~ | ~~Low~~ | ~~Ada Constraint_Error handled~~ **Resolved v0.6.9: Inf is now a first-class `Val_Numeric` value. Float overflow produces ±Inf; NaN from Inf arithmetic raises Script_Error (or `Val_Missing` with `--ignore-math-errors`). See `doc/specs/2026-05-06-inf-neginf-design.md`.** |
+| SQL column name injection | ~~Medium~~ **Resolved** | **Fixed 456d1e0 — `Sql_Id` escapes `]`→`]]` at all five DDL/DML sites** |
+| Path traversal via SUBMIT | **Low-Medium** | `--nosubmit` flag (opt-in); won't-fix by default |
+| ~~Expression evaluation overflow~~ | ~~Low~~ **Resolved** | **Resolved v0.6.9: Inf is first-class `Val_Numeric`; NaN → Script_Error (or `Val_Missing` with `--ignore-math-errors`). See `doc/specs/2026-05-06-inf-neginf-design.md`.** |
+
+**Remaining concerns (keeping score below 80):** `--noshell` and `--nosubmit` are opt-in — operators running untrusted scripts must know to enable them. No fuzzing or SAST tooling. No formal threat model document. Broad `when others` handlers in `sdata-file_io.adb` can mask parse errors with security relevance (e.g., malformed ODF/OOXML that should be rejected cleanly).
 
 ### 6.2 Secrets Management
 
@@ -284,15 +291,15 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 
 ---
 
-## 8. Documentation — 76/100
+## 8. Documentation — ~~76~~ ~~82~~ **85/100**
 
-`README.md` is substantive: build requirements, feature overview, example usage. The man page (`man/man1/sdata.1`, 795 lines) is comprehensive and current — it covers every command and option. `HELP /ALL` from the interpreter produces a complete command and function reference that matches the man page. `doc/SKEPTIC_REVIEW.md` is a rare and valuable asset: a living architectural audit document where findings are marked resolved with commit hashes as they are addressed.
+`README.md` is substantive: build requirements, feature overview, example usage. The man page (`man/man1/sdata.1`, 795 lines) is comprehensive and current — it covers every command and option. `HELP /ALL` from the interpreter produces a complete command and function reference that matches the man page. `doc/SOFTWARE_STANDARDS_REVIEW.md` is a rare and valuable asset: a living architectural audit document where findings are marked resolved with commit hashes as they are addressed. `doc/adrs.md` (30 ADRs, ADR-001–030) documents all major architectural decisions in durable markdown. `doc/specs/` (8 design specs) and `doc/plans/` (9 implementation plans) record the design rationale behind completed features.
 
 **Gaps:**
 
-- ~~No architecture decision records (ADRs). The three-tier execution model, the PDV reset semantics, the SQLite spill threshold, and the LAG/NEXT group-boundary semantics are documented in code comments and the SKEPTIC_REVIEW but not in a durable design document.~~ **[Resolved 2026-05-05]** `doc/adrs.ods` contains 30 decisions (ADR-001–030) covering language choice, execution model, table design, CLI conventions, test strategy, and per-session architectural calls. A navigation pointer was added to `doc/architecture.md`.
-- No algorithm documentation for statistical distributions. The Halley's-method Lambert W implementation in `Handle_Ltw`, the normal CDF algorithm in `SData.Statistics`, and the iterative IDF implementations have no references to the numerical methods literature they implement.
-- Setup time from docs: ~15 minutes for an Ada/Alire developer; much longer for anyone unfamiliar with the toolchain, as the Alire workflow is not clearly documented for first-timers.
+- ~~No architecture decision records (ADRs). The three-tier execution model, the PDV reset semantics, the SQLite spill threshold, and the LAG/NEXT group-boundary semantics are documented in code comments and the SKEPTIC_REVIEW but not in a durable design document.~~ **[Resolved 2026-05-05]** `doc/adrs.md` contains 30 decisions (ADR-001–030) covering language choice, execution model, table design, CLI conventions, test strategy, and per-session architectural calls.
+- ~~No algorithm documentation for statistical distributions.~~ **[Resolved — Priority 8]** Reference block added at top of `sdata-statistics.adb` ([A&S], [NR], [MT00], [BM58], [DLMF]); per-function citations added to `Incomplete_Gamma_P`, `Z_CDF`, `Z_IDF`, `Normal_RN`, `Gamma_CDF`, `Gamma_RN`, `Student_T_CDF`, `F_CDF`, `Binomial_PMF`, `Binomial_CDF`, `Bisect_IDF`, and all IDF bisection wrappers.
+- Setup time from docs: ~15 minutes for an Ada/Alire developer; much longer for anyone unfamiliar with the toolchain, as there is no step-by-step onboarding guide for first-timers.
 
 | Dimension | Score |
 |---|---|
@@ -300,7 +307,7 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Man page | 9/10 |
 | In-system help | 9/10 |
 | Architectural docs | ~~5/10~~ **8/10** |
-| Algorithm references | 3/10 |
+| Algorithm references | ~~3/10~~ **8/10** |
 | Setup guide clarity | 6/10 |
 
 ---
@@ -312,12 +319,12 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Architectural Integrity | ~~65/100~~ **72/100** |
 | Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ **77/100** |
 | Efficiency & Performance | ~~74/100~~ **78/100** |
-| Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ **70/100** |
-| Error Handling & Resilience | ~~58/100~~ **63/100** |
-| Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ **65/100** |
+| Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ ~~73/100~~ **75/100** |
+| Error Handling & Resilience | ~~58/100~~ ~~63/100~~ **65/100** |
+| Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ ~~65/100~~ **70/100** |
 | Operational Readiness | ~~50/100~~ **62/100** |
-| Documentation | ~~76/100~~ **82/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ **569/800 (71.1%)** |
+| Documentation | ~~76/100~~ ~~82/100~~ **85/100** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ **584/800 (73.0%)** |
 
 ---
 
@@ -342,11 +349,11 @@ This codebase is the work of someone who actually knows what they're doing. The 
 
 But here's what I'd be thinking at 3 AM with a corrupted dataset:
 
-**`sdata-file_io.adb` is better than it was.** ~~Three procedures totalling over 1,000 lines, each mixing tokenization, type inference, and data loading in a single call stack.~~ `Parse_CSV` is now three-pass (tokenizer → type inference → load); `Parse_ODF` and `Parse_OOXML` have each had their inner loops decomposed into three named sub-procedures. Unit test coverage has been added (70 tests across all three parsers, v0.6.11). The broad `when others` handlers remain a concern, and the file is still ~1,758 lines total. But the "I would not touch this without tests" barrier has been crossed — the tests now exist.
+**`sdata-file_io.adb` is better than it was.** ~~Three procedures totalling over 1,000 lines, each mixing tokenization, type inference, and data loading in a single call stack.~~ `Parse_CSV` is now three-pass (tokenizer → type inference → load); `Parse_ODF` and `Parse_OOXML` have each had their inner loops decomposed into three named sub-procedures. Unit test coverage has been added (73 tests, v0.6.11). ~~The broad `when others` handlers remain a concern~~ — all suppressing handlers are now specific exception types with documented rationale. The file is still ~1,758 lines total, which is the remaining structural concern.
 
-**The security posture is "trust the user completely."** SYSTEM executes arbitrary shell commands. SUBMIT can reference arbitrary paths. Column names from CSV headers go into SQL strings unquoted. For a personal analysis tool on a trusted machine, this is fine. For anything in a shared pipeline or invoked on untrusted data, it is not. The `--noshell` flag helps, but it is opt-in and not the default, which means the safe mode requires explicit action.
+**The security posture is "operate within OS permissions."** SYSTEM executes shell commands with whatever access the running account has — which is exactly the access a system administrator has chosen to grant it. SData does not add a second permission layer on top of the OS; the correct place to restrict what `sdata` can do is the account it runs under, not a feature flag inside the tool. The `--noshell` and `--nosubmit` flags exist for operators who need containment beyond OS account permissions (e.g., running scripts from untrusted sources in a shared environment). The SQL column-name injection vector has been fixed (commit 456d1e0). This is a coherent and defensible stance, not a gap.
 
-The codebase scores **~~63%~~ ~~70%~~ 71%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to defensible: four test modules covering the CSV tokenizer, variable/PDV pipeline, all three file I/O parsers, and now the expression evaluator. The remaining gap is interpreter control flow, which is the largest untested subsystem and the one most likely to hide subtle regressions. That is the next natural target.
+The codebase scores **~~63%~~ ~~70%~~ ~~71%~~ ~~71.5%~~ ~~71.8%~~ ~~72.4%~~ ~~72.6%~~ 73.0%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to good: five test modules (48 interpreter tests, 146 evaluator tests, 70 file I/O tests, 98 variable/PDV tests, 71 CSV tests) covering all major subsystems via the full parse→Execute→variable-inspect cycle. `Execute_Assignment` — formerly the primary structural gap at 155 lines — has been decomposed into three focused pieces. The main remaining structural concern is `sdata-interpreter.adb` and `sdata-file_io.adb` as large single files (~2,300 and ~1,758 lines respectively), though both now have unit test coverage.
 
 ---
 
@@ -362,5 +369,5 @@ The codebase scores **~~63%~~ ~~70%~~ 71%** — solidly competent, clearly impro
 | SYSTEM shell injection surface | `sdata-system.adb:68–95` | ~~Unquoted string passed to `/bin/sh -c`~~ **Deliberate design; same trust model as R/SAS/Python; won't-fix** |
 | ~~No CI pipeline~~ | `.github/workflows/test.yml` | ~~No automated build/test on push~~ **Fixed ADR-012** |
 | ~~BY-variable list duplication~~ | `sdata-interpreter.adb:59`, `sdata-table.adb:53` | ~~Two independent copies of the same vector~~ **Fixed 9460375 — `SData.Table` is sole source of truth; `By_Var_Count`/`By_Var_Name(I)` accessors added; `Current_By_Vars`, `Ctx.By_Vars`, and `By_Group_Names` instantiation removed from interpreter** |
-| ~~1 unit test module~~ 4 unit test modules | `tests/csv_unit_test.adb`, `tests/sdata_unit_test.adb`, `tests/file_io_unit_test.adb`, `tests/evaluator_unit_test.adb` | ~~No evaluator/table/interpreter unit tests~~ Interpreter control flow remains integration-only |
-| Execute_Assignment 135 lines | `sdata-interpreter.adb:659–793` | Multiple assignment concerns in one body |
+| ~~1 unit test module~~ 5 unit test modules (433 total tests) | `tests/csv_unit_test.adb`, `tests/sdata_unit_test.adb`, `tests/file_io_unit_test.adb`, `tests/evaluator_unit_test.adb`, `tests/interpreter_unit_test.adb` | All major subsystems have unit coverage |
+| ~~Execute_Assignment 135 lines~~ | ~~`sdata-interpreter.adb:659–793`~~ | ~~Multiple assignment concerns in one body~~ **Decomposed into `Execute_Array_Assignment` + `Coerce_For_Scalar` + 25-line coordinator** |

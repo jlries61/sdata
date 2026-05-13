@@ -1,6 +1,6 @@
 # Makefile for SData
 
-VERSION          := 0.6.11
+VERSION          := 0.6.12
 ZIPADA_VERSION   := 61.0.0
 XMLADA_VERSION   := 26.0.0
 MATHPAQS_VERSION := 20260205.0.0
@@ -71,6 +71,11 @@ check: build
 	 fi
 	@[ -x bin/file_io_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
 	@$(TIMEOUT) 30 ./bin/file_io_unit_test; \
+	 if [ $$? -ne 0 ]; then \
+	   echo "Unit tests FAILED"; exit 1; \
+	 fi
+	@[ -x bin/interpreter_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
+	@$(TIMEOUT) 30 ./bin/interpreter_unit_test; \
 	 if [ $$? -ne 0 ]; then \
 	   echo "Unit tests FAILED"; exit 1; \
 	 fi
