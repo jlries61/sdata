@@ -38,6 +38,24 @@ Set the maximum number of temporary variables per data step.
 .BI \-\-clen " len"
 Set the maximum length of character (string) variables in bytes.
 .TP
+.BI \-\-shell\-timeout " seconds"
+Set the timeout for
+.B SYSTEM
+commands and the
+.B SHELL()
+function.
+A value of 0 disables the timeout (unlimited).
+The default is 300 seconds in batch mode and 0 in interactive mode.
+Requires the
+.BR timeout (1)
+utility on
+.BR PATH ;
+if
+.BR timeout (1)
+is absent, a one-time warning is printed and the limit is not enforced.
+The timeout can also be adjusted at runtime with
+.BR "OPTIONS SHELLTIMEOUT" .
+.TP
 .B \-\-noshell
 Disable the
 .B SYSTEM
@@ -259,10 +277,38 @@ Only meaningful in interactive mode.
 Execute commands from an external script file (default extension
 .BR .CMD ).
 .TP
+.B OPTIONS [\fIkey value\fR]
+Set or display runtime options.
+With no arguments, lists all current option values.
+Notable keys:
+.B SHELLTIMEOUT \fIn\fR
+(SYSTEM/SHELL timeout in seconds; 0 = unlimited; reset to startup default by
+.BR NEW ),
+.B IEEE_DIVIDE YES|NO
+(float division by zero returns +/\-Inf),
+.B CSVDLM \fIdelim\fR,
+.B HEADER YES|NO,
+.B SAVEOVERWRT YES|NO,
+.B TXTFMT AUTO|LF|CRLF|CR,
+.B CHARSET \fIname\fR,
+.B MAXINTAB \fIn\fR,
+and
+.B MAXTEMPMEM \fIn\fR.
+.TP
 .B SYSTEM \fIcmd\fR
 Run an external shell command.
 Disabled by
 .BR \-\-noshell .
+A timeout is applied when
+.B OPTIONS SHELLTIMEOUT
+is greater than 0; the command is killed and a
+.B Script_Error
+is raised if it exceeds the limit.
+See
+.B \-\-shell\-timeout
+and
+.B OPTIONS SHELLTIMEOUT
+for details.
 .TP
 .BR HELP " [\fItopic\fR | " /ALL ]
 Display built\-in help.
