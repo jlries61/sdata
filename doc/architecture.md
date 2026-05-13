@@ -176,6 +176,45 @@ Script file / REPL input
 
 ---
 
+## Shell Access and SUBMIT — Trust Model
+
+`SYSTEM cmd` and `SHELL cmd` pass their argument to the OS shell (`/bin/sh -c` on
+POSIX, `bash -c` / `cmd.exe /c` on Windows). `SUBMIT file` reads and executes another
+SData script. All three commands execute with the full permissions of the OS account
+that launched the interpreter — no more, no less.
+
+**This is intentional design, not a security gap.** SData's security model is that
+the OS account is the permission boundary. SData does not add a second layer on top
+of what the system administrator has already granted. The same model is used by every
+comparable tool: R's `system()`, SAS's `X` statement, Python's `subprocess`, `make`,
+`awk`. Adding an internal allowlist or metacharacter escaping would silently break
+legitimate use (pipes, redirects, compound commands) while providing no real security
+benefit — an attacker who can run an arbitrary SData script can already do anything
+the account permits.
+
+**Operator-level mitigations are available when needed:**
+
+| Flag | Effect |
+|---|---|
+| `--noshell` | Disables `SYSTEM` and `SHELL`; raises `Script_Error` if either is invoked |
+| `--nosubmit` | Disables `SUBMIT`; raises `Script_Error` if invoked |
+
+These flags exist for pipeline operators running scripts from untrusted sources in a
+shared environment. They are opt-in — the default is unrestricted, consistent with
+every analogous tool in this class.
+
+**Resource control (ADR-037):** `OPTIONS SHELLTIMEOUT n` and the `--shell-timeout=N`
+CLI flag limit how long a `SYSTEM`/`SHELL` command may run (seconds; 0 = unlimited).
+The default in batch mode is 300 s; interactive mode defaults to 0. Implementation
+uses `GNAT.OS_Lib.Non_Blocking_Spawn` with a 0.5-second poll loop — no dependency on
+`timeout(1)` or PowerShell.
+
+Do not propose sandboxing, allowlisting, or metacharacter escaping as improvements to
+this subsystem. The trust model is settled. See `doc/adrs.md` for the recorded
+decisions.
+
+---
+
 ## Architecture Decision Records
 
 Significant design choices — language selection, execution model, table storage strategy,
