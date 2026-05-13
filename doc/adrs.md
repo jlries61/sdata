@@ -46,6 +46,7 @@ that might relitigate a settled question.
 | ADR-034 | Measure MAXINTAB / -m in cells (rows × columns), not rows | 2026-05-07 | Accepted |
 | ADR-035 | Adopt IEEE 754 infinity as a first-class evaluator value | 2026-05-07 | Accepted |
 | ADR-036 | Set MAXINTAB default to 50 000 000 cells with a static value rather than runtime memory detection | 2026-05-07 | Accepted |
+| ADR-037 | Add configurable SYSTEM/SHELL timeout defaulting to 300 s in batch mode, unlimited in interactive | 2026-05-13 | Accepted |
 
 ---
 
@@ -452,3 +453,21 @@ that might relitigate a settled question.
 The value 50 000 000 was derived from targeting ~1.5 GB on an 8 GB machine (the low end of "average" in 2026). Each `Value` cell is a variant record sized to its largest variant (`Unbounded_String` in GNAT ≈ 16–20 bytes plus discriminant and alignment), giving an estimated 24–32 bytes per cell. At 32 bytes/cell: 50 000 000 × 32 = 1.6 GB. This covers 500 000 rows × 100 columns or 5 000 000 rows × 10 columns before spilling to SQLite, which is adequate for most statistical workloads. Users who need more set `OPTIONS MAXINTAB N` or `-m N`; users who want the old unlimited behaviour set `OPTIONS MAXINTAB 0` or `-m 0`.
 
 **Consequences:** Large datasets no longer silently exhaust RAM by default. The threshold is conservative for numeric-heavy data (actual cell size ≈ 16 bytes → ~800 MB at 50M cells) and reasonable for mixed data. The static value is easy to explain, easy to override, and requires no OS-specific code.
+
+---
+
+### ADR-037: Add configurable SYSTEM/SHELL timeout defaulting to 300 s in batch mode, unlimited in interactive
+**Date:** 2026-05-13 | **Status:** Accepted
+
+**Context:** `GNAT.OS_Lib.Spawn` (used for SYSTEM and SHELL execution, per ADR-010) is a blocking call with no timeout parameter. A hung shell command — waiting on a network mount, a stalled subprocess, or a deadlocked pipeline — blocks the sdata process indefinitely with no escape. This is a §5 gap in the software standards audit. However, imposing a blanket timeout is wrong for interactive use: a user running `SYSTEM "bash"` or `SYSTEM "python3"` at the REPL may legitimately keep an interactive shell open for any length of time. The timeout is only meaningful as a guard against accidental hangs in unattended batch runs.
+
+**Decision:** Add a `Shell_Timeout` configuration variable (seconds; 0 = unlimited) to `SData.Config.Runtime`, controlled by two surfaces:
+
+1. **CLI flag `--shell-timeout=N`** — sets the initial value at startup. Default: 300 in batch mode (stdin is not a terminal), 0 in interactive mode (stdin is a terminal). The mode check uses `GNAT.OS_Lib.Is_Stdin_A_TTY` (or equivalent `isatty(0)` via a small pragma-Import stub if not available directly).
+2. **`OPTIONS SHELLTIMEOUT N`** — runtime override, allowing scripts to raise the limit for known-slow operations (`OPTIONS SHELLTIMEOUT 600`) or lower it for rapid sanity checks.
+
+Implementation uses the POSIX `timeout` utility as a command prefix: the shell invocation becomes `timeout N /bin/sh -c "user_command"`. Exit code 124 from `timeout` is distinguished from a genuine non-zero exit and reported to the user as a distinct timeout error (`Script_Error` with message "SYSTEM command timed out after N seconds"). On platforms where `timeout` is absent the feature degrades gracefully: if `timeout` is not found on `PATH`, the command runs without a time limit and a one-time warning is emitted.
+
+300 seconds was chosen as the batch default: it is long enough to cover typical data-pipeline shell calls (sorting large files, calling `ssconvert` on a large spreadsheet, running an ETL subprocess), but short enough to limit damage from an accidental hang in an overnight batch run. Users with known slow operations can raise the limit explicitly; users who want the old unlimited behaviour set `OPTIONS SHELLTIMEOUT 0` or `--shell-timeout=0`.
+
+**Consequences:** Batch runs are now protected from indefinite hangs by default. Interactive use is unaffected. The implementation avoids POSIX signal handling in Ada (which requires `pragma Import` of `sigaction` and careful interaction with the Ada runtime's own signal use) by delegating to the well-tested `timeout` utility. The platform-availability caveat is limited: `timeout` ships in GNU coreutils and is present on all major Linux distributions, macOS (via Homebrew `coreutils`), and WSL; the graceful degradation path covers edge cases without making the feature a hard dependency. Exit-code 124 is a stable, documented convention of GNU `timeout` and the POSIX `timeout` command.
