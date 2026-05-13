@@ -14,7 +14,8 @@ with SData.Parser; use SData.Parser;
 with SData.AST; use SData.AST;
 
 with SData.Interpreter; use SData.Interpreter;
-with SData.Config;      use SData.Config;
+with SData.Config;         use SData.Config;
+with SData.Config.Runtime;
 with SData.IO;          use SData.IO;
 with SData.System;
 with SData.Signals;
@@ -71,6 +72,7 @@ procedure SData_Main is
       Put_Line ("  -m <cells>    Set max in-memory table cells (rows*cols; 0 = unlimited)");
       Put_Line ("  -t <count>    Set max temporary variables");
       Put_Line ("  --clen <len>  Set max character variable length");
+      Put_Line ("  --shell-timeout=N        SYSTEM/SHELL timeout in seconds (0=unlimited; default 300 in batch)");
       Put_Line ("  --noshell                Disable SHELL command and function");
       Put_Line ("  --nosubmit               Disable SUBMIT command");
       Put_Line ("  -k, --continue-on-error  Continue executing after a statement error");
@@ -168,12 +170,13 @@ procedure SData_Main is
       end loop REPL;
    end Run_REPL;
 
-   Ctx          : Parser_Context;
-   Prog         : Statement_Access;
-   Filename     : String (1 .. SData.Max_Path_Len);
-   Filename_Len : Natural := 0;
-   Idx          : Positive := 1;
-   Pager_Cmd    : Unbounded_String := Null_Unbounded_String;
+   Ctx                    : Parser_Context;
+   Prog                   : Statement_Access;
+   Filename               : String (1 .. SData.Max_Path_Len);
+   Filename_Len           : Natural := 0;
+   Idx                    : Positive := 1;
+   Pager_Cmd              : Unbounded_String := Null_Unbounded_String;
+   Shell_Timeout_Explicit : Boolean := False;
 begin
    --  Enforce --noshell and --nosubmit when running as root / SYSTEM.
    --  Done first so the restriction applies regardless of how sdata is invoked.
@@ -343,6 +346,17 @@ begin
                   Set_Exit_Status (Failure);
                   return;
             end;
+         elsif Arg'Length > 16 and then Arg (1 .. 16) = "--shell-timeout=" then
+            begin
+               SData.Config.Shell_Timeout_Default :=
+                  Natural'Value (Arg (17 .. Arg'Last));
+               Shell_Timeout_Explicit := True;
+            exception
+               when Constraint_Error =>
+                  Put_Line_Error ("Error: argument to --shell-timeout must be a non-negative integer");
+                  Set_Exit_Status (Failure);
+                  return;
+            end;
          elsif Arg = "-p" then
             if Idx < Argument_Count then
                Idx := Idx + 1;
@@ -398,6 +412,14 @@ begin
       end;
       Idx := Idx + 1;
    end loop;
+
+   --  Set shell-timeout default: 300 s for batch, 0 for interactive.
+   --  Only applies when --shell-timeout=N was not given explicitly.
+   if not Shell_Timeout_Explicit and then Filename_Len > 0 then
+      SData.Config.Shell_Timeout_Default := 300;
+   end if;
+   SData.Config.Runtime.Options_Shell_Timeout :=
+      SData.Config.Shell_Timeout_Default;
 
    --  Validate -p / --noshell interaction.
    if Length (Pager_Cmd) > 0 and then Disable_Shell then

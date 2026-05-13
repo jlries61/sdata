@@ -27,6 +27,7 @@ package body SData.Config.Runtime is
       Options_CHARSET     := (others => ' ');
       Options_CHARSET_Len := 0;
       IEEE_Divide         := False;
+      Options_Shell_Timeout := SData.Config.Shell_Timeout_Default;
       Save_DLM         := (others => ' ');
       Save_DLM (1)     := ',';
       Save_DLM_Len     := 1;
