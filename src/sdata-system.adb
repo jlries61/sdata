@@ -1,10 +1,13 @@
 with Ada.Environment_Variables;
+with Ada.Text_IO;
 with GNAT.OS_Lib; use GNAT.OS_Lib;
 with Interfaces.C; use type Interfaces.C.int;
+with SData.Config.Runtime;
 
 package body SData.System is
 
-   Is_Windows : constant Boolean := GNAT.OS_Lib.Directory_Separator = '\';
+   Is_Windows    : constant Boolean := GNAT.OS_Lib.Directory_Separator = '\';
+   Timeout_Warned : Boolean := False;
 
    function C_Is_System_Account return Interfaces.C.int;
    pragma Import (C, C_Is_System_Account, "sdata_is_system_account");
@@ -77,6 +80,7 @@ package body SData.System is
    procedure Shell_Execute (Command : String := ""; Success : out Boolean) is
    begin
       if Command = "" then
+         --  Interactive shell: no timeout applied.
          declare
             Path : GNAT.OS_Lib.String_Access;
          begin
@@ -86,19 +90,83 @@ package body SData.System is
          end;
       else
          declare
-            Path  : GNAT.OS_Lib.String_Access;
-            Posix : Boolean;
+            Timeout_Val : constant Natural :=
+               SData.Config.Runtime.Options_Shell_Timeout;
+            Path      : GNAT.OS_Lib.String_Access;
+            Posix     : Boolean;
+            Exit_Code : Integer;
          begin
             Resolve_Shell (Path, Posix);
             declare
-               Arg  : constant String := (if Posix then "-c" else "/c");
-               Args : GNAT.OS_Lib.Argument_List :=
-                  (new String'(Arg), new String'(Command));
+               Shell_Arg : constant String :=
+                  (if Posix then "-c" else "/c");
             begin
-               GNAT.OS_Lib.Spawn (Path.all, Args, Success);
-               for I in Args'Range loop Free (Args (I)); end loop;
+               if Timeout_Val > 0 and then not Is_Windows then
+                  declare
+                     TO_Path : GNAT.OS_Lib.String_Access :=
+                        GNAT.OS_Lib.Locate_Exec_On_Path ("timeout");
+                  begin
+                     if TO_Path /= null then
+                        declare
+                           T_Img : constant String := Timeout_Val'Image;
+                           T_Str : constant String :=
+                              T_Img (T_Img'First + 1 .. T_Img'Last);
+                           Args : GNAT.OS_Lib.Argument_List :=
+                              (new String'(T_Str),
+                               new String'(Path.all),
+                               new String'(Shell_Arg),
+                               new String'(Command));
+                        begin
+                           Exit_Code :=
+                              GNAT.OS_Lib.Spawn (TO_Path.all, Args);
+                           for I in Args'Range loop
+                              Free (Args (I));
+                           end loop;
+                        end;
+                        Free (TO_Path);
+                     else
+                        if not Timeout_Warned then
+                           Ada.Text_IO.Put_Line
+                              (Ada.Text_IO.Standard_Error,
+                               "Warning: 'timeout' not found on PATH; "
+                               & "SHELLTIMEOUT has no effect.");
+                           Timeout_Warned := True;
+                        end if;
+                        declare
+                           Args : GNAT.OS_Lib.Argument_List :=
+                              (new String'(Shell_Arg),
+                               new String'(Command));
+                        begin
+                           Exit_Code :=
+                              GNAT.OS_Lib.Spawn (Path.all, Args);
+                           for I in Args'Range loop
+                              Free (Args (I));
+                           end loop;
+                        end;
+                     end if;
+                  end;
+               else
+                  declare
+                     Args : GNAT.OS_Lib.Argument_List :=
+                        (new String'(Shell_Arg), new String'(Command));
+                  begin
+                     Exit_Code := GNAT.OS_Lib.Spawn (Path.all, Args);
+                     for I in Args'Range loop Free (Args (I)); end loop;
+                  end;
+               end if;
             end;
             Free (Path);
+            if Exit_Code = 124 then
+               declare
+                  T_Img : constant String := Timeout_Val'Image;
+                  T_Str : constant String :=
+                     T_Img (T_Img'First + 1 .. T_Img'Last);
+               begin
+                  raise Script_Error with
+                     "SYSTEM command timed out after " & T_Str & " seconds";
+               end;
+            end if;
+            Success := (Exit_Code = 0);
          end;
       end if;
    end Shell_Execute;
