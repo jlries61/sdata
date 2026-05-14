@@ -387,14 +387,14 @@ begin
                if N > 3 then
                   Put_Line_Error ("Warning: --debug level" & N'Image
                                   & " exceeds maximum (3); using 3");
-                  SData.Config.Debug_Level := 3;
+                  Debug_Level := 3;
                else
-                  SData.Config.Debug_Level := N;
+                  Debug_Level := N;
                end if;
             exception
                when Constraint_Error =>
-                  Put_Line_Error ("Error: invalid --debug level: "
-                                  & Level_Str);
+                  Put_Line_Error ("Error: argument to --debug must be"
+                                  & " 0, 1, 2, or 3");
                   Set_Exit_Status (Failure);
                   return;
             end;
