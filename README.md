@@ -76,7 +76,7 @@ Build a source RPM:
 make srpm
 ```
 
-This creates `sdata-0.6.13-1.src.rpm` which can be built with `rpmbuild
+This creates `sdata-0.6.14-1.src.rpm` which can be built with `rpmbuild
 --rebuild` or submitted to a build service. The vendored library tarballs must
 be present in `../Data/tarballs/`.
 
@@ -99,7 +99,7 @@ Create a SlackBuild tarball:
 make slackware
 ```
 
-This creates `sdata-0.6.13-slackbuild.tar.gz` containing the SlackBuild script,
+This creates `sdata-0.6.14-slackbuild.tar.gz` containing the SlackBuild script,
 source tarball, and vendored dependencies. Extract and run `./sdata.SlackBuild`
 as root to build the package.
 
@@ -149,7 +149,7 @@ Build a macOS installer package:
 make pkg
 ```
 
-This creates `sdata-0.6.13.pkg`. The `sdata` binary must already be built
+This creates `sdata-0.6.14.pkg`. The `sdata` binary must already be built
 (`make` first). Requires the `pkgbuild` tool (included with Xcode).
 
 ### Windows
@@ -181,7 +181,7 @@ Build a Windows MSI installer:
 alr exec -- make msi
 ```
 
-This creates `sdata-0.6.13-x64.msi`, a per-machine x64 installer that places
+This creates `sdata-0.6.14-x64.msi`, a per-machine x64 installer that places
 `sdata.exe`, `LICENSE.txt`, `README.md`, and an HTML rendering of the man page
 under `C:\Program Files\sdata\` and appends that directory to the system
 `PATH`. Requirements:
@@ -197,7 +197,7 @@ under `C:\Program Files\sdata\` and appends that directory to the system
   installed via [Chocolatey](https://chocolatey.org/) or downloaded directly
   from the [Pandoc website](https://pandoc.org/installing.html).
 
-Install the resulting MSI with `msiexec /i sdata-0.6.13-x64.msi`, or by
+Install the resulting MSI with `msiexec /i sdata-0.6.14-x64.msi`, or by
 double-clicking it. After install, `sdata` is available from any new CMD or
 PowerShell window.
 
@@ -215,7 +215,7 @@ scripts/bump-version.sh <new-version> "<changelog-summary>"
 For example:
 
 ```sh
-scripts/bump-version.sh 0.6.13 "Add spreadsheet formula evaluation and multi-sheet support."
+scripts/bump-version.sh 0.6.14 "Add spreadsheet formula evaluation and multi-sheet support."
 ```
 
 The script validates the `N.N.N` version format, detects the current version
@@ -230,7 +230,7 @@ Run `sdata` with no arguments to enter the interactive console:
 
 ```
 $ sdata
-SData Statistical Interpreter version 0.6.13
+SData Statistical Interpreter version 0.6.14
 Interactive Console. Type QUIT to exit.
 sdata> use "mydata.csv"
 sdata> print recno, name$, score

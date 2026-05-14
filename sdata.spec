@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.6.13
+Version:        0.6.14
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -54,6 +54,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_docdir}/%{name}/threat_model.md
 
 %changelog
+* Thu May 14 2026 John L. Ries <john@theyarnbard.com> - 0.6.14-1
+- configurable --debug log levels (--debug=N, OPTIONS DEBUG N)
+
 * Wed May 13 2026 John L. Ries <john@theyarnbard.com> - 0.6.13-1
 - Decompose interpreter monolith into 9 Ada subunits; add shell timeout (ADR-037)
 

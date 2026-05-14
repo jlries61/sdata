@@ -1,3 +1,9 @@
+sdata (0.6.14-1) unstable; urgency=medium
+
+  * configurable --debug log levels (--debug=N, OPTIONS DEBUG N)
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 14 May 2026 16:20:11 -0700
+
 sdata (0.6.13-1) unstable; urgency=medium
 
   * Decompose interpreter monolith into 9 Ada subunits; add shell timeout (ADR-037)
