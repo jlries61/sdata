@@ -90,6 +90,13 @@ Groff source; read directly. LANGUAGE OVERVIEW (line 138) and FUNCTIONS (line 37
 cover statements, expressions, and built-in functions concisely. Faster to scan
 than design.odt when design.txt is not pre-generated.
 
+**Threat model** — `doc/threat_model.md`
+
+Markdown; read directly. Consult before adding any new external input surface
+(file format, CLI flag, language statement), any new filesystem access, or any
+change to the SYSTEM/SHELL/SUBMIT execution path. Documents the trust model,
+attack surface table, nine STRIDE threats with mitigation status, and known gaps.
+
 ## Docs Convention
 
 All committed documentation lives under `doc/` (singular): man page, ADR
