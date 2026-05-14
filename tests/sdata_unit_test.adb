@@ -264,6 +264,124 @@ begin
    Check ("T-48 cleared BY vars → same group again (2,3)", In_Same_Group (2, 3), True);
 
    ---------------------------------------------------------------------------
+   --  ── SData.Table: Drop_Row ──────────────────────────────────────────────
+   ---------------------------------------------------------------------------
+
+   --  3-row table: values 10, 20, 30. Drop middle row and verify shift.
+   Clear;
+   Add_Column ("VAL", Col_Numeric);
+   Add_Row; Set_Value (1, "VAL", (Kind => Val_Numeric, Num_Val => 10.0));
+   Add_Row; Set_Value (2, "VAL", (Kind => Val_Numeric, Num_Val => 20.0));
+   Add_Row; Set_Value (3, "VAL", (Kind => Val_Numeric, Num_Val => 30.0));
+
+   Check ("T-49 Row_Count = 3 before Drop_Row", Row_Count, 3);
+   Drop_Row (2);
+   Check     ("T-50 Row_Count = 2 after Drop_Row",            Row_Count, 2);
+   V := Get_Value (1, "VAL");
+   Check_Float ("T-51 row 1 value unchanged after Drop_Row",  V.Num_Val, 10.0);
+   V := Get_Value (2, "VAL");
+   Check_Float ("T-52 row 2 is former row 3 after Drop_Row",  V.Num_Val, 30.0);
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Table: Sort ───────────────────────────────────────────────────
+   ---------------------------------------------------------------------------
+
+   --  3-row table: values 30, 10, 20 — sort ascending then descending.
+   Clear;
+   Add_Column ("VAL", Col_Numeric);
+   Add_Row; Set_Value (1, "VAL", (Kind => Val_Numeric, Num_Val => 30.0));
+   Add_Row; Set_Value (2, "VAL", (Kind => Val_Numeric, Num_Val => 10.0));
+   Add_Row; Set_Value (3, "VAL", (Kind => Val_Numeric, Num_Val => 20.0));
+
+   declare
+      SC : Sort_Criteria;
+   begin
+      SC.Name := (others => ' ');
+      SC.Name (1 .. 3) := "VAL";
+      SC.Len := 3;
+      SC.Dir := Ascending;
+      Sort ((1 => SC));
+   end;
+   V := Get_Value (1, "VAL");
+   Check_Float ("T-53 ascending sort: row 1 = 10.0", V.Num_Val, 10.0);
+   V := Get_Value (2, "VAL");
+   Check_Float ("T-54 ascending sort: row 2 = 20.0", V.Num_Val, 20.0);
+   V := Get_Value (3, "VAL");
+   Check_Float ("T-55 ascending sort: row 3 = 30.0", V.Num_Val, 30.0);
+
+   declare
+      SC : Sort_Criteria;
+   begin
+      SC.Name := (others => ' ');
+      SC.Name (1 .. 3) := "VAL";
+      SC.Len := 3;
+      SC.Dir := Descending;
+      Sort ((1 => SC));
+   end;
+   V := Get_Value (1, "VAL");
+   Check_Float ("T-56 descending sort: row 1 = 30.0", V.Num_Val, 30.0);
+   V := Get_Value (2, "VAL");
+   Check_Float ("T-57 descending sort: row 2 = 20.0", V.Num_Val, 20.0);
+   V := Get_Value (3, "VAL");
+   Check_Float ("T-58 descending sort: row 3 = 10.0", V.Num_Val, 10.0);
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Table: Get_Value_By_Col ───────────────────────────────────────
+   ---------------------------------------------------------------------------
+
+   --  2-column table; verify O(1) position-indexed cursor cache accessor.
+   Clear;
+   Add_Column ("FIRST",  Col_Numeric);
+   Add_Column ("SECOND", Col_Integer);
+   Add_Row;
+   Set_Value (1, "FIRST",  (Kind => Val_Numeric, Num_Val => 7.5));
+   Set_Value (1, "SECOND", (Kind => Val_Integer, Int_Val => 99));
+
+   V := Get_Value_By_Col (1, 1);
+   Check       ("T-59 Get_Value_By_Col(1,1) kind = Numeric", V.Kind = Val_Numeric, True);
+   Check_Float ("T-60 Get_Value_By_Col(1,1) value = 7.5",    V.Num_Val, 7.5);
+   V := Get_Value_By_Col (1, 2);
+   Check ("T-61 Get_Value_By_Col(1,2) kind = Integer",       V.Kind = Val_Integer, True);
+   Check ("T-62 Get_Value_By_Col(1,2) value = 99",           V.Int_Val, 99);
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Table: direct output table pipeline ───────────────────────────
+   ---------------------------------------------------------------------------
+
+   --  Add_Output_Column / Add_Output_Row / Set_Output_Value /
+   --  Set_Output_Value_By_Col / Commit_Output_Table without going through PDV.
+   Clear;
+   Initialize_Output_Table;
+   Add_Output_Column ("P",  Col_Numeric);
+   Add_Output_Column ("Q%", Col_Integer);
+
+   Add_Output_Row;
+   --  Set row 1: P by name, Q% by position (col 2).
+   Set_Output_Value     (1, "P",  (Kind => Val_Numeric, Num_Val => 3.14));
+   Set_Output_Value_By_Col (1, 2,  (Kind => Val_Integer, Int_Val => 7));
+   Check ("T-63 Output_Row_Count = 1 after first Add_Output_Row", Output_Row_Count, 1);
+
+   Add_Output_Row;
+   --  Set row 2: P by position (col 1), Q% by name.
+   Set_Output_Value_By_Col (2, 1,  (Kind => Val_Numeric, Num_Val => 2.72));
+   Set_Output_Value     (2, "Q%", (Kind => Val_Integer, Int_Val => 3));
+   Check ("T-64 Output_Row_Count = 2 after second Add_Output_Row", Output_Row_Count, 2);
+
+   Commit_Output_Table;
+
+   Check ("T-65 Row_Count = 2 after Commit_Output_Table",   Row_Count, 2);
+   Check ("T-66 Has_Column P after commit",                  Has_Column ("P"),  True);
+   Check ("T-67 Has_Column Q% after commit",                 Has_Column ("Q%"), True);
+   V := Get_Value (1, "P");
+   Check       ("T-68 P row 1 kind = Numeric",               V.Kind = Val_Numeric, True);
+   Check_Float ("T-69 P row 1 value = 3.14",                 V.Num_Val, 3.14);
+   V := Get_Value (1, "Q%");
+   Check ("T-70 Q% row 1 kind = Integer",                    V.Kind = Val_Integer, True);
+   Check ("T-71 Q% row 1 value set by position = 7",         V.Int_Val, 7);
+   V := Get_Value (2, "P");
+   Check_Float ("T-72 P row 2 value set by position = 2.72", V.Num_Val, 2.72);
+
+   ---------------------------------------------------------------------------
    --  ── SData.Evaluator: Convert_To_Float ───────────────────────────────────
    ---------------------------------------------------------------------------
 

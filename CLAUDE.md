@@ -14,10 +14,10 @@ make check           # build + run all tests (unit + integration)
 
 `make check` runs:
 1. `bin/csv_unit_test` — 71 tests for `SData.CSV` functions
-2. `bin/sdata_unit_test` — 98 tests for `SData.Variables` / PDV pipeline
-3. 128+ `.cmd` integration tests in `tests/`
+2. `bin/sdata_unit_test` — 122 tests for `SData.Table`, `SData.Variables` / PDV pipeline
+3. 131 `.cmd` integration tests in `tests/`
 
-All 128+ tests must pass before committing. Never use `--no-verify`.
+All 131 integration tests must pass before committing. Never use `--no-verify`.
 
 ## Key Architecture
 
