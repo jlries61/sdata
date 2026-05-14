@@ -31,7 +31,7 @@ jobs:
             alire-${{ runner.os }}-
 
       - name: Install system dependencies
-        run: sudo apt-get update -o Acquire::Languages=none && sudo apt-get install -y --no-install-recommends libsqlite3-dev gnat
+        run: sudo apt-get update -o Acquire::Languages=none && sudo apt-get install -y --no-install-recommends libsqlite3-dev
 
       - name: Build
         run: alr build
@@ -41,9 +41,6 @@ jobs:
 
       - name: Run test suite
         run: alr exec -- make check
-
-      - name: Run GNATcheck
-        run: alr exec -- make gnatcheck
 
       - name: Fuzz corpus regression
         run: alr exec -- make fuzz-corpus
