@@ -191,6 +191,7 @@ bin/sdata --debug tests/aggregates.cmd
 | `doc/adrs.md` | All architectural decisions (ADR-001–037) with rationale |
 | `man/man1/sdata.1` | Complete language reference — statements, expressions, built-in functions |
 | `doc/SOFTWARE_STANDARDS_REVIEW.md` | Living quality audit; findings marked resolved with commit hashes |
+| `doc/threat_model.md` | STRIDE threat model: trust model, attack surface, mitigations, known gaps |
 | `CLAUDE.md` | AI agent context, also useful for humans: build commands, key architecture notes, source layout |
 
 The authoritative language specification is `doc/design.odt` (LibreOffice).
