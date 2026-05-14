@@ -1,0 +1,132 @@
+separate (SData.Interpreter)
+procedure Process_One_Record (Logical_I        : Positive;
+                               Logical_Count    : Natural;
+                               Start            : Statement_Access;
+                               Boundary         : Statement_Access;
+                               Global_Has_Write : Boolean;
+                               Ctx              : in out Step_Context;
+                               Pause_After      : Boolean := False;
+                               Action           : out Step_Action) is
+   Phys_I : constant Positive := SData.Table.Logical_To_Physical (Logical_I);
+   Iter   : Statement_Access;
+begin
+   Set_Current_Record_Index (Phys_I);
+   SData.Table.Set_Logical_Record_Index (Logical_I);
+
+   Reset_PDV_Non_Held;
+   Load_PDV_From_Table (Phys_I);
+
+   declare
+      Flags  : constant Group_Flags_Result :=
+         Group_Flags (Logical_I, Logical_Count);
+      By_N   : constant Natural := SData.Table.By_Var_Count;
+   begin
+      Ctx.BOG := Flags.BOG;
+      Ctx.EOG := Flags.EOG;
+      Set_Group_Boundary (BOG => Ctx.BOG, EOG => Ctx.EOG);
+      for I in 1 .. By_N loop
+         declare Name : constant String := SData.Table.By_Var_Name (I); begin
+            Set_Temporary ("FIRST." & Name, (Kind => Val_Integer, Int_Val => (if Flags.BOG then 1 else 0)));
+            Set_Temporary ("LAST."  & Name, (Kind => Val_Integer, Int_Val => (if Flags.EOG then 1 else 0)));
+         end;
+      end loop;
+
+      --  Emit record header with optional BY group annotation
+      if SData.Config.Debug_Mode then
+         declare
+            Header : Ada.Strings.Unbounded.Unbounded_String :=
+               Ada.Strings.Unbounded.To_Unbounded_String
+                  ("-- record" & Logical_I'Image & " (physical" & Phys_I'Image & ")");
+         begin
+            if By_N > 0 and then Flags.BOG then
+               declare
+                  Label : constant String :=
+                     (if Logical_I = 1 then "BY GROUP START" else "BY GROUP CHANGE");
+               begin
+                  Ada.Strings.Unbounded.Append (Header, "  [" & Label & ":");
+                  for I in 1 .. By_N loop
+                     declare
+                        Name    : constant String :=
+                           SData.Table.By_Var_Name (I);
+                        New_Val : constant Value :=
+                           SData.Variables.Get (Name);
+                     begin
+                        if Logical_I > 1 then
+                           --  CHANGE: show old → new
+                           declare
+                              Prev_Phys : constant Positive :=
+                                 SData.Table.Logical_To_Physical (Logical_I - 1);
+                              Old_Val : constant Value :=
+                                 SData.Table.Get_Value (Prev_Phys, Name);
+                           begin
+                              Ada.Strings.Unbounded.Append
+                                 (Header, " " & Name & " " & Debug_Value (Old_Val)
+                                  & " → " & Debug_Value (New_Val));
+                           end;
+                        else
+                           --  START: show just the current value
+                           Ada.Strings.Unbounded.Append
+                              (Header, " " & Name & "=" & Debug_Value (New_Val));
+                        end if;
+                     end;
+                  end loop;
+                  Ada.Strings.Unbounded.Append (Header, "]");
+               end;
+            end if;
+            Debug_Trace (Ada.Strings.Unbounded.To_String (Header));
+         end;
+      end if;
+   end;
+
+   Iter := Start;
+   Ctx.Deleted := False;
+   SData.Table.Set_Record_Explicitly_Written (False);
+
+   declare
+      Break_Fired : Boolean := False;
+      Act         : Step_Action := Action_Continue;
+   begin
+      while Iter /= null and then Iter /= Boundary loop
+         case Iter.Kind is
+            when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
+               | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT
+               | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO
+               | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
+               | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
+               begin
+                  Execute_Statement (Iter, Ctx);
+               exception
+                  when Break_Triggered =>
+                     Inspect_PDV (Logical_I, Logical_Count, Act);
+                     Break_Fired := True;
+                  when E : Script_Error =>
+                     if SData.Config.Continue_On_Error then
+                        Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                        SData.Config.Runtime.Last_Error_Code := 1;
+                        SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
+                     else raise; end if;
+                  when E : others =>
+                     if SData.Config.Continue_On_Error then
+                        Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                        SData.Config.Runtime.Last_Error_Code := 1;
+                        SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
+                     else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
+               end;
+            when others => null;
+         end case;
+         exit when Ctx.Deleted or else Break_Fired;
+         Iter := Iter.Next;
+      end loop;
+
+      if not Break_Fired and then Pause_After then
+         Inspect_PDV (Logical_I, Logical_Count, Act);
+      end if;
+      Action := Act;
+   end;
+
+   --  Automatic flush: if the step contains no explicit WRITE and the
+   --  record was not deleted, write the final PDV state to the output table.
+   if not Ctx.Deleted and then not Global_Has_Write then
+      SData.Variables.Flush_PDV_To_Output;
+   end if;
+end Process_One_Record;
