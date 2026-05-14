@@ -84,7 +84,8 @@ procedure SData_Main is
       Put_Line ("  -p <pager>               External pager command for interactive output");
       Put_Line ("                           (e.g. ""less -F"", ""more""); ignored in batch mode;");
       Put_Line ("                           incompatible with --noshell");
-      Put_Line ("  --debug                  Trace each statement and record number to stderr");
+      Put_Line ("  --debug[=N]              Trace execution to stderr");
+      Put_Line ("                           1=I/O only  2=+record/flow  3=+assignments (default 3)");
    end Print_Usage;
 
    --  Runs the Interactive REPL.
@@ -374,6 +375,29 @@ begin
             Ignore_Math_Errors := True;
          elsif Arg = "--debug" then
             Debug_Level := 3;
+         elsif Arg'Length > 8
+            and then Arg (Arg'First .. Arg'First + 7) = "--debug="
+         then
+            declare
+               Level_Str : constant String :=
+                  Arg (Arg'First + 8 .. Arg'Last);
+               N         : Natural;
+            begin
+               N := Natural'Value (Level_Str);
+               if N > 3 then
+                  Put_Line_Error ("Warning: --debug level" & N'Image
+                                  & " exceeds maximum (3); using 3");
+                  SData.Config.Debug_Level := 3;
+               else
+                  SData.Config.Debug_Level := N;
+               end if;
+            exception
+               when Constraint_Error =>
+                  Put_Line_Error ("Error: invalid --debug level: "
+                                  & Level_Str);
+                  Set_Exit_Status (Failure);
+                  return;
+            end;
          elsif Arg = "-k" or else Arg = "--continue-on-error" then
             Continue_On_Error := True;
          elsif Arg'Length > 0 and then Arg (1) /= '-' then
