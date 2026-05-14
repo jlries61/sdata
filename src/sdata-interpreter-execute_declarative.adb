@@ -243,6 +243,7 @@ begin
                    else SData.Config.Runtime.Options_CHARSET (1 .. SData.Config.Runtime.Options_CHARSET_Len)));
                Put_Line ("OPTIONS IEEE_DIVIDE " & Bool_Display (SData.Config.Runtime.IEEE_Divide));
                Put_Line ("OPTIONS SHELLTIMEOUT " & Ada.Strings.Fixed.Trim (SData.Config.Runtime.Options_Shell_Timeout'Image, Ada.Strings.Both));
+               Put_Line ("OPTIONS DEBUG " & Ada.Strings.Fixed.Trim (SData.Config.Debug_Level'Image, Ada.Strings.Both));
             elsif Key = "MAXINTAB" then
                SData.Config.Max_Table_Cells := Natural'Value (Val);
             elsif Key = "MAXTEMPMEM" then
@@ -283,6 +284,8 @@ begin
             elsif Key = "SHELLTIMEOUT" then
                SData.Config.Runtime.Options_Shell_Timeout :=
                   Natural'Value (Val);
+            elsif Key = "DEBUG" then
+               SData.Config.Debug_Level := Natural'Value (Val);
             else
                Put_Line_Error ("Warning: Unknown OPTIONS key: " & Key);
             end if;
