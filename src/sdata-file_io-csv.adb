@@ -4,6 +4,7 @@ with Ada.Streams;
 with Ada.Directories;
 with Ada.Strings.UTF_Encoding;             use Ada.Strings.UTF_Encoding;
 with Ada.Strings.UTF_Encoding.Conversions;
+with SData.Config;
 with SData.Config.Runtime;
 with Ada.Unchecked_Deallocation;
 with SData.IO;                use SData.IO;
@@ -145,6 +146,7 @@ package body SData.File_IO.CSV is
       Is_Buffered     : Boolean := False;
       Needs_ASCII_Chk : Boolean := False;
       Rows_Written    : Natural := 0;
+      Eff_Max_Rows    : Natural := 0;
 
       procedure Validate_ASCII (S : String) is
       begin
@@ -179,7 +181,7 @@ package body SData.File_IO.CSV is
          N_Cols       : constant Natural := Natural (Col_Names.Length);
          Warned_Extra : Boolean := False;
       begin
-         if Max_Rows > 0 and then Rows_Written >= Max_Rows then return; end if;
+         if Eff_Max_Rows > 0 and then Rows_Written >= Eff_Max_Rows then return; end if;
          Rows_Written := Rows_Written + 1;
          Add_Row;
          loop
@@ -353,8 +355,17 @@ package body SData.File_IO.CSV is
       end Infer_Column_Types;
 
       procedure Load_Data_Rows is
-         N : constant Natural := Natural (Col_Names.Length);
+         N            : constant Natural := Natural (Col_Names.Length);
+         Cell_Ceiling : constant Natural := SData.Config.Max_Table_Cells;
+         Row_Ceiling  : constant Natural :=
+            (if Cell_Ceiling > 0 and then N > 0 then Cell_Ceiling / N else 0);
       begin
+         Eff_Max_Rows :=
+            (if Max_Rows > 0 and then Row_Ceiling > 0
+             then Natural'Min (Max_Rows, Row_Ceiling)
+             elsif Max_Rows > 0 then Max_Rows
+             else Row_Ceiling);
+
          Clear;
          for I in 1 .. N loop
             Add_Column (Col_Names (I).all, Col_Types (I));
@@ -366,23 +377,39 @@ package body SData.File_IO.CSV is
          end if;
 
          for R in 1 .. Scan_Count loop
-            exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+            exit when Eff_Max_Rows > 0 and then Rows_Written >= Eff_Max_Rows;
             Process_Line_Direct (To_String (Scan_Lines (R)));
          end loop;
 
          if Is_Buffered then
             while All_Lines_Idx < Natural (All_Lines.Length) loop
-               exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+               exit when Eff_Max_Rows > 0 and then Rows_Written >= Eff_Max_Rows;
                All_Lines_Idx := All_Lines_Idx + 1;
                Process_Line_Direct (To_String (All_Lines (All_Lines_Idx)));
             end loop;
          else
             while not Ada.Text_IO.End_Of_File (File) loop
-               exit when Max_Rows > 0 and then Rows_Written >= Max_Rows;
+               exit when Eff_Max_Rows > 0 and then Rows_Written >= Eff_Max_Rows;
                Ada.Text_IO.Get_Line (File, Line_Buf.all, Line_Last);
                if Needs_ASCII_Chk then Validate_ASCII (Line_Buf (1 .. Line_Last)); end if;
                Process_Line_Direct (Line_Buf (1 .. Line_Last));
             end loop;
+         end if;
+
+         --  Warn when automatic cell-ceiling truncation occurs (not a
+         --  user-requested Max_Rows cap).
+         if Eff_Max_Rows > 0 and then Rows_Written >= Eff_Max_Rows
+            and then (Max_Rows = 0 or else Eff_Max_Rows < Max_Rows)
+         then
+            SData.IO.Put_Line_Error
+               ("Warning: """ & File_Name & """: load truncated at" &
+                Natural'Image (Rows_Written) & " rows — cell ceiling reached" &
+                " (OPTIONS MAXINTAB " &
+                Ada.Strings.Fixed.Trim
+                   (SData.Config.Max_Table_Cells'Image, Ada.Strings.Both) &
+                ", " &
+                Ada.Strings.Fixed.Trim (N'Image, Ada.Strings.Both) &
+                " columns)");
          end if;
 
          for SA of Col_Names loop Free (SA); end loop;

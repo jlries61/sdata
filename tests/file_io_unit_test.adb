@@ -175,6 +175,23 @@ begin
    Check_Float ("PC-36 long-row C ok",     V.Num_Val, 8.0);
 
    ---------------------------------------------------------------------------
+   --  PC-37..PC-39: cell-ceiling row cap during Parse_CSV.
+   --  sample.csv has 4 columns and 6 data rows.
+   --  With Max_Table_Cells=8: row ceiling = 8/4 = 2 → only 2 rows loaded.
+   ---------------------------------------------------------------------------
+   declare
+      Saved_Cap : constant Natural := SData.Config.Max_Table_Cells;
+   begin
+      SData.Config.Max_Table_Cells := 8;
+      Parse_CSV ("tests/data/sample.csv");
+      SData.Config.Max_Table_Cells := Saved_Cap;
+   end;
+   Check ("PC-37 cell-cap row count",   Row_Count,    2);
+   Check ("PC-38 cell-cap col count",   Column_Count, 4);
+   V := Get_Value (2, "VAL1");
+   Check_Float ("PC-39 cell-cap row2 val", V.Num_Val, 4.0);
+
+   ---------------------------------------------------------------------------
    --  Parse_ODF tests  (PO-01 .. PO-23)
    ---------------------------------------------------------------------------
 
