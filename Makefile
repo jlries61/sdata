@@ -156,6 +156,26 @@ fuzz-corpus: build
 			echo "CRASH (exit $$?)"; failed=$$((failed+1)); \
 		fi; \
 	done; \
+	echo "Running corpus regression (ods_fuzz_driver)..."; \
+	for f in tests/fuzz_corpus/ods/*; do \
+		[ -f "$$f" ] || continue; \
+		printf "  %-52s" "$$f"; \
+		if $(TIMEOUT) 5 ./bin/ods_fuzz_driver "$$f" >/dev/null 2>&1; then \
+			echo "OK"; \
+		else \
+			echo "CRASH (exit $$?)"; failed=$$((failed+1)); \
+		fi; \
+	done; \
+	echo "Running corpus regression (xlsx_fuzz_driver)..."; \
+	for f in tests/fuzz_corpus/xlsx/*; do \
+		[ -f "$$f" ] || continue; \
+		printf "  %-52s" "$$f"; \
+		if $(TIMEOUT) 5 ./bin/xlsx_fuzz_driver "$$f" >/dev/null 2>&1; then \
+			echo "OK"; \
+		else \
+			echo "CRASH (exit $$?)"; failed=$$((failed+1)); \
+		fi; \
+	done; \
 	if [ $$failed -gt 0 ]; then \
 		echo "$$failed corpus file(s) caused unexpected crashes."; \
 		exit 1; \

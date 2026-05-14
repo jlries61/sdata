@@ -119,9 +119,10 @@ raise `Script_Error` for corrupt mandatory entries, which halts the data
 step cleanly. **Commit 781d56f.**
 
 **Residual risk:** Deep Zip-Ada parser state on a highly crafted archive has
-not been fuzz-tested. The fuzz drivers (`bin/csv_fuzz_driver`,
-`bin/parser_fuzz_driver`) do not cover the ODF/OOXML Zip path. This is a
-known gap (see §7).
+now been covered by corpus regression (`bin/ods_fuzz_driver`,
+`bin/xlsx_fuzz_driver`; 9 seed files; `make fuzz-corpus`). Full
+coverage-guided fuzzing with AFL++ is not continuous — the corpus seeds
+exercise known-bad inputs but may miss novel mutation paths.
 
 ---
 
@@ -265,7 +266,7 @@ should use `--nosubmit`.
 | ID | Threat | Likelihood | Impact | Status |
 |---|---|---|---|---|
 | T1 | SQL injection via CSV column names | Low | Medium | **Mitigated** (456d1e0) |
-| T2 | Malformed Zip in ODF / OOXML | Low | Low–Medium | **Partially mitigated**; ODF/OOXML path not fuzz-tested |
+| T2 | Malformed Zip in ODF / OOXML | Low | Low–Medium | **Mitigated**; corpus regression via `ods_fuzz_driver` / `xlsx_fuzz_driver` |
 | T3 | Recursive SUBMIT + WRITE disk exhaustion | Very low | Low | **Accepted** (`--nosubmit` opt-in) |
 | I1 | SQLite temp file on disk after crash | Low | Low | **Mitigated** (signal handlers + Finalize) |
 | D1 | Resource exhaustion via crafted file | Low | Medium | **Partially mitigated** (`-m` spill threshold) |
@@ -280,7 +281,7 @@ should use `--nosubmit`.
 
 | Gap | Notes |
 |---|---|
-| ODF / OOXML fuzz coverage | `bin/csv_fuzz_driver` and `bin/parser_fuzz_driver` do not reach the Zip-Ada or XML-Ada paths. A dedicated `ods_fuzz_driver` / `xlsx_fuzz_driver` that feeds raw file bytes through `Parse_ODF` / `Parse_OOXML` would close this. |
+| ~~ODF / OOXML fuzz coverage~~ | **Closed 2026-05-14:** `bin/ods_fuzz_driver` and `bin/xlsx_fuzz_driver` feed arbitrary files through `Parse_ODF` / `Parse_OOXML` using AFL++ `@@` file-path convention. Seed corpus: 4 ODS + 5 XLSX files in `tests/fuzz_corpus/ods/` and `tests/fuzz_corpus/xlsx/`; `make fuzz-corpus` runs corpus regression for all four drivers. |
 | ~~No per-file size cap during CSV read~~ | **Resolved 2026-05-14 (ce037be):** `Add_Row` in `sdata-table.adb` already spills in-memory segments to SQLite (batched inserts) whenever `Max_Table_Cells` is reached, then continues. `Fetch_From_Disk` reads segments back on demand. For the streaming UTF-8/ASCII path the full file is always read; no truncation occurs. |
 | No script execution timeout | A WHILE loop that iterates for hours is not constrained. This is by design but documented here for completeness. |
 | No formal SAST | `gnatcheck.rules` with two rules (`Recursive_Subprograms`, `Too_Many_Parameters:8`) and `make gnatcheck` target exist; intentional exceptions carry in-source `pragma Annotate` exemptions. `gnatcheck` is NOT run in CI — available in Ubuntu's `asis-programs` package (not in `gnat`); not found on Debian or openSUSE. `make gnatcheck` available for manual use on Ubuntu hosts. CodePeer (commercial) has not been run. AFL++ corpus regression runs in CI; full coverage-guided fuzzing is not continuous. |
