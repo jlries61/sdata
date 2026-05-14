@@ -156,6 +156,13 @@ package body SData.Evaluator is
    --  2. All other arguments are flattened (with array expansion) into Vals.
    --  3. Dispatch_Table maps the function name to a handler subprogram.
    ---------------------------------------------------------------------------
+   --  Evaluate_Function and Evaluate are mutually recursive: Evaluate calls
+   --  Evaluate_Function for named-function AST nodes; Evaluate_Function calls
+   --  Evaluate to resolve each argument.  An explicit stack would add complexity
+   --  without safety benefit given the bounded expression depth in practice.
+   pragma Annotate (GNATcheck, Exempt_On, "Recursive_Subprograms",
+                    "Mutual recursion is necessary for AST traversal; "
+                    & "expression depth is bounded by the parser");
    function Evaluate_Function (Name : String; Args : Expression_List) return Value is
       All_Vals  : Value_Vectors.Vector;
       Current   : Expression_List := Args;
@@ -550,6 +557,7 @@ package body SData.Evaluator is
             end;
       end case;
    end Evaluate;
+   pragma Annotate (GNATcheck, Exempt_Off, "Recursive_Subprograms");
 
 
 begin

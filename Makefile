@@ -39,7 +39,7 @@ INSTALL_DIR  = $(DESTDIR)$(BINDIR)
 MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 DOC_DIR      = $(DESTDIR)$(DOCDIR)
 
-.PHONY: all build clean run check fuzz-corpus install srpm pkg msi
+.PHONY: all build clean run check fuzz-corpus gnatcheck install srpm pkg msi
 
 all: build
 
@@ -130,6 +130,9 @@ check: build
 	else \
 		echo "All $$total tests passed."; \
 	fi
+
+gnatcheck: build
+	gnatcheck -P $(GPR_FILE) --rules-file=gnatcheck.rules -j0
 
 fuzz-corpus: build
 	@echo "Running corpus regression (csv_fuzz_driver)..."

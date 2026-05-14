@@ -1,0 +1,17 @@
+--  GNATcheck rules for SData
+--  Enforced in CI via "make gnatcheck" (alr exec -- make gnatcheck).
+--
+--  To exempt an intentional exception, bracket the construct with:
+--    pragma Annotate (GNATcheck, Exempt_On, "Rule_Name", "justification");
+--    ... code ...
+--    pragma Annotate (GNATcheck, Exempt_Off, "Rule_Name");
+
+--  Flag subprograms that call themselves directly or indirectly.
+--  Intentional recursive tree traversal in SData.Evaluator is exempted
+--  in-source with pragma Annotate.
++RRecursive_Subprograms
+
+--  Flag subprograms with more than 8 formal parameters.
+--  Open_Input exceeds this by design (7 optional params with safe defaults);
+--  the exemption is documented in-source with pragma Annotate.
++RToo_Many_Parameters:8

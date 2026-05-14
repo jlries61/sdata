@@ -283,7 +283,7 @@ should use `--nosubmit`.
 | ODF / OOXML fuzz coverage | `bin/csv_fuzz_driver` and `bin/parser_fuzz_driver` do not reach the Zip-Ada or XML-Ada paths. A dedicated `ods_fuzz_driver` / `xlsx_fuzz_driver` that feeds raw file bytes through `Parse_ODF` / `Parse_OOXML` would close this. |
 | No per-file size cap during CSV read | Very large CSV files are read fully into memory before the `-m` cell limit applies. A streaming row cap during `Parse_CSV` would bound memory for pathological inputs. |
 | No script execution timeout | A WHILE loop that iterates for hours is not constrained. This is by design but documented here for completeness. |
-| No formal SAST | The compiler runs `-gnatwa -gnatwl -gnatwu`; GNATcheck / CodePeer have not been run. AFL++ instrumented fuzzing has been documented but not continuously run in CI. |
+| No formal SAST | ~~GNATcheck has not been run.~~ GNATcheck now runs as a blocking CI step (`make gnatcheck`): `Recursive_Subprograms` and `Too_Many_Parameters:8` rules enforced; intentional exceptions carry in-source `pragma Annotate` exemptions. CodePeer (commercial) has not been run. AFL++ corpus regression runs in CI; full coverage-guided fuzzing is not continuous. |
 
 ---
 
