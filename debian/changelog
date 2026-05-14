@@ -1,3 +1,9 @@
+sdata (0.6.13-1) unstable; urgency=medium
+
+  * Decompose interpreter monolith into 9 Ada subunits; add shell timeout (ADR-037)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 13 May 2026 19:35:33 -0700
+
 sdata (0.6.12-1) unstable; urgency=medium
 
   * refactor: decompose sdata-file_io.adb into child packages; fix broad when-others handlers; add Execute_Assignment unit tests (IC-35..IC-41)
