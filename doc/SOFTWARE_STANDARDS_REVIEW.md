@@ -22,6 +22,7 @@
 **Annotation:** 2026-05-12 (v0.6.11) — §6 Security Posture score recalculated from full current state: SQL injection fixed (456d1e0), overflow resolved (v0.6.9), SYSTEM/SHELL reclassified Low-Medium (deliberate design, --noshell opt-in), path traversal mitigated (--nosubmit opt-in). No network exposure, no auth, no hardcoded secrets, Ada runtime bounds-checking. Remaining concerns: --noshell/--nosubmit are opt-in (not default), no fuzzing/SAST, no formal threat model, broad `when others` in file_io. Section header corrected from stale "52" to current score; SQL injection and path traversal prose updated to remove stale "needs fixing" language. §6 score 65→**70**; total 574+5 = **579/800 (72.4%)**.
 **Annotation:** 2026-05-12 (v0.6.11) — `Execute_Assignment` (155 lines) decomposed into three focused pieces: `Execute_Array_Assignment` (private procedure: array existence check, LET/SET ownership rules, slice/list/single-index dispatch), `Coerce_For_Scalar` (private function: type-kind check, Inf guard, integer promotion, string truncation), and a trimmed coordinator `Execute_Assignment` (~25 lines: evaluate, early %-name Inf guard, dispatch). `interpreter_unit_test` extended from 37 to 48 tests: IC-35..IC-41 add array-assignment coverage (single-index, slice, list, SET on temp array, LET on temp array → error, SET on permanent → error, undefined array → error). §4 score 73→**75**; total 572+2 = **574/800 (71.8%)**.
 **Annotation:** 2026-05-13 (v0.6.12) — ADR-037 implemented: configurable SYSTEM/SHELL timeout (commits 2d57654, 3ca764f). `OPTIONS SHELLTIMEOUT n` sets the per-run timeout in seconds (reset by NEW); `--shell-timeout=N` sets the batch-mode default at startup (300 s default when a filename is given, 0 in interactive mode). Implementation uses `GNAT.OS_Lib.Non_Blocking_Spawn` + `Non_Blocking_Wait_Process` + `Kill` in a 0.5-second poll loop — no external tool dependency (`timeout(1)`, PowerShell). Kills the child and raises `Script_Error` with a descriptive message on expiry. CI pipeline improved: Alire package cache added (`actions/cache@v4`, keyed on `alire.toml` hash); `apt-get update` hardened with `-o Acquire::Languages=none --no-install-recommends`. §5.2 concern (indefinite blocking on SYSTEM) resolved; §5 score 65→**68**. §7 score 62→**65** (runtime + CLI timeout configuration; CI caching). Total 591+3+3 = **597/800 (74.6%)**.
+**Annotation:** 2026-05-13 (v0.6.12) — `sdata-interpreter.adb` fully decomposed into nine Ada subunits using the `separate` mechanism (commits 49cd659–b8e037e): `execute_assignment` (with `Execute_Array_Assignment` and `Coerce_For_Scalar` nested), `execute_print`, `execute_control_flow`, `execute_metadata`, `execute_declarative`, `execute_io`, `resolve_expr_indices`, `inspect_pdv`, `process_one_record`. Parent body reduced from 2,267 to 912 lines; each subunit has one clear responsibility. No API or behaviour changes; all 131 tests pass. §1 score 75→**78** (interpreter monolith resolved; no large single-file subsystems remain); §2 score 79→**82** (cognitive load: all large files decomposed); §4 score 77→**80** (change resilience: adding a new command now touches one focused subunit). Total 597+3+3+3 = **606/800 (75.8%)**.
 **Annotation:** 2026-05-12 (v0.6.12) — `sdata-file_io.adb` (1,758 lines) fully decomposed into five focused child packages: `SData.File_IO` (parent, ~110 lines — `Open_Input`/`Open_Output` + `Save_Refused` exception), `SData.File_IO.Helpers` (private child, ~175 lines — shared utilities: `Get_Text`, `Detect_Inf`, `Apply_Dollar_Override`, `Safe_Name`, `Col_To_Letters`, `Escape_XML`, `Has_Formulas_XML`, `Convert_Via_LibreOffice`), `SData.File_IO.CSV` (~510 lines), `SData.File_IO.ODF` (~430 lines), `SData.File_IO.OOXML` (~440 lines). Each format package contains only its own parse and write logic; `Helpers` is a `private` child, invisible outside the hierarchy (Ada language guarantee; commit cc8560f). Also: `interpreter_unit_test` count corrected to 48 (IC-01..IC-41; file committed as part of v0.6.12). §1 score 72→**75** (file_io monolith fully resolved; `sdata-interpreter.adb` remains the sole large-file concern); §2 score 77→**79** (cognitive load: all file_io monoliths gone; self-doc note updated); §4 score 75→**77** (change resilience: "New file format" difficulty Hard→Medium; debt item resolved); total 584+3+2+2 = **591/800 (73.9%)**.
 
 ---
@@ -35,7 +36,7 @@
 
 ---
 
-## 1. Architectural Integrity — ~~65~~ ~~72~~ 75/100
+## 1. Architectural Integrity — ~~65~~ ~~72~~ ~~75~~ **78/100**
 
 ### 1.1 Structural Coherence
 
@@ -43,7 +44,7 @@
 Yes. The three-tier model (Declarative → Immediate → Deferred) is coherent, documented at the top of `sdata-interpreter.adb`, and consistently applied. The evaluator, table, variables, and help subsystems have clear charters. The parser and lexer are separate packages with appropriate layering.
 
 **Can a new developer understand the system's organization in under 30 minutes?**
-Mostly. The package structure is logical; an Ada developer can navigate it. `sdata-interpreter.adb` (~~2,213~~ 2,269 lines) remains the sole intimidating single-file subsystem. ~~`sdata-file_io.adb` (~~1,646~~ 1,758 lines) is still an intimidating single-file subsystem~~ — **Resolved v0.6.12 (cc8560f):** `sdata-file_io.adb` fully decomposed into `SData.File_IO` (~110 lines), `SData.File_IO.Helpers` (private child, ~175 lines), `SData.File_IO.CSV` (~510 lines), `SData.File_IO.ODF` (~430 lines), and `SData.File_IO.OOXML` (~440 lines). The evaluator refactoring brought `sdata-evaluator.adb` from 2,589 lines to ~~517~~ 543 lines — and the same treatment has now been applied to file I/O. The interpreter is the remaining large-file concern.
+Mostly. The package structure is logical; an Ada developer can navigate it. ~~`sdata-interpreter.adb` (~~2,213~~ 2,269 lines) remains the sole intimidating single-file subsystem~~ — **Resolved v0.6.12 (49cd659–b8e037e):** `sdata-interpreter.adb` decomposed into nine `separate` subunits; parent body is now 912 lines. ~~`sdata-file_io.adb` (~~1,646~~ 1,758 lines) is still an intimidating single-file subsystem~~ — **Resolved v0.6.12 (cc8560f):** `sdata-file_io.adb` fully decomposed into `SData.File_IO` (~110 lines), `SData.File_IO.Helpers` (private child, ~175 lines), `SData.File_IO.CSV` (~510 lines), `SData.File_IO.ODF` (~430 lines), and `SData.File_IO.OOXML` (~440 lines). The evaluator refactoring brought `sdata-evaluator.adb` from 2,589 lines to ~~517~~ 543 lines. No large single-file subsystems remain.
 
 **Are there orphaned modules?**
 No orphaned modules detected. Every package is actively used.
@@ -62,11 +63,11 @@ The SQLite backing store for large tables (`ada_sqlite3`) is a justified complex
 
 Four direct dependencies, all justified, all maintained, no version-pinning mismatches. Dependency hygiene is **exemplary** for a project of this size. No npm-style dependency explosion.
 
-**Verdict:** The architectural foundations are sound. The two original failing grades — (1) the global-state integration bus, and (2) monolithic file-I/O parsers — are now both fully resolved. **Updated 88def8c:** The global-state bus is fully closed: `BOG_Flag`/`EOG_Flag` moved to `SData.Evaluator.Nav_Fns` body; no evaluator-level globals remain (see SKEPTIC_REVIEW item 4). **Updated ab4d5c8:** `Parse_CSV` decomposed into tokenizer + type-inference passes. **Updated 7320963/781d56f (v0.6.11):** `Parse_ODF Load_Content` and `Parse_OOXML Load_Sheet` each decomposed into three named sub-procedures; data extraction and type inference are now separated in both XML parsers. Exception-safety also improved: `DOM.Readers.Free (Reader)` added to orchestrator-level exception handler for both parsers. **Fully resolved v0.6.12 (cc8560f):** `sdata-file_io.adb` decomposed into five focused child packages — each format is now its own module; `Helpers` is a `private` child invisible outside the hierarchy.
+**Verdict:** The architectural foundations are sound. The two original failing grades — (1) the global-state integration bus, and (2) monolithic file-I/O parsers — are now both fully resolved. **Updated 88def8c:** The global-state bus is fully closed: `BOG_Flag`/`EOG_Flag` moved to `SData.Evaluator.Nav_Fns` body; no evaluator-level globals remain (see SKEPTIC_REVIEW item 4). **Updated ab4d5c8:** `Parse_CSV` decomposed into tokenizer + type-inference passes. **Updated 7320963/781d56f (v0.6.11):** `Parse_ODF Load_Content` and `Parse_OOXML Load_Sheet` each decomposed into three named sub-procedures; data extraction and type inference are now separated in both XML parsers. Exception-safety also improved: `DOM.Readers.Free (Reader)` added to orchestrator-level exception handler for both parsers. **Fully resolved v0.6.12 (cc8560f):** `sdata-file_io.adb` decomposed into five focused child packages — each format is now its own module; `Helpers` is a `private` child invisible outside the hierarchy. **Also resolved v0.6.12 (49cd659–b8e037e):** `sdata-interpreter.adb` decomposed into nine `separate` subunits; parent body reduced from 2,267 to 912 lines. No large single-file subsystems remain in the codebase.
 
 ---
 
-## 2. Code Quality & Craftsmanship — ~~72~~ ~~75~~ ~~77~~ 79/100
+## 2. Code Quality & Craftsmanship — ~~72~~ ~~75~~ ~~77~~ ~~79~~ **82/100**
 
 ### 2.1 Naming & Readability
 
@@ -150,7 +151,7 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 ---
 
-## 4. Maintainability & Evolvability — ~~60~~ ~~65~~ ~~68~~ ~~70~~ ~~73~~ ~~75~~ **77/100**
+## 4. Maintainability & Evolvability — ~~60~~ ~~65~~ ~~68~~ ~~70~~ ~~73~~ ~~75~~ ~~77~~ **80/100**
 
 ### 4.1 Test Coverage & Quality
 
@@ -192,6 +193,7 @@ Adding a new command requires: parser (token + production), AST node, interprete
 |---|---|---|---|
 | ~~`Parse_CSV` / `Parse_OOXML` / `Parse_ODF` monoliths~~ | ~~High~~ ~~Medium~~ | ~~3–4 days~~ | ~~Stable~~ ~~**Improving — decomposed in v0.6.11**~~ **Resolved v0.6.12 (cc8560f) — each format is now its own focused package** |
 | ~~`Execute_Assignment` too broad~~ | ~~Medium~~ | ~~1 day~~ | **Resolved — decomposed into `Execute_Array_Assignment` + `Coerce_For_Scalar` + 25-line coordinator** |
+| ~~`sdata-interpreter.adb` monolith (2,267 lines)~~ | ~~High~~ | ~~3–5 days~~ | **Resolved v0.6.12 (49cd659–b8e037e) — nine `separate` subunits extracted; parent reduced to 912 lines; each subunit has one clear responsibility** |
 | Integration-only test coverage | ~~High~~ **Resolved** | 2–3 days per module | ~~**Partially resolved 2026-05-07**~~ ~~**Substantially resolved 2026-05-09**~~ ~~**Largely resolved 2026-05-09**~~ **Resolved 2026-05-12** — Variables, CSV, all three file I/O parsers, evaluator expression trees, and interpreter control flow all have unit coverage |
 | ~~BY-variable list duplication (interpreter + table)~~ | ~~Medium~~ | ~~4 hours~~ | **Fixed 9460375** |
 | ~~Column hash lookup per record~~ | ~~Low~~ | ~~1 day~~ | **Fixed 415714a** |
@@ -318,15 +320,15 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 
 | Category | Score |
 |---|---|
-| Architectural Integrity | ~~65/100~~ ~~72/100~~ **75/100** |
-| Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ ~~77/100~~ **79/100** |
+| Architectural Integrity | ~~65/100~~ ~~72/100~~ ~~75/100~~ **78/100** |
+| Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ ~~77/100~~ ~~79/100~~ **82/100** |
 | Efficiency & Performance | ~~74/100~~ **78/100** |
-| Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ ~~73/100~~ ~~75/100~~ **77/100** |
+| Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ ~~73/100~~ ~~75/100~~ ~~77/100~~ **80/100** |
 | Error Handling & Resilience | ~~58/100~~ ~~63/100~~ ~~65/100~~ **68/100** |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ ~~65/100~~ **70/100** |
 | Operational Readiness | ~~50/100~~ ~~62/100~~ **65/100** |
 | Documentation | ~~76/100~~ ~~82/100~~ **85/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ ~~591/800 (73.9%)~~ **597/800 (74.6%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ ~~591/800 (73.9%)~~ ~~597/800 (74.6%)~~ **606/800 (75.8%)** |
 
 ---
 
@@ -351,11 +353,11 @@ This codebase is the work of someone who actually knows what they're doing. The 
 
 But here's what I'd be thinking at 3 AM with a corrupted dataset:
 
-**`sdata-file_io.adb` is resolved.** ~~Three procedures totalling over 1,000 lines, each mixing tokenization, type inference, and data loading in a single call stack.~~ `Parse_CSV` was made three-pass (tokenizer → type inference → load) in v0.6.11; `Parse_ODF` and `Parse_OOXML` had their inner loops decomposed into three named sub-procedures. **v0.6.12 (cc8560f):** The 1,758-line file is gone — replaced by five focused packages (parent ~110 lines, Helpers private ~175, CSV ~510, ODF ~430, OOXML ~440). Unit test coverage added (70 tests, v0.6.11). All suppressing handlers are specific exception types with documented rationale. The remaining structural concern is `sdata-interpreter.adb` (~2,269 lines) — which has the same treatment available to it when the time comes.
+**`sdata-file_io.adb` is resolved.** ~~Three procedures totalling over 1,000 lines, each mixing tokenization, type inference, and data loading in a single call stack.~~ `Parse_CSV` was made three-pass (tokenizer → type inference → load) in v0.6.11; `Parse_ODF` and `Parse_OOXML` had their inner loops decomposed into three named sub-procedures. **v0.6.12 (cc8560f):** The 1,758-line file is gone — replaced by five focused packages (parent ~110 lines, Helpers private ~175, CSV ~510, ODF ~430, OOXML ~440). Unit test coverage added (70 tests, v0.6.11). All suppressing handlers are specific exception types with documented rationale. ~~The remaining structural concern is `sdata-interpreter.adb` (~2,269 lines) — which has the same treatment available to it when the time comes.~~ **`sdata-interpreter.adb` also resolved v0.6.12 (49cd659–b8e037e):** Nine `separate` subunits extracted; parent body reduced from 2,267 to 912 lines. No large single-file subsystems remain.
 
 **The security posture is "operate within OS permissions."** SYSTEM executes shell commands with whatever access the running account has — which is exactly the access a system administrator has chosen to grant it. SData does not add a second permission layer on top of the OS; the correct place to restrict what `sdata` can do is the account it runs under, not a feature flag inside the tool. The `--noshell` and `--nosubmit` flags exist for operators who need containment beyond OS account permissions (e.g., running scripts from untrusted sources in a shared environment). The SQL column-name injection vector has been fixed (commit 456d1e0). This is a coherent and defensible stance, not a gap.
 
-The codebase scores **~~63%~~ ~~70%~~ ~~71%~~ ~~71.5%~~ ~~71.8%~~ ~~72.4%~~ ~~72.6%~~ ~~73.0%~~ ~~73.9%~~ 74.6%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to good: five test modules (48 interpreter tests, 146 evaluator tests, 70 file I/O tests, 98 variable/PDV tests, 71 CSV tests) covering all major subsystems via the full parse→Execute→variable-inspect cycle. `Execute_Assignment` — formerly the primary structural gap at 155 lines — has been decomposed into three focused pieces. ~~The main remaining structural concern is `sdata-interpreter.adb` and `sdata-file_io.adb` as large single files~~ The main remaining structural concern is `sdata-interpreter.adb` (~2,269 lines); `sdata-file_io.adb` is fully decomposed as of v0.6.12.
+The codebase scores **~~63%~~ ~~70%~~ ~~71%~~ ~~71.5%~~ ~~71.8%~~ ~~72.4%~~ ~~72.6%~~ ~~73.0%~~ ~~73.9%~~ ~~74.6%~~ 75.8%** — solidly competent, clearly improving (the SKEPTIC_REVIEW trajectory is positive), and the unit test situation has gone from embarrassing to good: five test modules (48 interpreter tests, 146 evaluator tests, 70 file I/O tests, 98 variable/PDV tests, 71 CSV tests) covering all major subsystems via the full parse→Execute→variable-inspect cycle. `Execute_Assignment` — formerly the primary structural gap at 155 lines — has been decomposed into three focused pieces. ~~The main remaining structural concern is `sdata-interpreter.adb` and `sdata-file_io.adb` as large single files~~ ~~The main remaining structural concern is `sdata-interpreter.adb` (~2,269 lines); `sdata-file_io.adb` is fully decomposed as of v0.6.12~~ **Resolved v0.6.12 (49cd659–b8e037e):** `sdata-interpreter.adb` is now 912 lines; all nine subunits are in separate focused files. No large single-file subsystems remain.
 
 ---
 

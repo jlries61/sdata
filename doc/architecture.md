@@ -14,6 +14,11 @@ abstraction is the *data step*.
 ```
 sdata_main
   └── SData.Interpreter      statement executor and data step engine
+        │   Subunits: execute_assignment, execute_print,
+        │             execute_control_flow, execute_metadata,
+        │             execute_declarative, execute_io,
+        │             resolve_expr_indices, inspect_pdv,
+        │             process_one_record
         ├── SData.Parser      token stream → AST
         │     └── SData.Lexer keyword/token recogniser
         ├── SData.Evaluator   AST expression → Value
