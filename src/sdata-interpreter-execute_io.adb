@@ -32,7 +32,7 @@ begin
                   Initialize (Sub_Ctx, Contents.all);
                   Sub_Prog := Parse_Program (Sub_Ctx);
                   Debug_Trace ("SUBMIT: entering "
-                               & Stmt.File_Path (1 .. Stmt.File_Len));
+                               & Stmt.File_Path (1 .. Stmt.File_Len), 1);
                   Execute (Sub_Prog);
                   SData.AST.Free_Program (Sub_Prog);
                end;

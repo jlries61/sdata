@@ -61,7 +61,7 @@ begin
                       & Ada.Strings.Fixed.Trim (Natural'Image (SData.Table.Row_Count), Ada.Strings.Both)
                       & " records, "
                       & Ada.Strings.Fixed.Trim (Natural'Image (SData.Table.Column_Count), Ada.Strings.Both)
-                      & " variables)");
+                      & " variables)", 1);
       when Stmt_SAVE =>
          if Stmt.File_Len = 0 then
             SData.Config.Runtime.Save_File_Active := False;

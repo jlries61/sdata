@@ -7,15 +7,15 @@ begin
             Cond_Val : constant Boolean := Is_True (Evaluate (Stmt.Condition));
          begin
             if Cond_Val then
-               Debug_Trace ("IF → TRUE");
+               Debug_Trace ("IF → TRUE", 2);
                Execute_List (Stmt.Then_Branch, Ctx);
             else
                if Stmt.Else_Branch /= null then
-                  Debug_Trace ("IF → FALSE");
-                  Debug_Trace ("ELSE → taken");
+                  Debug_Trace ("IF → FALSE", 2);
+                  Debug_Trace ("ELSE → taken", 2);
                   Execute_List (Stmt.Else_Branch, Ctx);
                else
-                  Debug_Trace ("IF → FALSE (skipping)");
+                  Debug_Trace ("IF → FALSE (skipping)", 2);
                end if;
             end if;
          end;
@@ -40,7 +40,7 @@ begin
                      For_Var_Name : constant String := Stmt.For_Var (1 .. Stmt.For_Var_Len);
                   begin
                      Set_Permanent (For_Var_Name, Loop_Val);
-                     Debug_Trace ("FOR " & For_Var_Name & " = " & Debug_Value (Loop_Val));
+                     Debug_Trace ("FOR " & For_Var_Name & " = " & Debug_Value (Loop_Val), 2);
                      Execute_List (Stmt.For_Body, Ctx);
                   end;
                   Current_I := Current_I + ST;

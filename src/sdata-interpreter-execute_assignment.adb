@@ -44,7 +44,7 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
                             & Ada.Strings.Fixed.Trim (Integer'Image (Lo), Ada.Strings.Both)
                             & ":"
                             & Ada.Strings.Fixed.Trim (Integer'Image (Hi), Ada.Strings.Both)
-                            & ") = " & Debug_Value (Result));
+                            & ") = " & Debug_Value (Result), 3);
             end;
          else
             --  List assignment: ARR(1,3,5) = value
@@ -62,7 +62,7 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
                   Set_Array_Element (Var_Name, Idx, Result);
                   Node := Node.Next;
                end loop;
-               Debug_Trace (Prefix & Var_Name & "(...) = " & Debug_Value (Result));
+               Debug_Trace (Prefix & Var_Name & "(...) = " & Debug_Value (Result), 3);
             end;
          end if;
       else
@@ -81,7 +81,7 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
             Set_Array_Element (Var_Name, Idx, Result);
             Debug_Trace (Prefix & Var_Name & "("
                          & Ada.Strings.Fixed.Trim (Integer'Image (Idx), Ada.Strings.Both)
-                         & ") = " & Debug_Value (Result));
+                         & ") = " & Debug_Value (Result), 3);
          end;
       end if;
    end Execute_Array_Assignment;
@@ -169,7 +169,7 @@ begin
          Set_Temporary (Var_Name_Str, Result);
       end if;
       Debug_Trace ((if Stmt.Kind = Stmt_LET then "LET " else "SET ")
-                   & Var_Name_Str & " = " & Debug_Value (Result));
+                   & Var_Name_Str & " = " & Debug_Value (Result), 3);
    end if;
 exception
    when E : SData.Table.Type_Mismatch_Error =>

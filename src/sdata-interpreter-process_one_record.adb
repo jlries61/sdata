@@ -73,7 +73,7 @@ begin
                   Ada.Strings.Unbounded.Append (Header, "]");
                end;
             end if;
-            Debug_Trace (Ada.Strings.Unbounded.To_String (Header));
+            Debug_Trace (Ada.Strings.Unbounded.To_String (Header), 2);
          end;
       end if;
    end;

@@ -180,7 +180,7 @@ package body SData.Interpreter is
       SData.Table.Clear_By_Vars;
    end Clear_Active_Program;
 
-   procedure Debug_Trace (Msg : String; Level : Positive := 2) is
+   procedure Debug_Trace (Msg : String; Level : Positive) is
    begin
       if SData.Config.Debug_Level >= Level then
          Put_Line_Error ("[debug] " & Msg);
