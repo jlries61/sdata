@@ -116,7 +116,7 @@ Updates 9 files: `src/sdata-config.ads`, `alire.toml`, `Makefile`, `sdata.spec`,
 ## Phase Status
 
 - Phases 1–4: **complete** (core, control flow, distributions/aggregates, spreadsheet I/O)
-- Phase 5 (Polish): **partial** — disk spillover implemented (`Add_Row` → `Spill_Table_To_Disk` → `Fetch_From_Disk`; SQLite-backed segments, batch inserts, segment cache); interactive improvements and pager not started
+- Phase 5 (Polish): **complete** — disk spillover, interactive improvements, pager, HELP, LIST, ERR/ERL, error messages, performance, documentation
 - Phase 6 (Testing): **ongoing** — 131 integration tests, unit tests expanding (496 across 5 modules)
 
 Full plan: `doc/feasibility_assessment.md`

@@ -401,9 +401,9 @@ The specification is implementable in Ada with available libraries and tools. Th
 5. ✓ Error messages and diagnostics
 6. ✓ Performance optimization
 7. ✓ Documentation
-8. LIST command (display the currently queued program buffer — interactive convenience feature)
-9. ERR and ERL functions (return last error code and line number — runtime error introspection for scripts)
-10. Re-evaluate NEXT() lookahead if disk spillover is implemented as a streaming model rather than full in-memory; current implementation reads from the committed table and is correct for in-memory use but would need buffering for true streaming.
+8. ✓ LIST command (display the currently queued program buffer — interactive convenience feature)
+9. ✓ ERR and ERL functions (return last error code and line number — runtime error introspection for scripts)
+10. ✓ NEXT() re-evaluation not required — spillover is segment-based (full table addressable), not a streaming model; existing implementation is correct.
 
 **Deliverable:** Production-ready system; all command-line options fully active
 
