@@ -1,0 +1,5 @@
+LET A = (1 + 2) * 3 / 4 ^ 2 - ABS(-5.5)
+LET B = NOT (A > 0 AND A < 100) OR (A = 0)
+LET C$ = "hello" & " " & "world"
+LET D = IF(A > 0, SQRT(A), -A)
+LET E = SIN(3.14159 / 2) + COS(0) + EXP(1)

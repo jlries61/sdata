@@ -41,3 +41,6 @@ jobs:
 
       - name: Run test suite
         run: alr exec -- make check
+
+      - name: Fuzz corpus regression
+        run: alr exec -- make fuzz-corpus

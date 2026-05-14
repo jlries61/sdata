@@ -37,7 +37,7 @@ MANDIR  = $(PREFIX)/share/man
 INSTALL_DIR  = $(DESTDIR)$(BINDIR)
 MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 
-.PHONY: all build clean run check install srpm pkg msi
+.PHONY: all build clean run check fuzz-corpus install srpm pkg msi
 
 all: build
 
@@ -128,6 +128,34 @@ check: build
 	else \
 		echo "All $$total tests passed."; \
 	fi
+
+fuzz-corpus: build
+	@echo "Running corpus regression (csv_fuzz_driver)..."
+	@failed=0; \
+	for f in tests/fuzz_corpus/csv/*; do \
+		[ -f "$$f" ] || continue; \
+		printf "  %-52s" "$$f"; \
+		if $(TIMEOUT) 5 ./bin/csv_fuzz_driver < "$$f" >/dev/null 2>&1; then \
+			echo "OK"; \
+		else \
+			echo "CRASH (exit $$?)"; failed=$$((failed+1)); \
+		fi; \
+	done; \
+	echo "Running corpus regression (parser_fuzz_driver)..."; \
+	for f in tests/fuzz_corpus/script/*; do \
+		[ -f "$$f" ] || continue; \
+		printf "  %-52s" "$$f"; \
+		if $(TIMEOUT) 5 ./bin/parser_fuzz_driver < "$$f" >/dev/null 2>&1; then \
+			echo "OK"; \
+		else \
+			echo "CRASH (exit $$?)"; failed=$$((failed+1)); \
+		fi; \
+	done; \
+	if [ $$failed -gt 0 ]; then \
+		echo "$$failed corpus file(s) caused unexpected crashes."; \
+		exit 1; \
+	fi; \
+	echo "Corpus regression: all OK"
 
 srpm: clean
 	@echo "Creating source tarball..."

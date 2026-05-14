@@ -1,0 +1,15 @@
+LET N = 5
+FOR I = 1 TO N
+  FOR J = 1 TO N
+    IF I = J THEN
+      LET DIAG = I * J
+    ELSEIF I > J THEN
+      LET LOWER = I + J
+    ELSE
+      LET UPPER = I - J
+    END IF
+    WHILE DIAG > 100
+      LET DIAG = DIAG / 2
+    END WHILE
+  NEXT J
+NEXT I

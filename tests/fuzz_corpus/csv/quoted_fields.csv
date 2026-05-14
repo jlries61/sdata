@@ -1,0 +1,4 @@
+NAME$,ADDR$,NOTE$
+"Alice","123 Main St","Normal"
+"Bob, Jr.","456 ""Oak"" Ave","Embedded quotes"
+"Charlie","789 Elm St, Apt 2","Has comma"

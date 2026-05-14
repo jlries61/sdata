@@ -203,6 +203,67 @@ soffice --headless --convert-to txt doc/design.odt
 
 ---
 
+## Fuzzing
+
+Two AFL++-ready fuzz drivers live in `tests/`:
+
+| Driver | Surface covered |
+|---|---|
+| `bin/csv_fuzz_driver` | All six `SData.CSV` public functions (tokenizer, unquoting, type detection) |
+| `bin/parser_fuzz_driver` | Lexer + recursive-descent parser — parse only, interpreter never invoked |
+
+### Corpus regression (no AFL++ required)
+
+The seed corpus in `tests/fuzz_corpus/` is checked in CI. Run it locally:
+
+```sh
+alr exec -- make fuzz-corpus
+```
+
+This runs every seed file through both drivers and fails if any causes an
+unexpected crash. Add new seed files to `tests/fuzz_corpus/csv/` or
+`tests/fuzz_corpus/script/` whenever you find an interesting input.
+
+### Running AFL++ (full coverage-guided fuzzing)
+
+Install AFL++:
+
+```sh
+# Debian / Ubuntu
+sudo apt install afl++
+# Fedora / RHEL / Rocky
+sudo dnf install aflplusplus
+```
+
+Build the drivers with AFL++ instrumentation and run:
+
+```sh
+# Set the AFL++ compiler wrapper before building
+export CC=afl-clang-fast
+export CXX=afl-clang-fast++
+alr build
+
+# Fuzz the CSV tokenizer
+mkdir -p fuzz_out/csv
+afl-fuzz -i tests/fuzz_corpus/csv -o fuzz_out/csv -- bin/csv_fuzz_driver
+
+# Fuzz the parser (separate terminal)
+mkdir -p fuzz_out/script
+afl-fuzz -i tests/fuzz_corpus/script -o fuzz_out/script -- bin/parser_fuzz_driver
+```
+
+Any crash found by AFL++ lands in `fuzz_out/*/crashes/`. Reproduce it with:
+
+```sh
+bin/csv_fuzz_driver < fuzz_out/csv/crashes/id:000000,...
+```
+
+When a crash is confirmed, add the minimised input to the corpus and open a
+bug report. Use `afl-tmin` to reduce the crashing input to its smallest form
+before committing it.
+
+---
+
 ## Branching and Commit Conventions
 
 Work on a feature branch. Keep commits focused; use conventional prefixes:

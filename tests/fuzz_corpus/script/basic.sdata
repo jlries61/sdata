@@ -1,0 +1,4 @@
+LET X = 42
+LET Y$ = "hello"
+LET Z = X * 2 + 1
+PRINT X, Y$, Z
