@@ -105,28 +105,41 @@ Override the output dataset format.
 Accepted values:
 .BR CSV ", " ODF ", " OOXML .
 .TP
-.B \-\-debug
+.B \-\-debug\fR[\fB=\fIN\fR]
 Enables debug mode.
-Emits trace output to standard error for each statement executed:
-.BR LET / SET
-assignments (scalar and array),
-.B IF
-condition results,
+.I N
+selects the verbosity level (default\~3 if omitted):
+.RS
+.TP
+.B 1\ (sparse)
+I/O transitions only:
+.BR USE ,
+.BR SUBMIT ,
+and
+.B RUN
+completion events.
+.TP
+.B 2\ (normal)
+Level\~1 plus a header line per record (annotated with BY\-group transitions),
+.BR IF / ELSE
+condition outcomes,
 .B FOR
 loop iterations,
 .B SELECT
-filter decisions (a summary line also reports the total kept and dropped count),
-.B DELETE ,
-.BR USE ,
-.BR RUN ,
-and
-.B SUBMIT
-events.
-Each record is announced with a header line; BY\-group start and change
-transitions are annotated inline.
+filter decisions (plus a kept/dropped summary line), and
+.B DELETE
+marks.
+.TP
+.B 3\ (verbose)
+Level\~2 plus every
+.BR LET / SET
+assignment (scalar and array).
+.RE
 .IP
-In interactive sessions, execution pauses before each record and presents
-an inspection prompt
+The verbosity level can be changed inside a script with
+.BR "OPTIONS DEBUG " N .
+In interactive sessions, any non-zero level enables execution pausing before
+each record at the inspection prompt
 .RB ( [debug:record\ N]> ).
 At the prompt the following commands are available:
 .RS

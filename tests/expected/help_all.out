@@ -387,25 +387,37 @@ Example -- subtotal SALARY by DEPT:
 
 See also: HELP LET  HELP SET  HELP BY  HELP HOLD  HELP EXECUTION
 
-Debug mode: --debug flag
-Enables passive trace output to stderr and interactive step mode.
+Debug mode: --debug[=N] flag  (N = 1, 2, or 3; default 3)
+Enables trace output to stderr and interactive step mode.
 
-Passive trace events emitted to stderr:
-  [debug] -- record N (physical N)
-  [debug] LET X = 5.00000         each scalar or array assignment
-  [debug] IF -> TRUE / FALSE       each IF condition outcome
-  [debug] ELSE -> taken            ELSE branch entered
-  [debug] SELECT -> KEPT/DROPPED   per-record filter result
-  [debug] SELECT -> N of M records kept   summary after filtering
-  [debug] FOR I = 3                each FOR iteration
-  [debug] DELETE: record marked
-  [debug] RUN complete: N records, M variables
+Verbosity levels:
+  1  sparse   I/O transitions only
+  2  normal   Level 1 + per-record header + control-flow outcomes
+  3  verbose  Level 2 + every LET/SET assignment
+
+Level 1 trace events:
   [debug] USE: opened file.csv (N records, M variables)
   [debug] SUBMIT: entering script.sdata
+  [debug] RUN complete: N records, M variables
 
-Step mode (--debug + interactive stdin):
+Level 2 adds:
+  [debug] -- record N (physical P)  [BY GROUP ...]
+  [debug] IF -> TRUE / FALSE
+  [debug] ELSE -> taken
+  [debug] FOR I = 3
+  [debug] SELECT -> KEPT / DROPPED
+  [debug] SELECT -> N of M records kept
+  [debug] DELETE: record marked
+
+Level 3 adds:
+  [debug] LET X = 5.00000         each scalar or array assignment
+  [debug] SET X = 5.00000
+
+Runtime control:  OPTIONS DEBUG N  (0 disables tracing)
+
+Step mode (--debug[=N] + interactive stdin):
   After each record header, execution pauses at the inspection prompt.
-  CONTINUE/C processes the current record and advances to the next record.
+  CONTINUE/C processes the current record and advances to the next.
   STEP/S is equivalent to CONTINUE in step mode.
   RUN at the prompt disables step mode and runs to completion.
 
