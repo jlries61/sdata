@@ -32,7 +32,7 @@ begin
       end loop;
 
       --  Emit record header with optional BY group annotation
-      if SData.Config.Debug_Mode then
+      if SData.Config.Debug_Level >= 2 then
          declare
             Header : Ada.Strings.Unbounded.Unbounded_String :=
                Ada.Strings.Unbounded.To_Unbounded_String

@@ -40,7 +40,7 @@ package SData.Config is
    Disable_Submit     : Boolean := False;
    Continue_On_Error  : Boolean := False;
    Ignore_Math_Errors : Boolean := False; -- If True, domain errors return Val_Missing instead of halting.
-   Debug_Mode         : Boolean := False; -- If True, trace each statement and record to stderr.
+   Debug_Level        : Natural := 0;     -- 0=off 1=I/O 2=+record/flow 3=+assignments
    Shell_Timeout_Default : Natural := 0;
 
    --  Version information

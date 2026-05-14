@@ -180,9 +180,9 @@ package body SData.Interpreter is
       SData.Table.Clear_By_Vars;
    end Clear_Active_Program;
 
-   procedure Debug_Trace (Msg : String) is
+   procedure Debug_Trace (Msg : String; Level : Positive := 2) is
    begin
-      if SData.Config.Debug_Mode then
+      if SData.Config.Debug_Level >= Level then
          Put_Line_Error ("[debug] " & Msg);
       end if;
    end Debug_Trace;
@@ -582,7 +582,7 @@ package body SData.Interpreter is
             null;  --  Handled by loop termination in Execute.
          when Stmt_DELETE =>
             Ctx.Deleted := True;
-            Debug_Trace ("DELETE: record marked");
+            Debug_Trace ("DELETE: record marked", 2);
          when Stmt_BREAK =>
             if Stmt.Expr = null or else Is_True (Evaluate (Stmt.Expr)) then
                raise Break_Triggered;
@@ -742,9 +742,9 @@ package body SData.Interpreter is
                      if Is_True (Evaluate (Select_Filter_Expr)) then
                         Count := Count + 1;
                         Passing (Count) := R;
-                        Debug_Trace ("SELECT → KEPT");
+                        Debug_Trace ("SELECT → KEPT", 2);
                      else
-                        Debug_Trace ("SELECT → DROPPED");
+                        Debug_Trace ("SELECT → DROPPED", 2);
                      end if;
                   end loop;
                   SData.Table.Set_Current_Record_Index (Saved_Physical);
@@ -753,7 +753,7 @@ package body SData.Interpreter is
                                & Ada.Strings.Fixed.Trim (Natural'Image (Count), Ada.Strings.Both)
                                & " of "
                                & Ada.Strings.Fixed.Trim (Natural'Image (Total), Ada.Strings.Both)
-                               & " records kept");
+                               & " records kept", 2);
                end;
             end;
          end if;
@@ -820,7 +820,7 @@ package body SData.Interpreter is
          (if SData.Config.Runtime.Repeat_Active then SData.Config.Runtime.Repeat_Count
           else (if Row_Count > 0 then Row_Count else 1));
       Step_Mode : Boolean :=
-         SData.Config.Debug_Mode and then SData.IO.Is_Interactive;
+         SData.Config.Debug_Level > 0 and then SData.IO.Is_Interactive;
       Act       : Step_Action := Action_Continue;
       Ctx       : Step_Context;
    begin
@@ -871,7 +871,7 @@ package body SData.Interpreter is
                             & RC (RC'First + 1 .. RC'Last)
                             & " records, "
                             & VC (VC'First + 1 .. VC'Last)
-                            & " variables");
+                            & " variables", 1);
                if not SData.Config.Quiet_Mode then
                   Put_Line ("RUN complete. " &
                             RC (RC'First + 1 .. RC'Last) & " records and " &

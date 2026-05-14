@@ -373,7 +373,7 @@ begin
          elsif Arg = "--ignore-math-errors" then
             Ignore_Math_Errors := True;
          elsif Arg = "--debug" then
-            Debug_Mode := True;
+            Debug_Level := 3;
          elsif Arg = "-k" or else Arg = "--continue-on-error" then
             Continue_On_Error := True;
          elsif Arg'Length > 0 and then Arg (1) /= '-' then
