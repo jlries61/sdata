@@ -238,6 +238,9 @@ pkg: build
 	 chmod 755 "$$PKG_ROOT/usr/local/bin/sdata"; \
 	 gzip -9 -c man/man1/sdata.1 > "$$PKG_ROOT/usr/local/share/man/man1/sdata.1.gz"; \
 	 chmod 644 "$$PKG_ROOT/usr/local/share/man/man1/sdata.1.gz"; \
+	 mkdir -p "$$PKG_ROOT/usr/local/share/doc/sdata"; \
+	 install -m 644 README.md "$$PKG_ROOT/usr/local/share/doc/sdata/README.md"; \
+	 install -m 644 doc/threat_model.md "$$PKG_ROOT/usr/local/share/doc/sdata/threat_model.md"; \
 	 pkgbuild \
 	   --root "$$PKG_ROOT" \
 	   --identifier com.sdata.pkg \

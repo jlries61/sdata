@@ -41,6 +41,9 @@
         <File Source="README.md" />
       </Component>
       <Component>
+        <File Source="doc/threat_model.md" />
+      </Component>
+      <Component>
         <File Source="sdata.html" />
       </Component>
     </ComponentGroup>
