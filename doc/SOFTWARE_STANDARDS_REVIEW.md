@@ -22,6 +22,7 @@
 **Annotation:** 2026-05-12 (v0.6.11) — §6 Security Posture score recalculated from full current state: SQL injection fixed (456d1e0), overflow resolved (v0.6.9), SYSTEM/SHELL reclassified Low-Medium (deliberate design, --noshell opt-in), path traversal mitigated (--nosubmit opt-in). No network exposure, no auth, no hardcoded secrets, Ada runtime bounds-checking. Remaining concerns: --noshell/--nosubmit are opt-in (not default), no fuzzing/SAST, no formal threat model, broad `when others` in file_io. Section header corrected from stale "52" to current score; SQL injection and path traversal prose updated to remove stale "needs fixing" language. §6 score 65→**70**; total 574+5 = **579/800 (72.4%)**.
 **Annotation:** 2026-05-12 (v0.6.11) — `Execute_Assignment` (155 lines) decomposed into three focused pieces: `Execute_Array_Assignment` (private procedure: array existence check, LET/SET ownership rules, slice/list/single-index dispatch), `Coerce_For_Scalar` (private function: type-kind check, Inf guard, integer promotion, string truncation), and a trimmed coordinator `Execute_Assignment` (~25 lines: evaluate, early %-name Inf guard, dispatch). `interpreter_unit_test` extended from 37 to 48 tests: IC-35..IC-41 add array-assignment coverage (single-index, slice, list, SET on temp array, LET on temp array → error, SET on permanent → error, undefined array → error). §4 score 73→**75**; total 572+2 = **574/800 (71.8%)**.
 **Annotation:** 2026-05-13 (v0.6.12) — ADR-037 implemented: configurable SYSTEM/SHELL timeout (commits 2d57654, 3ca764f). `OPTIONS SHELLTIMEOUT n` sets the per-run timeout in seconds (reset by NEW); `--shell-timeout=N` sets the batch-mode default at startup (300 s default when a filename is given, 0 in interactive mode). Implementation uses `GNAT.OS_Lib.Non_Blocking_Spawn` + `Non_Blocking_Wait_Process` + `Kill` in a 0.5-second poll loop — no external tool dependency (`timeout(1)`, PowerShell). Kills the child and raises `Script_Error` with a descriptive message on expiry. CI pipeline improved: Alire package cache added (`actions/cache@v4`, keyed on `alire.toml` hash); `apt-get update` hardened with `-o Acquire::Languages=none --no-install-recommends`. §5.2 concern (indefinite blocking on SYSTEM) resolved; §5 score 65→**68**. §7 score 62→**65** (runtime + CLI timeout configuration; CI caching). Total 591+3+3 = **597/800 (74.6%)**.
+**Annotation:** 2026-05-14 (v0.6.13) — `CONTRIBUTING.md` added (commit cf807ad): seven-step Alire-based quickstart (~15 min from zero to passing tests), macOS/Windows callouts with README pointers, code map, development workflow (single integration test, individual unit test binaries, `--debug` flag), key reference documents table, and commit conventions. Setup guide sub-score 6→**8/10**. §8 score 85→**87**; total 610+2 = **612/800 (76.5%)**.
 **Annotation:** 2026-05-14 (v0.6.13) — `evaluator_unit_test` extended from 146 to 166 tests (commit 23a101a): EV-46..EV-52 cover all six comparison operators with float operands (previously only integer-operand path was tested) plus mixed int/float promotion; EV-53..EV-58 cover string ordering operators `<`, `<=`, `>`, `>=`; EV-59..EV-65 cover `IF()` lazy evaluation — true/false branch selection, lazy proof that the unselected branch is not evaluated (division-by-zero in the dead branch does not raise), missing condition propagation, and wrong argument count. All three previously noted evaluator gaps are now closed. Coverage estimate ~70–75% → **~75–80%**. §4 score 80→**82**; total 608+2 = **610/800 (76.3%)**.
 **Annotation:** 2026-05-14 (v0.6.13) — SQLite failure modes in `sdata-table.adb` fully wrapped: five `when E : SQLite_Error =>` handlers added to `Initialize_Backing_Store`, `Spill_Table_To_Disk`, `Sort` (spilled DDL block), `Commit_Output_Table`, and `Fetch_From_Disk` (commit e0d92a8). Each re-raises as `Script_Error` with an operation-specific message ("could not write dataset to disk (disk full?): …"); the raw SQLite detail is appended for diagnostics. Previously `SQLite_Error` propagated through the table module unhandled and was silently laundered by the interpreter's generic `when E : others` handler with no operation context. `Table` sub-scores updated 7→**8/10** across the board. §5 score 68→**70**; total 606+2 = **608/800 (76.0%)**.
 **Annotation:** 2026-05-14 (v0.6.13) — Version 0.6.13 released, consolidating ADR-037 shell timeout (2d57654, 3ca764f) and interpreter monolith decomposition (49cd659–b8e037e) from v0.6.12. No code changes; packaging and documentation only. Stale counts corrected: integration tests 128→**131** (§4.1); unit test total 433→**436** (CSV 71 + Variables 98 + Evaluator 146 + File I/O 73 + Interpreter 48). No score changes; total remains **606/800 (75.8%)**.
@@ -298,7 +299,7 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 
 ---
 
-## 8. Documentation — ~~76~~ ~~82~~ **85/100**
+## 8. Documentation — ~~76~~ ~~82~~ ~~85~~ **87/100**
 
 `README.md` is substantive: build requirements, feature overview, example usage. The man page (`man/man1/sdata.1`, 795 lines) is comprehensive and current — it covers every command and option. `HELP /ALL` from the interpreter produces a complete command and function reference that matches the man page. `doc/SOFTWARE_STANDARDS_REVIEW.md` is a rare and valuable asset: a living architectural audit document where findings are marked resolved with commit hashes as they are addressed. `doc/adrs.md` (30 ADRs, ADR-001–030) documents all major architectural decisions in durable markdown. `doc/specs/` (8 design specs) and `doc/plans/` (9 implementation plans) record the design rationale behind completed features.
 
@@ -306,7 +307,7 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 
 - ~~No architecture decision records (ADRs). The three-tier execution model, the PDV reset semantics, the SQLite spill threshold, and the LAG/NEXT group-boundary semantics are documented in code comments and the SKEPTIC_REVIEW but not in a durable design document.~~ **[Resolved 2026-05-05]** `doc/adrs.md` contains 30 decisions (ADR-001–030) covering language choice, execution model, table design, CLI conventions, test strategy, and per-session architectural calls.
 - ~~No algorithm documentation for statistical distributions.~~ **[Resolved — Priority 8]** Reference block added at top of `sdata-statistics.adb` ([A&S], [NR], [MT00], [BM58], [DLMF]); per-function citations added to `Incomplete_Gamma_P`, `Z_CDF`, `Z_IDF`, `Normal_RN`, `Gamma_CDF`, `Gamma_RN`, `Student_T_CDF`, `F_CDF`, `Binomial_PMF`, `Binomial_CDF`, `Bisect_IDF`, and all IDF bisection wrappers.
-- Setup time from docs: ~15 minutes for an Ada/Alire developer; much longer for anyone unfamiliar with the toolchain, as there is no step-by-step onboarding guide for first-timers.
+- ~~Setup time from docs: ~15 minutes for an Ada/Alire developer; much longer for anyone unfamiliar with the toolchain, as there is no step-by-step onboarding guide for first-timers.~~ **Resolved cf807ad:** `CONTRIBUTING.md` added — seven-step Alire-based quickstart targets ~15 minutes from zero to passing tests regardless of Ada/Alire familiarity; includes code map, dev workflow, and reference document index.
 
 | Dimension | Score |
 |---|---|
@@ -315,7 +316,7 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | In-system help | 9/10 |
 | Architectural docs | ~~5/10~~ **8/10** |
 | Algorithm references | ~~3/10~~ **8/10** |
-| Setup guide clarity | 6/10 |
+| Setup guide clarity | ~~6/10~~ **8/10** |
 
 ---
 
@@ -330,8 +331,8 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Error Handling & Resilience | ~~58/100~~ ~~63/100~~ ~~65/100~~ ~~68/100~~ **70/100** |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ ~~65/100~~ **70/100** |
 | Operational Readiness | ~~50/100~~ ~~62/100~~ **65/100** |
-| Documentation | ~~76/100~~ ~~82/100~~ **85/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ ~~591/800 (73.9%)~~ ~~597/800 (74.6%)~~ ~~606/800 (75.8%)~~ ~~608/800 (76.0%)~~ **610/800 (76.3%)** |
+| Documentation | ~~76/100~~ ~~82/100~~ ~~85/100~~ **87/100** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ ~~591/800 (73.9%)~~ ~~597/800 (74.6%)~~ ~~606/800 (75.8%)~~ ~~608/800 (76.0%)~~ ~~610/800 (76.3%)~~ **612/800 (76.5%)** |
 
 ---
 
