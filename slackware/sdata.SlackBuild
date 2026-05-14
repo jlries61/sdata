@@ -85,8 +85,9 @@ gnatmake \
   -largs sdata_privilege.o -lsqlite3
 cd ..
 
-# Install to the staging directory
-make install DESTDIR=$PKG PREFIX=/usr
+# Install to the staging directory; override DOCDIR to use Slackware's
+# /usr/doc/$PRGNAM-$VERSION convention instead of the FHS /usr/share/doc path.
+make install DESTDIR=$PKG PREFIX=/usr DOCDIR=/usr/doc/$PRGNAM-$VERSION
 
 find $PKG -print0 | xargs -0 file | grep -e "executable" -e "shared object" | grep ELF \
   | cut -f 1 -d : | xargs strip --strip-unneeded 2> /dev/null || true

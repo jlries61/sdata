@@ -34,8 +34,10 @@ export GPR_PROJECT_PATH ?= $(_LOCAL_GPR_PATH)
 PREFIX ?= /usr/local
 BINDIR  = $(PREFIX)/bin
 MANDIR  = $(PREFIX)/share/man
+DOCDIR  = $(PREFIX)/share/doc/sdata
 INSTALL_DIR  = $(DESTDIR)$(BINDIR)
 MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
+DOC_DIR      = $(DESTDIR)$(DOCDIR)
 
 .PHONY: all build clean run check fuzz-corpus install srpm pkg msi
 
@@ -252,6 +254,9 @@ install:
 	install -d $(MAN1_DIR)
 	install -m 644 man/man1/sdata.1 $(MAN1_DIR)/sdata.1
 	gzip -9 -f $(MAN1_DIR)/sdata.1
+	install -d $(DOC_DIR)
+	install -m 644 README.md $(DOC_DIR)/README.md
+	install -m 644 doc/threat_model.md $(DOC_DIR)/threat_model.md
 
 # Convert the Unix man page to a self-contained HTML file, used by
 # the Windows installer in place of the man page.
