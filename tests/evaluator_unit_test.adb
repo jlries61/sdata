@@ -798,6 +798,84 @@ begin
    --  EV-45: NOT TRUE -> Val_Integer 0
    Check_Int ("EV-45: NOT TRUE -> 0", Eval ("NOT TRUE"), 0);
 
+   --  EV-46 .. EV-52: Float comparison operators
+   --  EV-17..EV-23 only exercise the integer operand path; these exercise the
+   --  float path (at least one Val_Numeric operand) for every operator.
+
+   --  EV-46: Float < — true
+   Check_Int ("EV-46: 1.5 < 2.5 -> 1", Eval ("1.5 < 2.5"), 1);
+
+   --  EV-47: Float < — false
+   Check_Int ("EV-47: 2.5 < 1.5 -> 0", Eval ("2.5 < 1.5"), 0);
+
+   --  EV-48: Float <= — equal case
+   Check_Int ("EV-48: 1.5 <= 1.5 -> 1", Eval ("1.5 <= 1.5"), 1);
+
+   --  EV-49: Float > — true
+   Check_Int ("EV-49: 2.5 > 1.5 -> 1", Eval ("2.5 > 1.5"), 1);
+
+   --  EV-50: Float >= — equal case
+   Check_Int ("EV-50: 1.5 >= 1.5 -> 1", Eval ("1.5 >= 1.5"), 1);
+
+   --  EV-51: Float = — true (Val_Numeric path, separate from EV-17)
+   Check_Int ("EV-51: 1.5 = 1.5 -> 1", Eval ("1.5 = 1.5"), 1);
+
+   --  EV-52: Mixed int/float — integer promoted to float for comparison
+   Check_Int ("EV-52: 1 < 1.5 -> 1 (int promoted)", Eval ("1 < 1.5"), 1);
+
+   --  EV-53 .. EV-58: String ordering operators
+   --  EV-34..EV-35 cover string = and <>; these cover <, <=, >, >= (lexicographic).
+
+   --  EV-53: String < — true
+   Check_Int ("EV-53: ""abc"" < ""abd"" -> 1", Eval ("""abc"" < ""abd"""), 1);
+
+   --  EV-54: String < — false
+   Check_Int ("EV-54: ""abd"" < ""abc"" -> 0", Eval ("""abd"" < ""abc"""), 0);
+
+   --  EV-55: String <= — equal case
+   Check_Int ("EV-55: ""abc"" <= ""abc"" -> 1", Eval ("""abc"" <= ""abc"""), 1);
+
+   --  EV-56: String > — true
+   Check_Int ("EV-56: ""xyz"" > ""abc"" -> 1", Eval ("""xyz"" > ""abc"""), 1);
+
+   --  EV-57: String >= — equal case
+   Check_Int ("EV-57: ""abc"" >= ""abc"" -> 1", Eval ("""abc"" >= ""abc"""), 1);
+
+   --  EV-58: String > — false
+   Check_Int ("EV-58: ""a"" > ""b"" -> 0", Eval ("""a"" > ""b"""), 0);
+
+   --  EV-59 .. EV-65: IF() three-argument lazy evaluation
+   --  IF(cond, true_expr, false_expr) must evaluate only the selected branch.
+
+   --  EV-59: True branch selected
+   Check_Str ("EV-59: IF(1, ""yes"", ""no"") -> ""yes""",
+              Eval ("IF(1, ""yes"", ""no"")"), "yes");
+
+   --  EV-60: False branch selected
+   Check_Str ("EV-60: IF(0, ""yes"", ""no"") -> ""no""",
+              Eval ("IF(0, ""yes"", ""no"")"), "no");
+
+   --  EV-61: Lazy — false branch contains division by zero; must not be evaluated
+   Check_Int ("EV-61: IF(1, 42, 1/0) -> 42 (false branch not evaluated)",
+              Eval ("IF(1, 42, 1/0)"), 42);
+
+   --  EV-62: Lazy — true branch contains division by zero; must not be evaluated
+   Check_Int ("EV-62: IF(0, 1/0, 42) -> 42 (true branch not evaluated)",
+              Eval ("IF(0, 1/0, 42)"), 42);
+
+   --  EV-63: Missing condition propagates as missing
+   Set_Temporary ("C", (Kind => Val_Missing));
+   Check_Missing ("EV-63: IF(C, 1, 2) with C=missing -> missing",
+                  Eval ("IF(C, 1, 2)"));
+   Clear_Temporary;
+
+   --  EV-64: Fewer than three arguments -> missing (false_node is null)
+   Check_Missing ("EV-64: IF(1, 42) missing false arg -> missing",
+                  Eval ("IF(1, 42)"));
+
+   --  EV-65: Zero arguments -> missing (cond_node is null)
+   Check_Missing ("EV-65: IF() no args -> missing", Eval ("IF()"));
+
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
    if Failed > 0 then
