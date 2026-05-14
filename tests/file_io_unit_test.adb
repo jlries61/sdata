@@ -175,9 +175,11 @@ begin
    Check_Float ("PC-36 long-row C ok",     V.Num_Val, 8.0);
 
    ---------------------------------------------------------------------------
-   --  PC-37..PC-39: cell-ceiling row cap during Parse_CSV.
-   --  sample.csv has 4 columns and 6 data rows.
-   --  With Max_Table_Cells=8: row ceiling = 8/4 = 2 → only 2 rows loaded.
+   --  PC-37..PC-40: SQLite spill path during Parse_CSV.
+   --  sample.csv: 4 columns, 6 data rows.
+   --  Max_Table_Cells=8 → Add_Row spills every 2 rows.
+   --  After load: rows 1-2 and 3-4 in SQLite; rows 5-6 in memory.
+   --  All 6 rows must be accessible via Fetch_From_Disk / in-memory.
    ---------------------------------------------------------------------------
    declare
       Saved_Cap : constant Natural := SData.Config.Max_Table_Cells;
@@ -186,10 +188,12 @@ begin
       Parse_CSV ("tests/data/sample.csv");
       SData.Config.Max_Table_Cells := Saved_Cap;
    end;
-   Check ("PC-37 cell-cap row count",   Row_Count,    2);
-   Check ("PC-38 cell-cap col count",   Column_Count, 4);
-   V := Get_Value (2, "VAL1");
-   Check_Float ("PC-39 cell-cap row2 val", V.Num_Val, 4.0);
+   Check ("PC-37 spill row count",           Row_Count,    6);
+   Check ("PC-38 spill col count",           Column_Count, 4);
+   V := Get_Value (1, "VAL1");
+   Check_Float ("PC-39 spill row1 from disk",   V.Num_Val, 1.0);
+   V := Get_Value (3, "VAL1");
+   Check_Float ("PC-40 spill row3 from disk",   V.Num_Val, 7.0);
 
    ---------------------------------------------------------------------------
    --  Parse_ODF tests  (PO-01 .. PO-23)
