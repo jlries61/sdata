@@ -281,7 +281,7 @@ should use `--nosubmit`.
 | Gap | Notes |
 |---|---|
 | ODF / OOXML fuzz coverage | `bin/csv_fuzz_driver` and `bin/parser_fuzz_driver` do not reach the Zip-Ada or XML-Ada paths. A dedicated `ods_fuzz_driver` / `xlsx_fuzz_driver` that feeds raw file bytes through `Parse_ODF` / `Parse_OOXML` would close this. |
-| No per-file size cap during CSV read | Very large CSV files are read fully into memory before the `-m` cell limit applies. A streaming row cap during `Parse_CSV` would bound memory for pathological inputs. |
+| ~~No per-file size cap during CSV read~~ | **Resolved 2026-05-14 (4eaf33f):** `Parse_CSV` derives a row ceiling from `Max_Table_Cells / column_count` at load time; for the non-buffered (UTF-8/ASCII) path the file read stops early. A warning names the file, row count, `MAXINTAB` setting, and column count so the user can raise the limit or use `MAX_ROWS` explicitly. |
 | No script execution timeout | A WHILE loop that iterates for hours is not constrained. This is by design but documented here for completeness. |
 | No formal SAST | `gnatcheck.rules` with two rules (`Recursive_Subprograms`, `Too_Many_Parameters:8`) and `make gnatcheck` target exist; intentional exceptions carry in-source `pragma Annotate` exemptions. `gnatcheck` is NOT run in CI — available in Ubuntu's `asis-programs` package (not in `gnat`); not found on Debian or openSUSE. `make gnatcheck` available for manual use on Ubuntu hosts. CodePeer (commercial) has not been run. AFL++ corpus regression runs in CI; full coverage-guided fuzzing is not continuous. |
 

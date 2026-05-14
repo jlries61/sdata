@@ -23,6 +23,7 @@
 **Annotation:** 2026-05-12 (v0.6.11) — `Execute_Assignment` (155 lines) decomposed into three focused pieces: `Execute_Array_Assignment` (private procedure: array existence check, LET/SET ownership rules, slice/list/single-index dispatch), `Coerce_For_Scalar` (private function: type-kind check, Inf guard, integer promotion, string truncation), and a trimmed coordinator `Execute_Assignment` (~25 lines: evaluate, early %-name Inf guard, dispatch). `interpreter_unit_test` extended from 37 to 48 tests: IC-35..IC-41 add array-assignment coverage (single-index, slice, list, SET on temp array, LET on temp array → error, SET on permanent → error, undefined array → error). §4 score 73→**75**; total 572+2 = **574/800 (71.8%)**.
 **Annotation:** 2026-05-13 (v0.6.12) — ADR-037 implemented: configurable SYSTEM/SHELL timeout (commits 2d57654, 3ca764f). `OPTIONS SHELLTIMEOUT n` sets the per-run timeout in seconds (reset by NEW); `--shell-timeout=N` sets the batch-mode default at startup (300 s default when a filename is given, 0 in interactive mode). Implementation uses `GNAT.OS_Lib.Non_Blocking_Spawn` + `Non_Blocking_Wait_Process` + `Kill` in a 0.5-second poll loop — no external tool dependency (`timeout(1)`, PowerShell). Kills the child and raises `Script_Error` with a descriptive message on expiry. CI pipeline improved: Alire package cache added (`actions/cache@v4`, keyed on `alire.toml` hash); `apt-get update` hardened with `-o Acquire::Languages=none --no-install-recommends`. §5.2 concern (indefinite blocking on SYSTEM) resolved; §5 score 65→**68**. §7 score 62→**65** (runtime + CLI timeout configuration; CI caching). Total 591+3+3 = **597/800 (74.6%)**.
 **Annotation:** 2026-05-14 (v0.6.13) — `CONTRIBUTING.md` added (commit cf807ad): seven-step Alire-based quickstart (~15 min from zero to passing tests), macOS/Windows callouts with README pointers, code map, development workflow (single integration test, individual unit test binaries, `--debug` flag), key reference documents table, and commit conventions. Setup guide sub-score 6→**8/10**. §8 score 85→**87**; total 610+2 = **612/800 (76.5%)**.
+**Annotation:** 2026-05-14 (v0.6.13) — CSV streaming row cap added (commit 4eaf33f): `Load_Data_Rows` in `sdata-file_io-csv.adb` now derives a row ceiling from `Max_Table_Cells / column_count` at load time; the effective cap is the tighter of this ceiling and any user-supplied `MAX_ROWS`. For the non-buffered (UTF-8/ASCII) path this stops reading the file mid-stream, bounding memory regardless of file size. A warning is emitted on automatic truncation naming the file, row count, `MAXINTAB` setting, and column count. `file_io_unit_test` extended to 88 tests: PC-37..PC-39 cover cell-ceiling truncation using `sample.csv` with a temporary `Max_Table_Cells=8` (4 cols → 2-row ceiling). Known gap in threat_model.md closed. §5 score 72→**73**; §6 score 75→**76** (no-size-cap gap closed). Unit test total 492+3 = **495** (File I/O 85→88). Total 621+1+1 = **623/800 (77.9%)**.
 **Annotation:** 2026-05-14 (v0.6.13) — GNATcheck rules added locally: `gnatcheck.rules` with two rules (`Recursive_Subprograms`, `Too_Many_Parameters:8`) and `make gnatcheck` target. Intentional exceptions documented with in-source `pragma Annotate` exemptions: mutual recursion in `Evaluate`/`Evaluate_Function` (AST traversal); `Open_Input` 9-parameter API (7 optional params with safe defaults). `gnatcheck` is NOT run in CI — the tool is in Ubuntu's `asis-programs` package (not `gnat`); not found on Debian or openSUSE. `make gnatcheck` is available for manual use on Ubuntu hosts. No CI score change; §6 score remains **75**; total remains **619/800 (77.4%)**.
 **Annotation:** 2026-05-14 (v0.6.13) — CSV parser diagnostic warnings added (commit 0629fa0): `Process_Line_Direct` in `sdata-file_io-csv.adb` now emits actionable warnings for four error categories: (1) unclosed quoted field (detected by checking that `CSV_Unquote` result still starts with a quote character — properly closed fields have quotes stripped); (2) type mismatch in a `Col_Numeric` column — stores `Val_Missing` instead of silently coercing to `Val_String`, preventing downstream arithmetic from producing nonsense results; (3) extra fields beyond header count — one warning per row, suppressed after the first extra field; (4) short row — warns with actual vs. expected field count. All messages include filename, data-row number, and column index. `file_io_unit_test` extended to 85 tests: PC-25..PC-36 (12 new scenarios) cover all four categories with three new fixtures (`unclosed_quote.csv`, `type_mismatch.csv`, `ragged_rows.csv`). CSV sub-scores updated (see §5). §5 score 70→**72**; unit test total 480+12 = **492** (CSV 71 + Variables 122 + Evaluator 166 + File I/O 85 + Interpreter 48). Total 619+2 = **621/800 (77.6%)**.
 **Annotation:** 2026-05-14 (v0.6.13) — Distribution packages updated: `README.md` and `doc/threat_model.md` added to all three packaging formats. `Makefile install` target gains a `DOCDIR` variable (`$(PREFIX)/share/doc/sdata`; overridable) and installs both files there. RPM `sdata.spec` `%files` lists `%{_docdir}/%{name}/README.md` and `%{_docdir}/%{name}/threat_model.md`. Slackware `sdata.SlackBuild` passes `DOCDIR=/usr/doc/$PRGNAM-$VERSION` to `make install`, routing docs to the Slackware-conventional path. Debian already installs `debian/changelog` as `changelog.Debian.gz` automatically via `dh_installchangelogs`; no change needed. No score change — no open gap in the review was tracking this; improvement is logged for completeness.
@@ -169,7 +170,7 @@ No dynamic library loading, no JIT, no network calls at startup. Binary starts i
 
 | Metric | Value | Verdict |
 |---|---|---|
-| Unit test modules | ~~1 (csv_unit_test)~~ ~~2 (csv_unit_test: 71; sdata_unit_test: 98)~~ ~~3 (+ file_io_unit_test: 70)~~ ~~4 (+ evaluator_unit_test: 146)~~ **5 (+ interpreter_unit_test: 48); sdata_unit_test 122; file_io_unit_test 85** | **Good; CSV tokenizer, PDV/Variables/Table, all three file I/O parsers (incl. CSV error paths), expression evaluator, and interpreter control flow now covered** |
+| Unit test modules | ~~1 (csv_unit_test)~~ ~~2 (csv_unit_test: 71; sdata_unit_test: 98)~~ ~~3 (+ file_io_unit_test: 70)~~ ~~4 (+ evaluator_unit_test: 146)~~ **5 (+ interpreter_unit_test: 48); sdata_unit_test 122; file_io_unit_test 88** | **Good; CSV tokenizer, PDV/Variables/Table, all three file I/O parsers (incl. CSV error paths and cell-ceiling cap), expression evaluator, and interpreter control flow now covered** |
 | Integration tests | ~~118~~ ~~128~~ **131** .cmd files | Comprehensive for happy paths |
 | Coverage estimate | ~~~35–45%~~ ~~**~45–55%**~~ ~~**~55–65%**~~ ~~**~65–70%**~~ ~~**~70–75%**~~ **~75–80%** branch coverage | **Float comparison, string ordering, and IF() lazy-eval paths now unit-covered; all noted evaluator gaps closed** |
 | Test execution time | < 30s total | Excellent |
@@ -214,7 +215,7 @@ Adding a new command requires: parser (token + production), AST node, interprete
 
 ---
 
-## 5. Error Handling & Resilience — ~~58~~ ~~63~~ ~~65~~ ~~68~~ ~~70~~ **72/100**
+## 5. Error Handling & Resilience — ~~58~~ ~~63~~ ~~65~~ ~~68~~ ~~70~~ ~~72~~ **73/100**
 
 ### 5.1 Error Philosophy
 
@@ -236,7 +237,7 @@ Adding a new command requires: parser (token + production), AST node, interprete
 | Interpreter | 8/10 | 8/10 | 8/10 |
 | Table | ~~7/10~~ **8/10** | ~~7/10~~ **8/10** | ~~7/10~~ **8/10** |
 | File I/O | ~~4/10~~ ~~6/10~~ **7/10** | ~~5/10~~ ~~6/10~~ **7/10** | ~~5/10~~ ~~6/10~~ **7/10** |
-| CSV | ~~3/10~~ ~~6/10~~ **8/10** | ~~3/10~~ ~~5/10~~ **7/10** | ~~3/10~~ ~~5/10~~ **7/10** |
+| CSV | ~~3/10~~ ~~6/10~~ **8/10** | ~~3/10~~ ~~5/10~~ **8/10** | ~~3/10~~ ~~5/10~~ **8/10** |
 
 ### 5.2 Failure Modes
 
@@ -246,7 +247,7 @@ External services are limited to: shell commands (SYSTEM/SHELL), file system, SQ
 
 ---
 
-## 6. Security Posture — ~~52~~ ~~58~~ ~~63~~ ~~65~~ ~~70~~ ~~73~~ **75/100**
+## 6. Security Posture — ~~52~~ ~~58~~ ~~63~~ ~~65~~ ~~70~~ ~~73~~ ~~75~~ **76/100**
 
 ### 6.1 Input Validation
 
@@ -265,7 +266,7 @@ Sandboxing, allowlisting, and metacharacter escaping are all **won't-fix**: sand
 | Path traversal via SUBMIT | **Low-Medium** | `--nosubmit` flag (opt-in); won't-fix by default |
 | ~~Expression evaluation overflow~~ | ~~Low~~ **Resolved** | **Resolved v0.6.9: Inf is first-class `Val_Numeric`; NaN → Script_Error (or `Val_Missing` with `--ignore-math-errors`). See `doc/specs/2026-05-06-inf-neginf-design.md`.** |
 
-**Remaining concerns (keeping score below 80):** `--noshell` and `--nosubmit` are opt-in — operators running untrusted scripts must know to enable them. ~~No fuzzing or SAST tooling~~ — **Partially resolved:** `bin/csv_fuzz_driver` and `bin/parser_fuzz_driver` (AFL++-ready stdin harnesses) added; 17-file seed corpus in `tests/fuzz_corpus/`; `make fuzz-corpus` corpus-regression target runs in CI. `gnatcheck.rules` with two rules and `make gnatcheck` target exist for manual static analysis, but `gnatcheck` is not run in CI (unavailable outside Debian/Ubuntu). ~~No formal threat model document~~ — **Resolved 2026-05-14:** `doc/threat_model.md` added; covers trust model, full STRIDE analysis, nine threats with likelihood/impact/status, known gaps, and deployment recommendations. ~~Broad `when others` handlers in `sdata-file_io.adb` can mask parse errors with security relevance~~ — resolved 2026-05-12: all suppressing handlers are now specific exception types with documented rationale.
+**Remaining concerns (keeping score below 80):** `--noshell` and `--nosubmit` are opt-in — operators running untrusted scripts must know to enable them. ~~No fuzzing or SAST tooling~~ — **Partially resolved:** `bin/csv_fuzz_driver` and `bin/parser_fuzz_driver` (AFL++-ready stdin harnesses) added; 17-file seed corpus in `tests/fuzz_corpus/`; `make fuzz-corpus` corpus-regression target runs in CI. `gnatcheck.rules` with two rules and `make gnatcheck` target exist for manual static analysis, but `gnatcheck` is not run in CI (unavailable outside Debian/Ubuntu). ~~No formal threat model document~~ — **Resolved 2026-05-14:** `doc/threat_model.md` added; covers trust model, full STRIDE analysis, nine threats with likelihood/impact/status, known gaps, and deployment recommendations. ~~No per-file CSV size cap~~ — **Resolved 2026-05-14 (4eaf33f):** `Parse_CSV` derives a row ceiling from `Max_Table_Cells / column_count`; load truncates early with a warning on the non-buffered path (most CSV files). ~~Broad `when others` handlers in `sdata-file_io.adb` can mask parse errors with security relevance~~ — resolved 2026-05-12: all suppressing handlers are now specific exception types with documented rationale.
 
 ### 6.2 Secrets Management
 
@@ -334,11 +335,11 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ ~~77/100~~ ~~79/100~~ **82/100** |
 | Efficiency & Performance | ~~74/100~~ **78/100** |
 | Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ ~~73/100~~ ~~75/100~~ ~~77/100~~ ~~80/100~~ ~~82/100~~ **84/100** |
-| Error Handling & Resilience | ~~58/100~~ ~~63/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ **72/100** |
-| Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ ~~65/100~~ ~~70/100~~ ~~73/100~~ **75/100** |
+| Error Handling & Resilience | ~~58/100~~ ~~63/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ ~~72/100~~ **73/100** |
+| Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ ~~65/100~~ ~~70/100~~ ~~73/100~~ ~~75/100~~ **76/100** |
 | Operational Readiness | ~~50/100~~ ~~62/100~~ **65/100** |
 | Documentation | ~~76/100~~ ~~82/100~~ ~~85/100~~ **87/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ ~~591/800 (73.9%)~~ ~~597/800 (74.6%)~~ ~~606/800 (75.8%)~~ ~~608/800 (76.0%)~~ ~~610/800 (76.3%)~~ ~~612/800 (76.5%)~~ ~~614/800 (76.8%)~~ ~~617/800 (77.1%)~~ ~~619/800 (77.4%)~~ **621/800 (77.6%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ ~~591/800 (73.9%)~~ ~~597/800 (74.6%)~~ ~~606/800 (75.8%)~~ ~~608/800 (76.0%)~~ ~~610/800 (76.3%)~~ ~~612/800 (76.5%)~~ ~~614/800 (76.8%)~~ ~~617/800 (77.1%)~~ ~~619/800 (77.4%)~~ ~~621/800 (77.6%)~~ **623/800 (77.9%)** |
 
 ---
 
