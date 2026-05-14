@@ -143,6 +143,37 @@ begin
    V := Get_Value (2, "VAL1");
    Check_Float ("PC-24 max_rows=2 row2 VAL1", V.Num_Val, 4.0);
 
+   --  PC-25..PC-27: unclosed quote — parser recovers; corrupt field stored
+   --  with the leading quote character still present in the value.
+   --  File: NAME$,SCORE / "Alice,90 / Bob,85
+   Parse_CSV ("tests/data/unclosed_quote.csv");
+   Check ("PC-25 unclosed-quote col count",  Column_Count, 2);
+   Check ("PC-26 unclosed-quote row count",  Row_Count,    2);
+   V := Get_Value (2, "NAME$");
+   Check ("PC-27 unclosed-quote row2 NAME$", To_String (V.Str_Val), "Bob");
+
+   --  PC-28..PC-31: non-numeric value in numeric column stored as missing.
+   --  File: ID,VALUE / 1,10.0 / 2,N/A / 3,30.0
+   Parse_CSV ("tests/data/type_mismatch.csv");
+   Check ("PC-28 type-mismatch col count",     Column_Count, 2);
+   Check ("PC-29 type-mismatch row count",     Row_Count,    3);
+   V := Get_Value (2, "VALUE");
+   Check ("PC-30 type-mismatch row2 missing",  V.Kind = Val_Missing, True);
+   V := Get_Value (3, "VALUE");
+   Check_Float ("PC-31 type-mismatch row3 ok", V.Num_Val, 30.0);
+
+   --  PC-32..PC-36: ragged rows — short and long rows.
+   --  File: A,B,C / 1,2,3 / 4,5 / 6,7,8,9
+   Parse_CSV ("tests/data/ragged_rows.csv");
+   Check ("PC-32 ragged col count",        Column_Count, 3);
+   Check ("PC-33 ragged row count",        Row_Count,    3);
+   V := Get_Value (2, "C");
+   Check ("PC-34 short-row missing C",     V.Kind = Val_Missing, True);
+   V := Get_Value (3, "A");
+   Check_Float ("PC-35 long-row A ok",     V.Num_Val, 6.0);
+   V := Get_Value (3, "C");
+   Check_Float ("PC-36 long-row C ok",     V.Num_Val, 8.0);
+
    ---------------------------------------------------------------------------
    --  Parse_ODF tests  (PO-01 .. PO-23)
    ---------------------------------------------------------------------------

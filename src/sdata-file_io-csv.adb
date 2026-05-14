@@ -172,43 +172,92 @@ package body SData.File_IO.CSV is
       Col_Types : Col_Type_Vecs.Vector;
 
       procedure Process_Line_Direct (Line : String) is
-         DLen        : constant Positive :=
+         DLen         : constant Positive :=
             (if Delimiter'Length > 0 then Delimiter'Length else 1);
-         Start       : Integer := Line'First;
-         Field_Count : Natural := 0;
+         Start        : Integer := Line'First;
+         Field_Count  : Natural := 0;
+         N_Cols       : constant Natural := Natural (Col_Names.Length);
+         Warned_Extra : Boolean := False;
       begin
          if Max_Rows > 0 and then Rows_Written >= Max_Rows then return; end if;
          Rows_Written := Rows_Written + 1;
          Add_Row;
          loop
             declare
-               Delim_Pos : constant Natural := CSV_Field_End (Line, Start, Delimiter);
-               Val       : Value;
-               Num       : Float;
+               Delim_Pos : constant Natural :=
+                  CSV_Field_End (Line, Start, Delimiter);
+               Val : Value;
+               Num : Float;
             begin
                declare
                   Raw : constant String :=
                      (if Delim_Pos > 0 then Line (Start .. Delim_Pos - 1)
                       else                  Line (Start .. Line'Last));
-                  F   : constant String := CSV_Unquote (Raw);
+                  F : constant String := CSV_Unquote (Raw);
                begin
                   Field_Count := Field_Count + 1;
-                  if Field_Count <= Natural (Col_Names.Length) then
+
+                  --  Detect unclosed/malformed quote: CSV_Unquote strips
+                  --  matched opening+closing quotes; if the result still
+                  --  starts with a quote character the closing quote was
+                  --  absent and the field value is corrupt.
+                  if F'Length > 0
+                     and then (F (F'First) = '"' or else F (F'First) = ''')
+                  then
+                     SData.IO.Put_Line_Error
+                        ("Warning: """ & File_Name & """, data row" &
+                         Natural'Image (Rows_Written) & ", column" &
+                         Natural'Image (Field_Count) &
+                         ": unclosed quote — value includes the quote character");
+                  end if;
+
+                  if Field_Count <= N_Cols then
                      if F = "" or else F = "." then
                         Val := (Kind => Val_Missing);
                      elsif Try_Fast_Float (F, Num) then
                         Val := (Kind => Val_Numeric, Num_Val => Num);
                      else
-                        Val := (Kind    => Val_String,
-                                Str_Val => To_Unbounded_String (F));
+                        --  Non-numeric value in a column inferred as numeric:
+                        --  store as missing rather than as a string so that
+                        --  arithmetic on the column stays well-typed.
+                        if Col_Types (Field_Count) = Col_Numeric then
+                           SData.IO.Put_Line_Error
+                              ("Warning: """ & File_Name & """, data row" &
+                               Natural'Image (Rows_Written) & ", column """ &
+                               Col_Names (Field_Count).all &
+                               """: non-numeric value """ & F &
+                               """ in numeric column — stored as missing");
+                           Val := (Kind => Val_Missing);
+                        else
+                           Val := (Kind    => Val_String,
+                                   Str_Val => To_Unbounded_String (F));
+                        end if;
                      end if;
                      Set_Value_Upper (Row_Count, Col_Names (Field_Count).all, Val);
+                  elsif not Warned_Extra then
+                     SData.IO.Put_Line_Error
+                        ("Warning: """ & File_Name & """, data row" &
+                         Natural'Image (Rows_Written) &
+                         ": row has more fields than the" &
+                         Natural'Image (N_Cols) &
+                         " defined columns — extra fields ignored");
+                     Warned_Extra := True;
                   end if;
                end;
                exit when Delim_Pos = 0;
                Start := Delim_Pos + DLen;
             end;
          end loop;
+
+         --  Short row: non-empty line with fewer fields than columns.
+         if Line'Length > 0 and then Field_Count < N_Cols then
+            SData.IO.Put_Line_Error
+               ("Warning: """ & File_Name & """, data row" &
+                Natural'Image (Rows_Written) &
+                ": only" & Natural'Image (Field_Count) &
+                " of" & Natural'Image (N_Cols) &
+                " expected fields present — missing columns set to missing");
+         end if;
       end Process_Line_Direct;
 
       Has_File_Header : Boolean := False;
