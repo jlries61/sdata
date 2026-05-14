@@ -1,5 +1,6 @@
 with Ada.Characters.Handling;
 with Ada.Containers;
+with Ada.Exceptions;
 with SData.Config;
 with SData.Signals;
 
@@ -411,6 +412,11 @@ package body SData.Table is
                               "SELECT " & Ada.Strings.Unbounded.To_String (Cols_CSV) & " FROM data " & Ada.Strings.Unbounded.To_String (OrderBy));
             Store.DB.Execute ("DROP TABLE data");
             Store.DB.Execute ("ALTER TABLE data_new RENAME TO data");
+         exception
+            when E : SQLite_Error =>
+               raise Script_Error with
+                  "could not sort spilled dataset (disk full?): "
+                  & Ada.Exceptions.Exception_Message (E);
          end;
          return;
       end if;
@@ -751,6 +757,11 @@ package body SData.Table is
       Initialize_Output_Table;
       Current_Segment_Start := Output_Segment_Start;
       Output_Segment_Start := 1;
+   exception
+      when E : SQLite_Error =>
+         raise Script_Error with
+            "could not commit data step output to disk (disk full?): "
+            & Ada.Exceptions.Exception_Message (E);
    end Commit_Output_Table;
 
    function Output_Row_Count return Natural is
@@ -835,6 +846,11 @@ package body SData.Table is
       Store.Is_Active := True;
       SData.Signals.Register_Cleanup_Path (Temp_Name.all);
       GNAT.Strings.Free (Temp_Name);
+   exception
+      when E : SQLite_Error =>
+         raise Script_Error with
+            "could not create disk backing store for dataset: "
+            & Ada.Exceptions.Exception_Message (E);
    end Initialize_Backing_Store;
 
    ---------------------------
@@ -913,6 +929,11 @@ package body SData.Table is
       end;
 
       for Pos in T.Iterate loop T.Reference (Pos).Element.all.Data.Clear; end loop;
+   exception
+      when E : SQLite_Error =>
+         raise Script_Error with
+            "could not write dataset to disk (disk full?): "
+            & Ada.Exceptions.Exception_Message (E);
    end Spill_Table_To_Disk;
 
    procedure Spill_To_Disk is
@@ -1011,6 +1032,11 @@ package body SData.Table is
          end;
       end if;
       return (Kind => Val_Missing);
+   exception
+      when E : SQLite_Error =>
+         raise Script_Error with
+            "could not read dataset from disk (backing store corrupted or missing?): "
+            & Ada.Exceptions.Exception_Message (E);
    end Fetch_From_Disk;
 
 end SData.Table;
