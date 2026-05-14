@@ -22,6 +22,7 @@
 **Annotation:** 2026-05-12 (v0.6.11) — §6 Security Posture score recalculated from full current state: SQL injection fixed (456d1e0), overflow resolved (v0.6.9), SYSTEM/SHELL reclassified Low-Medium (deliberate design, --noshell opt-in), path traversal mitigated (--nosubmit opt-in). No network exposure, no auth, no hardcoded secrets, Ada runtime bounds-checking. Remaining concerns: --noshell/--nosubmit are opt-in (not default), no fuzzing/SAST, no formal threat model, broad `when others` in file_io. Section header corrected from stale "52" to current score; SQL injection and path traversal prose updated to remove stale "needs fixing" language. §6 score 65→**70**; total 574+5 = **579/800 (72.4%)**.
 **Annotation:** 2026-05-12 (v0.6.11) — `Execute_Assignment` (155 lines) decomposed into three focused pieces: `Execute_Array_Assignment` (private procedure: array existence check, LET/SET ownership rules, slice/list/single-index dispatch), `Coerce_For_Scalar` (private function: type-kind check, Inf guard, integer promotion, string truncation), and a trimmed coordinator `Execute_Assignment` (~25 lines: evaluate, early %-name Inf guard, dispatch). `interpreter_unit_test` extended from 37 to 48 tests: IC-35..IC-41 add array-assignment coverage (single-index, slice, list, SET on temp array, LET on temp array → error, SET on permanent → error, undefined array → error). §4 score 73→**75**; total 572+2 = **574/800 (71.8%)**.
 **Annotation:** 2026-05-13 (v0.6.12) — ADR-037 implemented: configurable SYSTEM/SHELL timeout (commits 2d57654, 3ca764f). `OPTIONS SHELLTIMEOUT n` sets the per-run timeout in seconds (reset by NEW); `--shell-timeout=N` sets the batch-mode default at startup (300 s default when a filename is given, 0 in interactive mode). Implementation uses `GNAT.OS_Lib.Non_Blocking_Spawn` + `Non_Blocking_Wait_Process` + `Kill` in a 0.5-second poll loop — no external tool dependency (`timeout(1)`, PowerShell). Kills the child and raises `Script_Error` with a descriptive message on expiry. CI pipeline improved: Alire package cache added (`actions/cache@v4`, keyed on `alire.toml` hash); `apt-get update` hardened with `-o Acquire::Languages=none --no-install-recommends`. §5.2 concern (indefinite blocking on SYSTEM) resolved; §5 score 65→**68**. §7 score 62→**65** (runtime + CLI timeout configuration; CI caching). Total 591+3+3 = **597/800 (74.6%)**.
+**Annotation:** 2026-05-14 (v0.6.13) — SQLite failure modes in `sdata-table.adb` fully wrapped: five `when E : SQLite_Error =>` handlers added to `Initialize_Backing_Store`, `Spill_Table_To_Disk`, `Sort` (spilled DDL block), `Commit_Output_Table`, and `Fetch_From_Disk` (commit e0d92a8). Each re-raises as `Script_Error` with an operation-specific message ("could not write dataset to disk (disk full?): …"); the raw SQLite detail is appended for diagnostics. Previously `SQLite_Error` propagated through the table module unhandled and was silently laundered by the interpreter's generic `when E : others` handler with no operation context. `Table` sub-scores updated 7→**8/10** across the board. §5 score 68→**70**; total 606+2 = **608/800 (76.0%)**.
 **Annotation:** 2026-05-14 (v0.6.13) — Version 0.6.13 released, consolidating ADR-037 shell timeout (2d57654, 3ca764f) and interpreter monolith decomposition (49cd659–b8e037e) from v0.6.12. No code changes; packaging and documentation only. Stale counts corrected: integration tests 128→**131** (§4.1); unit test total 433→**436** (CSV 71 + Variables 98 + Evaluator 146 + File I/O 73 + Interpreter 48). No score changes; total remains **606/800 (75.8%)**.
 **Annotation:** 2026-05-13 (v0.6.12) — `sdata-interpreter.adb` fully decomposed into nine Ada subunits using the `separate` mechanism (commits 49cd659–b8e037e): `execute_assignment` (with `Execute_Array_Assignment` and `Coerce_For_Scalar` nested), `execute_print`, `execute_control_flow`, `execute_metadata`, `execute_declarative`, `execute_io`, `resolve_expr_indices`, `inspect_pdv`, `process_one_record`. Parent body reduced from 2,267 to 912 lines; each subunit has one clear responsibility. No API or behaviour changes; all 131 tests pass. §1 score 75→**78** (interpreter monolith resolved; no large single-file subsystems remain); §2 score 79→**82** (cognitive load: all large files decomposed); §4 score 77→**80** (change resilience: adding a new command now touches one focused subunit). Total 597+3+3+3 = **606/800 (75.8%)**.
 **Annotation:** 2026-05-12 (v0.6.12) — `sdata-file_io.adb` (1,758 lines) fully decomposed into five focused child packages: `SData.File_IO` (parent, ~110 lines — `Open_Input`/`Open_Output` + `Save_Refused` exception), `SData.File_IO.Helpers` (private child, ~175 lines — shared utilities: `Get_Text`, `Detect_Inf`, `Apply_Dollar_Override`, `Safe_Name`, `Col_To_Letters`, `Escape_XML`, `Has_Formulas_XML`, `Convert_Via_LibreOffice`), `SData.File_IO.CSV` (~510 lines), `SData.File_IO.ODF` (~430 lines), `SData.File_IO.OOXML` (~440 lines). Each format package contains only its own parse and write logic; `Helpers` is a `private` child, invisible outside the hierarchy (Ada language guarantee; commit cc8560f). Also: `interpreter_unit_test` count corrected to 48 (IC-01..IC-41; file committed as part of v0.6.12). §1 score 72→**75** (file_io monolith fully resolved; `sdata-interpreter.adb` remains the sole large-file concern); §2 score 77→**79** (cognitive load: all file_io monoliths gone; self-doc note updated); §4 score 75→**77** (change resilience: "New file format" difficulty Hard→Medium; debt item resolved); total 584+3+2+2 = **591/800 (73.9%)**.
@@ -205,7 +206,7 @@ Adding a new command requires: parser (token + production), AST node, interprete
 
 ---
 
-## 5. Error Handling & Resilience — ~~58~~ ~~63~~ ~~65~~ **68/100**
+## 5. Error Handling & Resilience — ~~58~~ ~~63~~ ~~65~~ ~~68~~ **70/100**
 
 ### 5.1 Error Philosophy
 
@@ -225,13 +226,13 @@ Adding a new command requires: parser (token + production), AST node, interprete
 |---|---|---|---|
 | Evaluator | 9/10 | 9/10 | 9/10 |
 | Interpreter | 8/10 | 8/10 | 8/10 |
-| Table | 7/10 | 7/10 | 7/10 |
+| Table | ~~7/10~~ **8/10** | ~~7/10~~ **8/10** | ~~7/10~~ **8/10** |
 | File I/O | ~~4/10~~ ~~6/10~~ **7/10** | ~~5/10~~ ~~6/10~~ **7/10** | ~~5/10~~ ~~6/10~~ **7/10** |
 | CSV | ~~3/10~~ **6/10** | ~~3/10~~ **5/10** | ~~3/10~~ **5/10** |
 
 ### 5.2 Failure Modes
 
-External services are limited to: shell commands (SYSTEM/SHELL), file system, SQLite. Shell failures are reported via return code. File-not-found raises `Script_Error` with filename. SQLite failure modes are partially handled but not uniformly.
+External services are limited to: shell commands (SYSTEM/SHELL), file system, SQLite. Shell failures are reported via return code. File-not-found raises `Script_Error` with filename. ~~SQLite failure modes are partially handled but not uniformly.~~ **Resolved e0d92a8:** Five `when E : SQLite_Error =>` handlers added to `Initialize_Backing_Store`, `Spill_Table_To_Disk`, `Sort` (spilled DDL block), `Commit_Output_Table`, and `Fetch_From_Disk`; each re-raises as `Script_Error` with an operation-specific message. `SQLite_Error` no longer escapes the table module unhandled.
 
 ~~No timeout logic for shell commands launched via SYSTEM — a long-running shell command blocks the interpreter indefinitely with no escape mechanism.~~ **Resolved ADR-037 (2d57654, 3ca764f):** `OPTIONS SHELLTIMEOUT n` and `--shell-timeout=N` provide runtime and startup timeout control. Implementation is fully Ada-native: `GNAT.OS_Lib.Non_Blocking_Spawn` + 0.5-second poll loop + `Kill` + `Wait_Process` to reap. Default is 300 s in batch mode, 0 (unlimited) in interactive mode. No external tool dependency.
 
@@ -325,11 +326,11 @@ Configuration is externalized correctly — CLI flags control all runtime behavi
 | Code Quality & Craftsmanship | ~~72/100~~ ~~75/100~~ ~~77/100~~ ~~79/100~~ **82/100** |
 | Efficiency & Performance | ~~74/100~~ **78/100** |
 | Maintainability & Evolvability | ~~60/100~~ ~~65/100~~ ~~68/100~~ ~~70/100~~ ~~73/100~~ ~~75/100~~ ~~77/100~~ **80/100** |
-| Error Handling & Resilience | ~~58/100~~ ~~63/100~~ ~~65/100~~ **68/100** |
+| Error Handling & Resilience | ~~58/100~~ ~~63/100~~ ~~65/100~~ ~~68/100~~ **70/100** |
 | Security Posture | ~~52/100~~ ~~58/100~~ ~~63/100~~ ~~65/100~~ **70/100** |
 | Operational Readiness | ~~50/100~~ ~~62/100~~ **65/100** |
 | Documentation | ~~76/100~~ ~~82/100~~ **85/100** |
-| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ ~~591/800 (73.9%)~~ ~~597/800 (74.6%)~~ **606/800 (75.8%)** |
+| **TOTAL** | ~~507/800 (63.4%)~~ ~~513/800 (64.1%)~~ ~~519/800 (64.9%)~~ ~~524/800 (65.5%)~~ ~~526/800 (65.8%)~~ ~~530/800 (66.3%)~~ ~~535/800 (66.9%)~~ ~~550/800 (68.8%)~~ ~~555/800 (69.4%)~~ ~~557/800 (69.6%)~~ ~~569/800 (71.1%)~~ ~~572/800 (71.5%)~~ ~~574/800 (71.8%)~~ ~~579/800 (72.4%)~~ ~~581/800 (72.6%)~~ ~~584/800 (73.0%)~~ ~~591/800 (73.9%)~~ ~~597/800 (74.6%)~~ ~~606/800 (75.8%)~~ **608/800 (76.0%)** |
 
 ---
 
