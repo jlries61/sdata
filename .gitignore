@@ -27,6 +27,9 @@ CHASX*.CSV
 # SSD working directory (see .ssd/README.md)
 .ssd/
 
+# Claude Code project settings (session memory, local overrides)
+.claude/
+
 # Other temp files
 *.swp
 *~

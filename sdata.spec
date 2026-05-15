@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
 License:        GPLv3
-URL:            https://github.com/user/sdata
+URL:            https://github.com/jlries61/sdata
 Source0:        %{name}-%{version}.tar.gz
 Source1:        zipada-61.0.0.tar.gz
 Source2:        xmlada-26.0.0.tar.gz

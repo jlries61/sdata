@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: sdata
-Source: https://github.com/user/sdata
+Source: https://github.com/jlries61/sdata
 
 Files: *
 Copyright: 2026 John L. Ries <john@theyarnbard.com>
