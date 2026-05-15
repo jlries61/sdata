@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+ * License: GNU General Public License v3 or later
+ * See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+ */
+
 /* Platform-specific privilege detection for SData.
    Returns 1 when the process is running with elevated system-level privilege
    (root on POSIX, SYSTEM account on Windows), 0 otherwise. */
