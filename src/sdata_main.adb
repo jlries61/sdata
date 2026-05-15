@@ -100,6 +100,8 @@ procedure SData_Main is
       --  always appear immediately, not be held until the first command).
       Ada.Text_IO.Put_Line ("SData Statistical Interpreter version "
                             & SData.Config.Version_Str);
+      Ada.Text_IO.Put_Line (SData.Config.Copyright_Str
+                            & ". License GPLv3+. Run 'sdata --copyright' for details.");
       Ada.Text_IO.Put_Line ("Interactive Console. Type QUIT to exit.");
       Buffer := Null_Unbounded_String;
       REPL : loop
