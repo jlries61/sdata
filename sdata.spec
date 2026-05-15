@@ -53,6 +53,7 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_mandir}/man1/sdata.1*
 %{_docdir}/%{name}/README.md
 %{_docdir}/%{name}/threat_model.md
+%{_docdir}/%{name}/LICENSE
 
 %changelog
 * Thu May 14 2026 John L. Ries <john@theyarnbard.com> - 0.6.14-1
