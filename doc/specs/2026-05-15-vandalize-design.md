@@ -48,12 +48,14 @@ At least one of `/PERTURB`, `/SHUFFLE`, `/MISS` must be specified.
 
 #### /PERTURB[=<prob>[,<sd-frac>]]
 
-Adds normally-distributed noise Normal(0, sd-frac × σ) to the cell, where σ is the
-sample standard deviation of the source column (or the within-group standard deviation
-when `/BY=` is active).
+Adds a random amount to the cell drawn from the normal distribution with mean 0 and
+standard deviation equal to sd-frac × σ, where σ is the sample standard deviation of
+the source column (or the within-group standard deviation when `/BY=` is active).
+Formally: noise ~ Normal(mean = 0, σ_noise = sd-frac × σ).
 
 - `<prob>`: probability that the cell is perturbed. Default **1.0**.
-- `<sd-frac>`: noise scale as a fraction of σ. Default **0.01**.
+- `<sd-frac>`: noise standard deviation as a fraction of the source column's sample
+  standard deviation σ. Default **0.01**.
 - Use `.` as a placeholder to accept the default for `<prob>` while supplying
   `<sd-frac>`: e.g. `/PERTURB=.,0.05` means prob=1.0, sd-frac=0.05.
 - **Requires a floating-point source variable** (no name suffix). Script_Error if the
@@ -297,7 +299,7 @@ The sum of all probabilities must be <= 1.0; the remainder is
 the implicit probability of leaving the cell unchanged.
 
 Operations are mutually exclusive per cell (one uniform draw per row):
-  /PERTURB  Add Normal(0, sd-frac x StdDev) noise. Float variables only.
+  /PERTURB  Add noise ~ Normal(mean=0, sigma=sd-frac x StdDev). Float only.
             prob default 1.0; sd-frac default 0.01.
             Use '.' to keep the prob default: /PERTURB=.,0.05
   /SHUFFLE  Replace with a random value from the same group (or column).
