@@ -52,4 +52,22 @@ package SData.Config is
       Natural'Image (Version_Minor)(2 .. Natural'Image (Version_Minor)'Last) & "." &
       Natural'Image (Version_Patch)(2 .. Natural'Image (Version_Patch)'Last);
 
+   --  Copyright and license information
+   Copyright_Str : constant String :=
+      "Copyright (C) 2026 John L. Ries <john@theyarnbard.com>";
+
+   Copyright_Notice : constant String :=
+      "SData version " & Version_Str & ASCII.LF &
+      Copyright_Str & ASCII.LF & ASCII.LF &
+      "This program is free software: you can redistribute it and/or modify" & ASCII.LF &
+      "it under the terms of the GNU General Public License as published by" & ASCII.LF &
+      "the Free Software Foundation, either version 3 of the License, or" & ASCII.LF &
+      "(at your option) any later version." & ASCII.LF & ASCII.LF &
+      "This program is distributed in the hope that it will be useful," & ASCII.LF &
+      "but WITHOUT ANY WARRANTY; without even the implied warranty of" & ASCII.LF &
+      "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the" & ASCII.LF &
+      "GNU General Public License for more details." & ASCII.LF & ASCII.LF &
+      "You should have received a copy of the GNU General Public License" & ASCII.LF &
+      "along with this program. If not, see <https://www.gnu.org/licenses/>.";
+
 end SData.Config;
