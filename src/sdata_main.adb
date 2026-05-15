@@ -69,6 +69,7 @@ procedure SData_Main is
       Put_Line ("Options:");
       Put_Line ("  -h, --help    Show this help message");
       Put_Line ("  -v, --version Show version information");
+      Put_Line ("  --copyright   Show copyright and license information");
       Put_Line ("  -m <cells>    Set max in-memory table cells (rows*cols; 0 = unlimited)");
       Put_Line ("  -t <count>    Set max temporary variables");
       Put_Line ("  --clen <len>  Set max character variable length");
@@ -208,6 +209,9 @@ begin
             return;
          elsif Arg = "-v" or Arg = "--version" then
             Put_Line ("SData version " & Version_Str);
+            return;
+         elsif Arg = "--copyright" then
+            Ada.Text_IO.Put_Line (SData.Config.Copyright_Notice);
             return;
          elsif Arg = "-q" then
             Quiet_Mode := True;
