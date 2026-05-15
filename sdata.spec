@@ -48,6 +48,7 @@ rm -rf %{buildroot}
 make install DESTDIR=%{buildroot} PREFIX=/usr
 
 %files
+%license LICENSE
 %{_bindir}/sdata
 %{_mandir}/man1/sdata.1*
 %{_docdir}/%{name}/README.md
