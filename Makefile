@@ -264,6 +264,7 @@ pkg: build
 	 mkdir -p "$$PKG_ROOT/usr/local/share/doc/sdata"; \
 	 install -m 644 README.md "$$PKG_ROOT/usr/local/share/doc/sdata/README.md"; \
 	 install -m 644 doc/threat_model.md "$$PKG_ROOT/usr/local/share/doc/sdata/threat_model.md"; \
+	 install -m 644 LICENSE "$$PKG_ROOT/usr/local/share/doc/sdata/LICENSE"; \
 	 pkgbuild \
 	   --root "$$PKG_ROOT" \
 	   --identifier com.sdata.pkg \
@@ -283,6 +284,7 @@ install:
 	install -d $(DOC_DIR)
 	install -m 644 README.md $(DOC_DIR)/README.md
 	install -m 644 doc/threat_model.md $(DOC_DIR)/threat_model.md
+	install -m 644 LICENSE $(DOC_DIR)/LICENSE
 
 # Convert the Unix man page to a self-contained HTML file, used by
 # the Windows installer in place of the man page.
