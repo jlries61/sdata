@@ -530,6 +530,9 @@ package body SData.Evaluator is
                end if;
             end;
 
+         when Expr_Missing =>
+            return (Kind => Val_Missing);
+
          when Expr_Function_Call =>
             declare
                FName : constant String :=

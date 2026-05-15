@@ -179,6 +179,7 @@ package body SData.AST is
             Res.Arr_Name := Expr.Arr_Name;
             Res.Arr_Len  := Expr.Arr_Len;
             Res.Arr_Idx  := Copy_Expression_List (Expr.Arr_Idx);
+         when Expr_Missing => null;
       end case;
       return Res;
    end Copy_Expression;

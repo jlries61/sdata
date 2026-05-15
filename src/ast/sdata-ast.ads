@@ -19,7 +19,8 @@ package SData.AST is
       Expr_Binary_Op,       -- e.g., A + B
       Expr_Unary_Op,        -- e.g., -A
       Expr_Function_Call,   -- e.g., SQRT(X)
-      Expr_Array_Access     -- e.g., ARR{1}
+      Expr_Array_Access,    -- e.g., ARR{1}
+      Expr_Missing          -- '.' literal: evaluates to Val_Missing
    );
 
    --  Arithmetic and logical binary operators.
@@ -69,6 +70,8 @@ package SData.AST is
             Arr_Name : String (1 .. Max_Name_Len);
             Arr_Len  : Natural;
             Arr_Idx  : Expression_List; -- Supports multiple subscripts: X(1, 3, 5)
+         when Expr_Missing =>
+            null;
       end case;
    end record;
 

@@ -304,7 +304,9 @@ package body SData.Lexer is
                elsif Upper = "DISPLAY" then T.Kind := Token_DISPLAY;
                elsif Upper = "TO" then T.Kind := Token_TO;
                elsif Upper = "STEP" then T.Kind := Token_STEP;
-               elsif Upper = "BREAK" then T.Kind := Token_BREAK;
+               elsif Upper = "BREAK"     then T.Kind := Token_BREAK;
+               elsif Upper = "INTO"      then T.Kind := Token_INTO;
+               elsif Upper = "VANDALIZE" then T.Kind := Token_VANDALIZE;
                else
                   T.Kind := Token_Identifier;
                end if;
@@ -395,6 +397,7 @@ package body SData.Lexer is
                      T.Length := 2;
                      Advance (Ctx);
                   end if;
+               when '.' => T.Kind := Token_Dot; Advance (Ctx);
                when others =>
                   --  Unknown character, skip it and move on.
                   Advance (Ctx);

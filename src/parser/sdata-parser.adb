@@ -339,6 +339,9 @@ package body SData.Parser is
                      end if;
                      return Node;
 
+                  when Token_Dot =>
+                     return new Expression (Expr_Missing);
+
                   when others =>
                      return null;
                end case;

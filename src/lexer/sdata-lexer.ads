@@ -26,13 +26,13 @@ package SData.Lexer is
       Token_BY, Token_SORT, Token_RENAME, Token_DELETE, Token_RSEED, Token_NOT, Token_AND, Token_OR, Token_XOR,
       Token_OPTIONS, Token_DIGITS, Token_FPATH, Token_HEADER, Token_ALL,
       Token_REM, Token_HELP, Token_END, Token_RUN, Token_QUIT, Token_NAMES, Token_LIST, Token_DISPLAY,
-      Token_TO, Token_STEP, Token_BREAK,
+      Token_TO, Token_STEP, Token_BREAK, Token_INTO, Token_VANDALIZE,
 
       -- Operators and Punctuation
       Token_Plus, Token_Minus, Token_Star, Token_Slash, Token_Caret, -- +, -, *, /, ^
       Token_Equal, Token_Not_Equal, Token_Less, Token_Less_Equal, Token_Greater, Token_Greater_Equal, -- =, <>, <, <=, >, >=
       Token_Left_Paren, Token_Right_Paren, Token_Left_Brace, Token_Right_Brace, -- (, ), {, }
-      Token_Comma, Token_Semicolon, Token_Colon, -- ,, ;, :
+      Token_Comma, Token_Semicolon, Token_Colon, Token_Dot, -- ,, ;, :, .
       Token_Pipe,            -- | or || (delimiter value)
       Token_Newline,         -- Explicit newline tracking
       Token_Range_Dash       -- Used in variable ranges: NAME1-NAME5
