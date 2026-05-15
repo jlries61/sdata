@@ -132,7 +132,7 @@
               Vand_Pprob       : Float   := 1.0;
               Vand_SD_Frac     : Float   := 0.01;
               Vand_Sprob       : Float   := 1.0;
-              Vand_Mprob       : Float   := 1.0;
+              Vand_Mprob       : Float   := 0.05;
               Vand_By_Vars     : Variable_List;
   ```
 

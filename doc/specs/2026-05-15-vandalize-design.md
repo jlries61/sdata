@@ -76,7 +76,7 @@ not specified).
 
 Sets the cell to missing.
 
-- `<prob>`: probability that the cell is set to missing. Default **1.0**.
+- `<prob>`: probability that the cell is set to missing. Default **0.05**.
 - Applicable to all variable types.
 
 ### 2.3 /BY=<var>[,<var>...]
@@ -229,7 +229,7 @@ when Stmt_VANDALIZE =>
    Vand_Pprob       : Float   := 1.0;   -- /PERTURB probability
    Vand_SD_Frac     : Float   := 0.01;  -- /PERTURB sd fraction
    Vand_Sprob       : Float   := 1.0;   -- /SHUFFLE probability
-   Vand_Mprob       : Float   := 1.0;   -- /MISS probability
+   Vand_Mprob       : Float   := 0.05;  -- /MISS probability
    Vand_By_Vars     : Variable_List;    -- null if /BY= not specified
 ```
 
