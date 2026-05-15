@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  Unit tests for SData.Evaluator handler families:
 --  numeric_fns, distrib_fns, misc_fns, aggregate_fns.
 --  Calls functions via Call_Function — no parser or interpreter involved.

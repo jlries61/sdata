@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  SData Main Entry Point.
 --  This procedure handles command-line argument parsing, reads the source command file,
 --  invokes the parser to build the AST, and finally runs the interpreter.

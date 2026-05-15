@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  OOXML (Excel .xlsx) fuzz driver.
 --
 --  Passes an arbitrary file through Parse_OOXML.  The file path is given as

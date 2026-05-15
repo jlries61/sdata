@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  Package SData.Parser implements a recursive descent parser for the SData language.
 --  It takes a stream of tokens from the lexer and organizes them into an AST
 --  consisting of linked statements and expressions.

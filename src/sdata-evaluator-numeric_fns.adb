@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with Ada.Numerics;
 with SData.Values; use SData.Values;

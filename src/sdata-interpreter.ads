@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  Package SData.Interpreter implements the Command Execution Engine.
 --  It takes a linked list of AST statements (the "program") and executes them
 --  in order, managing data loading, the implicit record loop (Data Step), 

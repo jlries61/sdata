@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  Unit tests for SData.File_IO: Parse_CSV, Parse_ODF, Parse_OOXML.
 --  Calls parsers directly with fixture files in tests/data/ and
 --  inspects the resulting SData.Table state via the public API.

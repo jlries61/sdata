@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  Package SData.Lexer performs lexical analysis, converting raw source code (String)
 --  into a stream of meaningful 'Token' records. It handles keywords, literals,
 --  operators, and tracks position (line/column) for error reporting.

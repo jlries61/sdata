@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  Package SData.Config.Runtime holds interpreter state that changes during
 --  execution and is reset to defaults by the NEW command.  Separating it from
 --  SData.Config makes the boundary between startup configuration (set once by

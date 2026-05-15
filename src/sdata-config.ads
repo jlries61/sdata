@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  Package SData.Config holds startup configuration set by the CLI and
 --  constant across the lifetime of the process.  Per-run interpreter state
 --  that changes during execution (SAVE path, REPEAT mode, FPATH directories)

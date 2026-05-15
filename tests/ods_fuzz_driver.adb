@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  ODS (OpenDocument Spreadsheet) fuzz driver.
 --
 --  Passes an arbitrary file through Parse_ODF.  The file path is given as the

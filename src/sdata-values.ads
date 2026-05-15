@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  Package SData.Values defines the core data types used within the SData interpreter.
 --  It provides a variant record type 'Value' that can represent numeric (Float),
 --  integer (Integer), string, or missing values, along with utility functions.

@@ -1,3 +1,7 @@
+--  Copyright (C) 2026 John L. Ries <john@theyarnbard.com>
+--  License: GNU General Public License v3 or later
+--  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 --  Package SData.File_IO implements the File I/O Layer. It provides the capability 
 --  to read from and write to various dataset formats: CSV, ODS, and XLSX.
 --  It supports automatic format detection and utilizes external utilities (ssconvert)
