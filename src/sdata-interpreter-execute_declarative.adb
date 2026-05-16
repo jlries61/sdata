@@ -321,67 +321,9 @@ begin
                return SData.Table.Col_Numeric;
             end Col_Type_Of;
 
-         begin
-            --  Validate source exists.
-            if not SData.Table.Has_Column (Src) then
-               raise Script_Error with
-                  "VANDALIZE: source variable '" & Src & "' not found.";
-            end if;
-
-            --  Validate suffix compatibility.
-            if Suffix (Src) /= Suffix (Dst) then
-               raise Script_Error with
-                  "VANDALIZE: source and destination name suffixes must match.";
-            end if;
-            if SData.Table.Has_Column (Dst) then
-               if Suffix (Src) /= Suffix (Dst) then
-                  raise Script_Error with
-                     "VANDALIZE: destination '" & Dst &
-                     "' exists with incompatible type.";
-               end if;
-            end if;
-
-            --  PERTURB requires float source.
-            if Stmt.Vand_Perturb and then Suffix (Src) /= ' ' then
-               raise Script_Error with
-                  "VANDALIZE: /PERTURB requires a floating-point variable (no suffix).";
-            end if;
-
-            --  Validate probability sum.
-            declare
-               Total : Float := 0.0;
-            begin
-               if Stmt.Vand_Miss    then Total := Total + Stmt.Vand_Mprob; end if;
-               if Stmt.Vand_Shuffle then Total := Total + Stmt.Vand_Sprob; end if;
-               if Stmt.Vand_Perturb then Total := Total + Stmt.Vand_Pprob; end if;
-               if Total > 1.0 then
-                  raise Script_Error with
-                     "VANDALIZE: sum of probabilities exceeds 1.0.";
-               end if;
-            end;
-
-            --  Validate BY variables.
-            if Stmt.Vand_By_Vars /= null then
-               declare
-                  Curr : Variable_List := Stmt.Vand_By_Vars;
-               begin
-                  while Curr /= null loop
-                     declare
-                        BV : constant String :=
-                           To_Upper (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len));
-                     begin
-                        if not SData.Table.Has_Column (BV) then
-                           raise Script_Error with
-                              "VANDALIZE /BY: variable '" & BV & "' not found.";
-                        end if;
-                     end;
-                     Curr := Curr.Next;
-                  end loop;
-               end;
-            end if;
-
-            --  Collect source values.
-            declare
+            --  Core logic for a single source/destination column pair.
+            --  Captures N and Stmt from the enclosing scope.
+            procedure Vandalize_One_Column (Src_Col, Dst_Col : String) is
                type Value_Array is array (1 .. Natural'Max (1, N)) of SData.Values.Value;
                Src_Vals : Value_Array;
                Out_Vals : Value_Array;
@@ -412,7 +354,7 @@ begin
 
             begin
                for R in 1 .. N loop
-                  Src_Vals (R) := SData.Table.Get_Value_Upper (R, Src);
+                  Src_Vals (R) := SData.Table.Get_Value_Upper (R, Src_Col);
                end loop;
 
                --  Initialize Shuffle_Src to identity (each row draws from itself).
@@ -612,19 +554,101 @@ begin
                end loop;
 
                --  Create destination column if absent.
-               if not SData.Table.Has_Column (Dst) then
-                  SData.Table.Add_Column (Dst, Col_Type_Of (Suffix (Src)));
+               if not SData.Table.Has_Column (Dst_Col) then
+                  SData.Table.Add_Column (Dst_Col, Col_Type_Of (Suffix (Src_Col)));
                end if;
 
                --  Write output values.
                for R in 1 .. N loop
-                  SData.Table.Set_Value_Upper (R, Dst, Out_Vals (R));
+                  SData.Table.Set_Value_Upper (R, Dst_Col, Out_Vals (R));
                end loop;
+            end Vandalize_One_Column;
 
-               Put_Line ("VANDALIZE complete. " &
-                  Ada.Strings.Fixed.Trim (Natural'Image (N), Ada.Strings.Both) &
-                  " records processed.");
+         begin
+            --  Validate source exists (as a column or as a DIM array base name).
+            if not SData.Variables.Has_Array (Src)
+               and then not SData.Table.Has_Column (Src)
+            then
+               raise Script_Error with
+                  "VANDALIZE: source variable '" & Src & "' not found.";
+            end if;
+
+            --  Validate suffix compatibility.
+            if Suffix (Src) /= Suffix (Dst) then
+               raise Script_Error with
+                  "VANDALIZE: source and destination name suffixes must match.";
+            end if;
+            if SData.Table.Has_Column (Dst) then
+               if Suffix (Src) /= Suffix (Dst) then
+                  raise Script_Error with
+                     "VANDALIZE: destination '" & Dst &
+                     "' exists with incompatible type.";
+               end if;
+            end if;
+
+            --  PERTURB requires float source.
+            if Stmt.Vand_Perturb and then Suffix (Src) /= ' ' then
+               raise Script_Error with
+                  "VANDALIZE: /PERTURB requires a floating-point variable (no suffix).";
+            end if;
+
+            --  Validate probability sum.
+            declare
+               Total : Float := 0.0;
+            begin
+               if Stmt.Vand_Miss    then Total := Total + Stmt.Vand_Mprob; end if;
+               if Stmt.Vand_Shuffle then Total := Total + Stmt.Vand_Sprob; end if;
+               if Stmt.Vand_Perturb then Total := Total + Stmt.Vand_Pprob; end if;
+               if Total > 1.0 then
+                  raise Script_Error with
+                     "VANDALIZE: sum of probabilities exceeds 1.0.";
+               end if;
             end;
+
+            --  Validate BY variables.
+            if Stmt.Vand_By_Vars /= null then
+               declare
+                  Curr : Variable_List := Stmt.Vand_By_Vars;
+               begin
+                  while Curr /= null loop
+                     declare
+                        BV : constant String :=
+                           To_Upper (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len));
+                     begin
+                        if not SData.Table.Has_Column (BV) then
+                           raise Script_Error with
+                              "VANDALIZE /BY: variable '" & BV & "' not found.";
+                        end if;
+                     end;
+                     Curr := Curr.Next;
+                  end loop;
+               end;
+            end if;
+
+            --  Dispatch: DIM array or scalar column.
+            if SData.Variables.Has_Array (Src) then
+               declare
+                  Start_Idx, End_Idx : Integer;
+               begin
+                  SData.Variables.Get_Array_Bounds (Src, Start_Idx, End_Idx);
+                  for I in Start_Idx .. End_Idx loop
+                     declare
+                        I_Str   : constant String :=
+                           Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both);
+                        Src_Col : constant String := Src & "(" & I_Str & ")";
+                        Dst_Col : constant String := Dst & "(" & I_Str & ")";
+                     begin
+                        Vandalize_One_Column (Src_Col, Dst_Col);
+                     end;
+                  end loop;
+               end;
+            else
+               Vandalize_One_Column (Src, Dst);
+            end if;
+
+            Put_Line ("VANDALIZE complete. " &
+               Ada.Strings.Fixed.Trim (Natural'Image (N), Ada.Strings.Both) &
+               " records processed.");
          end;
       when others => null;
    end case;
