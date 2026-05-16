@@ -402,10 +402,15 @@ begin
                T_Miss    : constant Float := P_Miss;
                T_Shuffle : constant Float := T_Miss    + P_Shuffle;
                T_Perturb : constant Float := T_Shuffle + P_Perturb;
-               pragma Unreferenced (T_Perturb);
 
                type Index_Array is array (1 .. Natural'Max (1, N)) of Positive;
                Shuffle_Src : Index_Array := (others => 1);
+
+               --  Per-row SD of the row's BY-group (for PERTURB).
+               type SD_Row_Array is array (1 .. Natural'Max (1, N)) of Float;
+               pragma Warnings (Off, "* is not modified *");
+               SD_For_Row : SD_Row_Array := (others => 0.0);
+               pragma Warnings (On, "* is not modified *");
 
             begin
                for R in 1 .. N loop
@@ -522,6 +527,49 @@ begin
                   end;
                end if;
 
+               --  Compute per-group SD for PERTURB (two-pass per group).
+               if Stmt.Vand_Perturb then
+                  declare
+                     Max_G : Natural := 1;
+                  begin
+                     for R in 1 .. N loop
+                        if Groups (R) > Max_G then Max_G := Groups (R); end if;
+                     end loop;
+                     for G in 1 .. Max_G loop
+                        declare
+                           N_G    : Natural := 0;
+                           Sum_G  : Float   := 0.0;
+                           SumSq_G : Float  := 0.0;
+                           SD_G   : Float   := 0.0;
+                        begin
+                           for R in 1 .. N loop
+                              if Groups (R) = G and then
+                                 Src_Vals (R).Kind = SData.Values.Val_Numeric
+                              then
+                                 N_G    := N_G + 1;
+                                 Sum_G  := Sum_G  + Src_Vals (R).Num_Val;
+                                 SumSq_G := SumSq_G + Src_Vals (R).Num_Val ** 2;
+                              end if;
+                           end loop;
+                           if N_G >= 2 then
+                              declare
+                                 Mean_G   : constant Float := Sum_G / Float (N_G);
+                                 Variance : constant Float :=
+                                    SumSq_G / Float (N_G) - Mean_G ** 2;
+                              begin
+                                 SD_G := (if Variance > 0.0 then Sqrt (Variance) else 0.0);
+                              end;
+                           end if;
+                           for R in 1 .. N loop
+                              if Groups (R) = G then
+                                 SD_For_Row (R) := SD_G;
+                              end if;
+                           end loop;
+                        end;
+                     end loop;
+                  end;
+               end if;
+
                --  Generate output values.
                for R in 1 .. N loop
                   if Src_Vals (R).Kind = SData.Values.Val_Missing then
@@ -535,8 +583,14 @@ begin
                            Out_Vals (R) := (Kind => SData.Values.Val_Missing);
                         elsif U < T_Shuffle then
                            Out_Vals (R) := Src_Vals (Shuffle_Src (R));
+                        elsif U < T_Perturb then
+                           Out_Vals (R) :=
+                              (Kind    => SData.Values.Val_Numeric,
+                               Num_Val => Src_Vals (R).Num_Val
+                                  + SData.Statistics.Normal_RN
+                                       (0.0, SD_For_Row (R) * Stmt.Vand_SD_Frac));
                         else
-                           Out_Vals (R) := Src_Vals (R);  --  PERTURB: placeholder
+                           Out_Vals (R) := Src_Vals (R);
                         end if;
                      end;
                   end if;
