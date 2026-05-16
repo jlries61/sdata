@@ -192,6 +192,59 @@ package body SData.Help is
       Put_Line ("Execution: Declarative -- grouping is active for all subsequent RUNs.");
    end Help_BY;
 
+   procedure Help_VANDALIZE is
+   begin
+      Put_Line ("Command: VANDALIZE <source> INTO <dest>");
+      Put_Line ("         [/PERTURB[=<prob>[,<sd-frac>]]]");
+      Put_Line ("         [/SHUFFLE[=<prob>]]");
+      Put_Line ("         [/MISS[=<prob>]]");
+      Put_Line ("         [/BY=<var>[,<var>...]]");
+      Put_Line ("Creates a noisy copy of a variable by applying one or more degradation");
+      Put_Line ("operations.  Source and destination may be the same variable (in-place).");
+      Put_Line ("DIM array base names are supported as source and destination.");
+      New_Line;
+      Put_Line ("Options:");
+      Put_Line ("  /MISS[=prob]");
+      Put_Line ("    Set the destination to missing with probability prob.");
+      Put_Line ("    Default prob: 0.05.");
+      New_Line;
+      Put_Line ("  /SHUFFLE[=prob]");
+      Put_Line ("    Replace the destination with a value drawn uniformly at random");
+      Put_Line ("    from the same column (within the active BY group if /BY is set).");
+      Put_Line ("    Default prob: 1.0.");
+      New_Line;
+      Put_Line ("  /PERTURB[=prob[,sd-frac]]");
+      Put_Line ("    Add Gaussian noise: mean 0, SD = sd-frac * column_SD.");
+      Put_Line ("    Requires a numeric (float) variable.");
+      Put_Line ("    Default prob: 1.0.  Default sd-frac: 0.01.");
+      New_Line;
+      Put_Line ("  /BY=var[,var...]");
+      Put_Line ("    Stratify all operations by the named grouping variables.");
+      Put_Line ("    Each group is treated independently (statistics and random");
+      Put_Line ("    draws are confined to records within the same group).");
+      New_Line;
+      Put_Line ("Notes:");
+      Put_Line ("  At least one operation (/MISS, /SHUFFLE, /PERTURB) must be specified.");
+      Put_Line ("  If more than one operation is listed, each record is assigned to at most");
+      Put_Line ("  one operation; the probabilities must therefore sum to <= 1.0.");
+      Put_Line ("  Records whose combined probability leaves a remainder receive no change.");
+      Put_Line ("  /PERTURB is not valid for character variables.");
+      New_Line;
+      Put_Line ("Examples:");
+      Put_Line ("  VANDALIZE SCORE INTO SCORE_NOISY /PERTURB=1.0,0.05");
+      Put_Line ("    Copy SCORE to SCORE_NOISY, adding Gaussian noise with SD = 5% of");
+      Put_Line ("    the column standard deviation.");
+      New_Line;
+      Put_Line ("  VANDALIZE INCOME INTO INCOME_BAD /MISS=0.10 /SHUFFLE=0.05");
+      Put_Line ("    10% of records become missing; 5% get a random value from the column;");
+      Put_Line ("    the remaining 85% are copied unchanged.");
+      New_Line;
+      Put_Line ("  VANDALIZE AGE INTO AGE /PERTURB /BY=DEPT$");
+      Put_Line ("    Perturb AGE in-place using noise calibrated within each DEPT$ group.");
+      New_Line;
+      Put_Line ("Execution: Immediate -- operates on the current Data Table at once.");
+   end Help_VANDALIZE;
+
    procedure Help_SORT is
    begin
       Put_Line ("Command: SORT variable(s)");
@@ -1111,6 +1164,7 @@ package body SData.Help is
    K_ARRAY        : aliased constant String := "ARRAY";
    K_DIM          : aliased constant String := "DIM";
    K_BY           : aliased constant String := "BY";
+   K_VANDALIZE    : aliased constant String := "VANDALIZE";
    K_SORT         : aliased constant String := "SORT";
    K_NEW          : aliased constant String := "NEW";
    K_LIST         : aliased constant String := "LIST";
@@ -1321,6 +1375,7 @@ package body SData.Help is
       (K_ARRAY'Access,    Help_ARRAY'Access,    C, N),
       (K_DIM'Access,      Help_DIM'Access,      C, N),
       (K_BY'Access,       Help_BY'Access,       C, N),
+      (K_VANDALIZE'Access, Help_VANDALIZE'Access, C, N),
       (K_SORT'Access,     Help_SORT'Access,     C, N),
       (K_NEW'Access,      Help_NEW'Access,      C, N),
       (K_LIST'Access,     Help_LIST'Access,     C, N),
