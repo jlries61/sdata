@@ -298,6 +298,11 @@ begin
                Put_Line_Error
                   ("Error: Invalid value for OPTIONS " & Key & ": " & Val);
          end;
+      when Stmt_VANDALIZE =>
+         Put_Line ("VANDALIZE complete. " &
+            Ada.Strings.Fixed.Trim (Natural'Image (SData.Table.Row_Count),
+                                    Ada.Strings.Both) &
+            " records processed.");
       when others => null;
    end case;
 end Execute_Declarative;
