@@ -25,7 +25,6 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;    use Ada.Strings.Unbounded;
 with Ada.Unchecked_Deallocation;
 with Ada.Text_IO.Unbounded_IO;
-with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 
 --  SData.Interpreter — statement executor and data step engine.
 --
