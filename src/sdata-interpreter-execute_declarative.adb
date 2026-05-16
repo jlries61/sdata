@@ -388,8 +388,9 @@ begin
 
                --  Group assignment (all 1 when no /BY=).
                type Group_Array is array (1 .. Natural'Max (1, N)) of Natural;
+               pragma Warnings (Off, "* is not modified *");
                Groups : Group_Array := (others => 1);
-               pragma Unreferenced (Groups);
+               pragma Warnings (On, "* is not modified *");
 
                --  Probability thresholds (fixed order: MISS, SHUFFLE, PERTURB).
                P_Miss    : constant Float :=
@@ -401,11 +402,19 @@ begin
                T_Miss    : constant Float := P_Miss;
                T_Shuffle : constant Float := T_Miss    + P_Shuffle;
                T_Perturb : constant Float := T_Shuffle + P_Perturb;
-               pragma Unreferenced (T_Shuffle, T_Perturb);
+               pragma Unreferenced (T_Perturb);
+
+               type Index_Array is array (1 .. Natural'Max (1, N)) of Positive;
+               Shuffle_Src : Index_Array := (others => 1);
 
             begin
                for R in 1 .. N loop
                   Src_Vals (R) := SData.Table.Get_Value_Upper (R, Src);
+               end loop;
+
+               --  Initialize Shuffle_Src to identity (each row draws from itself).
+               for R in 1 .. N loop
+                  Shuffle_Src (R) := R;
                end loop;
 
                --  Compute BY-group assignments if /BY= specified.
@@ -442,7 +451,78 @@ begin
                   end;
                end if;
 
-               --  Generate output values (MISS only for now; SHUFFLE/PERTURB in later tasks).
+               --  Build per-group Fisher-Yates shuffle index for SHUFFLE.
+               if Stmt.Vand_Shuffle then
+                  declare
+                     Max_G : Natural := 1;
+                  begin
+                     for R in 1 .. N loop
+                        if Groups (R) > Max_G then Max_G := Groups (R); end if;
+                     end loop;
+                     for G in 1 .. Max_G loop
+                        --  Count rows in this group.
+                        declare
+                           G_Count : Natural := 0;
+                        begin
+                           for R in 1 .. N loop
+                              if Groups (R) = G then G_Count := G_Count + 1; end if;
+                           end loop;
+                           if G_Count > 0 then
+                              declare
+                                 G_Rows : array (1 .. G_Count) of Positive;
+                                 G_Idx  : Natural := 0;
+                              begin
+                                 --  Collect non-missing rows.
+                                 for R in 1 .. N loop
+                                    if Groups (R) = G and then
+                                       Src_Vals (R).Kind /= SData.Values.Val_Missing
+                                    then
+                                       G_Idx := G_Idx + 1;
+                                       G_Rows (G_Idx) := R;
+                                    end if;
+                                 end loop;
+                                 --  Fisher-Yates shuffle on G_Rows (G_Idx non-missing rows).
+                                 for I in reverse 2 .. G_Idx loop
+                                    declare
+                                       J_Raw     : constant Integer :=
+                                          1 + Integer (SData.Statistics.Uniform_RN
+                                             (0.0, 1.0) * Float (I));
+                                       J         : constant Positive :=
+                                          (if J_Raw < 1 then 1
+                                           elsif J_Raw > I then I
+                                           else J_Raw);
+                                       Tmp : constant Positive := G_Rows (I);
+                                    begin
+                                       G_Rows (I) := G_Rows (J);
+                                       G_Rows (J) := Tmp;
+                                    end;
+                                 end loop;
+                                 --  Build Shuffle_Src mapping: Orig_Rows(i) draws from G_Rows(i).
+                                 declare
+                                    Orig_Rows : array (1 .. G_Count) of Positive;
+                                    Idx2 : Natural := 0;
+                                 begin
+                                    for R in 1 .. N loop
+                                       if Groups (R) = G then
+                                          Idx2 := Idx2 + 1;
+                                          Orig_Rows (Idx2) := R;
+                                       end if;
+                                    end loop;
+                                    --  Map each row to its shuffled source.
+                                    --  Rows with missing source get source = self (will be
+                                    --  overridden in output loop by the missing check).
+                                    for I in 1 .. G_Idx loop
+                                       Shuffle_Src (Orig_Rows (I)) := G_Rows (I);
+                                    end loop;
+                                 end;
+                              end;
+                           end if;
+                        end;
+                     end loop;
+                  end;
+               end if;
+
+               --  Generate output values.
                for R in 1 .. N loop
                   if Src_Vals (R).Kind = SData.Values.Val_Missing then
                      Out_Vals (R) := (Kind => SData.Values.Val_Missing);
@@ -453,8 +533,10 @@ begin
                      begin
                         if U < T_Miss then
                            Out_Vals (R) := (Kind => SData.Values.Val_Missing);
+                        elsif U < T_Shuffle then
+                           Out_Vals (R) := Src_Vals (Shuffle_Src (R));
                         else
-                           Out_Vals (R) := Src_Vals (R);
+                           Out_Vals (R) := Src_Vals (R);  --  PERTURB: placeholder
                         end if;
                      end;
                   end if;
