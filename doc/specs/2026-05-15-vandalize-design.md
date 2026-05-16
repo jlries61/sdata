@@ -37,10 +37,12 @@ VANDALIZE <source-var> INTO <dest-var>
 - Source and destination may be the **same** variable (in-place vandalization). The
   column is replaced only after all output values have been computed, so the read and
   write passes never overlap.
-- **Arrays:** if `<source-var>` is a defined array (ARRAY or DIM), `<dest-var>` must
-  also be an array name. VANDALIZE is applied independently to each element pair
-  (source element i → dest element i). The destination array is created or overwritten
-  with the same number of elements as the source array.
+- **Arrays:** if `<source-var>` is a defined DIM array base name, VANDALIZE is applied
+  independently to each element pair (source element i → dest element i). Element column
+  names use parenthesis notation: `DIM X(3)` creates `X(1)`, `X(2)`, `X(3)`. The
+  destination array elements are created or overwritten to match the source bounds. Array
+  detection uses `SData.Variables.Has_Array`; bounds are retrieved via
+  `SData.Variables.Get_Array_Bounds`.
 
 ### 2.2 Operations
 
@@ -164,9 +166,10 @@ is intentional and consistent with SORT.
 6. **Collect** all source column values into a working array (all physical rows).
 7. If `/BY=` is specified, compute group membership for all rows by comparing BY
    variable values directly from the table (independent of global BY state).
-8. If PERTURB is active: compute sample standard deviation per group (or globally) over
-   non-missing values using the two-pass accumulator (N, Sum, Sum_Sq). Raise
-   Script_Error if any group has fewer than two non-missing values.
+8. If PERTURB is active: compute population standard deviation per group (or globally)
+   over non-missing values using a single-pass accumulator (N, Sum, Sum_Sq).
+   If a group has fewer than two non-missing values, SD is treated as 0.0 (no
+   perturbation noise is applied for that group).
 9. If SHUFFLE is active: build a Fisher-Yates shuffled index array per group (or
    globally), drawing swap indices via `Uniform_RN`. Missing source values are excluded
    from the shuffle pool.
@@ -193,9 +196,7 @@ For arrays, steps 6–12 repeat independently for each source/dest element pair.
 | PERTURB specified for an integer or string variable | Script_Error |
 | Sum of probabilities > 1.0 | Script_Error |
 | Any BY variable not found in table | Script_Error |
-| Source group has < 2 non-missing values and PERTURB is active | Script_Error |
 | Source is an array and dest is a scalar (or vice versa) | Script_Error |
-| Source array and dest array have different sizes | Script_Error |
 
 ---
 
@@ -205,15 +206,16 @@ For arrays, steps 6–12 repeat independently for each source/dest element pair.
 
 | File | Change |
 |---|---|
-| `src/lexer/sdata-lexer.ads` | Add `Token_Dot` to `Token_Kind` |
-| `src/lexer/sdata-lexer.adb` | Add `when '.' => T.Kind := Token_Dot; Advance (Ctx);` in the punctuation case; add `Token_VANDALIZE` to `Token_Kind`; add `"VANDALIZE"` keyword |
-| `src/ast/sdata-ast.ads` | Add `Stmt_VANDALIZE` to `Statement_Kind`; add AST variant (§7.2) |
-| `src/ast/sdata-ast.adb` | Free `Vand_By_Vars` variable list in `Free_Program` |
-| `src/parser/sdata-parser.adb` | Parse VANDALIZE statement (§7.3) |
+| `src/lexer/sdata-lexer.ads` | Add `Token_Dot`, `Token_INTO`, `Token_VANDALIZE` to `Token_Kind` |
+| `src/lexer/sdata-lexer.adb` | Add `when '.' => T.Kind := Token_Dot; Advance (Ctx);` in the punctuation case; register `INTO` and `VANDALIZE` keywords |
+| `src/ast/sdata-ast.ads` | Add `Expr_Missing` to `Expression_Kind` (null variant); add `Stmt_VANDALIZE` to `Statement_Kind`; add AST variant (§7.2) |
+| `src/ast/sdata-ast.adb` | Handle `Expr_Missing` in `Copy_Expression`; free `Vand_By_Vars` in `Free` |
+| `src/sdata-evaluator.adb` | Add `when Expr_Missing => return (Kind => Val_Missing);` in `Evaluate` |
+| `src/parser/sdata-parser.adb` | Add `when Token_Dot => return new Expression (Expr_Missing);` in `Parse_Primary`; parse VANDALIZE statement (§7.3) |
 | `src/sdata-interpreter.adb` | Add `Stmt_VANDALIZE` to `Is_Immediate`; add dispatch case in `Execute_Statement` routing to `Execute_Declarative` |
-| `src/sdata-interpreter-execute_declarative.adb` | Add `when Stmt_VANDALIZE =>` handler |
-| `src/sdata-help.adb` | Add VANDALIZE help entry (§7.4) |
-| `man/man1/sdata.1` | Document VANDALIZE |
+| `src/sdata-interpreter-execute_declarative.adb` | Add `when Stmt_VANDALIZE =>` handler with `Vandalize_One_Column` local procedure |
+| `src/sdata-help.adb` | Add VANDALIZE help entry and dispatch table registration |
+| `man/man1/sdata.1` | Document VANDALIZE in Immediate commands section |
 
 ### 7.2 AST variant for Stmt_VANDALIZE
 
@@ -258,23 +260,25 @@ Token_VANDALIZE
                  parse comma-separated variable names into Vand_By_Vars
 ```
 
-`INTO` should be registered in the lexer as `Token_INTO`, or detected as a
-Token_Identifier whose upper-cased text is "INTO" — whichever matches existing
-practice for similar two-keyword constructs in the grammar.
+`INTO` is registered in the lexer as `Token_INTO` (a proper keyword token), consistent
+with how `TO`, `STEP`, and `BREAK` are handled.
 
 ### 7.4 Standard deviation computation
 
-Implement inline in the VANDALIZE executor using the same two-pass accumulator as
-`Handle_Std_Fn` in `sdata-evaluator-aggregate_fns.adb`. Do not call into the
-evaluator; VANDALIZE has no expression evaluation context.
+Implement inline in the VANDALIZE executor. Do not call into the evaluator; VANDALIZE
+has no expression evaluation context. Population SD is used (divides by N, not N−1),
+matching the intent that sd-frac scales against the empirical spread of the data as
+observed. If a group has fewer than two non-missing values, SD is 0.0.
 
 ```ada
---  Over non-missing values in the group:
-N      : Natural    := 0;
-Sum    : Long_Float := 0.0;
-Sum_Sq : Long_Float := 0.0;
---  After accumulation:
-SD := Float (Sqrt ((Sum_Sq - Sum ** 2 / Long_Float (N)) / Long_Float (N - 1)));
+--  Over non-missing numeric values in the group:
+N_G     : Natural := 0;
+Sum_G   : Float   := 0.0;
+SumSq_G : Float   := 0.0;
+--  After accumulation (if N_G >= 2):
+Mean_G   := Sum_G / Float (N_G);
+Variance := SumSq_G / Float (N_G) - Mean_G ** 2;
+SD_G     := (if Variance > 0.0 then Sqrt (Variance) else 0.0);
 ```
 
 ### 7.5 Fisher-Yates shuffle

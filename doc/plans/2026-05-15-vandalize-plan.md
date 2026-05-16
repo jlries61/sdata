@@ -512,29 +512,13 @@ This task replaces the stub with real validation and implements the MISS operati
   1
   ```
 
-  Create `tests/expected/vandalize_miss.out`:
-  ```
-  RUN complete. 5 records and 1 variables processed.
-  VANDALIZE complete. 5 records processed.
-  RUN complete. 5 records and 1 variables processed.
-  N(X_V) should be 0: 0
-  NMISS(X_V) should be 5: 5
-  RUN complete. 5 records and 0 variables processed.
-  RUN complete. 5 records and 1 variables processed.
-  VANDALIZE complete. 5 records processed.
-  RUN complete. 5 records and 2 variables processed.
-  N(X_V) should be 5: 5.00000
-  SUM(X_V) should be 15: 15.0000
-  RUN complete. 5 records and 2 variables processed.
-  RUN complete. 3 records and 1 variables processed.
-  Error: VANDALIZE: sum of probabilities exceeds 1.0.
-  ```
-
-  > **Note:** The exact `N()` and `SUM()` output format (decimal places) depends on the DIGITS setting. Run `bin/sdata tests/vandalize_miss.cmd` after implementing and capture actual output:
+  > **Implementation note:** `N()` and `NMISS()` in a deferred `PRINT` statement are
+  > aggregate functions evaluated per-record: `N(X_V)` returns 1 if the current row is
+  > non-missing, 0 if missing. The expected output therefore shows one line per record,
+  > not a single aggregate over all records. Capture actual output after implementing:
   > ```bash
   > bin/sdata tests/vandalize_miss.cmd > tests/expected/vandalize_miss.out 2>&1
   > ```
-  > Then verify the values match expectations before committing the expected output.
 
 - [ ] **Step 2: Confirm the test fails**
 
@@ -1006,15 +990,9 @@ With sd-frac=0.0 the noise SD is zero, so Normal(0,0) = 0 and output = source. T
 
 - [ ] **Step 2: Implement PERTURB**
 
-  Before the output generation loop, add SD computation per group:
-
-  ```ada
-                 --  Compute per-group standard deviation for PERTURB.
-                 type SD_Array is array (1 .. Natural'Max (1, N)) of Float;
-                 Group_SD : SD_Array := (others => 0.0);
-  ```
-
-  After the shuffle index build block, add:
+  Before the output generation loop, add SD computation per group. Use **population SD**
+  (divide by N, not N−1) and treat groups with fewer than two non-missing values as
+  SD = 0.0 (no noise), rather than raising Script_Error:
 
   ```ada
                  if Stmt.Vand_Perturb then
@@ -1026,42 +1004,32 @@ With sd-frac=0.0 the noise SD is zero, so Normal(0,0) = 0 and output = source. T
                        end loop;
                        for G in 1 .. Max_G loop
                           declare
-                             Cnt    : Natural    := 0;
-                             Sum    : Long_Float := 0.0;
-                             Sum_Sq : Long_Float := 0.0;
+                             N_G     : Natural := 0;
+                             Sum_G   : Float   := 0.0;
+                             SumSq_G : Float   := 0.0;
+                             SD_G    : Float   := 0.0;
                           begin
                              for R in 1 .. N loop
                                 if Groups (R) = G and then
                                    Src_Vals (R).Kind = SData.Values.Val_Numeric
                                 then
-                                   declare
-                                      FV : constant Long_Float :=
-                                         Long_Float (Src_Vals (R).Num_Val);
-                                   begin
-                                      Cnt    := Cnt + 1;
-                                      Sum    := Sum    + FV;
-                                      Sum_Sq := Sum_Sq + FV ** 2;
-                                   end;
+                                   N_G     := N_G + 1;
+                                   Sum_G   := Sum_G   + Src_Vals (R).Num_Val;
+                                   SumSq_G := SumSq_G + Src_Vals (R).Num_Val ** 2;
                                 end if;
                              end loop;
-                             if Cnt < 2 then
-                                raise Script_Error with
-                                   "VANDALIZE /PERTURB: group has fewer than 2 " &
-                                   "non-missing values (standard deviation undefined).";
+                             if N_G >= 2 then
+                                declare
+                                   Mean_G   : constant Float := Sum_G / Float (N_G);
+                                   Variance : constant Float :=
+                                      SumSq_G / Float (N_G) - Mean_G ** 2;
+                                begin
+                                   SD_G := (if Variance > 0.0 then Sqrt (Variance) else 0.0);
+                                end;
                              end if;
-                             declare
-                                NF    : constant Long_Float := Long_Float (Cnt);
-                                Var_V : constant Long_Float :=
-                                   (Sum_Sq - Sum ** 2 / NF) / (NF - 1.0);
-                                SD_V  : constant Float :=
-                                   Sqrt (Float (Var_V));
-                             begin
-                                for R in 1 .. N loop
-                                   if Groups (R) = G then
-                                      Group_SD (R) := Stmt.Vand_SD_Frac * SD_V;
-                                   end if;
-                                end loop;
-                             end;
+                             for R in 1 .. N loop
+                                if Groups (R) = G then SD_For_Row (R) := SD_G; end if;
+                             end loop;
                           end;
                        end loop;
                     end;
@@ -1124,7 +1092,12 @@ With sd-frac=0.0 the noise SD is zero, so Normal(0,0) = 0 and output = source. T
 - Create: `tests/vandalize_inplace.cmd`, `tests/expected/vandalize_inplace.out`
 - Create: `tests/vandalize_combined.cmd`, `tests/expected/vandalize_combined.out`
 
-The BY-group code was already implemented in Task 5. This task just adds tests to exercise it.
+> **Implementation note:** Testing revealed that the Task 5 BY-group implementation had a
+> bug: the `Groups` array was initialized to all-1 but never populated when `/BY=` was
+> active. The code installed the local BY vars into `SData.Table` but did not call
+> `In_Same_Group` to assign sequential group IDs before clearing them again. The fix
+> (applied in this task) inserts the group-ID computation loop between installing the BY
+> vars and restoring the saved state.
 
 - [ ] **Step 1: Write the BY test**
 
@@ -1238,7 +1211,7 @@ The BY-group code was already implemented in Task 5. This task just adds tests t
 - Modify: `src/sdata-interpreter-execute_declarative.adb` (wrap existing logic in a helper; expand arrays)
 - Create: `tests/vandalize_array.cmd`, `tests/expected/vandalize_array.out`
 
-For a DIM array `X` with bounds Start..End, element column names in the table are `X(1)`, `X(2)`, etc. (from `Get_Real_Var_Name` in variables.adb, format `Name & "(" & Trim(Image(I)) & ")"`). `Has_Array(Name)` returns True; `Get_Array_Bounds` returns Start_Idx and End_Idx.
+For a DIM array `X` with bounds Start..End, element column names in the table are `X(1)`, `X(2)`, etc. (parenthesis notation, not suffix notation like `X1`). Detection: `SData.Variables.Has_Array(Name)` returns True for array base names; `SData.Variables.Get_Array_Bounds(Name, Start_Idx, End_Idx)` returns the bounds.
 
 - [ ] **Step 1: Write the array test**
 
