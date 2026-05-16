@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.6.14
+Version:        0.7.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -56,6 +56,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Fri May 15 2026 John L. Ries <john@theyarnbard.com> - 0.7.0-1
+- Add VANDALIZE command for synthetic data generation, anonymisation, and sensitivity testing
+
 * Thu May 14 2026 John L. Ries <john@theyarnbard.com> - 0.6.14-1
 - configurable --debug log levels (--debug=N, OPTIONS DEBUG N)
 

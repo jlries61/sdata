@@ -1,3 +1,9 @@
+sdata (0.7.0-1) unstable; urgency=medium
+
+  * Add VANDALIZE command for synthetic data generation, anonymisation, and sensitivity testing
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 15 May 2026 20:26:20 -0700
+
 sdata (0.6.14-1) unstable; urgency=medium
 
   * configurable --debug log levels (--debug=N, OPTIONS DEBUG N)
