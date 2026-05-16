@@ -1353,6 +1353,145 @@ package body SData.Parser is
             Stmt := new Statement (Stmt_DISPLAY);
             Stmt.Vars := Parse_Variable_List (Ctx);
 
+         when Token_VANDALIZE =>
+            declare
+               Src_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Into_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Dst_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if Src_Tok.Kind /= Token_Identifier then
+                  raise Script_Error with "VANDALIZE: expected source variable name.";
+               end if;
+               if Into_Tok.Kind /= Token_INTO then
+                  raise Script_Error with "VANDALIZE: expected INTO.";
+               end if;
+               if Dst_Tok.Kind /= Token_Identifier then
+                  raise Script_Error with "VANDALIZE: expected destination variable name.";
+               end if;
+               Stmt := new Statement (Stmt_VANDALIZE);
+               Stmt.Vand_Source_Len := Src_Tok.Length;
+               Stmt.Vand_Source_Name (1 .. Src_Tok.Length) :=
+                  To_Upper (Src_Tok.Text (1 .. Src_Tok.Length));
+               Stmt.Vand_Dest_Len := Dst_Tok.Length;
+               Stmt.Vand_Dest_Name (1 .. Dst_Tok.Length) :=
+                  To_Upper (Dst_Tok.Text (1 .. Dst_Tok.Length));
+               --  Parse slash options.
+               loop
+                  exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Slash;
+                  declare
+                     Discard   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     Flag_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     Flag_Name : constant String :=
+                        To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+                     pragma Unreferenced (Discard);
+                  begin
+                     if Flag_Name = "PERTURB" then
+                        Stmt.Vand_Perturb := True;
+                        if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Equal then
+                           declare
+                              Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              pragma Unreferenced (Eq);
+                              V1 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           begin
+                              if V1.Kind = Token_Numeric_Literal then
+                                 Stmt.Vand_Pprob :=
+                                    Float'Value (V1.Text (1 .. V1.Length));
+                              elsif V1.Kind /= Token_Dot then
+                                 raise Script_Error with
+                                    "/PERTURB=: expected probability or '.'";
+                              end if;
+                           end;
+                           if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
+                              declare
+                                 Cm : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                 V2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                 pragma Unreferenced (Cm);
+                              begin
+                                 if V2.Kind /= Token_Numeric_Literal then
+                                    raise Script_Error with
+                                       "/PERTURB=: expected sd-fraction after ','";
+                                 end if;
+                                 Stmt.Vand_SD_Frac :=
+                                    Float'Value (V2.Text (1 .. V2.Length));
+                              end;
+                           end if;
+                        end if;
+                     elsif Flag_Name = "SHUFFLE" then
+                        Stmt.Vand_Shuffle := True;
+                        if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Equal then
+                           declare
+                              Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              V  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              pragma Unreferenced (Eq);
+                           begin
+                              if V.Kind /= Token_Numeric_Literal then
+                                 raise Script_Error with "/SHUFFLE=: expected probability";
+                              end if;
+                              Stmt.Vand_Sprob := Float'Value (V.Text (1 .. V.Length));
+                           end;
+                        end if;
+                     elsif Flag_Name = "MISS" then
+                        Stmt.Vand_Miss := True;
+                        if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Equal then
+                           declare
+                              Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              V  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              pragma Unreferenced (Eq);
+                           begin
+                              if V.Kind /= Token_Numeric_Literal then
+                                 raise Script_Error with "/MISS=: expected probability";
+                              end if;
+                              Stmt.Vand_Mprob := Float'Value (V.Text (1 .. V.Length));
+                           end;
+                        end if;
+                     elsif Flag_Name = "BY" then
+                        if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                           raise Script_Error with "/BY: expected '='";
+                        end if;
+                        declare
+                           Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           pragma Unreferenced (Eq);
+                        begin
+                           loop
+                              declare
+                                 VT : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                 VN : Variable_List_Node;
+                              begin
+                                 if VT.Kind /= Token_Identifier then
+                                    raise Script_Error with
+                                       "/BY=: expected variable name";
+                                 end if;
+                                 VN.Var.Start_Len := VT.Length;
+                                 VN.Var.Start_Name (1 .. VT.Length) :=
+                                    To_Upper (VT.Text (1 .. VT.Length));
+                                 VN.Var.Is_Range := False;
+                                 VN.Next := Stmt.Vand_By_Vars;
+                                 Stmt.Vand_By_Vars := new Variable_List_Node'(VN);
+                              end;
+                              exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Comma;
+                              declare
+                                 Cm : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                                 pragma Unreferenced (Cm);
+                              begin
+                                 null;
+                              end;
+                           end loop;
+                        end;
+                     else
+                        raise Script_Error with
+                           "VANDALIZE: unknown option /" & Flag_Name;
+                     end if;
+                  end;
+               end loop;
+               if not Stmt.Vand_Perturb and then
+                  not Stmt.Vand_Shuffle and then
+                  not Stmt.Vand_Miss
+               then
+                  raise Script_Error with
+                     "VANDALIZE: at least one of /PERTURB, /SHUFFLE, /MISS required.";
+               end if;
+            end;
+
          when Token_END | Token_QUIT | Token_NAMES | Token_LIST | Token_NEW | Token_HELP =>
             declare
                K : constant Statement_Kind := (if Tok.Kind = Token_END then Stmt_END
