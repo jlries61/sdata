@@ -193,7 +193,7 @@ fi
 # Optional: build and test
 # ---------------------------------------------------------------------------
 printf 'Run make build and make check? [y/N] '
-read -r RUN_TESTS
+read -r RUN_TESTS || true
 case "$RUN_TESTS" in
     [yY]*)
         cd "$ROOT"
@@ -208,7 +208,7 @@ echo ""
 # Optional: commit and tag
 # ---------------------------------------------------------------------------
 printf 'Commit and tag v%s? [y/N] ' "$NEW_VER"
-read -r DO_COMMIT
+read -r DO_COMMIT || true
 case "$DO_COMMIT" in
     [yY]*)
         cd "$ROOT"
