@@ -388,9 +388,7 @@ begin
 
                --  Group assignment (all 1 when no /BY=).
                type Group_Array is array (1 .. Natural'Max (1, N)) of Natural;
-               pragma Warnings (Off, "* is not modified *");
                Groups : Group_Array := (others => 1);
-               pragma Warnings (On, "* is not modified *");
 
                --  Probability thresholds (fixed order: MISS, SHUFFLE, PERTURB).
                P_Miss    : constant Float :=
@@ -448,6 +446,23 @@ begin
                         end loop;
                      end;
 
+                     --  Assign consecutive group IDs using In_Same_Group.
+                     --  Requires table is sorted by BY vars (same assumption as BY).
+                     declare
+                        Next_G : Natural := 1;
+                     begin
+                        Groups (1) := 1;
+                        for R in 2 .. N loop
+                           if SData.Table.In_Same_Group (R, R - 1) then
+                              Groups (R) := Groups (R - 1);
+                           else
+                              Next_G     := Next_G + 1;
+                              Groups (R) := Next_G;
+                           end if;
+                        end loop;
+                     end;
+
+                     --  Restore global BY vars.
                      SData.Table.Clear_By_Vars;
                      for I in 1 .. Saved_Count loop
                         SData.Table.Add_By_Var
