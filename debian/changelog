@@ -1,3 +1,9 @@
+sdata (0.7.1-1) unstable; urgency=medium
+
+  * feat: VANDALIZE supports virtual arrays (ARRAY command) as source
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 18 May 2026 11:56:48 -0700
+
 sdata (0.7.0-1) unstable; urgency=medium
 
   * Add VANDALIZE command for synthetic data generation, anonymisation, and sensitivity testing
