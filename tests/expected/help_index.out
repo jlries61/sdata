@@ -21,7 +21,7 @@ Available Functions:
                UCASE$/UPPER$, LCASE$/LOWER$, POS, INSTR, INDEX, MATCH,
                CHR$, ASCII/ASC, STR$, VAL, NUM$, MAXLEN
   Conversion:  NUM, HEX, HEX$, OCT$, BIN$
-  Arrays:      LBOUND, UBOUND
+  Arrays:      LBOUND, UBOUND, HBOUND
   Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, NEXT, NEXTC$, OBS, OBSC$
   Special:     MISSING, INF, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,
                FALSE, TRUE, ERR, ERL,

@@ -633,6 +633,21 @@ Returns missing if row < 1 or row > total row count.
 The variable name may be given unquoted: OBS(X, 3) is equivalent to OBS("X", 3).
 OBS returns a numeric value; OBSC$ returns a string value.
 
+Function: LBOUND(arrayname)
+Returns the lower bound (first valid subscript) of the named array.
+Works for both virtual arrays (ARRAY) and real arrays (DIM).
+Returns missing if the array does not exist.
+The array name may be given unquoted: LBOUND(A) is equivalent to LBOUND("A").
+See also: UBOUND, HBOUND
+
+Function: UBOUND(arrayname) / HBOUND(arrayname)
+Returns the upper bound (last valid subscript) of the named array.
+HBOUND is the SAS-compatible spelling; UBOUND is retained for compatibility.
+Works for both virtual arrays (ARRAY) and real arrays (DIM).
+Returns missing if the array does not exist.
+The array name may be given unquoted: UBOUND(A) is equivalent to UBOUND("A").
+See also: LBOUND
+
 Function: MISSING(x)  ->  1 if x is missing, else 0
 
 Function: INF(x)  ->  1 if x is +Inf or -Inf, else 0

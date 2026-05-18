@@ -36,7 +36,7 @@ package body SData.Help is
       Put_Line ("               UCASE$/UPPER$, LCASE$/LOWER$, POS, INSTR, INDEX, MATCH,");
       Put_Line ("               CHR$, ASCII/ASC, STR$, VAL, NUM$, MAXLEN");
       Put_Line ("  Conversion:  NUM, HEX, HEX$, OCT$, BIN$");
-      Put_Line ("  Arrays:      LBOUND, UBOUND");
+      Put_Line ("  Arrays:      LBOUND, UBOUND, HBOUND");
       Put_Line ("  Record:      RECNO, BOF, EOF, BOG, EOG, LAG, LAGC$, NEXT, NEXTC$, OBS, OBSC$");
       Put_Line ("  Special:     MISSING, INF, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,");
       Put_Line ("               FALSE, TRUE, ERR, ERL,");
@@ -817,6 +817,31 @@ package body SData.Help is
    end Help_OBS;
 
    -- ==========================================================================
+   --  Array functions
+   -- ==========================================================================
+
+   procedure Help_LBOUND is
+   begin
+      Put_Line ("Function: LBOUND(arrayname)");
+      Put_Line ("Returns the lower bound (first valid subscript) of the named array.");
+      Put_Line ("Works for both virtual arrays (ARRAY) and real arrays (DIM).");
+      Put_Line ("Returns missing if the array does not exist.");
+      Put_Line ("The array name may be given unquoted: LBOUND(A) is equivalent to LBOUND(""A"").");
+      Put_Line ("See also: UBOUND, HBOUND");
+   end Help_LBOUND;
+
+   procedure Help_UBOUND is
+   begin
+      Put_Line ("Function: UBOUND(arrayname) / HBOUND(arrayname)");
+      Put_Line ("Returns the upper bound (last valid subscript) of the named array.");
+      Put_Line ("HBOUND is the SAS-compatible spelling; UBOUND is retained for compatibility.");
+      Put_Line ("Works for both virtual arrays (ARRAY) and real arrays (DIM).");
+      Put_Line ("Returns missing if the array does not exist.");
+      Put_Line ("The array name may be given unquoted: UBOUND(A) is equivalent to UBOUND(""A"").");
+      Put_Line ("See also: LBOUND");
+   end Help_UBOUND;
+
+   -- ==========================================================================
    --  Special functions
    -- ==========================================================================
 
@@ -1352,6 +1377,9 @@ package body SData.Help is
    K_LCF          : aliased constant String := "LCF";
    K_LIF          : aliased constant String := "LIF";
    K_LRN          : aliased constant String := "LRN";
+   K_LBOUND  : aliased constant String := "LBOUND";
+   K_UBOUND  : aliased constant String := "UBOUND";
+   K_HBOUND  : aliased constant String := "HBOUND";
 
    --  C = appears in COMMAND REFERENCE for /ALL
    --  F = appears in FUNCTION REFERENCE for /ALL
@@ -1494,6 +1522,10 @@ package body SData.Help is
       (K_NEXTCS'Access,   Help_NEXT'Access,     N, N),   --  alias
       (K_OBS'Access,      Help_OBS'Access,      N, F),
       (K_OBSCS'Access,    Help_OBS'Access,      N, N),   --  alias
+      --  Array functions
+      (K_LBOUND'Access,   Help_LBOUND'Access,   N, F),
+      (K_UBOUND'Access,   Help_UBOUND'Access,   N, F),
+      (K_HBOUND'Access,   Help_UBOUND'Access,   N, N),   --  SAS alias
       --  Special functions
       (K_MISSING'Access,  Help_MISSING'Access,  N, F),
       (K_INF'Access,      Help_INF'Access,      N, F),

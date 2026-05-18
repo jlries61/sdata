@@ -1,0 +1,7 @@
+Function: UBOUND(arrayname) / HBOUND(arrayname)
+Returns the upper bound (last valid subscript) of the named array.
+HBOUND is the SAS-compatible spelling; UBOUND is retained for compatibility.
+Works for both virtual arrays (ARRAY) and real arrays (DIM).
+Returns missing if the array does not exist.
+The array name may be given unquoted: UBOUND(A) is equivalent to UBOUND("A").
+See also: LBOUND
