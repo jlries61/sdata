@@ -565,7 +565,7 @@ begin
             end Vandalize_One_Column;
 
          begin
-            --  Validate source exists (as a column or as a DIM array base name).
+            --  Validate source exists (as a column or as an array base name).
             if not SData.Variables.Has_Array (Src)
                and then not SData.Table.Has_Column (Src)
             then
@@ -625,7 +625,7 @@ begin
                end;
             end if;
 
-            --  Dispatch: DIM array or scalar column.
+            --  Dispatch: array (DIM or virtual) or scalar column.
             if SData.Variables.Has_Array (Src) then
                declare
                   Start_Idx, End_Idx : Integer;
@@ -635,12 +635,19 @@ begin
                      declare
                         I_Str   : constant String :=
                            Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both);
-                        Src_Col : constant String := Src & "(" & I_Str & ")";
+                        Src_Col : constant String :=
+                           SData.Variables.Get_Array_Element_Column (Src, I);
                         Dst_Col : constant String := Dst & "(" & I_Str & ")";
                      begin
                         Vandalize_One_Column (Src_Col, Dst_Col);
                      end;
                   end loop;
+                  --  Register destination as a DIM array so element access
+                  --  expressions (e.g. COPY(1)) resolve via Has_Array.
+                  if not SData.Variables.Has_Array (Dst) then
+                     SData.Variables.Dim_Array (Dst, Start_Idx, End_Idx,
+                                                Is_Temp => False);
+                  end if;
                end;
             else
                Vandalize_One_Column (Src, Dst);

@@ -686,6 +686,29 @@ package body SData.Variables is
       end if;
    end Get_Array_Bounds;
 
+   ----------------------------
+   -- Get_Array_Element_Column --
+   ----------------------------
+   function Get_Array_Element_Column (Name : String; Index : Integer) return String is
+      Upper_Name : constant String := To_Upper (Name);
+   begin
+      if Array_Symbols.Contains (Upper_Name) then
+         declare
+            Arr_Def : constant Array_Definition_Type :=
+               Array_Symbols.Element (Upper_Name);
+         begin
+            if Arr_Def.Kind = Virtual_Array then
+               --  Constituents vector is 1-indexed; virtual arrays always start at 1.
+               return To_String (Arr_Def.Constituents.Element (Index));
+            else
+               return Get_Real_Var_Name (Upper_Name, Index);
+            end if;
+         end;
+      else
+         return Get_Real_Var_Name (Upper_Name, Index);
+      end if;
+   end Get_Array_Element_Column;
+
    --------------
    -- Set_Hold --
    --------------

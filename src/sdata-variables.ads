@@ -88,6 +88,11 @@ package SData.Variables is
    -- Returns the bounds of an array if it exists.
    procedure Get_Array_Bounds (Name : String; Start_Idx, End_Idx : out Integer);
 
+   -- Returns the physical table column name for element Index of the named array.
+   -- For Real_Array (DIM): "NAME(Index)".
+   -- For Virtual_Array (ARRAY): the constituent variable name at that position.
+   function Get_Array_Element_Column (Name : String; Index : Integer) return String;
+
    -- Hold/Unhold Management
    procedure Set_Hold (Name : String; State : Boolean);
    function Is_Held (Name : String) return Boolean;
