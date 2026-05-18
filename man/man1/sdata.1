@@ -326,15 +326,17 @@ and
 .B OPTIONS SHELLTIMEOUT
 for details.
 .TP
-.BR "VANDALIZE " \fIsource\fR " INTO " \fIdest\fR " [" /PERTURB "[=" \fIprob\fR "[," \fIsd\-frac\fR "]] [" /SHUFFLE "[=" \fIprob\fR "] [" /MISS "[=" \fIprob\fR "] [" /BY= \fIvar\fR "[," \fIvar\fR "...]]"
-Create a noisy copy of column
-.I source
-in column
-.IR dest .
-.I source
-and
+.BR "VANDALIZE " \fIsource\fR " [INTO " \fIdest\fR "] [" /PERTURB "[=" \fIprob\fR "[," \fIsd\-frac\fR "]] [" /SHUFFLE "[=" \fIprob\fR "] [" /MISS "[=" \fIprob\fR "] [" /BY= \fIvar\fR "[," \fIvar\fR "...]]"
+Vandalize column
+.IR source ,
+writing results to
 .I dest
-may be the same column (in\-place modification).
+(created if absent).
+.B INTO
+.I dest
+is optional; if omitted,
+.I source
+is modified in place.
 At least one option is required.
 Option probabilities must sum to no more than 1.0.
 DIM arrays are supported (the same noise is applied to all elements).

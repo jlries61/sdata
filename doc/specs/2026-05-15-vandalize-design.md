@@ -21,7 +21,7 @@ Primary use cases: synthetic data generation, anonymisation, and sensitivity tes
 ## 2. Syntax
 
 ```
-VANDALIZE <source-var> INTO <dest-var>
+VANDALIZE <source-var> [INTO <dest-var>]
     [/PERTURB[=<prob>[,<sd-frac>]]]
     [/SHUFFLE[=<prob>]]
     [/MISS[=<prob>]]
@@ -32,11 +32,14 @@ VANDALIZE <source-var> INTO <dest-var>
 
 - `<source-var>` must be an existing **permanent** variable (a column in the current
   table). Temporary variables created by SET are not allowed.
-- `<dest-var>` names the output column. It is created if it does not exist; if it
-  already exists it is overwritten in full once all output values are computed.
-- Source and destination may be the **same** variable (in-place vandalization). The
-  column is replaced only after all output values have been computed, so the read and
-  write passes never overlap.
+- `INTO <dest-var>` is optional. If omitted, the source variable is used as the
+  destination (in-place vandalization). When `INTO` is present, `<dest-var>` names
+  the output column; it is created if it does not exist and overwritten in full once
+  all output values are computed.
+- Source and destination may be the **same** variable (in-place vandalization), either
+  by omitting `INTO` or by writing `INTO <source-var>` explicitly. The column is
+  replaced only after all output values have been computed, so the read and write
+  passes never overlap.
 - **Arrays:** if `<source-var>` is a defined DIM array base name, VANDALIZE is applied
   independently to each element pair (source element i → dest element i). Element column
   names use parenthesis notation: `DIM X(3)` creates `X(1)`, `X(2)`, `X(3)`. The

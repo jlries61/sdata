@@ -194,14 +194,14 @@ package body SData.Help is
 
    procedure Help_VANDALIZE is
    begin
-      Put_Line ("Command: VANDALIZE <source> INTO <dest>");
+      Put_Line ("Command: VANDALIZE <source> [INTO <dest>]");
       Put_Line ("         [/PERTURB[=<prob>[,<sd-frac>]]]");
       Put_Line ("         [/SHUFFLE[=<prob>]]");
       Put_Line ("         [/MISS[=<prob>]]");
       Put_Line ("         [/BY=<var>[,<var>...]]");
       Put_Line ("Creates a noisy copy of a variable by applying one or more degradation");
-      Put_Line ("operations.  Source and destination may be the same variable (in-place).");
-      Put_Line ("DIM array base names are supported as source and destination.");
+      Put_Line ("operations.  INTO <dest> is optional; if omitted, the source variable is");
+      Put_Line ("modified in place.  DIM array base names are supported as source and dest.");
       New_Line;
       Put_Line ("Options:");
       Put_Line ("  /MISS[=prob]");
@@ -239,7 +239,7 @@ package body SData.Help is
       Put_Line ("    10% of records become missing; 5% get a random value from the column;");
       Put_Line ("    the remaining 85% are copied unchanged.");
       New_Line;
-      Put_Line ("  VANDALIZE AGE INTO AGE /PERTURB /BY=DEPT$");
+      Put_Line ("  VANDALIZE AGE /PERTURB /BY=DEPT$");
       Put_Line ("    Perturb AGE in-place using noise calibrated within each DEPT$ group.");
       New_Line;
       Put_Line ("Execution: Immediate -- operates on the current Data Table at once.");

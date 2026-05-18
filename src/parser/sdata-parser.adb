@@ -1355,26 +1355,34 @@ package body SData.Parser is
 
          when Token_VANDALIZE =>
             declare
-               Src_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Into_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               Dst_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Src_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
                if Src_Tok.Kind /= Token_Identifier then
                   raise Script_Error with "VANDALIZE: expected source variable name.";
-               end if;
-               if Into_Tok.Kind /= Token_INTO then
-                  raise Script_Error with "VANDALIZE: expected INTO.";
-               end if;
-               if Dst_Tok.Kind /= Token_Identifier then
-                  raise Script_Error with "VANDALIZE: expected destination variable name.";
                end if;
                Stmt := new Statement (Stmt_VANDALIZE);
                Stmt.Vand_Source_Len := Src_Tok.Length;
                Stmt.Vand_Source_Name (1 .. Src_Tok.Length) :=
                   To_Upper (Src_Tok.Text (1 .. Src_Tok.Length));
-               Stmt.Vand_Dest_Len := Dst_Tok.Length;
-               Stmt.Vand_Dest_Name (1 .. Dst_Tok.Length) :=
-                  To_Upper (Dst_Tok.Text (1 .. Dst_Tok.Length));
+               --  INTO <dest> is optional; omitting it implies in-place (dest = source).
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_INTO then
+                  declare
+                     Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     Dst_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     pragma Unreferenced (Discard);
+                  begin
+                     if Dst_Tok.Kind /= Token_Identifier then
+                        raise Script_Error with "VANDALIZE: expected destination variable name.";
+                     end if;
+                     Stmt.Vand_Dest_Len := Dst_Tok.Length;
+                     Stmt.Vand_Dest_Name (1 .. Dst_Tok.Length) :=
+                        To_Upper (Dst_Tok.Text (1 .. Dst_Tok.Length));
+                  end;
+               else
+                  Stmt.Vand_Dest_Len := Stmt.Vand_Source_Len;
+                  Stmt.Vand_Dest_Name (1 .. Stmt.Vand_Source_Len) :=
+                     Stmt.Vand_Source_Name (1 .. Stmt.Vand_Source_Len);
+               end if;
                --  Parse slash options.
                loop
                   exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Slash;

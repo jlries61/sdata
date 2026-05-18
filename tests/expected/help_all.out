@@ -91,14 +91,14 @@ LAG, NEXT, and BOG/EOG functions.
 Bare BY (no variables) cancels the active grouping.
 Execution: Declarative -- grouping is active for all subsequent RUNs.
 
-Command: VANDALIZE <source> INTO <dest>
+Command: VANDALIZE <source> [INTO <dest>]
          [/PERTURB[=<prob>[,<sd-frac>]]]
          [/SHUFFLE[=<prob>]]
          [/MISS[=<prob>]]
          [/BY=<var>[,<var>...]]
 Creates a noisy copy of a variable by applying one or more degradation
-operations.  Source and destination may be the same variable (in-place).
-DIM array base names are supported as source and destination.
+operations.  INTO <dest> is optional; if omitted, the source variable is
+modified in place.  DIM array base names are supported as source and dest.
 
 Options:
   /MISS[=prob]
@@ -136,7 +136,7 @@ Examples:
     10% of records become missing; 5% get a random value from the column;
     the remaining 85% are copied unchanged.
 
-  VANDALIZE AGE INTO AGE /PERTURB /BY=DEPT$
+  VANDALIZE AGE /PERTURB /BY=DEPT$
     Perturb AGE in-place using noise calibrated within each DEPT$ group.
 
 Execution: Immediate -- operates on the current Data Table at once.
