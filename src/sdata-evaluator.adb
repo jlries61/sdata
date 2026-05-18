@@ -150,7 +150,7 @@ package body SData.Evaluator is
       U : constant String := To_Upper (N);
    begin
       return U in "LAG" | "LAGC$" | "NEXT" | "NEXTC$" | "OBS" | "OBSC$"
-                | "LBOUND" | "UBOUND";
+                | "LBOUND" | "UBOUND" | "HBOUND";
    end Is_Identifier_Ref_Function;
 
    ---------------------------------------------------------------------------

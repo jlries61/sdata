@@ -362,6 +362,7 @@ package body SData.Evaluator.Misc_Fns is
       Dispatch_Table.Insert ("TRUNCATE", Handle_Truncate'Access);
       Dispatch_Table.Insert ("LBOUND",  Handle_Lbound'Access);
       Dispatch_Table.Insert ("UBOUND",  Handle_Ubound'Access);
+      Dispatch_Table.Insert ("HBOUND",  Handle_Ubound'Access);
       Dispatch_Table.Insert ("INDEX",   Handle_Index_Str'Access);
       Dispatch_Table.Insert ("MATCH",   Handle_Match'Access);
       Dispatch_Table.Insert ("MAXLEN",  Handle_Maxlen'Access);

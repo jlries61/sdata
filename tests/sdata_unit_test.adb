@@ -429,8 +429,9 @@ begin
    Check ("E-11 OBS is identifier-ref",          Is_Identifier_Ref_Function ("OBS"),    True);
    Check ("E-12 LBOUND is identifier-ref",       Is_Identifier_Ref_Function ("LBOUND"), True);
    Check ("E-13 UBOUND is identifier-ref",       Is_Identifier_Ref_Function ("UBOUND"), True);
-   Check ("E-14 ABS is not identifier-ref",      Is_Identifier_Ref_Function ("ABS"),    False);
-   Check ("E-15 SQRT is not identifier-ref",     Is_Identifier_Ref_Function ("SQRT"),   False);
+   Check ("E-14 HBOUND is identifier-ref",       Is_Identifier_Ref_Function ("HBOUND"), True);
+   Check ("E-15 ABS is not identifier-ref",      Is_Identifier_Ref_Function ("ABS"),    False);
+   Check ("E-16 SQRT is not identifier-ref",     Is_Identifier_Ref_Function ("SQRT"),   False);
 
    ---------------------------------------------------------------------------
    --  ── SData.Variables: temporary (session) variables ───────────────────

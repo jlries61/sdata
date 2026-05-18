@@ -51,6 +51,8 @@ PRINT LBOUND(A)
 PRINT UBOUND(A)
 PRINT LBOUND(B)
 PRINT UBOUND(B)
+PRINT HBOUND(A)
+PRINT HBOUND(B)
 
 -- LTW: Lambert W principal branch; LTW(e) = 1 because 1*e^1 = e
 PRINT LTW(0)
