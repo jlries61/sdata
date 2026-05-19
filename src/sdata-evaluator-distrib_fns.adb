@@ -2,9 +2,9 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
-with SData.Statistics;
+with SData_Core.Statistics;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
-with SData.Values; use SData.Values;
+with SData_Core.Values; use SData_Core.Values;
 
 package body SData.Evaluator.Distrib_Fns is
 
@@ -19,12 +19,12 @@ package body SData.Evaluator.Distrib_Fns is
       if N = 2 then raise SData.Script_Error with "ZDF requires 1 or 3 arguments, not 2."; end if;
       if N >= 3 then
          if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)),
+         return Num_Result (SData_Core.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)),
                                                          Convert_To_Float (Vals.Element (2)),
                                                          Convert_To_Float (Vals.Element (3))));
       else
          if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-         return Num_Result (SData.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+         return Num_Result (SData_Core.Statistics.Normal_PDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
       end if;
    end Handle_ZDF;
 
@@ -32,7 +32,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Binomial_PMF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Binomial_PMF (Convert_To_Float (Vals.Element (1)),
                                                         Convert_To_Float (Vals.Element (2)),
                                                         Convert_To_Float (Vals.Element (3))));
    end Handle_NDF;
@@ -41,7 +41,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Uniform_PDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Uniform_PDF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2)),
                                                        Convert_To_Float (Vals.Element (3))));
    end Handle_UDF;
@@ -50,7 +50,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Exponential_PDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Exponential_PDF (Convert_To_Float (Vals.Element (1)),
                                                            Convert_To_Float (Vals.Element (2))));
    end Handle_EDF;
 
@@ -58,7 +58,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Beta_PDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Beta_PDF (Convert_To_Float (Vals.Element (1)),
                                                     Convert_To_Float (Vals.Element (2)),
                                                     Convert_To_Float (Vals.Element (3))));
    end Handle_BDF;
@@ -67,7 +67,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Poisson_PMF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Poisson_PMF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2))));
    end Handle_PDF;
 
@@ -75,7 +75,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Gamma_PDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Gamma_PDF (Convert_To_Float (Vals.Element (1)),
                                                      Convert_To_Float (Vals.Element (2)),
                                                      Convert_To_Float (Vals.Element (3))));
    end Handle_GDF;
@@ -84,7 +84,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Chi_Square_PDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Chi_Square_PDF (Convert_To_Float (Vals.Element (1)),
                                                           Convert_To_Float (Vals.Element (2))));
    end Handle_XDF;
 
@@ -92,7 +92,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Student_T_PDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Student_T_PDF (Convert_To_Float (Vals.Element (1)),
                                                          Convert_To_Float (Vals.Element (2))));
    end Handle_TDF;
 
@@ -100,7 +100,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.F_PDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.F_PDF (Convert_To_Float (Vals.Element (1)),
                                                  Convert_To_Float (Vals.Element (2)),
                                                  Convert_To_Float (Vals.Element (3))));
    end Handle_FDF;
@@ -109,7 +109,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Binomial_PMF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Binomial_PMF (Convert_To_Float (Vals.Element (1)),
                                                         Convert_To_Float (Vals.Element (2)),
                                                         Convert_To_Float (Vals.Element (3))));
    end Handle_MDF;
@@ -118,7 +118,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Weibull_PDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Weibull_PDF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2)),
                                                        Convert_To_Float (Vals.Element (3))));
    end Handle_WDF;
@@ -148,12 +148,12 @@ package body SData.Evaluator.Distrib_Fns is
       if N = 2 then raise SData.Script_Error with "ZCF requires 1 or 3 arguments, not 2."; end if;
       if N >= 3 then
          if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)),
+         return Num_Result (SData_Core.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)),
                                                          Convert_To_Float (Vals.Element (2)),
                                                          Convert_To_Float (Vals.Element (3))));
       else
          if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-         return Num_Result (SData.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+         return Num_Result (SData_Core.Statistics.Normal_CDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
       end if;
    end Handle_ZCF;
 
@@ -161,7 +161,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Binomial_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Binomial_CDF (Convert_To_Float (Vals.Element (1)),
                                                         Convert_To_Float (Vals.Element (2)),
                                                         Convert_To_Float (Vals.Element (3))));
    end Handle_NCF;
@@ -170,7 +170,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Uniform_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Uniform_CDF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2)),
                                                        Convert_To_Float (Vals.Element (3))));
    end Handle_UCF;
@@ -179,7 +179,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Exponential_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Exponential_CDF (Convert_To_Float (Vals.Element (1)),
                                                            Convert_To_Float (Vals.Element (2))));
    end Handle_ECF;
 
@@ -187,7 +187,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Beta_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Beta_CDF (Convert_To_Float (Vals.Element (1)),
                                                     Convert_To_Float (Vals.Element (2)),
                                                     Convert_To_Float (Vals.Element (3))));
    end Handle_BCF;
@@ -196,7 +196,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Poisson_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Poisson_CDF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2))));
    end Handle_PCF;
 
@@ -204,7 +204,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Gamma_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Gamma_CDF (Convert_To_Float (Vals.Element (1)),
                                                      Convert_To_Float (Vals.Element (2)),
                                                      Convert_To_Float (Vals.Element (3))));
    end Handle_GCF;
@@ -213,7 +213,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Chi_Square_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Chi_Square_CDF (Convert_To_Float (Vals.Element (1)),
                                                           Convert_To_Float (Vals.Element (2))));
    end Handle_XCF;
 
@@ -221,7 +221,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Student_T_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Student_T_CDF (Convert_To_Float (Vals.Element (1)),
                                                          Convert_To_Float (Vals.Element (2))));
    end Handle_TCF;
 
@@ -229,7 +229,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.F_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.F_CDF (Convert_To_Float (Vals.Element (1)),
                                                  Convert_To_Float (Vals.Element (2)),
                                                  Convert_To_Float (Vals.Element (3))));
    end Handle_FCF;
@@ -238,7 +238,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Binomial_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Binomial_CDF (Convert_To_Float (Vals.Element (1)),
                                                         Convert_To_Float (Vals.Element (2)),
                                                         Convert_To_Float (Vals.Element (3))));
    end Handle_MCF;
@@ -247,7 +247,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Weibull_CDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Weibull_CDF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2)),
                                                        Convert_To_Float (Vals.Element (3))));
    end Handle_WCF;
@@ -271,12 +271,12 @@ package body SData.Evaluator.Distrib_Fns is
       if N = 2 then raise SData.Script_Error with "ZIF requires 1 or 3 arguments, not 2."; end if;
       if N >= 3 then
          if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)),
+         return Num_Result (SData_Core.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)),
                                                          Convert_To_Float (Vals.Element (2)),
                                                          Convert_To_Float (Vals.Element (3))));
       else
          if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-         return Num_Result (SData.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
+         return Num_Result (SData_Core.Statistics.Normal_IDF (Convert_To_Float (Vals.Element (1)), 0.0, 1.0));
       end if;
    end Handle_ZIF;
 
@@ -284,7 +284,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Binomial_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Binomial_IDF (Convert_To_Float (Vals.Element (1)),
                                                         Convert_To_Float (Vals.Element (2)),
                                                         Convert_To_Float (Vals.Element (3))));
    end Handle_NIF;
@@ -293,7 +293,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Uniform_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Uniform_IDF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2)),
                                                        Convert_To_Float (Vals.Element (3))));
    end Handle_UIF;
@@ -302,7 +302,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Exponential_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Exponential_IDF (Convert_To_Float (Vals.Element (1)),
                                                            Convert_To_Float (Vals.Element (2))));
    end Handle_EIF;
 
@@ -310,7 +310,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Beta_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Beta_IDF (Convert_To_Float (Vals.Element (1)),
                                                     Convert_To_Float (Vals.Element (2)),
                                                     Convert_To_Float (Vals.Element (3))));
    end Handle_BIF;
@@ -333,7 +333,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Poisson_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Poisson_IDF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2))));
    end Handle_PIF;
 
@@ -341,7 +341,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Gamma_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Gamma_IDF (Convert_To_Float (Vals.Element (1)),
                                                      Convert_To_Float (Vals.Element (2)),
                                                      Convert_To_Float (Vals.Element (3))));
    end Handle_GIF;
@@ -350,7 +350,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Chi_Square_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Chi_Square_IDF (Convert_To_Float (Vals.Element (1)),
                                                           Convert_To_Float (Vals.Element (2))));
    end Handle_XIF;
 
@@ -358,7 +358,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Student_T_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Student_T_IDF (Convert_To_Float (Vals.Element (1)),
                                                          Convert_To_Float (Vals.Element (2))));
    end Handle_TIF;
 
@@ -366,7 +366,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.F_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.F_IDF (Convert_To_Float (Vals.Element (1)),
                                                  Convert_To_Float (Vals.Element (2)),
                                                  Convert_To_Float (Vals.Element (3))));
    end Handle_FIF;
@@ -375,7 +375,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Weibull_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Weibull_IDF (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2)),
                                                        Convert_To_Float (Vals.Element (3))));
    end Handle_WIF;
@@ -384,7 +384,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 3) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Binomial_IDF (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Binomial_IDF (Convert_To_Float (Vals.Element (1)),
                                                         Convert_To_Float (Vals.Element (2)),
                                                         Convert_To_Float (Vals.Element (3))));
    end Handle_MIF;
@@ -398,13 +398,13 @@ package body SData.Evaluator.Distrib_Fns is
       N : constant Natural := Natural (Vals.Length);
    begin
       if N = 0 then
-         return Num_Result (SData.Statistics.Normal_RN (0.0, 1.0));
+         return Num_Result (SData_Core.Statistics.Normal_RN (0.0, 1.0));
       elsif N = 1 then
          if Vals.Element (1).Kind = Val_Missing then return (Kind => Val_Missing); end if;
          raise SData.Script_Error with "ZRN requires 0 or 2 arguments, not 1.";
       else
          if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-         return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
+         return Num_Result (SData_Core.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
                                                         Convert_To_Float (Vals.Element (2))));
       end if;
    end Handle_ZRN;
@@ -413,7 +413,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Normal_RN (Convert_To_Float (Vals.Element (1)),
                                                       Convert_To_Float (Vals.Element (2))));
    end Handle_NRN;
 
@@ -422,13 +422,13 @@ package body SData.Evaluator.Distrib_Fns is
       N : constant Natural := Natural (Vals.Length);
    begin
       if N = 0 then
-         return Num_Result (SData.Statistics.Uniform_RN (0.0, 1.0));
+         return Num_Result (SData_Core.Statistics.Uniform_RN (0.0, 1.0));
       elsif N = 1 then
          if Vals.Element (1).Kind = Val_Missing then return (Kind => Val_Missing); end if;
          raise SData.Script_Error with "URN requires 0 or 2 arguments, not 1.";
       else
          if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-         return Num_Result (SData.Statistics.Uniform_RN (Convert_To_Float (Vals.Element (1)),
+         return Num_Result (SData_Core.Statistics.Uniform_RN (Convert_To_Float (Vals.Element (1)),
                                                          Convert_To_Float (Vals.Element (2))));
       end if;
    end Handle_URN;
@@ -437,21 +437,21 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Exponential_RN (Convert_To_Float (Vals.Element (1))));
+      return Num_Result (SData_Core.Statistics.Exponential_RN (Convert_To_Float (Vals.Element (1))));
    end Handle_ERN;
 
    function Handle_PRN (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Poisson_RN (Convert_To_Float (Vals.Element (1))));
+      return Num_Result (SData_Core.Statistics.Poisson_RN (Convert_To_Float (Vals.Element (1))));
    end Handle_PRN;
 
    function Handle_GRN (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Gamma_RN (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Gamma_RN (Convert_To_Float (Vals.Element (1)),
                                                     Convert_To_Float (Vals.Element (2))));
    end Handle_GRN;
 
@@ -459,7 +459,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Binomial_RN (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Binomial_RN (Convert_To_Float (Vals.Element (1)),
                                                        Convert_To_Float (Vals.Element (2))));
    end Handle_MRN;
 
@@ -467,7 +467,7 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Weibull_RN (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Weibull_RN (Convert_To_Float (Vals.Element (1)),
                                                       Convert_To_Float (Vals.Element (2))));
    end Handle_WRN;
 
@@ -475,14 +475,14 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Beta_RN (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.Beta_RN (Convert_To_Float (Vals.Element (1)),
                                                    Convert_To_Float (Vals.Element (2))));
    end Handle_BRN;
 
    --  Logistic RN: sample via inversion — U(0,1) → logit(U)
    function Handle_LRN (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
-      U : constant Float := SData.Statistics.Uniform_RN (0.0, 1.0);
+      U : constant Float := SData_Core.Statistics.Uniform_RN (0.0, 1.0);
    begin
       return Num_Result (Log (U / (1.0 - U)));
    end Handle_LRN;
@@ -491,28 +491,28 @@ package body SData.Evaluator.Distrib_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Chi_Square_RN (Convert_To_Float (Vals.Element (1))));
+      return Num_Result (SData_Core.Statistics.Chi_Square_RN (Convert_To_Float (Vals.Element (1))));
    end Handle_XRN;
 
    function Handle_TRN (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.Student_T_RN (Convert_To_Float (Vals.Element (1))));
+      return Num_Result (SData_Core.Statistics.Student_T_RN (Convert_To_Float (Vals.Element (1))));
    end Handle_TRN;
 
    function Handle_FRN (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 2) then return (Kind => Val_Missing); end if;
-      return Num_Result (SData.Statistics.F_RN (Convert_To_Float (Vals.Element (1)),
+      return Num_Result (SData_Core.Statistics.F_RN (Convert_To_Float (Vals.Element (1)),
                                                 Convert_To_Float (Vals.Element (2))));
    end Handle_FRN;
 
    function Handle_Ran (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
    begin
-      return Num_Result (SData.Statistics.Uniform_Random);
+      return Num_Result (SData_Core.Statistics.Uniform_Random);
    end Handle_Ran;
 
    ---------------------------------------------------------------------------

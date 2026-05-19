@@ -4,16 +4,16 @@
 
 --  Unit tests for SData.File_IO: Parse_CSV, Parse_ODF, Parse_OOXML.
 --  Calls parsers directly with fixture files in tests/data/ and
---  inspects the resulting SData.Table state via the public API.
+--  inspects the resulting SData_Core.Table state via the public API.
 --  Must be run from the project root (paths are relative to it).
 
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData;
-with SData.Config;
-with SData.Table;           use SData.Table;
-with SData.Values;          use SData.Values;
+with SData_Core.Config;
+with SData_Core.Table;           use SData_Core.Table;
+with SData_Core.Values;          use SData_Core.Values;
 with SData.File_IO;
 with SData.File_IO.CSV;     use SData.File_IO.CSV;
 with SData.File_IO.ODF;     use SData.File_IO.ODF;
@@ -75,7 +75,7 @@ procedure File_IO_Unit_Test is
    V : Value;
 
 begin
-   SData.Config.Quiet_Mode := True;
+   SData_Core.Config.Quiet_Mode := True;
 
    ---------------------------------------------------------------------------
    --  Parse_CSV tests  (PC-01 .. PC-24)
@@ -186,11 +186,11 @@ begin
    --  All 6 rows must be accessible via Fetch_From_Disk / in-memory.
    ---------------------------------------------------------------------------
    declare
-      Saved_Cap : constant Natural := SData.Config.Max_Table_Cells;
+      Saved_Cap : constant Natural := SData_Core.Config.Max_Table_Cells;
    begin
-      SData.Config.Max_Table_Cells := 8;
+      SData_Core.Config.Max_Table_Cells := 8;
       Parse_CSV ("tests/data/sample.csv");
-      SData.Config.Max_Table_Cells := Saved_Cap;
+      SData_Core.Config.Max_Table_Cells := Saved_Cap;
    end;
    Check ("PC-37 spill row count",           Row_Count,    6);
    Check ("PC-38 spill col count",           Column_Count, 4);
@@ -350,13 +350,13 @@ begin
    --  PX-24: OOXML file with no workbook.xml falls back to sheet1.xml.
    --  Exercises the Zip.Entry_name_not_found suppression path in
    --  Find_Sheet_XML_Path (lines 1269, 1314 of sdata-file_io.adb).
-   SData.Table.Clear;
+   SData_Core.Table.Clear;
    Parse_OOXML ("tests/data/no_workbook.xlsx");
    Check ("PX-24 no-workbook xlsx row count", Row_Count, 1);
    Check ("PX-24 no-workbook xlsx A1 = 77",
-          Integer (SData.Table.Get_Value (1, "A").Num_Val), 77);
+          Integer (SData_Core.Table.Get_Value (1, "A").Num_Val), 77);
    Check ("PX-24 no-workbook xlsx B1 = 88",
-          Integer (SData.Table.Get_Value (1, "B").Num_Val), 88);
+          Integer (SData_Core.Table.Get_Value (1, "B").Num_Val), 88);
 
    ---------------------------------------------------------------------------
    --  Summary

@@ -1,8 +1,4 @@
-with "zipada";
-with "xmlada_dom";
-with "xmlada_input";
-with "mathpaqs";
-with "ada_sqlite3";
+with "sdata_core";
 
 project SData is
    for Languages use ("Ada", "C");

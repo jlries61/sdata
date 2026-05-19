@@ -3,20 +3,20 @@
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
 with SData.Help;
-with SData.Table;     use SData.Table;
-with SData.Values;    use SData.Values;
-with SData.Variables; use SData.Variables;
+with SData_Core.Table;     use SData_Core.Table;
+with SData_Core.Values;    use SData_Core.Values;
+with SData_Core.Variables; use SData_Core.Variables;
 with SData.Evaluator; use SData.Evaluator;
 with GNAT.Strings; use GNAT.Strings;
 with SData.System;
-with SData.Statistics;
+with SData_Core.Statistics;
 with SData.Parser; use SData.Parser;
 with Ada.Streams.Stream_IO;
 with Ada.Exceptions;
 with SData.File_IO;
-with SData.Config;         use SData.Config;
-with SData.Config.Runtime;
-with SData.IO;        use SData.IO;
+with SData_Core.Config;         use SData_Core.Config;
+with SData.Run_State;
+with SData_Core.IO;        use SData_Core.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Vectors;
@@ -61,7 +61,7 @@ package body SData.Interpreter is
    --  Per-record execution context, created once per data step and threaded
    --  through the entire execution chain.  Eliminates the Global_Record_Deleted
    --  package variable and makes per-record state visible in signatures.
-   --  BY variable names are queried directly from SData.Table (single source
+   --  BY variable names are queried directly from SData_Core.Table (single source
    --  of truth); no local copy is kept here.
    type Step_Context is record
       Deleted : Boolean := False;
@@ -91,7 +91,7 @@ package body SData.Interpreter is
 
    procedure Set_Interactive (Val : Boolean) is
    begin
-      SData.IO.Set_Interactive (Val);
+      SData_Core.IO.Set_Interactive (Val);
    end Set_Interactive;
 
    type Step_Action is (Action_Continue, Action_Step, Action_Run);
@@ -181,13 +181,13 @@ package body SData.Interpreter is
          SData.AST.Free_Program (E.Stmt);
       end loop;
       Active_Program_Vec.Clear;
-      SData.Table.Clear_Index_Map;
-      SData.Table.Clear_By_Vars;
+      SData_Core.Table.Clear_Index_Map;
+      SData_Core.Table.Clear_By_Vars;
    end Clear_Active_Program;
 
    procedure Debug_Trace (Msg : String; Level : Positive) is
    begin
-      if SData.Config.Debug_Level >= Level then
+      if SData_Core.Config.Debug_Level >= Level then
          Put_Line_Error ("[debug] " & Msg);
       end if;
    end Debug_Trace;
@@ -482,13 +482,13 @@ package body SData.Interpreter is
       else
          -- 2. Handle FPATH prepending
          if Cat = "USE" then
-            Base := SData.Config.Runtime.FPath_Use;
+            Base := SData.Run_State.FPath_Use;
          elsif Cat = "SAVE" then
-            Base := SData.Config.Runtime.FPath_Save;
+            Base := SData.Run_State.FPath_Save;
          elsif Cat = "SUBMIT" then
-            Base := SData.Config.Runtime.FPath_Submit;
+            Base := SData.Run_State.FPath_Submit;
          elsif Cat = "OUTPUT" then
-            Base := SData.Config.Runtime.FPath_Output;
+            Base := SData.Run_State.FPath_Output;
          end if;
 
          if Base /= Null_Unbounded_String and then To_String (Base) /= "" then
@@ -593,10 +593,10 @@ package body SData.Interpreter is
                raise Break_Triggered;
             end if;
          when Stmt_WRITE =>
-            SData.Variables.Flush_PDV_To_Output;
-            SData.Table.Set_Record_Explicitly_Written (True);
+            SData_Core.Variables.Flush_PDV_To_Output;
+            SData_Core.Table.Set_Record_Explicitly_Written (True);
          when Stmt_ECHO =>
-            SData.IO.Set_Local_Echo (Stmt.Echo_State);
+            SData_Core.IO.Set_Local_Echo (Stmt.Echo_State);
          when Stmt_LET | Stmt_SET =>
             Execute_Assignment (Stmt);
          when Stmt_PRINT =>
@@ -695,20 +695,20 @@ package body SData.Interpreter is
                          Logical_Count : Natural)
                          return Group_Flags_Result
    is
-      Phys_Curr : constant Positive := SData.Table.Logical_To_Physical (Logical_I);
+      Phys_Curr : constant Positive := SData_Core.Table.Logical_To_Physical (Logical_I);
    begin
       --  During REPEAT the input table is empty; BY variables have no data to
       --  compare, so all generated records form one implicit group.
-      if SData.Table.Row_Count = 0 then
+      if SData_Core.Table.Row_Count = 0 then
          return (BOG => Logical_I = 1, EOG => Logical_I = Logical_Count);
       end if;
       return
         (BOG => (Logical_I = 1) or else
-                not SData.Table.In_Same_Group
-                      (Phys_Curr, SData.Table.Logical_To_Physical (Logical_I - 1)),
+                not SData_Core.Table.In_Same_Group
+                      (Phys_Curr, SData_Core.Table.Logical_To_Physical (Logical_I - 1)),
          EOG => (Logical_I = Logical_Count) or else
-                not SData.Table.In_Same_Group
-                      (Phys_Curr, SData.Table.Logical_To_Physical (Logical_I + 1)));
+                not SData_Core.Table.In_Same_Group
+                      (Phys_Curr, SData_Core.Table.Logical_To_Physical (Logical_I + 1)));
    end Group_Flags;
 
    --  Rebuild_Filter_Map — re-evaluates the SELECT filter against the current
@@ -721,10 +721,10 @@ package body SData.Interpreter is
       if Select_Filter_Expr = null then return; end if;
       declare
          Total          : constant Natural := Row_Count;
-         Saved_Physical : constant Natural := SData.Table.Get_Current_Record_Index;
+         Saved_Physical : constant Natural := SData_Core.Table.Get_Current_Record_Index;
       begin
          if Total = 0 then
-            SData.Table.Clear_Index_Map;
+            SData_Core.Table.Clear_Index_Map;
          else
             declare
                Filter_Cols : Name_Sets.Set;
@@ -734,14 +734,14 @@ package body SData.Interpreter is
                --  they are already in the symbol table.
                Collect_Filter_Vars (Select_Filter_Expr, Filter_Cols);
                declare
-                  Passing : SData.Table.Index_Array (1 .. Total);
+                  Passing : SData_Core.Table.Index_Array (1 .. Total);
                   Count   : Natural := 0;
                begin
                   for R in 1 .. Total loop
-                     SData.Table.Set_Current_Record_Index (R);
+                     SData_Core.Table.Set_Current_Record_Index (R);
                      for Col_Name of Filter_Cols loop
-                        if SData.Table.Has_Column (Col_Name) then
-                           SData.Variables.Load_PDV_One_Column (R, Col_Name);
+                        if SData_Core.Table.Has_Column (Col_Name) then
+                           SData_Core.Variables.Load_PDV_One_Column (R, Col_Name);
                         end if;
                      end loop;
                      if Is_True (Evaluate (Select_Filter_Expr)) then
@@ -752,8 +752,8 @@ package body SData.Interpreter is
                         Debug_Trace ("SELECT → DROPPED", 2);
                      end if;
                   end loop;
-                  SData.Table.Set_Current_Record_Index (Saved_Physical);
-                  SData.Table.Set_Index_Map (Passing (1 .. Count));
+                  SData_Core.Table.Set_Current_Record_Index (Saved_Physical);
+                  SData_Core.Table.Set_Index_Map (Passing (1 .. Count));
                   Debug_Trace ("SELECT → "
                                & Ada.Strings.Fixed.Trim (Natural'Image (Count), Ada.Strings.Both)
                                & " of "
@@ -782,32 +782,32 @@ package body SData.Interpreter is
    --  writes to disk if a SAVE was deferred until after RUN.
    procedure Commit_Step is
    begin
-      SData.Table.Set_Logical_Record_Index (0);
-      SData.Table.Commit_Output_Table;
+      SData_Core.Table.Set_Logical_Record_Index (0);
+      SData_Core.Table.Commit_Output_Table;
       --  The committed table is a new physical row set; clear the stale map
       --  so it is rebuilt fresh at the start of the next RUN.
-      SData.Table.Clear_Index_Map;
+      SData_Core.Table.Clear_Index_Map;
       --  REPEAT generates records for exactly one RUN.  Subsequent RUNs
       --  must iterate the committed table, not re-use Repeat_Count.
-      SData.Config.Runtime.Repeat_Active := False;
+      SData.Run_State.Repeat_Active := False;
       Set_Current_Record_Index (0);
       Apply_Pending_Mods;
-      if SData.Config.Runtime.Save_File_Active then
+      if SData.Run_State.Save_File_Active then
          begin
             SData.File_IO.Open_Output
-               (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"),
-                SData.Config.Runtime.Save_File_Fmt,
-                SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
-                SData.Config.Runtime.Save_DLM (1 .. SData.Config.Runtime.Save_DLM_Len),
-                SData.Config.Runtime.Save_Header,
-                SData.Config.Runtime.Options_SAVEOVERWRT,
-                SData.Config.Runtime.Save_Charset
-                   (1 .. SData.Config.Runtime.Save_Charset_Len));
-            if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+               (Full_Path (SData.Run_State.Save_File_Path (1 .. SData.Run_State.Save_File_Len), "SAVE"),
+                SData.Run_State.Save_File_Fmt,
+                SData.Run_State.Save_Sheet_Name (1 .. SData.Run_State.Save_Sheet_Name_Len),
+                SData.Run_State.Save_DLM (1 .. SData.Run_State.Save_DLM_Len),
+                SData.Run_State.Save_Header,
+                SData.Run_State.Options_SAVEOVERWRT,
+                SData.Run_State.Save_Charset
+                   (1 .. SData.Run_State.Save_Charset_Len));
+            if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Run_State.Save_File_Path (1 .. SData.Run_State.Save_File_Len)); end if;
          exception
             when SData.File_IO.Save_Refused => null;
          end;
-         SData.Config.Runtime.Save_File_Active := False;
+         SData.Run_State.Save_File_Active := False;
       end if;
    end Commit_Step;
 
@@ -822,20 +822,20 @@ package body SData.Interpreter is
    procedure Run_One_Step (Start, Boundary : Statement_Access) is
       Global_Has_Write : constant Boolean := Has_Output_Statement (Start, Boundary);
       Num_Records      : constant Natural :=
-         (if SData.Config.Runtime.Repeat_Active then SData.Config.Runtime.Repeat_Count
+         (if SData.Run_State.Repeat_Active then SData.Run_State.Repeat_Count
           else (if Row_Count > 0 then Row_Count else 1));
       Step_Mode : Boolean :=
-         SData.Config.Debug_Level > 0 and then SData.IO.Is_Interactive;
+         SData_Core.Config.Debug_Level > 0 and then SData_Core.IO.Is_Interactive;
       Act       : Step_Action := Action_Continue;
       Ctx       : Step_Context;
    begin
       Initialize_PDV;
       Resolve_Expr_Indices (Start, Boundary);
-      SData.Table.Initialize_Output_Table;
+      SData_Core.Table.Initialize_Output_Table;
       Rebuild_Filter_Map;
       declare
          Logical_Count : constant Natural :=
-            (if SData.Table.Is_Filtered then SData.Table.Logical_Row_Count
+            (if SData_Core.Table.Is_Filtered then SData_Core.Table.Logical_Row_Count
              else Num_Records);
       begin
          for Logical_I in 1 .. Logical_Count loop
@@ -869,15 +869,15 @@ package body SData.Interpreter is
          if Current.Kind = Stmt_RUN then
             Run_One_Step (Step_Start, Current);
             declare
-               RC : constant String := Natural'Image (SData.Table.Row_Count);
-               VC : constant String := Natural'Image (SData.Table.Column_Count);
+               RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
+               VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
             begin
                Debug_Trace ("RUN complete: "
                             & RC (RC'First + 1 .. RC'Last)
                             & " records, "
                             & VC (VC'First + 1 .. VC'Last)
                             & " variables", 1);
-               if not SData.Config.Quiet_Mode then
+               if not SData_Core.Config.Quiet_Mode then
                   Put_Line ("RUN complete. " &
                             RC (RC'First + 1 .. RC'Last) & " records and " &
                             VC (VC'First + 1 .. VC'Last) & " variables processed.");
@@ -897,16 +897,16 @@ package body SData.Interpreter is
                Execute_Statement (Current, Outer_Ctx);
             exception
                when E : Script_Error =>
-                  if SData.Config.Continue_On_Error then
+                  if SData_Core.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                     SData.Config.Runtime.Last_Error_Code := 1;
-                     SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
+                     SData.Run_State.Last_Error_Code := 1;
+                     SData.Run_State.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
                   else raise; end if;
                when E : others =>
-                  if SData.Config.Continue_On_Error then
+                  if SData_Core.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                     SData.Config.Runtime.Last_Error_Code := 1;
-                     SData.Config.Runtime.Last_Error_Line := SData.Table.Get_Current_Record_Index;
+                     SData.Run_State.Last_Error_Code := 1;
+                     SData.Run_State.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
                   else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
             end;
          end if;

@@ -10,20 +10,20 @@ procedure Inspect_PDV
 is
    Inspect_I  : Positive := Logical_I;
    Saved_Phys : constant Positive :=
-      SData.Table.Logical_To_Physical (Logical_I);
+      SData_Core.Table.Logical_To_Physical (Logical_I);
 
    procedure Load_Inspect_Record (L : Positive) is
-      P : constant Positive := SData.Table.Logical_To_Physical (L);
+      P : constant Positive := SData_Core.Table.Logical_To_Physical (L);
    begin
-      SData.Table.Set_Current_Record_Index (P);
-      SData.Variables.Load_PDV_From_Table (P);
+      SData_Core.Table.Set_Current_Record_Index (P);
+      SData_Core.Variables.Load_PDV_From_Table (P);
       Put_Line_Error ("[debug] loaded record" & L'Image & " into PDV");
    end Load_Inspect_Record;
 
 begin
    Action := Action_Continue;
 
-   if not SData.IO.Is_Interactive then
+   if not SData_Core.IO.Is_Interactive then
       Put_Line_Error ("[debug] BREAK: record" & Logical_I'Image
                       & " paused (non-interactive — continuing)");
       return;
@@ -46,20 +46,20 @@ begin
             Upper : constant String := To_Upper (S);
          begin
             if Upper = "CONTINUE" or else Upper = "C" then
-               SData.Table.Set_Current_Record_Index (Saved_Phys);
-               SData.Variables.Load_PDV_From_Table (Saved_Phys);
+               SData_Core.Table.Set_Current_Record_Index (Saved_Phys);
+               SData_Core.Variables.Load_PDV_From_Table (Saved_Phys);
                Action := Action_Continue;
                return;
 
             elsif Upper = "STEP" or else Upper = "S" then
-               SData.Table.Set_Current_Record_Index (Saved_Phys);
-               SData.Variables.Load_PDV_From_Table (Saved_Phys);
+               SData_Core.Table.Set_Current_Record_Index (Saved_Phys);
+               SData_Core.Variables.Load_PDV_From_Table (Saved_Phys);
                Action := Action_Step;
                return;
 
             elsif Upper = "RUN" then
-               SData.Table.Set_Current_Record_Index (Saved_Phys);
-               SData.Variables.Load_PDV_From_Table (Saved_Phys);
+               SData_Core.Table.Set_Current_Record_Index (Saved_Phys);
+               SData_Core.Variables.Load_PDV_From_Table (Saved_Phys);
                Action := Action_Run;
                return;
 

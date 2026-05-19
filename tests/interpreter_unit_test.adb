@@ -5,17 +5,17 @@
 --  Unit tests for SData.Interpreter: control flow (IF/ELSE/ELSEIF, FOR, WHILE,
 --  REPEAT/UNTIL, BREAK, SELECT/CASE) and array assignment (single-index, slice,
 --  list, LET/SET ownership rules).
---  Parses and executes script fragments, then inspects SData.Variables and
---  SData.Table state via their public APIs.
+--  Parses and executes script fragments, then inspects SData_Core.Variables and
+--  SData_Core.Table state via their public APIs.
 
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with SData.Config;
-with SData.Config.Runtime;
-with SData.Table;
-with SData.Values;          use SData.Values;
-with SData.Variables;
+with SData_Core.Config;
+with SData.Run_State;
+with SData_Core.Table;
+with SData_Core.Values;          use SData_Core.Values;
+with SData_Core.Variables;
 with SData.AST;             use SData.AST;
 with SData.Parser;
 with SData.Interpreter;
@@ -79,10 +79,10 @@ procedure Interpreter_Unit_Test is
    --  Reset all interpreter state between tests.
    procedure Reset is
    begin
-      SData.Table.Clear;
-      SData.Variables.Clear_Temporary;
-      SData.Variables.Initialize_PDV;
-      SData.Config.Runtime.Reset;
+      SData_Core.Table.Clear;
+      SData_Core.Variables.Clear_Temporary;
+      SData_Core.Variables.Initialize_PDV;
+      SData.Run_State.Reset;
    end Reset;
 
    --  Parse and execute Script from a clean state.  Propagates any exception.
@@ -112,7 +112,7 @@ procedure Interpreter_Unit_Test is
 
    --  Read a variable as integer from the PDV (handles Numeric → Integer).
    function GI (Name : String) return Integer is
-      V : constant Value := SData.Variables.Get (Name);
+      V : constant Value := SData_Core.Variables.Get (Name);
    begin
       case V.Kind is
          when Val_Integer => return V.Int_Val;
@@ -123,7 +123,7 @@ procedure Interpreter_Unit_Test is
 
    --  Read a variable as float from the PDV.
    function GF (Name : String) return Float is
-      V : constant Value := SData.Variables.Get (Name);
+      V : constant Value := SData_Core.Variables.Get (Name);
    begin
       case V.Kind is
          when Val_Numeric => return V.Num_Val;
@@ -134,7 +134,7 @@ procedure Interpreter_Unit_Test is
 
    --  Read a variable as string from the PDV.
    function GS (Name : String) return String is
-      V : constant Value := SData.Variables.Get (Name);
+      V : constant Value := SData_Core.Variables.Get (Name);
    begin
       if V.Kind = Val_String then return To_String (V.Str_Val);
       else return "<not-a-string>";
@@ -143,7 +143,7 @@ procedure Interpreter_Unit_Test is
 
    --  Read a committed table cell as integer.
    function TGI (Row : Positive; Name : String) return Integer is
-      V : constant Value := SData.Table.Get_Value (Row, Name);
+      V : constant Value := SData_Core.Table.Get_Value (Row, Name);
    begin
       case V.Kind is
          when Val_Integer => return V.Int_Val;
@@ -154,7 +154,7 @@ procedure Interpreter_Unit_Test is
 
    --  Read an array element as integer.
    function GI_Arr (Name : String; Idx : Integer) return Integer is
-      V : constant Value := SData.Variables.Get_Array_Element (Name, Idx);
+      V : constant Value := SData_Core.Variables.Get_Array_Element (Name, Idx);
    begin
       case V.Kind is
          when Val_Integer => return V.Int_Val;
@@ -164,7 +164,7 @@ procedure Interpreter_Unit_Test is
    end GI_Arr;
 
 begin
-   SData.Config.Quiet_Mode := True;
+   SData_Core.Config.Quiet_Mode := True;
 
    Put_Line ("=== Interpreter Control Flow Unit Tests ===");
    Put_Line ("");
@@ -439,7 +439,7 @@ begin
    Run ("REPEAT 3" & L &
         "LET X = RECNO()" & L &
         "RUN");
-   Check ("IC-30: REPEAT 3 creates 3 rows", SData.Table.Row_Count, 3);
+   Check ("IC-30: REPEAT 3 creates 3 rows", SData_Core.Table.Row_Count, 3);
 
    --  IC-31: Each record carries the correct RECNO value.
    Check ("IC-31: record 1 X = 1", TGI (1, "X"), 1);
@@ -450,7 +450,7 @@ begin
    Run ("REPEAT 1" & L &
         "LET X = 42" & L &
         "RUN");
-   Check ("IC-32: REPEAT 1 creates 1 row", SData.Table.Row_Count, 1);
+   Check ("IC-32: REPEAT 1 creates 1 row", SData_Core.Table.Row_Count, 1);
    Check ("IC-32: REPEAT 1 row value", TGI (1, "X"), 42);
 
    -----------------------------------------------------------------------
@@ -467,7 +467,7 @@ begin
    --  Evaluate_Function returns Val_Missing for names not in the dispatch table.
    Run ("LET X = XXXXXXXX()" & L & "RUN");
    Check ("IC-34: unknown function returns Val_Missing",
-          SData.Variables.Get ("X").Kind = Val_Missing, True);
+          SData_Core.Variables.Get ("X").Kind = Val_Missing, True);
 
    -----------------------------------------------------------------------
    --  J.  Array Assignment (safety net for Execute_Assignment refactor)

@@ -28,7 +28,7 @@ procedure Resolve_Expr_Indices (Start, Boundary : Statement_Access) is
                Upper : constant String :=
                   To_Upper (Expr.Var_Name (1 .. Expr.Var_Len));
             begin
-               Expr.Var_Index := SData.Variables.PDV_Resolve (Upper);
+               Expr.Var_Index := SData_Core.Variables.PDV_Resolve (Upper);
             end;
          when Expr_Binary_Op =>
             Resolve_Expr (Expr.Left);

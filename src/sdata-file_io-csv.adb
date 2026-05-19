@@ -8,17 +8,17 @@ with Ada.Streams;
 with Ada.Directories;
 with Ada.Strings.UTF_Encoding;             use Ada.Strings.UTF_Encoding;
 with Ada.Strings.UTF_Encoding.Conversions;
-with SData.Config.Runtime;
+with SData.Run_State;
 with Ada.Unchecked_Deallocation;
-with SData.IO;                use SData.IO;
+with SData_Core.IO;                use SData_Core.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Fixed;       use Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
 with Ada.Containers.Vectors;
-with SData.Table;             use SData.Table;
-with SData.Values;            use SData.Values;
+with SData_Core.Table;             use SData_Core.Table;
+with SData_Core.Values;            use SData_Core.Values;
 with GNAT.Strings;            use GNAT.Strings;
-with SData.CSV;               use SData.CSV;
+with SData_Core.CSV;               use SData_Core.CSV;
 with SData.File_IO.Helpers;   use SData.File_IO.Helpers;
 
 package body SData.File_IO.CSV is
@@ -154,7 +154,7 @@ package body SData.File_IO.CSV is
       begin
          for I in S'Range loop
             if Character'Pos (S (I)) > 127 then
-               SData.IO.Put_Line_Error
+               SData_Core.IO.Put_Line_Error
                   ("Warning: non-ASCII byte (value" &
                    Integer'Image (Character'Pos (S (I))) &
                    ") found in """ & File_Name & """");
@@ -208,7 +208,7 @@ package body SData.File_IO.CSV is
                   if F'Length > 0
                      and then (F (F'First) = '"' or else F (F'First) = ''')
                   then
-                     SData.IO.Put_Line_Error
+                     SData_Core.IO.Put_Line_Error
                         ("Warning: """ & File_Name & """, data row" &
                          Natural'Image (Rows_Written) & ", column" &
                          Natural'Image (Field_Count) &
@@ -225,7 +225,7 @@ package body SData.File_IO.CSV is
                         --  store as missing rather than as a string so that
                         --  arithmetic on the column stays well-typed.
                         if Col_Types (Field_Count) = Col_Numeric then
-                           SData.IO.Put_Line_Error
+                           SData_Core.IO.Put_Line_Error
                               ("Warning: """ & File_Name & """, data row" &
                                Natural'Image (Rows_Written) & ", column """ &
                                Col_Names (Field_Count).all &
@@ -239,7 +239,7 @@ package body SData.File_IO.CSV is
                      end if;
                      Set_Value_Upper (Row_Count, Col_Names (Field_Count).all, Val);
                   elsif not Warned_Extra then
-                     SData.IO.Put_Line_Error
+                     SData_Core.IO.Put_Line_Error
                         ("Warning: """ & File_Name & """, data row" &
                          Natural'Image (Rows_Written) &
                          ": row has more fields than the" &
@@ -255,7 +255,7 @@ package body SData.File_IO.CSV is
 
          --  Short row: non-empty line with fewer fields than columns.
          if Line'Length > 0 and then Field_Count < N_Cols then
-            SData.IO.Put_Line_Error
+            SData_Core.IO.Put_Line_Error
                ("Warning: """ & File_Name & """, data row" &
                 Natural'Image (Rows_Written) &
                 ": only" & Natural'Image (Field_Count) &
@@ -365,7 +365,7 @@ package body SData.File_IO.CSV is
          end loop;
 
          if Has_File_Header and then Scan_Count = 0 then
-            SData.IO.Put_Line_Error
+            SData_Core.IO.Put_Line_Error
                ("Warning: File contains a header but no data records.");
          end if;
 
@@ -499,9 +499,9 @@ package body SData.File_IO.CSV is
                         Charset         : String  := "") is
       use Ada.Directories;
 
-      TXTFMT_Len : constant Natural := SData.Config.Runtime.Options_TXTFMT_Len;
+      TXTFMT_Len : constant Natural := SData.Run_State.Options_TXTFMT_Len;
       TXTFMT_Raw : constant String  :=
-         (if TXTFMT_Len > 0 then SData.Config.Runtime.Options_TXTFMT (1 .. TXTFMT_Len)
+         (if TXTFMT_Len > 0 then SData.Run_State.Options_TXTFMT (1 .. TXTFMT_Len)
           else "AUTO");
       EOL : constant String :=
          (if    TXTFMT_Raw = "CRLF" then "" & ASCII.CR & ASCII.LF
@@ -539,7 +539,7 @@ package body SData.File_IO.CSV is
             if Is_ASCII_Chk then
                for I in S'Range loop
                   if Character'Pos (S (I)) > 127 then
-                     SData.IO.Put_Line_Error
+                     SData_Core.IO.Put_Line_Error
                         ("Warning: non-ASCII byte (value" &
                          Integer'Image (Character'Pos (S (I))) &
                          ") in output for """ & File_Name & """");
@@ -595,7 +595,7 @@ package body SData.File_IO.CSV is
 
    begin
       if not Allow_Overwrite and then Exists (File_Name) then
-         SData.IO.Put_Line_Error
+         SData_Core.IO.Put_Line_Error
             ("Error: SAVE aborted — file already exists: " & File_Name &
              " (use OPTIONS SAVEOVERWRT YES to allow overwriting)");
          raise SData.File_IO.Save_Refused;
@@ -627,7 +627,7 @@ package body SData.File_IO.CSV is
                   elsif Val.Kind = Val_Integer then
                      Write_String (Trim (Val.Int_Val'Img, Ada.Strings.Both));
                   elsif Val.Kind = Val_String then
-                     Write_String (CSV_Quote (SData.Values.To_String (Val)));
+                     Write_String (CSV_Quote (SData_Core.Values.To_String (Val)));
                   end if;
                end;
                if C /= N then Write_String (D_Str); end if;

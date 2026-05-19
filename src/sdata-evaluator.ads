@@ -4,10 +4,10 @@
 
 --  Package SData.Evaluator implements the Expression Evaluation Engine.
 --  It takes AST expression nodes and returns computed 'Value' records,
---  interacting with SData.Variables for symbol lookups.
+--  interacting with SData_Core.Variables for symbol lookups.
 
 with SData.AST;    use SData.AST;
-with SData.Values; use SData.Values;
+with SData_Core.Values; use SData_Core.Values;
 private with Ada.Containers.Vectors;
 private with Ada.Containers.Indefinite_Hashed_Maps;
 private with Ada.Strings.Hash;
@@ -56,7 +56,7 @@ private
    package Value_Vectors is new Ada.Containers.Vectors
       (Index_Type   => Positive,
        Element_Type => Value,
-       "="          => SData.Values."=");
+       "="          => SData_Core.Values."=");
 
    use type Ada.Containers.Count_Type;
 

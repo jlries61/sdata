@@ -6,9 +6,9 @@ with Ada.Containers.Vectors;
 with Ada.Exceptions;
 with Ada.Strings.Fixed;       use Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
-with SData.IO;                use SData.IO;
-with SData.Table;             use SData.Table;
-with SData.Values;            use SData.Values;
+with SData_Core.IO;                use SData_Core.IO;
+with SData_Core.Table;             use SData_Core.Table;
+with SData_Core.Values;            use SData_Core.Values;
 with GNAT.OS_Lib;
 with Zip;
 with UnZip;
@@ -19,7 +19,7 @@ with DOM.Core.Elements;
 with DOM.Core.Documents;
 with DOM.Readers;
 with Input_Sources.File;
-with SData.Config;
+with SData_Core.Config;
 with SData.File_IO.Helpers;   use SData.File_IO.Helpers;
 with SData.File_IO.ODF;
 
@@ -179,7 +179,7 @@ package body SData.File_IO.OOXML is
          GNAT.OS_Lib.Delete_File (Temp_Shared, Success);
       exception
          when E : others =>
-            if not SData.Config.Quiet_Mode then
+            if not SData_Core.Config.Quiet_Mode then
                Put_Line_Error
                   ("Warning: OOXML shared strings failed to load; " &
                    "string cells will be missing: " &
@@ -274,7 +274,7 @@ package body SData.File_IO.OOXML is
                      Trim (Integer (I + 1)'Img, Ada.Strings.Both);
                   Nam : constant String :=
                      (if V.Kind = Val_String
-                      then SData.Values.To_String (V)
+                      then SData_Core.Values.To_String (V)
                       else "COL" & Idx);
                begin
                   Col_Name_Vec.Append
@@ -352,7 +352,7 @@ package body SData.File_IO.OOXML is
                               end if;
                            exception
                               when E : others =>
-                                 if not SData.Config.Quiet_Mode then
+                                 if not SData_Core.Config.Quiet_Mode then
                                     Put_Line_Error
                                        ("Warning: OOXML import skipped cell at row" &
                                         Row_Count'Image &
@@ -376,7 +376,7 @@ package body SData.File_IO.OOXML is
          if Has_Formulas_XML (Temp_Sheet, Is_ODF => False) then
             declare
                Converted : constant String :=
-                  Convert_Via_LibreOffice (File_Name, SData.Config.OOXML);
+                  Convert_Via_LibreOffice (File_Name, SData_Core.Config.OOXML);
                OK : Boolean;
             begin
                if Converted /= "" then
@@ -386,7 +386,7 @@ package body SData.File_IO.OOXML is
                   GNAT.OS_Lib.Delete_File (Converted, OK);
                   return;
                end if;
-               if not SData.Config.Quiet_Mode then
+               if not SData_Core.Config.Quiet_Mode then
                   Put_Line_Error
                      ("Warning: formula cells found in XLSX file but LibreOffice " &
                       "is not available; using cached values.");
@@ -572,7 +572,7 @@ package body SData.File_IO.OOXML is
                         Append (S1,
                            "<c r=""" & Ref &
                            """ t=""inlineStr""><is><t>" &
-                           Escape_XML (SData.Values.To_String (V)) &
+                           Escape_XML (SData_Core.Values.To_String (V)) &
                            "</t></is></c>");
                      when Val_Missing =>
                         null;

@@ -100,21 +100,21 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
    begin
       if Existing_Kind /= Val_Missing then
          if Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
-            raise SData.Table.Type_Mismatch_Error with
+            raise SData_Core.Table.Type_Mismatch_Error with
               "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
          end if;
          if Existing_Kind = Val_String and Result.Kind /= Val_String then
-            raise SData.Table.Type_Mismatch_Error with
+            raise SData_Core.Table.Type_Mismatch_Error with
               "Cannot assign numeric to string variable " & Var_Name;
          elsif Existing_Kind /= Val_String and Result.Kind = Val_String then
-            raise SData.Table.Type_Mismatch_Error with
+            raise SData_Core.Table.Type_Mismatch_Error with
               "Cannot assign string to numeric variable " & Var_Name;
          end if;
       end if;
       if Result.Kind = Val_Numeric and then Is_Inf (Result.Num_Val)
          and then Expected = Val_Integer
       then
-         if SData.Config.Ignore_Math_Errors then
+         if SData_Core.Config.Ignore_Math_Errors then
             Put_Line_Error ("Warning: Cannot convert Inf to integer.");
             return (Kind => Val_Missing);
          else
@@ -130,18 +130,18 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
          elsif Expected /= Result.Kind
             and not (Expected = Val_Numeric and Result.Kind = Val_Integer)
          then
-            raise SData.Table.Type_Mismatch_Error with
+            raise SData_Core.Table.Type_Mismatch_Error with
               "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
          end if;
       end if;
       if Result.Kind = Val_String
-         and then SData.Config.Max_String_Len > 0
-         and then Length (Result.Str_Val) > SData.Config.Max_String_Len
+         and then SData_Core.Config.Max_String_Len > 0
+         and then Length (Result.Str_Val) > SData_Core.Config.Max_String_Len
       then
          Put_Line_Error ("Warning: String truncated to "
-                         & Integer'Image (SData.Config.Max_String_Len) & " characters.");
+                         & Integer'Image (SData_Core.Config.Max_String_Len) & " characters.");
          Result.Str_Val :=
-           To_Unbounded_String (Slice (Result.Str_Val, 1, SData.Config.Max_String_Len));
+           To_Unbounded_String (Slice (Result.Str_Val, 1, SData_Core.Config.Max_String_Len));
       end if;
       return Result;
    end Coerce_For_Scalar;
@@ -156,7 +156,7 @@ begin
       and then Result.Kind = Val_Numeric
       and then Is_Inf (Result.Num_Val)
    then
-      if SData.Config.Ignore_Math_Errors then
+      if SData_Core.Config.Ignore_Math_Errors then
          Put_Line_Error ("Warning: Cannot convert Inf to integer.");
          Result := (Kind => Val_Missing);
       else
@@ -176,7 +176,7 @@ begin
                    & Var_Name_Str & " = " & Debug_Value (Result), 3);
    end if;
 exception
-   when E : SData.Table.Type_Mismatch_Error =>
+   when E : SData_Core.Table.Type_Mismatch_Error =>
       raise Script_Error with "Type mismatch for variable " & Var_Name_Str
         & ": " & Ada.Exceptions.Exception_Message (E);
    when Script_Error => raise;

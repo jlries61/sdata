@@ -2,11 +2,11 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
-with SData.IO;        use SData.IO;
+with SData_Core.IO;        use SData_Core.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
-with SData.Config;
-with SData.Variables; use SData.Variables;
+with SData_Core.Config;
+with SData_Core.Variables; use SData_Core.Variables;
 
 --  SData.Parser — recursive-descent parser for the SData command language.
 --
@@ -796,9 +796,9 @@ package body SData.Parser is
                               begin
                                  if Flag_Name = "FMT" then
                                     Stmt.Format_Specified := True;
-                                    if Val_Str = "CSV" then Stmt.Fmt_Override := SData.Config.CSV;
-                                    elsif Val_Str = "ODF" or else Val_Str = "ODS" then Stmt.Fmt_Override := SData.Config.ODF;
-                                    elsif Val_Str = "OOXML" or else Val_Str = "XLSX" then Stmt.Fmt_Override := SData.Config.OOXML;
+                                    if Val_Str = "CSV" then Stmt.Fmt_Override := SData_Core.Config.CSV;
+                                    elsif Val_Str = "ODF" or else Val_Str = "ODS" then Stmt.Fmt_Override := SData_Core.Config.ODF;
+                                    elsif Val_Str = "OOXML" or else Val_Str = "XLSX" then Stmt.Fmt_Override := SData_Core.Config.OOXML;
                                     end if;
                                  elsif Flag_Name = "NSCAN" then
                                     Stmt.NSCAN_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));

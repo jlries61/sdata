@@ -2,12 +2,12 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
-with SData.Variables; use SData.Variables;
-with SData.Config;
-with SData.Config.Runtime;
+with SData_Core.Variables; use SData_Core.Variables;
+with SData_Core.Config;
+with SData.Run_State;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
-with SData.IO;        use SData.IO;
+with SData_Core.IO;        use SData_Core.IO;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Interfaces;
 use type Interfaces.Integer_64;
@@ -123,7 +123,7 @@ package body SData.Evaluator is
 
    function Handle_Domain_Error (Msg : String) return Value is
    begin
-      if SData.Config.Ignore_Math_Errors then
+      if SData_Core.Config.Ignore_Math_Errors then
          Put_Line_Error ("Warning: " & Msg);
          return (Kind => Val_Missing);
       else
@@ -470,7 +470,7 @@ package body SData.Evaluator is
                            when Op_Mul => return Numeric_Result_Checked (FL * FR);
                            when Op_Div =>
                               if FR = 0.0 and then
-                                 not SData.Config.Runtime.IEEE_Divide
+                                 not SData.Run_State.IEEE_Divide
                               then
                                  raise SData.Script_Error with "Division by zero.";
                               end if;
@@ -496,8 +496,8 @@ package body SData.Evaluator is
                            V     : Value (Val_String);
                            Limit : Natural := 1024;
                         begin
-                           if SData.Config.Max_String_Len > 0 then
-                              Limit := SData.Config.Max_String_Len;
+                           if SData_Core.Config.Max_String_Len > 0 then
+                              Limit := SData_Core.Config.Max_String_Len;
                            end if;
                            declare
                               LL : constant Natural := Length (L.Str_Val);

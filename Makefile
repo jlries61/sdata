@@ -10,7 +10,18 @@ GPR_FILE = sdata.gpr
 # Use GPRBUILD from the environment or command line if set; otherwise detect
 # from PATH.  When working with an Alire-managed toolchain, run 'alr build'
 # directly, or ensure the toolchain is on PATH via 'eval $(alr printenv)'.
+#
+# When alr is available, build via 'alr exec -- gprbuild' so that alire
+# manages GPR_PROJECT_PATH for all transitive dependencies (including
+# sdata-core and its deps).  Fall back to raw gprbuild for packaging builds
+# where GPR_PROJECT_PATH is provided externally (e.g. RPM spec).
+ALR      := $(firstword $(shell which alr 2>/dev/null))
 GPRBUILD ?= $(firstword $(shell which gprbuild 2>/dev/null) gprbuild)
+ifneq ($(ALR),)
+  BUILD_CMD = $(ALR) exec -- $(GPRBUILD) -P $(GPR_FILE)
+else
+  BUILD_CMD = $(GPRBUILD) -P $(GPR_FILE)
+endif
 # GNU coreutils 'timeout' is 'gtimeout' on macOS/MacPorts; fall back to plain
 # 'timeout' (Linux) if 'gtimeout' is not found.
 TIMEOUT  := $(firstword $(shell which gtimeout 2>/dev/null) timeout)
@@ -20,16 +31,17 @@ TIMEOUT  := $(firstword $(shell which gtimeout 2>/dev/null) timeout)
 # Otherwise auto-detect from the sibling source directories in the parent.
 #
 # Note: these sibling directories (zipada_*, xmlada_*, mathpaqs_*) are the
-# library sources used for 'make build' and for packaging targets (srpm, dsc,
-# slackware).  They are separate from the copies that 'alr build' manages in
-# ~/.local/share/alire/builds/ -- both paths use the same library versions,
-# they are just physically independent.
+# library sources used for packaging targets (srpm, dsc, slackware) where
+# alr may not be available.  They are separate from the copies that
+# 'alr build' manages in ~/.local/share/alire/builds/ -- both paths use
+# the same library versions, they are just physically independent.
 DEP_BASE := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 _ZIPADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/zipada_*))
 _XMLADA_DIR    := $(firstword $(wildcard $(DEP_BASE)/xmlada_*))
 _MATHPAQS_DIR  := $(firstword $(wildcard $(DEP_BASE)/mathpaqs_*))
 _SQLITE3_DIR   := $(firstword $(wildcard $(DEP_BASE)/ada_sqlite3_*))
-_LOCAL_GPR_PATH := $(_ZIPADA_DIR):$(_XMLADA_DIR)/dom:$(_XMLADA_DIR)/input_sources:$(_MATHPAQS_DIR):$(_SQLITE3_DIR)
+_SDATA_CORE_DIR := $(DEP_BASE)/sdata-core
+_LOCAL_GPR_PATH := $(_ZIPADA_DIR):$(_XMLADA_DIR)/dom:$(_XMLADA_DIR)/input_sources:$(_MATHPAQS_DIR):$(_SQLITE3_DIR):$(_SDATA_CORE_DIR)
 export GPR_PROJECT_PATH ?= $(_LOCAL_GPR_PATH)
 PREFIX ?= /usr/local
 BINDIR  = $(PREFIX)/bin
@@ -44,7 +56,7 @@ DOC_DIR      = $(DESTDIR)$(DOCDIR)
 all: build
 
 build:
-	$(GPRBUILD) -P $(GPR_FILE)
+	$(BUILD_CMD)
 
 run: build
 	@if [ -z "$(FILE)" ]; then \
@@ -55,8 +67,8 @@ run: build
 	./bin/sdata $(FILE)
 
 check: build
-	@[ -x bin/csv_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
-	@[ -x bin/sdata_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
+	@[ -x bin/csv_unit_test ] || $(BUILD_CMD)
+	@[ -x bin/sdata_unit_test ] || $(BUILD_CMD)
 	@echo "Running unit tests..."
 	@$(TIMEOUT) 30 ./bin/csv_unit_test; \
 	 if [ $$? -ne 0 ]; then \
@@ -66,17 +78,17 @@ check: build
 	 if [ $$? -ne 0 ]; then \
 	   echo "Unit tests FAILED"; exit 1; \
 	 fi
-	@[ -x bin/evaluator_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
+	@[ -x bin/evaluator_unit_test ] || $(BUILD_CMD)
 	@$(TIMEOUT) 30 ./bin/evaluator_unit_test; \
 	 if [ $$? -ne 0 ]; then \
 	   echo "Unit tests FAILED"; exit 1; \
 	 fi
-	@[ -x bin/file_io_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
+	@[ -x bin/file_io_unit_test ] || $(BUILD_CMD)
 	@$(TIMEOUT) 30 ./bin/file_io_unit_test; \
 	 if [ $$? -ne 0 ]; then \
 	   echo "Unit tests FAILED"; exit 1; \
 	 fi
-	@[ -x bin/interpreter_unit_test ] || $(GPRBUILD) -P $(GPR_FILE)
+	@[ -x bin/interpreter_unit_test ] || $(BUILD_CMD)
 	@$(TIMEOUT) 30 ./bin/interpreter_unit_test; \
 	 if [ $$? -ne 0 ]; then \
 	   echo "Unit tests FAILED"; exit 1; \

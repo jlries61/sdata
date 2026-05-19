@@ -4,8 +4,8 @@
 
 with Ada.Text_IO;      use Ada.Text_IO;
 with Ada.Command_Line;
-with SData.CSV;        use SData.CSV;
-with SData.Values;     use SData.Values;
+with SData_Core.CSV;        use SData_Core.CSV;
+with SData_Core.Values;     use SData_Core.Values;
 
 procedure CSV_Unit_Test is
    Passed : Natural := 0;

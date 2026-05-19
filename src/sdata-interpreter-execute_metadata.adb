@@ -11,7 +11,7 @@ begin
          begin
             if Stmt.Kind = Stmt_UNSET then
                while Curr_Var /= null loop
-                  SData.Variables.Unset (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
+                  SData_Core.Variables.Unset (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
                   Curr_Var := Curr_Var.Next;
                end loop;
             elsif Stmt.Kind = Stmt_KEEP or Stmt.Kind = Stmt_DROP then
@@ -189,7 +189,7 @@ begin
       when Stmt_DISPLAY =>
          declare
             V    : Name_Vectors.Vector;
-            Rows : constant Natural := SData.Table.Logical_Row_Count;
+            Rows : constant Natural := SData_Core.Table.Logical_Row_Count;
          begin
             if Stmt.Vars = null then
                for I in 1 .. Column_Count loop
@@ -248,7 +248,7 @@ begin
 
             for R in 1 .. Rows loop
                declare
-                  Phys_R : constant Positive := SData.Table.Logical_To_Physical (R);
+                  Phys_R : constant Positive := SData_Core.Table.Logical_To_Physical (R);
                begin
                   Put (Ada.Strings.Fixed.Trim (R'Image, Ada.Strings.Both) & " ");
                   for Name of V loop

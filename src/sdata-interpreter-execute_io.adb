@@ -7,7 +7,7 @@ procedure Execute_IO (Stmt : Statement_Access) is
 begin
    case Stmt.Kind is
       when Stmt_SUBMIT =>
-         if SData.Config.Disable_Submit then
+         if SData_Core.Config.Disable_Submit then
             Put_Line_Error ("Error: SUBMIT command is disabled.");
          else
          declare
@@ -55,7 +55,7 @@ begin
          end;
          end if;
       when Stmt_SYSTEM =>
-         if SData.Config.Disable_Shell then
+         if SData_Core.Config.Disable_Shell then
             Put_Line_Error ("Error: SYSTEM command is disabled.");
          else
             declare Success : Boolean;
@@ -64,31 +64,31 @@ begin
             end;
          end if;
       when Stmt_OUTPUT =>
-         if SData.IO.Is_Redirected then SData.IO.Close_Output; end if;
+         if SData_Core.IO.Is_Redirected then SData_Core.IO.Close_Output; end if;
          if Stmt.File_Len > 0 then
-            SData.IO.Open_Output (Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT"));
+            SData_Core.IO.Open_Output (Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT"));
          end if;
          if Stmt.Output_FMT_Len > 0 then
-            SData.Config.Runtime.Options_TXTFMT := (others => ' ');
-            SData.Config.Runtime.Options_TXTFMT (1 .. Stmt.Output_FMT_Len) :=
+            SData.Run_State.Options_TXTFMT := (others => ' ');
+            SData.Run_State.Options_TXTFMT (1 .. Stmt.Output_FMT_Len) :=
                Stmt.Output_FMT_Val (1 .. Stmt.Output_FMT_Len);
-            SData.Config.Runtime.Options_TXTFMT_Len := Stmt.Output_FMT_Len;
+            SData.Run_State.Options_TXTFMT_Len := Stmt.Output_FMT_Len;
          end if;
          if Stmt.Output_CHARSET_Len > 0 then
-            SData.Config.Runtime.Options_CHARSET := (others => ' ');
-            SData.Config.Runtime.Options_CHARSET (1 .. Stmt.Output_CHARSET_Len) :=
+            SData.Run_State.Options_CHARSET := (others => ' ');
+            SData.Run_State.Options_CHARSET (1 .. Stmt.Output_CHARSET_Len) :=
                Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len);
-            SData.Config.Runtime.Options_CHARSET_Len := Stmt.Output_CHARSET_Len;
+            SData.Run_State.Options_CHARSET_Len := Stmt.Output_CHARSET_Len;
          end if;
       when Stmt_FPATH =>
          declare
             Path      : constant String  := (if Stmt.File_Len > 0 then Stmt.File_Path (1 .. Stmt.File_Len) else "");
             Reset_All : constant Boolean := not (Stmt.Use_Flag or Stmt.Save_Flag or Stmt.Submit_Flag or Stmt.Output_Flag);
          begin
-            if Reset_All or Stmt.Use_Flag    then SData.Config.Runtime.FPath_Use    := To_Unbounded_String (Path); end if;
-            if Reset_All or Stmt.Save_Flag   then SData.Config.Runtime.FPath_Save   := To_Unbounded_String (Path); end if;
-            if Reset_All or Stmt.Submit_Flag then SData.Config.Runtime.FPath_Submit := To_Unbounded_String (Path); end if;
-            if Reset_All or Stmt.Output_Flag then SData.Config.Runtime.FPath_Output := To_Unbounded_String (Path); end if;
+            if Reset_All or Stmt.Use_Flag    then SData.Run_State.FPath_Use    := To_Unbounded_String (Path); end if;
+            if Reset_All or Stmt.Save_Flag   then SData.Run_State.FPath_Save   := To_Unbounded_String (Path); end if;
+            if Reset_All or Stmt.Submit_Flag then SData.Run_State.FPath_Submit := To_Unbounded_String (Path); end if;
+            if Reset_All or Stmt.Output_Flag then SData.Run_State.FPath_Output := To_Unbounded_String (Path); end if;
          end;
       when others => null;
    end case;

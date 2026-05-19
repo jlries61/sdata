@@ -21,8 +21,8 @@ procedure Execute_Declarative (Stmt : Statement_Access) is
 begin
    case Stmt.Kind is
       when Stmt_USE =>
-         SData.Config.Runtime.Repeat_Active := False;
-         SData.Config.Runtime.Repeat_Count := 0;
+         SData.Run_State.Repeat_Active := False;
+         SData.Run_State.Repeat_Count := 0;
          declare
             File_Name  : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
             Expanded   : String (1 .. Max_Path_Len);
@@ -30,17 +30,17 @@ begin
             Eff_DLM     : constant String :=
                (if Stmt.DLM_Len > 0
                 then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                else SData.Config.Runtime.Options_CSVDLM
-                        (1 .. SData.Config.Runtime.Options_CSVDLM_Len));
+                else SData.Run_State.Options_CSVDLM
+                        (1 .. SData.Run_State.Options_CSVDLM_Len));
             Eff_Header  : constant Boolean :=
                (if Stmt.Header_Specified
                 then Stmt.Header_Val
-                else SData.Config.Runtime.Options_Header);
+                else SData.Run_State.Options_Header);
             Eff_Charset : constant String :=
                (if Stmt.Output_CHARSET_Len > 0
                 then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
-                else SData.Config.Runtime.Options_CHARSET
-                        (1 .. SData.Config.Runtime.Options_CHARSET_Len));
+                else SData.Run_State.Options_CHARSET
+                        (1 .. SData.Run_State.Options_CHARSET_Len));
          begin
             if Stmt.Is_Mock then
                Exp_Len := 4; Expanded (1 .. 4) := "MOCK";
@@ -49,7 +49,7 @@ begin
                begin Exp_Len := Full'Length; Expanded (1 .. Exp_Len) := Full; end;
             end if;
             SData.File_IO.Open_Input (Expanded (1 .. Exp_Len),
-              (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Input_Format),
+              (if Stmt.Format_Specified then Stmt.Fmt_Override else SData_Core.Config.Input_Format),
               Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
               Eff_DLM, Eff_Header, Eff_Charset,
               Stmt.Skip_Val, Stmt.Maxrows_Val, Stmt.NSCAN_Val);
@@ -62,49 +62,49 @@ begin
          Debug_Trace ("USE: opened "
                       & Stmt.File_Path (1 .. Stmt.File_Len)
                       & " ("
-                      & Ada.Strings.Fixed.Trim (Natural'Image (SData.Table.Row_Count), Ada.Strings.Both)
+                      & Ada.Strings.Fixed.Trim (Natural'Image (SData_Core.Table.Row_Count), Ada.Strings.Both)
                       & " records, "
-                      & Ada.Strings.Fixed.Trim (Natural'Image (SData.Table.Column_Count), Ada.Strings.Both)
+                      & Ada.Strings.Fixed.Trim (Natural'Image (SData_Core.Table.Column_Count), Ada.Strings.Both)
                       & " variables)", 1);
       when Stmt_SAVE =>
          if Stmt.File_Len = 0 then
-            SData.Config.Runtime.Save_File_Active := False;
-            SData.Config.Runtime.Save_File_Len := 0;
+            SData.Run_State.Save_File_Active := False;
+            SData.Run_State.Save_File_Len := 0;
          else
             declare
                Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
                SLen  : constant Natural := Stmt.Sheet_Name_Len;
             begin
-               SData.Config.Runtime.Save_File_Path (1 .. Full'Length) := Full;
-               SData.Config.Runtime.Save_File_Len := Full'Length;
-               SData.Config.Runtime.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData.Config.Output_Format);
-               SData.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
-               SData.Config.Runtime.Save_Sheet_Name_Len := SLen;
-               SData.Config.Runtime.Save_File_Active := True;
+               SData.Run_State.Save_File_Path (1 .. Full'Length) := Full;
+               SData.Run_State.Save_File_Len := Full'Length;
+               SData.Run_State.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData_Core.Config.Output_Format);
+               SData.Run_State.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
+               SData.Run_State.Save_Sheet_Name_Len := SLen;
+               SData.Run_State.Save_File_Active := True;
                declare
                   Eff_DLM : constant String :=
                      (if Stmt.DLM_Len > 0
                       then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                      else SData.Config.Runtime.Options_CSVDLM
-                              (1 .. SData.Config.Runtime.Options_CSVDLM_Len));
+                      else SData.Run_State.Options_CSVDLM
+                              (1 .. SData.Run_State.Options_CSVDLM_Len));
                   EL : constant Natural := Eff_DLM'Length;
                begin
-                  SData.Config.Runtime.Save_DLM (1 .. EL) := Eff_DLM;
-                  SData.Config.Runtime.Save_DLM_Len := EL;
+                  SData.Run_State.Save_DLM (1 .. EL) := Eff_DLM;
+                  SData.Run_State.Save_DLM_Len := EL;
                end;
-               SData.Config.Runtime.Save_Header :=
+               SData.Run_State.Save_Header :=
                   (if Stmt.Header_Specified
                    then Stmt.Header_Val
-                   else SData.Config.Runtime.Options_Header);
+                   else SData.Run_State.Options_Header);
                if Stmt.Output_CHARSET_Len > 0 then
-                  SData.Config.Runtime.Save_Charset (1 .. Stmt.Output_CHARSET_Len) :=
+                  SData.Run_State.Save_Charset (1 .. Stmt.Output_CHARSET_Len) :=
                      Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len);
-                  SData.Config.Runtime.Save_Charset_Len := Stmt.Output_CHARSET_Len;
+                  SData.Run_State.Save_Charset_Len := Stmt.Output_CHARSET_Len;
                else
-                  SData.Config.Runtime.Save_Charset :=
-                     SData.Config.Runtime.Options_CHARSET;
-                  SData.Config.Runtime.Save_Charset_Len :=
-                     SData.Config.Runtime.Options_CHARSET_Len;
+                  SData.Run_State.Save_Charset :=
+                     SData.Run_State.Options_CHARSET;
+                  SData.Run_State.Save_Charset_Len :=
+                     SData.Run_State.Options_CHARSET_Len;
                end if;
             end;
          end if;
@@ -131,36 +131,36 @@ begin
                end;
             end if;
             declare
-               RC : constant String := Natural'Image (SData.Table.Row_Count);
-               VC : constant String := Natural'Image (SData.Table.Column_Count);
+               RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
+               VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
             begin
                Put_Line ("SORT complete. " &
                          RC (RC'First + 1 .. RC'Last) & " records and " &
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
-            if SData.Config.Runtime.Save_File_Active then
+            if SData.Run_State.Save_File_Active then
                begin
                   SData.File_IO.Open_Output
-                     (Full_Path (SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len), "SAVE"),
-                      SData.Config.Runtime.Save_File_Fmt,
-                      SData.Config.Runtime.Save_Sheet_Name (1 .. SData.Config.Runtime.Save_Sheet_Name_Len),
-                      SData.Config.Runtime.Save_DLM (1 .. SData.Config.Runtime.Save_DLM_Len),
-                      SData.Config.Runtime.Save_Header,
-                      SData.Config.Runtime.Options_SAVEOVERWRT,
-                      SData.Config.Runtime.Save_Charset
-                         (1 .. SData.Config.Runtime.Save_Charset_Len));
-                  if not SData.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Config.Runtime.Save_File_Path (1 .. SData.Config.Runtime.Save_File_Len)); end if;
+                     (Full_Path (SData.Run_State.Save_File_Path (1 .. SData.Run_State.Save_File_Len), "SAVE"),
+                      SData.Run_State.Save_File_Fmt,
+                      SData.Run_State.Save_Sheet_Name (1 .. SData.Run_State.Save_Sheet_Name_Len),
+                      SData.Run_State.Save_DLM (1 .. SData.Run_State.Save_DLM_Len),
+                      SData.Run_State.Save_Header,
+                      SData.Run_State.Options_SAVEOVERWRT,
+                      SData.Run_State.Save_Charset
+                         (1 .. SData.Run_State.Save_Charset_Len));
+                  if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Run_State.Save_File_Path (1 .. SData.Run_State.Save_File_Len)); end if;
                exception
                   when SData.File_IO.Save_Refused => null;
                end;
-               SData.Config.Runtime.Save_File_Active := False;
+               SData.Run_State.Save_File_Active := False;
             end if;
          end;
       when Stmt_BY =>
-         if SData.Table.Column_Count = 0 and then not SData.Config.Runtime.Repeat_Active then
+         if SData_Core.Table.Column_Count = 0 and then not SData.Run_State.Repeat_Active then
             raise Script_Error with "BY statement requires an active dataset (use USE or REPEAT first).";
          end if;
-         SData.Table.Clear_By_Vars;
+         SData_Core.Table.Clear_By_Vars;
          declare
             Curr_Var : Variable_List := Stmt.Sort_Vars;
             Count    : Natural := 0;
@@ -177,7 +177,7 @@ begin
                      Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
                      Crit (Idx).Len := Curr_Var.Var.Start_Len;
                      Crit (Idx).Dir := Ascending;
-                     SData.Table.Add_By_Var (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
+                     SData_Core.Table.Add_By_Var (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
                      Idx := Idx + 1; Curr_Var := Curr_Var.Next;
                   end loop;
                   Sort (Crit);
@@ -185,16 +185,16 @@ begin
             end if;
          end;
       when Stmt_REPEAT =>
-         SData.Table.Clear;
-         SData.Config.Runtime.Repeat_Active := True;
-         SData.Config.Runtime.Repeat_Count := Stmt.Count;
+         SData_Core.Table.Clear;
+         SData.Run_State.Repeat_Active := True;
+         SData.Run_State.Repeat_Count := Stmt.Count;
          Input_File_Columns.Clear;
       when Stmt_SELECT_FILTER =>
          SData.AST.Free_Expression (Select_Filter_Expr);
          Select_Filter_Expr := SData.AST.Copy_Expression (Stmt.Expr);
-         SData.Table.Clear_Index_Map;
+         SData_Core.Table.Clear_Index_Map;
       when Stmt_DIGITS =>
-         SData.Config.Print_Digits := Stmt.Digits_Count;
+         SData_Core.Config.Print_Digits := Stmt.Digits_Count;
       when Stmt_RSEED =>
          declare
             V : constant Value := Evaluate (Stmt.Seed_Expr);
@@ -202,14 +202,14 @@ begin
                (if V.Kind = Val_Integer then V.Int_Val
                 else Integer (Convert_To_Float (V)));
          begin
-            SData.Statistics.Set_Seed (S);
+            SData_Core.Statistics.Set_Seed (S);
          end;
       when Stmt_NEW =>
-         SData.Table.Clear;
-         SData.Variables.Clear_Temporary;
-         SData.Variables.Initialize_PDV;
+         SData_Core.Table.Clear;
+         SData_Core.Variables.Clear_Temporary;
+         SData_Core.Variables.Initialize_PDV;
          Clear_Active_Program;
-         SData.Config.Runtime.Reset;
+         SData.Run_State.Reset;
       when Stmt_OPTIONS =>
          declare
             Key : constant String :=
@@ -236,60 +236,60 @@ begin
 
          begin
             if Key = "" then
-               Put_Line ("OPTIONS MAXINTAB "    & Ada.Strings.Fixed.Trim (SData.Config.Max_Table_Cells'Image, Ada.Strings.Both));
-               Put_Line ("OPTIONS MAXTEMPMEM "  & Ada.Strings.Fixed.Trim (SData.Config.Max_Temp_Vars'Image, Ada.Strings.Both));
-               Put_Line ("OPTIONS CSVDLM "      & Dlm_Display (SData.Config.Runtime.Options_CSVDLM (1 .. SData.Config.Runtime.Options_CSVDLM_Len)));
-               Put_Line ("OPTIONS HEADER "      & Bool_Display (SData.Config.Runtime.Options_Header));
-               Put_Line ("OPTIONS SAVEOVERWRT " & Bool_Display (SData.Config.Runtime.Options_SAVEOVERWRT));
-               Put_Line ("OPTIONS TXTFMT "      & SData.Config.Runtime.Options_TXTFMT (1 .. SData.Config.Runtime.Options_TXTFMT_Len));
+               Put_Line ("OPTIONS MAXINTAB "    & Ada.Strings.Fixed.Trim (SData_Core.Config.Max_Table_Cells'Image, Ada.Strings.Both));
+               Put_Line ("OPTIONS MAXTEMPMEM "  & Ada.Strings.Fixed.Trim (SData_Core.Config.Max_Temp_Vars'Image, Ada.Strings.Both));
+               Put_Line ("OPTIONS CSVDLM "      & Dlm_Display (SData.Run_State.Options_CSVDLM (1 .. SData.Run_State.Options_CSVDLM_Len)));
+               Put_Line ("OPTIONS HEADER "      & Bool_Display (SData.Run_State.Options_Header));
+               Put_Line ("OPTIONS SAVEOVERWRT " & Bool_Display (SData.Run_State.Options_SAVEOVERWRT));
+               Put_Line ("OPTIONS TXTFMT "      & SData.Run_State.Options_TXTFMT (1 .. SData.Run_State.Options_TXTFMT_Len));
                Put_Line ("OPTIONS CHARSET "     &
-                  (if SData.Config.Runtime.Options_CHARSET_Len = 0 then "AUTO"
-                   else SData.Config.Runtime.Options_CHARSET (1 .. SData.Config.Runtime.Options_CHARSET_Len)));
-               Put_Line ("OPTIONS IEEE_DIVIDE " & Bool_Display (SData.Config.Runtime.IEEE_Divide));
-               Put_Line ("OPTIONS SHELLTIMEOUT " & Ada.Strings.Fixed.Trim (SData.Config.Runtime.Options_Shell_Timeout'Image, Ada.Strings.Both));
-               Put_Line ("OPTIONS DEBUG " & Ada.Strings.Fixed.Trim (SData.Config.Debug_Level'Image, Ada.Strings.Both));
+                  (if SData.Run_State.Options_CHARSET_Len = 0 then "AUTO"
+                   else SData.Run_State.Options_CHARSET (1 .. SData.Run_State.Options_CHARSET_Len)));
+               Put_Line ("OPTIONS IEEE_DIVIDE " & Bool_Display (SData.Run_State.IEEE_Divide));
+               Put_Line ("OPTIONS SHELLTIMEOUT " & Ada.Strings.Fixed.Trim (SData.Run_State.Options_Shell_Timeout'Image, Ada.Strings.Both));
+               Put_Line ("OPTIONS DEBUG " & Ada.Strings.Fixed.Trim (SData_Core.Config.Debug_Level'Image, Ada.Strings.Both));
             elsif Key = "MAXINTAB" then
-               SData.Config.Max_Table_Cells := Natural'Value (Val);
+               SData_Core.Config.Max_Table_Cells := Natural'Value (Val);
             elsif Key = "MAXTEMPMEM" then
-               SData.Config.Max_Temp_Vars := Natural'Value (Val);
+               SData_Core.Config.Max_Temp_Vars := Natural'Value (Val);
             elsif Key = "CSVDLM" then
                declare
                   DS : constant String := Dlm_To_Str (Val);
                   DL : constant Natural := Natural'Min (DS'Length, 8);
                begin
-                  SData.Config.Runtime.Options_CSVDLM := (others => ' ');
-                  SData.Config.Runtime.Options_CSVDLM (1 .. DL) := DS (DS'First .. DS'First + DL - 1);
-                  SData.Config.Runtime.Options_CSVDLM_Len := DL;
+                  SData.Run_State.Options_CSVDLM := (others => ' ');
+                  SData.Run_State.Options_CSVDLM (1 .. DL) := DS (DS'First .. DS'First + DL - 1);
+                  SData.Run_State.Options_CSVDLM_Len := DL;
                end;
             elsif Key = "HEADER" then
-               SData.Config.Runtime.Options_Header := (Val_Upper = "YES");
+               SData.Run_State.Options_Header := (Val_Upper = "YES");
             elsif Key = "SAVEOVERWRT" then
-               SData.Config.Runtime.Options_SAVEOVERWRT := (Val_Upper = "YES");
+               SData.Run_State.Options_SAVEOVERWRT := (Val_Upper = "YES");
             elsif Key = "TXTFMT" then
                declare
                   VL : constant Natural := Natural'Min (Val_Upper'Length, 8);
                begin
-                  SData.Config.Runtime.Options_TXTFMT := (others => ' ');
-                  SData.Config.Runtime.Options_TXTFMT (1 .. VL) :=
+                  SData.Run_State.Options_TXTFMT := (others => ' ');
+                  SData.Run_State.Options_TXTFMT (1 .. VL) :=
                      Val_Upper (Val_Upper'First .. Val_Upper'First + VL - 1);
-                  SData.Config.Runtime.Options_TXTFMT_Len := VL;
+                  SData.Run_State.Options_TXTFMT_Len := VL;
                end;
             elsif Key = "CHARSET" then
                declare
                   VL : constant Natural := Natural'Min (Val'Length, 64);
                begin
-                  SData.Config.Runtime.Options_CHARSET := (others => ' ');
-                  SData.Config.Runtime.Options_CHARSET (1 .. VL) :=
+                  SData.Run_State.Options_CHARSET := (others => ' ');
+                  SData.Run_State.Options_CHARSET (1 .. VL) :=
                      Val (Val'First .. Val'First + VL - 1);
-                  SData.Config.Runtime.Options_CHARSET_Len := VL;
+                  SData.Run_State.Options_CHARSET_Len := VL;
                end;
             elsif Key = "IEEE_DIVIDE" then
-               SData.Config.Runtime.IEEE_Divide := (Val_Upper = "YES");
+               SData.Run_State.IEEE_Divide := (Val_Upper = "YES");
             elsif Key = "SHELLTIMEOUT" then
-               SData.Config.Runtime.Options_Shell_Timeout :=
+               SData.Run_State.Options_Shell_Timeout :=
                   Natural'Value (Val);
             elsif Key = "DEBUG" then
-               SData.Config.Debug_Level := Natural'Value (Val);
+               SData_Core.Config.Debug_Level := Natural'Value (Val);
             else
                Put_Line_Error ("Warning: Unknown OPTIONS key: " & Key);
             end if;
@@ -304,7 +304,7 @@ begin
                To_Upper (Stmt.Vand_Source_Name (1 .. Stmt.Vand_Source_Len));
             Dst : constant String :=
                To_Upper (Stmt.Vand_Dest_Name (1 .. Stmt.Vand_Dest_Len));
-            N   : constant Natural := SData.Table.Row_Count;
+            N   : constant Natural := SData_Core.Table.Row_Count;
 
             function Suffix (Name : String) return Character is
             begin
@@ -314,17 +314,17 @@ begin
                return ' ';
             end Suffix;
 
-            function Col_Type_Of (S : Character) return SData.Table.Column_Type is
+            function Col_Type_Of (S : Character) return SData_Core.Table.Column_Type is
             begin
-               if S = '%' then return SData.Table.Col_Integer; end if;
-               if S = '$' then return SData.Table.Col_String;  end if;
-               return SData.Table.Col_Numeric;
+               if S = '%' then return SData_Core.Table.Col_Integer; end if;
+               if S = '$' then return SData_Core.Table.Col_String;  end if;
+               return SData_Core.Table.Col_Numeric;
             end Col_Type_Of;
 
             --  Core logic for a single source/destination column pair.
             --  Captures N and Stmt from the enclosing scope.
             procedure Vandalize_One_Column (Src_Col, Dst_Col : String) is
-               type Value_Array is array (1 .. Natural'Max (1, N)) of SData.Values.Value;
+               type Value_Array is array (1 .. Natural'Max (1, N)) of SData_Core.Values.Value;
                Src_Vals : Value_Array;
                Out_Vals : Value_Array;
 
@@ -354,7 +354,7 @@ begin
 
             begin
                for R in 1 .. N loop
-                  Src_Vals (R) := SData.Table.Get_Value_Upper (R, Src_Col);
+                  Src_Vals (R) := SData_Core.Table.Get_Value_Upper (R, Src_Col);
                end loop;
 
                --  Initialize Shuffle_Src to identity (each row draws from itself).
@@ -365,7 +365,7 @@ begin
                --  Compute BY-group assignments if /BY= specified.
                if Stmt.Vand_By_Vars /= null then
                   declare
-                     Saved_Count : constant Natural := SData.Table.By_Var_Count;
+                     Saved_Count : constant Natural := SData_Core.Table.By_Var_Count;
                      type Saved_Name_Array is
                         array (1 .. Natural'Max (1, Saved_Count)) of
                            Ada.Strings.Unbounded.Unbounded_String;
@@ -374,15 +374,15 @@ begin
                      for I in 1 .. Saved_Count loop
                         Saved_Names (I) :=
                            Ada.Strings.Unbounded.To_Unbounded_String
-                              (SData.Table.By_Var_Name (I));
+                              (SData_Core.Table.By_Var_Name (I));
                      end loop;
 
-                     SData.Table.Clear_By_Vars;
+                     SData_Core.Table.Clear_By_Vars;
                      declare
                         Curr : Variable_List := Stmt.Vand_By_Vars;
                      begin
                         while Curr /= null loop
-                           SData.Table.Add_By_Var
+                           SData_Core.Table.Add_By_Var
                               (To_Upper (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
                            Curr := Curr.Next;
                         end loop;
@@ -395,7 +395,7 @@ begin
                      begin
                         Groups (1) := 1;
                         for R in 2 .. N loop
-                           if SData.Table.In_Same_Group (R, R - 1) then
+                           if SData_Core.Table.In_Same_Group (R, R - 1) then
                               Groups (R) := Groups (R - 1);
                            else
                               Next_G     := Next_G + 1;
@@ -405,9 +405,9 @@ begin
                      end;
 
                      --  Restore global BY vars.
-                     SData.Table.Clear_By_Vars;
+                     SData_Core.Table.Clear_By_Vars;
                      for I in 1 .. Saved_Count loop
-                        SData.Table.Add_By_Var
+                        SData_Core.Table.Add_By_Var
                            (Ada.Strings.Unbounded.To_String (Saved_Names (I)));
                      end loop;
                   end;
@@ -437,7 +437,7 @@ begin
                                  --  Collect non-missing rows.
                                  for R in 1 .. N loop
                                     if Groups (R) = G and then
-                                       Src_Vals (R).Kind /= SData.Values.Val_Missing
+                                       Src_Vals (R).Kind /= SData_Core.Values.Val_Missing
                                     then
                                        G_Idx := G_Idx + 1;
                                        G_Rows (G_Idx) := R;
@@ -447,7 +447,7 @@ begin
                                  for I in reverse 2 .. G_Idx loop
                                     declare
                                        J_Raw     : constant Integer :=
-                                          1 + Integer (SData.Statistics.Uniform_RN
+                                          1 + Integer (SData_Core.Statistics.Uniform_RN
                                              (0.0, 1.0) * Float (I));
                                        J         : constant Positive :=
                                           (if J_Raw < 1 then 1
@@ -501,7 +501,7 @@ begin
                         begin
                            for R in 1 .. N loop
                               if Groups (R) = G and then
-                                 Src_Vals (R).Kind = SData.Values.Val_Numeric
+                                 Src_Vals (R).Kind = SData_Core.Values.Val_Numeric
                               then
                                  N_G    := N_G + 1;
                                  Sum_G  := Sum_G  + Src_Vals (R).Num_Val;
@@ -529,22 +529,22 @@ begin
 
                --  Generate output values.
                for R in 1 .. N loop
-                  if Src_Vals (R).Kind = SData.Values.Val_Missing then
-                     Out_Vals (R) := (Kind => SData.Values.Val_Missing);
+                  if Src_Vals (R).Kind = SData_Core.Values.Val_Missing then
+                     Out_Vals (R) := (Kind => SData_Core.Values.Val_Missing);
                   else
                      declare
                         U : constant Float :=
-                           SData.Statistics.Uniform_RN (0.0, 1.0);
+                           SData_Core.Statistics.Uniform_RN (0.0, 1.0);
                      begin
                         if U < T_Miss then
-                           Out_Vals (R) := (Kind => SData.Values.Val_Missing);
+                           Out_Vals (R) := (Kind => SData_Core.Values.Val_Missing);
                         elsif U < T_Shuffle then
                            Out_Vals (R) := Src_Vals (Shuffle_Src (R));
                         elsif U < T_Perturb then
                            Out_Vals (R) :=
-                              (Kind    => SData.Values.Val_Numeric,
+                              (Kind    => SData_Core.Values.Val_Numeric,
                                Num_Val => Src_Vals (R).Num_Val
-                                  + SData.Statistics.Normal_RN
+                                  + SData_Core.Statistics.Normal_RN
                                        (0.0, SD_For_Row (R) * Stmt.Vand_SD_Frac));
                         else
                            Out_Vals (R) := Src_Vals (R);
@@ -554,20 +554,20 @@ begin
                end loop;
 
                --  Create destination column if absent.
-               if not SData.Table.Has_Column (Dst_Col) then
-                  SData.Table.Add_Column (Dst_Col, Col_Type_Of (Suffix (Src_Col)));
+               if not SData_Core.Table.Has_Column (Dst_Col) then
+                  SData_Core.Table.Add_Column (Dst_Col, Col_Type_Of (Suffix (Src_Col)));
                end if;
 
                --  Write output values.
                for R in 1 .. N loop
-                  SData.Table.Set_Value_Upper (R, Dst_Col, Out_Vals (R));
+                  SData_Core.Table.Set_Value_Upper (R, Dst_Col, Out_Vals (R));
                end loop;
             end Vandalize_One_Column;
 
          begin
             --  Validate source exists (as a column or as an array base name).
-            if not SData.Variables.Has_Array (Src)
-               and then not SData.Table.Has_Column (Src)
+            if not SData_Core.Variables.Has_Array (Src)
+               and then not SData_Core.Table.Has_Column (Src)
             then
                raise Script_Error with
                   "VANDALIZE: source variable '" & Src & "' not found.";
@@ -578,7 +578,7 @@ begin
                raise Script_Error with
                   "VANDALIZE: source and destination name suffixes must match.";
             end if;
-            if SData.Table.Has_Column (Dst) then
+            if SData_Core.Table.Has_Column (Dst) then
                if Suffix (Src) /= Suffix (Dst) then
                   raise Script_Error with
                      "VANDALIZE: destination '" & Dst &
@@ -615,7 +615,7 @@ begin
                         BV : constant String :=
                            To_Upper (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len));
                      begin
-                        if not SData.Table.Has_Column (BV) then
+                        if not SData_Core.Table.Has_Column (BV) then
                            raise Script_Error with
                               "VANDALIZE /BY: variable '" & BV & "' not found.";
                         end if;
@@ -626,17 +626,17 @@ begin
             end if;
 
             --  Dispatch: array (DIM or virtual) or scalar column.
-            if SData.Variables.Has_Array (Src) then
+            if SData_Core.Variables.Has_Array (Src) then
                declare
                   Start_Idx, End_Idx : Integer;
                begin
-                  SData.Variables.Get_Array_Bounds (Src, Start_Idx, End_Idx);
+                  SData_Core.Variables.Get_Array_Bounds (Src, Start_Idx, End_Idx);
                   for I in Start_Idx .. End_Idx loop
                      declare
                         I_Str   : constant String :=
                            Ada.Strings.Fixed.Trim (Integer'Image (I), Ada.Strings.Both);
                         Src_Col : constant String :=
-                           SData.Variables.Get_Array_Element_Column (Src, I);
+                           SData_Core.Variables.Get_Array_Element_Column (Src, I);
                         Dst_Col : constant String := Dst & "(" & I_Str & ")";
                      begin
                         Vandalize_One_Column (Src_Col, Dst_Col);
@@ -644,8 +644,8 @@ begin
                   end loop;
                   --  Register destination as a DIM array so element access
                   --  expressions (e.g. COPY(1)) resolve via Has_Array.
-                  if not SData.Variables.Has_Array (Dst) then
-                     SData.Variables.Dim_Array (Dst, Start_Idx, End_Idx,
+                  if not SData_Core.Variables.Has_Array (Dst) then
+                     SData_Core.Variables.Dim_Array (Dst, Start_Idx, End_Idx,
                                                 Is_Temp => False);
                   end if;
                end;

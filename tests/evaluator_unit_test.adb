@@ -10,13 +10,13 @@ with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Numerics;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with SData.Values;          use SData.Values;
+with SData_Core.Values;          use SData_Core.Values;
 with SData.Evaluator;       use SData.Evaluator;
-with SData.Statistics;
-pragma Warnings (Off, SData.Statistics);
+with SData_Core.Statistics;
+pragma Warnings (Off, SData_Core.Statistics);
 with SData.AST;       use SData.AST;
 with SData.Parser;
-with SData.Variables; use SData.Variables;
+with SData_Core.Variables; use SData_Core.Variables;
 
 procedure Evaluator_Unit_Test is
    Passed : Natural := 0;
@@ -361,25 +361,25 @@ begin
           Raises ("LIF", (1 => (Kind => Val_Numeric, Num_Val => 1.0))), True);
 
    --  DF-13: NRN(10.0, 2.0) returns Val_Numeric (regression: was calling BRN)
-   SData.Statistics.Set_Seed (42);
+   SData_Core.Statistics.Set_Seed (42);
    V := F2 ("NRN", 10.0, 2.0);
    Check ("DF-13: NRN(10,2) returns Val_Numeric", V.Kind = Val_Numeric, True);
    --  Exact value with seed 42:
    Check_Num ("DF-13b: NRN(10,2) seed-42 value", V, 11.39017, 0.0001);
 
    --  DF-14: URN(0, 1) returns a value in [0.0, 1.0)
-   SData.Statistics.Set_Seed (42);
+   SData_Core.Statistics.Set_Seed (42);
    V := F2 ("URN", 0.0, 1.0);
    Check ("DF-14: URN(0,1) returns Val_Numeric", V.Kind = Val_Numeric, True);
    Check ("DF-14b: URN(0,1) in [0,1)", V.Num_Val >= 0.0 and V.Num_Val < 1.0, True);
 
    --  DF-15: ZRN() with no args returns Val_Numeric
-   SData.Statistics.Set_Seed (42);
+   SData_Core.Statistics.Set_Seed (42);
    V := F0 ("ZRN");
    Check ("DF-15: ZRN() returns Val_Numeric", V.Kind = Val_Numeric, True);
 
    --  DF-16: RAN() returns value in [0.0, 1.0)
-   SData.Statistics.Set_Seed (42);
+   SData_Core.Statistics.Set_Seed (42);
    V := F0 ("RAN");
    Check ("DF-16: RAN() in [0,1)", V.Num_Val >= 0.0 and V.Num_Val < 1.0, True);
 

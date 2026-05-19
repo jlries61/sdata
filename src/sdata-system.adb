@@ -6,7 +6,7 @@ with Ada.Environment_Variables;
 with Ada.Real_Time;
 with GNAT.OS_Lib; use GNAT.OS_Lib;
 with Interfaces.C; use type Interfaces.C.int;
-with SData.Config.Runtime;
+with SData.Run_State;
 
 package body SData.System is
 
@@ -94,7 +94,7 @@ package body SData.System is
       else
          declare
             Timeout_Val : constant Natural :=
-               SData.Config.Runtime.Options_Shell_Timeout;
+               SData.Run_State.Options_Shell_Timeout;
             Path  : GNAT.OS_Lib.String_Access;
             Posix : Boolean;
          begin

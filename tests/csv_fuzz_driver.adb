@@ -5,7 +5,7 @@
 --  CSV tokenizer fuzz driver.
 --
 --  Reads arbitrary bytes from stdin and exercises every public function in
---  SData.CSV.  Unexpected exceptions (Constraint_Error, Program_Error,
+--  SData_Core.CSV.  Unexpected exceptions (Constraint_Error, Program_Error,
 --  Storage_Error) propagate uncaught so that AFL++ or a crash-regression
 --  harness can detect them.  Expected user-input errors (none defined for
 --  the pure tokenizer layer) are also allowed to propagate.
@@ -18,7 +18,7 @@
 
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with SData.CSV;             use SData.CSV;
+with SData_Core.CSV;             use SData_Core.CSV;
 
 procedure CSV_Fuzz_Driver is
 
@@ -36,7 +36,7 @@ procedure CSV_Fuzz_Driver is
       when End_Error => return To_String (Buf);
    end Read_Stdin;
 
-   --  Exercise every SData.CSV function on a single string with a given delimiter.
+   --  Exercise every SData_Core.CSV function on a single string with a given delimiter.
    procedure Exercise (S : String; Delim : String) is
       Fields  : Field_Vectors.Vector;
       Dummy_B : Boolean;

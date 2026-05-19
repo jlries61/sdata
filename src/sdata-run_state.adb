@@ -2,14 +2,14 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
-package body SData.Config.Runtime is
+package body SData.Run_State is
 
    procedure Reset is
    begin
       Save_File_Path      := (others => ' ');
       Save_File_Len       := 0;
       Save_File_Active    := False;
-      Save_File_Fmt       := CSV;
+      Save_File_Fmt       := SData_Core.Config.CSV;
       Save_Sheet_Name     := (others => ' ');
       Save_Sheet_Name_Len := 0;
       FPath_Use           := Null_Unbounded_String;
@@ -31,7 +31,7 @@ package body SData.Config.Runtime is
       Options_CHARSET     := (others => ' ');
       Options_CHARSET_Len := 0;
       IEEE_Divide         := False;
-      Options_Shell_Timeout := SData.Config.Shell_Timeout_Default;
+      Options_Shell_Timeout := SData_Core.Config.Shell_Timeout_Default;
       Save_DLM         := (others => ' ');
       Save_DLM (1)     := ',';
       Save_DLM_Len     := 1;
@@ -40,4 +40,4 @@ package body SData.Config.Runtime is
       Save_Charset_Len := 0;
    end Reset;
 
-end SData.Config.Runtime;
+end SData.Run_State;

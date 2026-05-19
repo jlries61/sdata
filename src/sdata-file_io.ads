@@ -7,7 +7,7 @@
 --  It supports automatic format detection and utilizes external utilities (ssconvert)
 --  or native logic for specific file types.
 
-with SData.Config; use SData.Config;
+with SData_Core.Config; use SData_Core.Config;
 
 package SData.File_IO is
 

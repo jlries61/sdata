@@ -18,12 +18,12 @@ with SData.Parser; use SData.Parser;
 with SData.AST; use SData.AST;
 
 with SData.Interpreter; use SData.Interpreter;
-with SData.Config;         use SData.Config;
-with SData.Config.Runtime;
-with SData.IO;          use SData.IO;
+with SData_Core.Config;         use SData_Core.Config;
+with SData.Run_State;
+with SData_Core.IO;          use SData_Core.IO;
 with SData.System;
-with SData.Signals;
-pragma Unreferenced (SData.Signals);
+with SData_Core.Signals;
+pragma Unreferenced (SData_Core.Signals);
 
 procedure SData_Main is
    
@@ -100,12 +100,12 @@ procedure SData_Main is
       Prog   : Statement_Access;
       Buffer : Unbounded_String;
    begin
-      SData.IO.Set_Interactive (True);
+      SData_Core.IO.Set_Interactive (True);
       --  Print the banner directly (bypasses pager buffer — it should
       --  always appear immediately, not be held until the first command).
       Ada.Text_IO.Put_Line ("SData Statistical Interpreter version "
-                            & SData.Config.Version_Str);
-      Ada.Text_IO.Put_Line (SData.Config.Copyright_Str
+                            & SData_Core.Config.Version_Str);
+      Ada.Text_IO.Put_Line (SData_Core.Config.Copyright_Str
                             & ". License GPLv3+. Run 'sdata --copyright' for details.");
       Ada.Text_IO.Put_Line ("Interactive Console. Type QUIT to exit.");
       Buffer := Null_Unbounded_String;
@@ -139,7 +139,7 @@ procedure SData_Main is
                            if Prog.Kind = Stmt_RUN then
                               Run_Active_Program;
                            elsif Prog.Kind = Stmt_QUIT or else Prog.Kind = Stmt_END then
-                              SData.IO.Flush_Pager_Buffer;
+                              SData_Core.IO.Flush_Pager_Buffer;
                               exit REPL;
                            else
                               Execute (Prog);
@@ -152,7 +152,7 @@ procedure SData_Main is
                      Prog := Prog.Next;
                   end loop;
                end;
-               SData.IO.Flush_Pager_Buffer;
+               SData_Core.IO.Flush_Pager_Buffer;
 
             exception
                when SData.Parser.Incomplete_Statement =>
@@ -162,17 +162,17 @@ procedure SData_Main is
 
          exception
             when Ada.Text_IO.End_Error =>
-               SData.IO.Flush_Pager_Buffer;
+               SData_Core.IO.Flush_Pager_Buffer;
                Ada.Text_IO.New_Line;
                exit REPL;
             when E : SData.Script_Error =>
                Put_Line_Error ("Error: " & Exception_Message (E));
                Buffer := Null_Unbounded_String;
-               SData.IO.Flush_Pager_Buffer;
+               SData_Core.IO.Flush_Pager_Buffer;
             when E : others =>
                Put_Line_Error ("Internal error: " & Exception_Name (E) & ": " & Exception_Message (E));
                Buffer := Null_Unbounded_String;
-               SData.IO.Flush_Pager_Buffer;
+               SData_Core.IO.Flush_Pager_Buffer;
          end;
          exit REPL when not Ada.Text_IO.Is_Open (Ada.Text_IO.Standard_Input);
       end loop REPL;
@@ -215,7 +215,7 @@ begin
             Put_Line ("SData version " & Version_Str);
             return;
          elsif Arg = "--copyright" then
-            Ada.Text_IO.Put_Line (SData.Config.Copyright_Notice);
+            Ada.Text_IO.Put_Line (SData_Core.Config.Copyright_Notice);
             return;
          elsif Arg = "-q" then
             Quiet_Mode := True;
@@ -359,7 +359,7 @@ begin
             end;
          elsif Arg'Length > 16 and then Arg (1 .. 16) = "--shell-timeout=" then
             begin
-               SData.Config.Shell_Timeout_Default :=
+               SData_Core.Config.Shell_Timeout_Default :=
                   Natural'Value (Arg (17 .. Arg'Last));
                Shell_Timeout_Explicit := True;
             exception
@@ -450,10 +450,10 @@ begin
    --  Set shell-timeout default: 300 s for batch, 0 for interactive.
    --  Only applies when --shell-timeout=N was not given explicitly.
    if not Shell_Timeout_Explicit and then Filename_Len > 0 then
-      SData.Config.Shell_Timeout_Default := 300;
+      SData_Core.Config.Shell_Timeout_Default := 300;
    end if;
-   SData.Config.Runtime.Options_Shell_Timeout :=
-      SData.Config.Shell_Timeout_Default;
+   SData.Run_State.Options_Shell_Timeout :=
+      SData_Core.Config.Shell_Timeout_Default;
 
    --  Validate -p / --noshell interaction.
    if Length (Pager_Cmd) > 0 and then Disable_Shell then
@@ -466,9 +466,9 @@ begin
    --  Activate external pager (interactive mode only; ignored for batch scripts).
    if Length (Pager_Cmd) > 0 and then Filename_Len = 0 then
       begin
-         SData.IO.Set_Pager (To_String (Pager_Cmd));
+         SData_Core.IO.Set_Pager (To_String (Pager_Cmd));
       exception
-         when E : SData.IO.Pager_Not_Found =>
+         when E : SData_Core.IO.Pager_Not_Found =>
             Put_Line_Error ("Error: " & Exception_Message (E));
             Set_Exit_Status (Failure);
             return;
@@ -477,7 +477,7 @@ begin
 
    --  Handle output redirection if specified on command line.
    if Output_File_Len > 0 then
-      SData.IO.Open_Output (Output_File (1 .. Output_File_Len));
+      SData_Core.IO.Open_Output (Output_File (1 .. Output_File_Len));
    end if;
 
    --  Verify that a command file was provided.
@@ -527,8 +527,8 @@ begin
       SData.AST.Free_Program (Prog);
    end;
 
-   if SData.IO.Is_Redirected then
-      SData.IO.Close_Output;
+   if SData_Core.IO.Is_Redirected then
+      SData_Core.IO.Close_Output;
    end if;
 
 exception

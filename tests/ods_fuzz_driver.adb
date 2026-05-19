@@ -20,8 +20,8 @@
 --    make fuzz-corpus
 
 with Ada.Command_Line;
-with SData.Config;
-with SData.Table;
+with SData_Core.Config;
+with SData_Core.Table;
 with SData.File_IO.ODF;
 
 procedure ODS_Fuzz_Driver is
@@ -31,8 +31,8 @@ begin
       return;
    end if;
 
-   SData.Config.Quiet_Mode := True;
-   SData.Table.Clear;
+   SData_Core.Config.Quiet_Mode := True;
+   SData_Core.Table.Clear;
 
    begin
       SData.File_IO.ODF.Parse_ODF (Ada.Command_Line.Argument (1));

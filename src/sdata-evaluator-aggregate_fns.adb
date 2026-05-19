@@ -5,7 +5,7 @@
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with Ada.Containers.Vectors;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with SData.Values; use SData.Values;
+with SData_Core.Values; use SData_Core.Values;
 
 package body SData.Evaluator.Aggregate_Fns is
 

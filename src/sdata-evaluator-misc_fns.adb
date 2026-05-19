@@ -7,12 +7,12 @@ with Ada.Numerics;
 with Ada.Calendar;
 with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with SData.Variables; use SData.Variables;
-with SData.Config;
-with SData.Config.Runtime;
+with SData_Core.Variables; use SData_Core.Variables;
+with SData_Core.Config;
+with SData.Run_State;
 with SData.System;
-with SData.IO; use SData.IO;
-with SData.Values; use SData.Values;
+with SData_Core.IO; use SData_Core.IO;
+with SData_Core.Values; use SData_Core.Values;
 
 package body SData.Evaluator.Misc_Fns is
 
@@ -38,7 +38,7 @@ package body SData.Evaluator.Misc_Fns is
       declare
          V : constant Value := Vals.Element (1);
       begin
-         if V.Kind = Val_Numeric and then SData.Values.Is_Inf (V.Num_Val) then
+         if V.Kind = Val_Numeric and then SData_Core.Values.Is_Inf (V.Num_Val) then
             return (Kind => Val_Integer, Int_Val => 1);
          else
             return (Kind => Val_Integer, Int_Val => 0);
@@ -61,13 +61,13 @@ package body SData.Evaluator.Misc_Fns is
    function Handle_Err_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
    begin
-      return (Kind => Val_Integer, Int_Val => SData.Config.Runtime.Last_Error_Code);
+      return (Kind => Val_Integer, Int_Val => SData.Run_State.Last_Error_Code);
    end Handle_Err_Fn;
 
    function Handle_Erl_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
    begin
-      return (Kind => Val_Integer, Int_Val => SData.Config.Runtime.Last_Error_Line);
+      return (Kind => Val_Integer, Int_Val => SData.Run_State.Last_Error_Line);
    end Handle_Erl_Fn;
 
    function Handle_Date (Name : String; Vals : Value_Vectors.Vector) return Value is
@@ -126,12 +126,12 @@ package body SData.Evaluator.Misc_Fns is
       pragma Unreferenced (Name);
    begin
       if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      if SData.Config.Disable_Shell then
+      if SData_Core.Config.Disable_Shell then
          Put_Line_Error ("Error: SHELL function is disabled.");
          return (Kind => Val_Missing);
       end if;
       declare
-         Command : constant String := SData.Values.To_String (Vals.Element (1));
+         Command : constant String := SData_Core.Values.To_String (Vals.Element (1));
          Success : Boolean;
       begin
          SData.System.Shell_Execute (Command, Success);
@@ -150,7 +150,7 @@ package body SData.Evaluator.Misc_Fns is
          elsif V.Kind = Val_String then
             begin
                return (Kind    => Val_Numeric,
-                       Num_Val => Float'Value (SData.Values.To_String (V)));
+                       Num_Val => Float'Value (SData_Core.Values.To_String (V)));
             exception
                when Constraint_Error => return (Kind => Val_Missing);
             end;
@@ -193,7 +193,7 @@ package body SData.Evaluator.Misc_Fns is
          return (Kind => Val_Missing);
       end if;
       declare
-         AName              : constant String := SData.Values.To_String (Vals.Element (1));
+         AName              : constant String := SData_Core.Values.To_String (Vals.Element (1));
          Start_Idx, End_Idx : Integer;
       begin
          Get_Array_Bounds (AName, Start_Idx, End_Idx);
@@ -209,7 +209,7 @@ package body SData.Evaluator.Misc_Fns is
          return (Kind => Val_Missing);
       end if;
       declare
-         AName              : constant String := SData.Values.To_String (Vals.Element (1));
+         AName              : constant String := SData_Core.Values.To_String (Vals.Element (1));
          Start_Idx, End_Idx : Integer;
       begin
          Get_Array_Bounds (AName, Start_Idx, End_Idx);
@@ -231,7 +231,7 @@ package body SData.Evaluator.Misc_Fns is
          end if;
          if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => 1); end if;
          return (Kind    => Val_Integer,
-                 Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle)));
+                 Int_Val => Index (Haystack.Str_Val, SData_Core.Values.To_String (Needle)));
       end;
    end Handle_Index_Str;
 
@@ -243,8 +243,8 @@ package body SData.Evaluator.Misc_Fns is
          Haystack : constant Value   := Vals.Element (1);
          Needle   : constant Value   := Vals.Element (2);
          Start    : constant Integer := Integer (Convert_To_Float (Vals.Element (3)));
-         H_Str    : constant String  := SData.Values.To_String (Haystack);
-         N_Str    : constant String  := SData.Values.To_String (Needle);
+         H_Str    : constant String  := SData_Core.Values.To_String (Haystack);
+         N_Str    : constant String  := SData_Core.Values.To_String (Needle);
          From     : constant Positive := Positive'Max (Start, 1);
       begin
          if Haystack.Kind /= Val_String or else Needle.Kind /= Val_String then
@@ -261,7 +261,7 @@ package body SData.Evaluator.Misc_Fns is
    function Handle_Maxlen (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
    begin
-      return (Kind => Val_Integer, Int_Val => SData.Config.Max_String_Len);
+      return (Kind => Val_Integer, Int_Val => SData_Core.Config.Max_String_Len);
    end Handle_Maxlen;
 
    function Handle_Maxlvl (Name : String; Vals : Value_Vectors.Vector) return Value is

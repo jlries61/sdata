@@ -2,16 +2,16 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
---  Unit tests for SData.Table, SData.Evaluator pure helpers, and BY-group logic.
+--  Unit tests for SData_Core.Table, SData.Evaluator pure helpers, and BY-group logic.
 --  Exercises the public API directly — no parser or interpreter involved.
 
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with SData.Table;           use SData.Table;
-with SData.Values;          use SData.Values;
+with SData_Core.Table;           use SData_Core.Table;
+with SData_Core.Values;          use SData_Core.Values;
 with SData.Evaluator;       use SData.Evaluator;
-with SData.Variables;       use SData.Variables;
+with SData_Core.Variables;       use SData_Core.Variables;
 
 procedure SData_Unit_Test is
    Passed : Natural := 0;
@@ -83,7 +83,7 @@ procedure SData_Unit_Test is
 begin
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: column management ─────────────────────────────────────
+   --  ── SData_Core.Table: column management ─────────────────────────────────────
    ---------------------------------------------------------------------------
 
    Clear;
@@ -105,7 +105,7 @@ begin
    Check ("T-09 Column_Name(3)", Column_Name (3), "N%");
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: row operations and value roundtrip ────────────────────
+   --  ── SData_Core.Table: row operations and value roundtrip ────────────────────
    ---------------------------------------------------------------------------
 
    Add_Row;
@@ -139,7 +139,7 @@ begin
    Check ("T-18 Get_Value_Upper numeric kind", V.Kind = Val_Numeric, True);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: type enforcement ───────────────────────────────────────
+   --  ── SData_Core.Table: type enforcement ───────────────────────────────────────
    ---------------------------------------------------------------------------
 
    declare
@@ -149,7 +149,7 @@ begin
       Set_Value (1, "X",
                  (Kind => Val_String, Str_Val => To_Unbounded_String ("bad")));
    exception
-      when SData.Table.Type_Mismatch_Error => Raised := True;
+      when SData_Core.Table.Type_Mismatch_Error => Raised := True;
    end;
    Check ("T-19 type mismatch numeric←string raises", True, True);
    --  Note: T-19 always passes structurally; the real guard is T-12/T-13
@@ -164,14 +164,14 @@ begin
    begin
       Set_Value (1, "NAME$", (Kind => Val_Numeric, Num_Val => 1.0));
    exception
-      when SData.Table.Type_Mismatch_Error => Raised := True;
+      when SData_Core.Table.Type_Mismatch_Error => Raised := True;
    end;
    V := Get_Value (1, "NAME$");
    Check ("T-20 string value unchanged after rejected write",
           To_String (V.Str_Val), "Alice");
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: Rename_Column ──────────────────────────────────────────
+   --  ── SData_Core.Table: Rename_Column ──────────────────────────────────────────
    ---------------------------------------------------------------------------
 
    Rename_Column ("X", "Y");
@@ -184,7 +184,7 @@ begin
    Check_Float ("T-24b renamed column value intact", V.Num_Val, 3.14);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: Drop_Column ────────────────────────────────────────────
+   --  ── SData_Core.Table: Drop_Column ────────────────────────────────────────────
    ---------------------------------------------------------------------------
 
    Drop_Column ("N%");
@@ -192,7 +192,7 @@ begin
    Check ("T-26 dropped column is gone",            Has_Column ("N%"), False);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: Set_Index_Map / filter logic ───────────────────────────
+   --  ── SData_Core.Table: Set_Index_Map / filter logic ───────────────────────────
    ---------------------------------------------------------------------------
 
    --  Build a 5-row table on a single column.
@@ -231,7 +231,7 @@ begin
    Check ("T-40 Logical_To_Physical(3)=3 unfiltered",        Logical_To_Physical (3), 3);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: In_Same_Group / BY-group detection ────────────────────
+   --  ── SData_Core.Table: In_Same_Group / BY-group detection ────────────────────
    ---------------------------------------------------------------------------
 
    --  4-row table: rows 1+2 → GROUP$="A", rows 3+4 → GROUP$="B".
@@ -268,7 +268,7 @@ begin
    Check ("T-48 cleared BY vars → same group again (2,3)", In_Same_Group (2, 3), True);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: Drop_Row ──────────────────────────────────────────────
+   --  ── SData_Core.Table: Drop_Row ──────────────────────────────────────────────
    ---------------------------------------------------------------------------
 
    --  3-row table: values 10, 20, 30. Drop middle row and verify shift.
@@ -287,7 +287,7 @@ begin
    Check_Float ("T-52 row 2 is former row 3 after Drop_Row",  V.Num_Val, 30.0);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: Sort ───────────────────────────────────────────────────
+   --  ── SData_Core.Table: Sort ───────────────────────────────────────────────────
    ---------------------------------------------------------------------------
 
    --  3-row table: values 30, 10, 20 — sort ascending then descending.
@@ -330,7 +330,7 @@ begin
    Check_Float ("T-58 descending sort: row 3 = 10.0", V.Num_Val, 10.0);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: Get_Value_By_Col ───────────────────────────────────────
+   --  ── SData_Core.Table: Get_Value_By_Col ───────────────────────────────────────
    ---------------------------------------------------------------------------
 
    --  2-column table; verify O(1) position-indexed cursor cache accessor.
@@ -349,7 +349,7 @@ begin
    Check ("T-62 Get_Value_By_Col(1,2) value = 99",           V.Int_Val, 99);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Table: direct output table pipeline ───────────────────────────
+   --  ── SData_Core.Table: direct output table pipeline ───────────────────────────
    ---------------------------------------------------------------------------
 
    --  Add_Output_Column / Add_Output_Row / Set_Output_Value /
@@ -434,11 +434,11 @@ begin
    Check ("E-16 SQRT is not identifier-ref",     Is_Identifier_Ref_Function ("SQRT"),   False);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Variables: temporary (session) variables ───────────────────
+   --  ── SData_Core.Variables: temporary (session) variables ───────────────────
    ---------------------------------------------------------------------------
 
    --  Start from a known state: empty table, empty temp symbols.
-   SData.Table.Clear;
+   SData_Core.Table.Clear;
    Clear_Temporary;
 
    Set_Temporary ("myvar", (Kind => Val_Numeric, Num_Val => 5.5));
@@ -464,11 +464,11 @@ begin
    Check ("V-09 Defined after Clear_Temporary beta",  Defined ("beta"),  False);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Variables: permanent variables (PDV slots) ──────────────────
+   --  ── SData_Core.Variables: permanent variables (PDV slots) ──────────────────
    ---------------------------------------------------------------------------
 
    --  Empty table → empty PDV after Initialize_PDV.
-   SData.Table.Clear;
+   SData_Core.Table.Clear;
    Clear_Temporary;
    Initialize_PDV;
 
@@ -493,15 +493,15 @@ begin
    Check ("V-16 PDV_Resolve unknown returns 0", PDV_Resolve ("NOSUCHVAR"), 0);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Variables: Load_PDV_From_Table roundtrip ────────────────────
+   --  ── SData_Core.Variables: Load_PDV_From_Table roundtrip ────────────────────
    ---------------------------------------------------------------------------
 
-   SData.Table.Clear;
-   SData.Table.Add_Column ("A",  SData.Table.Col_Numeric);
-   SData.Table.Add_Column ("B%", SData.Table.Col_Integer);
-   SData.Table.Add_Row;
-   SData.Table.Set_Value (1, "A",  (Kind => Val_Numeric, Num_Val => 3.14));
-   SData.Table.Set_Value (1, "B%", (Kind => Val_Integer, Int_Val => 7));
+   SData_Core.Table.Clear;
+   SData_Core.Table.Add_Column ("A",  SData_Core.Table.Col_Numeric);
+   SData_Core.Table.Add_Column ("B%", SData_Core.Table.Col_Integer);
+   SData_Core.Table.Add_Row;
+   SData_Core.Table.Set_Value (1, "A",  (Kind => Val_Numeric, Num_Val => 3.14));
+   SData_Core.Table.Set_Value (1, "B%", (Kind => Val_Integer, Int_Val => 7));
 
    Clear_Temporary;
    Initialize_PDV;
@@ -526,15 +526,15 @@ begin
    end if;
 
    ---------------------------------------------------------------------------
-   --  ── SData.Variables: hold / Reset_PDV_Non_Held ─────────────────────────
+   --  ── SData_Core.Variables: hold / Reset_PDV_Non_Held ─────────────────────────
    ---------------------------------------------------------------------------
 
-   SData.Table.Clear;
-   SData.Table.Add_Column ("HELD", SData.Table.Col_Numeric);
-   SData.Table.Add_Column ("FREE", SData.Table.Col_Numeric);
-   SData.Table.Add_Row;
-   SData.Table.Set_Value (1, "HELD", (Kind => Val_Numeric, Num_Val => 7.0));
-   SData.Table.Set_Value (1, "FREE", (Kind => Val_Numeric, Num_Val => 3.0));
+   SData_Core.Table.Clear;
+   SData_Core.Table.Add_Column ("HELD", SData_Core.Table.Col_Numeric);
+   SData_Core.Table.Add_Column ("FREE", SData_Core.Table.Col_Numeric);
+   SData_Core.Table.Add_Row;
+   SData_Core.Table.Set_Value (1, "HELD", (Kind => Val_Numeric, Num_Val => 7.0));
+   SData_Core.Table.Set_Value (1, "FREE", (Kind => Val_Numeric, Num_Val => 3.0));
    Clear_Temporary;
    Initialize_PDV;
    Load_PDV_From_Table (1);
@@ -559,28 +559,28 @@ begin
    Check ("V-28 Is_Held after clearing", Is_Held ("HELD"), False);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Variables: Flush_PDV_To_Output pipeline ──────────────────────
+   --  ── SData_Core.Variables: Flush_PDV_To_Output pipeline ──────────────────────
    ---------------------------------------------------------------------------
 
-   SData.Table.Clear;
-   SData.Table.Add_Column ("X", SData.Table.Col_Numeric);
-   SData.Table.Add_Row;
-   SData.Table.Set_Value (1, "X", (Kind => Val_Numeric, Num_Val => 42.0));
+   SData_Core.Table.Clear;
+   SData_Core.Table.Add_Column ("X", SData_Core.Table.Col_Numeric);
+   SData_Core.Table.Add_Row;
+   SData_Core.Table.Set_Value (1, "X", (Kind => Val_Numeric, Num_Val => 42.0));
 
    Clear_Temporary;
    Initialize_PDV;
    Load_PDV_From_Table (1);
 
-   SData.Table.Initialize_Output_Table;
+   SData_Core.Table.Initialize_Output_Table;
    Flush_PDV_To_Output;
 
-   Check ("V-29 Output_Row_Count = 1 after flush", SData.Table.Output_Row_Count, 1);
+   Check ("V-29 Output_Row_Count = 1 after flush", SData_Core.Table.Output_Row_Count, 1);
 
-   SData.Table.Commit_Output_Table;
+   SData_Core.Table.Commit_Output_Table;
 
-   Check ("V-30 Row_Count = 1 after commit",    SData.Table.Row_Count, 1);
-   Check ("V-31 Column X present after commit", SData.Table.Has_Column ("X"), True);
-   V := SData.Table.Get_Value (1, "X");
+   Check ("V-30 Row_Count = 1 after commit",    SData_Core.Table.Row_Count, 1);
+   Check ("V-31 Column X present after commit", SData_Core.Table.Has_Column ("X"), True);
+   V := SData_Core.Table.Get_Value (1, "X");
    Check       ("V-32 Committed value kind",  V.Kind = Val_Numeric, True);
    Check_Float ("V-33 Committed value",       V.Num_Val, 42.0);
 

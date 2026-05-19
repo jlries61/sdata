@@ -3,7 +3,7 @@
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
 with Ada.Characters.Handling; use Ada.Characters.Handling;
-with SData.IO;                use SData.IO;
+with SData_Core.IO;                use SData_Core.IO;
 
 package body SData.Help is
 

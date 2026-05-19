@@ -5,7 +5,7 @@
 with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
-with SData.Values; use SData.Values;
+with SData_Core.Values; use SData_Core.Values;
 
 package body SData.Evaluator.String_Fns is
 
@@ -190,7 +190,7 @@ package body SData.Evaluator.String_Fns is
       if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
       V := Vals.Element (1);
       if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-      R.Str_Val := To_Unbounded_String (To_Upper (SData.Values.To_String (V)));
+      R.Str_Val := To_Unbounded_String (To_Upper (SData_Core.Values.To_String (V)));
       return R;
    end Handle_Upper;
 
@@ -202,7 +202,7 @@ package body SData.Evaluator.String_Fns is
       if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
       V := Vals.Element (1);
       if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
-      R.Str_Val := To_Unbounded_String (To_Lower (SData.Values.To_String (V)));
+      R.Str_Val := To_Unbounded_String (To_Lower (SData_Core.Values.To_String (V)));
       return R;
    end Handle_Lower;
 
@@ -222,7 +222,7 @@ package body SData.Evaluator.String_Fns is
          if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => From); end if;
          if From > Length (Haystack.Str_Val) then return (Kind => Val_Integer, Int_Val => 0); end if;
          return (Kind    => Val_Integer,
-                 Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle), From));
+                 Int_Val => Index (Haystack.Str_Val, SData_Core.Values.To_String (Needle), From));
       end;
    end Handle_Pos;
 
@@ -250,7 +250,7 @@ package body SData.Evaluator.String_Fns is
             if Length (Needle.Str_Val) = 0 then return (Kind => Val_Integer, Int_Val => Start_Pos); end if;
             if Start_Pos > Length (Haystack.Str_Val) then return (Kind => Val_Integer, Int_Val => 0); end if;
             return (Kind    => Val_Integer,
-                    Int_Val => Index (Haystack.Str_Val, SData.Values.To_String (Needle), Start_Pos));
+                    Int_Val => Index (Haystack.Str_Val, SData_Core.Values.To_String (Needle), Start_Pos));
          end;
       end;
    end Handle_Instr;
@@ -272,7 +272,7 @@ package body SData.Evaluator.String_Fns is
       R : Value (Val_String);
    begin
       if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
-      R.Str_Val := To_Unbounded_String (SData.Values.To_String_Formatted (Vals.Element (1)));
+      R.Str_Val := To_Unbounded_String (SData_Core.Values.To_String_Formatted (Vals.Element (1)));
       return R;
    end Handle_Str;
 
@@ -285,7 +285,7 @@ package body SData.Evaluator.String_Fns is
          if V.Kind /= Val_String then return (Kind => Val_Missing); end if;
          begin
             return (Kind    => Val_Numeric,
-                    Num_Val => Float'Value (SData.Values.To_String (V)));
+                    Num_Val => Float'Value (SData_Core.Values.To_String (V)));
          exception
             when Constraint_Error => return (Kind => Val_Missing);
          end;
@@ -298,7 +298,7 @@ package body SData.Evaluator.String_Fns is
    begin
       if not Has_Args (Vals, 1) then return (Kind => Val_Missing); end if;
       Result.Str_Val :=
-         To_Unbounded_String (SData.Values.To_String_Formatted (Vals.Element (1)));
+         To_Unbounded_String (SData_Core.Values.To_String_Formatted (Vals.Element (1)));
       return Result;
    end Handle_Num_Str;
 

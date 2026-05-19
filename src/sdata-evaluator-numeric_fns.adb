@@ -4,7 +4,7 @@
 
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with Ada.Numerics;
-with SData.Values; use SData.Values;
+with SData_Core.Values; use SData_Core.Values;
 
 package body SData.Evaluator.Numeric_Fns is
 

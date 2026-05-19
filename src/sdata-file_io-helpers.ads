@@ -5,8 +5,8 @@
 with Ada.Containers.Vectors;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with DOM.Core;
-with SData.Values; use SData.Values;
-with SData.Table;  use SData.Table;
+with SData_Core.Values; use SData_Core.Values;
+with SData_Core.Table;  use SData_Core.Table;
 
 private package SData.File_IO.Helpers is
 

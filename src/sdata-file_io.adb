@@ -4,9 +4,9 @@
 
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
-with SData.IO;                use SData.IO;
-with SData.Table;             use SData.Table;
-with SData.Values;            use SData.Values;
+with SData_Core.IO;                use SData_Core.IO;
+with SData_Core.Table;             use SData_Core.Table;
+with SData_Core.Values;            use SData_Core.Values;
 with SData.File_IO.CSV;       use SData.File_IO.CSV;
 with SData.File_IO.ODF;       use SData.File_IO.ODF;
 with SData.File_IO.OOXML;     use SData.File_IO.OOXML;
@@ -48,7 +48,7 @@ package body SData.File_IO is
          Set_Value (3, "NAME$",
             (Kind    => Val_String,
              Str_Val => To_Unbounded_String ("Charlie")));
-         if not SData.Config.Quiet_Mode then
+         if not SData_Core.Config.Quiet_Mode then
             Put_Line ("Generating mock data...");
          end if;
          return;
@@ -66,26 +66,26 @@ package body SData.File_IO is
             Ext : constant String := File_Name (Ext_Idx + 1 .. File_Name'Last);
          begin
             if Ext = "csv" then
-               Actual_Fmt := SData.Config.CSV;
+               Actual_Fmt := SData_Core.Config.CSV;
             elsif Ext = "ods" or Ext = "odf" then
-               Actual_Fmt := SData.Config.ODF;
+               Actual_Fmt := SData_Core.Config.ODF;
             elsif Ext = "xlsx" or Ext = "ooxml" then
-               Actual_Fmt := SData.Config.OOXML;
+               Actual_Fmt := SData_Core.Config.OOXML;
             end if;
          end;
       end if;
 
       case Actual_Fmt is
-         when SData.Config.CSV =>
+         when SData_Core.Config.CSV =>
             Parse_CSV (File_Name, Delimiter, Read_Header, Charset,
                        Skip_Rows, Max_Rows, Nscan_Rows);
-         when SData.Config.ODF =>
+         when SData_Core.Config.ODF =>
             Parse_ODF (File_Name, Sheet_Name, Skip_Rows, Max_Rows);
-         when SData.Config.OOXML =>
+         when SData_Core.Config.OOXML =>
             Parse_OOXML (File_Name, Sheet_Name, Skip_Rows, Max_Rows);
       end case;
 
-      if not SData.Config.Quiet_Mode then
+      if not SData_Core.Config.Quiet_Mode then
          Put_Line ("Dataset opened: " & File_Name);
       end if;
    end Open_Input;
@@ -117,22 +117,22 @@ package body SData.File_IO is
             Ext : constant String := File_Name (Ext_Idx + 1 .. File_Name'Last);
          begin
             if Ext = "csv" then
-               Actual_Fmt := SData.Config.CSV;
+               Actual_Fmt := SData_Core.Config.CSV;
             elsif Ext = "ods" or Ext = "odf" then
-               Actual_Fmt := SData.Config.ODF;
+               Actual_Fmt := SData_Core.Config.ODF;
             elsif Ext = "xlsx" or Ext = "ooxml" then
-               Actual_Fmt := SData.Config.OOXML;
+               Actual_Fmt := SData_Core.Config.OOXML;
             end if;
          end;
       end if;
 
       case Actual_Fmt is
-         when SData.Config.CSV =>
+         when SData_Core.Config.CSV =>
             Write_CSV (File_Name, Delimiter, Write_Header, Allow_Overwrite,
                        Charset);
-         when SData.Config.ODF =>
+         when SData_Core.Config.ODF =>
             Write_ODF (File_Name, Sname);
-         when SData.Config.OOXML =>
+         when SData_Core.Config.OOXML =>
             Write_OOXML (File_Name, Sname);
       end case;
    end Open_Output;
