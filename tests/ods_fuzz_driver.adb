@@ -22,7 +22,7 @@
 with Ada.Command_Line;
 with SData_Core.Config;
 with SData_Core.Table;
-with SData.File_IO.ODF;
+with SData_Core.File_IO.ODF;
 
 procedure ODS_Fuzz_Driver is
 begin
@@ -35,8 +35,8 @@ begin
    SData_Core.Table.Clear;
 
    begin
-      SData.File_IO.ODF.Parse_ODF (Ada.Command_Line.Argument (1));
+      SData_Core.File_IO.ODF.Parse_ODF (Ada.Command_Line.Argument (1));
    exception
-      when SData.Script_Error => null;
+      when SData_Core.Script_Error => null;
    end;
 end ODS_Fuzz_Driver;

@@ -15,5 +15,5 @@ Dataset opened: sdata_opt_nohdr.csv
 3.00000
 RUN complete. 3 records and 3 variables processed.
 Generating mock data...
-Error: SAVE aborted — file already exists: sdata_opt_nohdr.csv (use OPTIONS SAVEOVERWRT YES to allow overwriting)
+Error: SAVE aborted -- file already exists: sdata_opt_nohdr.csv (use OPTIONS SAVEOVERWRT YES to allow overwriting)
 RUN complete. 3 records and 3 variables processed.

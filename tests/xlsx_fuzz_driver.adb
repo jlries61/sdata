@@ -22,7 +22,7 @@
 with Ada.Command_Line;
 with SData_Core.Config;
 with SData_Core.Table;
-with SData.File_IO.OOXML;
+with SData_Core.File_IO.OOXML;
 
 procedure XLSX_Fuzz_Driver is
 begin
@@ -35,8 +35,8 @@ begin
    SData_Core.Table.Clear;
 
    begin
-      SData.File_IO.OOXML.Parse_OOXML (Ada.Command_Line.Argument (1));
+      SData_Core.File_IO.OOXML.Parse_OOXML (Ada.Command_Line.Argument (1));
    exception
-      when SData.Script_Error => null;
+      when SData_Core.Script_Error => null;
    end;
 end XLSX_Fuzz_Driver;

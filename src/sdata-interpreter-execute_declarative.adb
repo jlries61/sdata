@@ -48,7 +48,7 @@ begin
                declare Full : constant String := Full_Path (File_Name, "USE");
                begin Exp_Len := Full'Length; Expanded (1 .. Exp_Len) := Full; end;
             end if;
-            SData.File_IO.Open_Input (Expanded (1 .. Exp_Len),
+            SData_Core.File_IO.Open_Input (Expanded (1 .. Exp_Len),
               (if Stmt.Format_Specified then Stmt.Fmt_Override else SData_Core.Config.Input_Format),
               Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
               Eff_DLM, Eff_Header, Eff_Charset,
@@ -140,7 +140,7 @@ begin
             end;
             if SData_Core.Config.Runtime.Save_File_Active then
                begin
-                  SData.File_IO.Open_Output
+                  SData_Core.File_IO.Open_Output
                      (Full_Path (SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len), "SAVE"),
                       SData_Core.Config.Runtime.Save_File_Fmt,
                       SData_Core.Config.Runtime.Save_Sheet_Name (1 .. SData_Core.Config.Runtime.Save_Sheet_Name_Len),
@@ -151,7 +151,7 @@ begin
                          (1 .. SData_Core.Config.Runtime.Save_Charset_Len));
                   if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len)); end if;
                exception
-                  when SData.File_IO.Save_Refused => null;
+                  when SData_Core.File_IO.Save_Refused => null;
                end;
                SData_Core.Config.Runtime.Save_File_Active := False;
             end if;

@@ -13,7 +13,7 @@ with SData_Core.Statistics;
 with SData.Parser; use SData.Parser;
 with Ada.Streams.Stream_IO;
 with Ada.Exceptions;
-with SData.File_IO;
+with SData_Core.File_IO;
 with SData_Core.Config;         use SData_Core.Config;
 with SData_Core.Config.Runtime;
 with SData_Core.IO;        use SData_Core.IO;
@@ -794,7 +794,7 @@ package body SData.Interpreter is
       Apply_Pending_Mods;
       if SData_Core.Config.Runtime.Save_File_Active then
          begin
-            SData.File_IO.Open_Output
+            SData_Core.File_IO.Open_Output
                (Full_Path (SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len), "SAVE"),
                 SData_Core.Config.Runtime.Save_File_Fmt,
                 SData_Core.Config.Runtime.Save_Sheet_Name (1 .. SData_Core.Config.Runtime.Save_Sheet_Name_Len),
@@ -805,7 +805,7 @@ package body SData.Interpreter is
                    (1 .. SData_Core.Config.Runtime.Save_Charset_Len));
             if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len)); end if;
          exception
-            when SData.File_IO.Save_Refused => null;
+            when SData_Core.File_IO.Save_Refused => null;
          end;
          SData_Core.Config.Runtime.Save_File_Active := False;
       end if;

@@ -2,7 +2,7 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
---  Unit tests for SData.File_IO: Parse_CSV, Parse_ODF, Parse_OOXML.
+--  Unit tests for SData_Core.File_IO: Parse_CSV, Parse_ODF, Parse_OOXML.
 --  Calls parsers directly with fixture files in tests/data/ and
 --  inspects the resulting SData_Core.Table state via the public API.
 --  Must be run from the project root (paths are relative to it).
@@ -14,10 +14,10 @@ with SData;
 with SData_Core.Config;
 with SData_Core.Table;           use SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
-with SData.File_IO;
-with SData.File_IO.CSV;     use SData.File_IO.CSV;
-with SData.File_IO.ODF;     use SData.File_IO.ODF;
-with SData.File_IO.OOXML;   use SData.File_IO.OOXML;
+with SData_Core.File_IO;
+with SData_Core.File_IO.CSV;     use SData_Core.File_IO.CSV;
+with SData_Core.File_IO.ODF;     use SData_Core.File_IO.ODF;
+with SData_Core.File_IO.OOXML;   use SData_Core.File_IO.OOXML;
 
 procedure File_IO_Unit_Test is
    Passed : Natural := 0;
@@ -264,14 +264,14 @@ begin
    Parse_ODF ("tests/data/sample.ods", Max_Rows => 2);
    Check ("PO-22 max_rows=2 row count",    Row_Count, 2);
 
-   --  PO-23: corrupt zip file raises SData.Script_Error
+   --  PO-23: corrupt zip file raises SData_Core.Script_Error
    declare
       Raised : Boolean := False;
    begin
       begin
          Parse_ODF ("tests/data/bad.ods");
       exception
-         when SData.Script_Error =>
+         when SData_Core.Script_Error =>
             Raised := True;
       end;
       Check ("PO-23 bad ODS raises Script_Error", Raised, True);
@@ -334,14 +334,14 @@ begin
    Parse_OOXML ("tests/data/sample.xlsx", Max_Rows => 2);
    Check ("PX-22 max_rows=2 row count",    Row_Count, 2);
 
-   --  PX-23: corrupt zip file raises SData.Script_Error
+   --  PX-23: corrupt zip file raises SData_Core.Script_Error
    declare
       Raised : Boolean := False;
    begin
       begin
          Parse_OOXML ("tests/data/bad.xlsx");
       exception
-         when SData.Script_Error =>
+         when SData_Core.Script_Error =>
             Raised := True;
       end;
       Check ("PX-23 bad XLSX raises Script_Error", Raised, True);
