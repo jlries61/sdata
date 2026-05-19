@@ -397,7 +397,25 @@ package body SData.Lexer is
                      T.Length := 2;
                      Advance (Ctx);
                   end if;
-               when '.' => T.Kind := Token_Dot; Advance (Ctx);
+               when '.' =>
+                  Advance (Ctx);
+                  if not Is_End_Of_Source (Ctx)
+                     and then Is_Digit (Current_Char (Ctx))
+                  then
+                     T.Kind := Token_Numeric_Literal;
+                     T.Length := 2;
+                     T.Text (1) := '0';
+                     T.Text (2) := '.';
+                     while not Is_End_Of_Source (Ctx)
+                        and then Is_Digit (Current_Char (Ctx))
+                     loop
+                        T.Length := T.Length + 1;
+                        T.Text (T.Length) := Current_Char (Ctx);
+                        Advance (Ctx);
+                     end loop;
+                  else
+                     T.Kind := Token_Dot;
+                  end if;
                when others =>
                   --  Unknown character, skip it and move on.
                   Advance (Ctx);

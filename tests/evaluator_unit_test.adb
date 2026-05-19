@@ -881,6 +881,21 @@ begin
    Check_Missing ("EV-65: IF() no args -> missing", Eval ("IF()"));
 
    Put_Line ("");
+   Put_Line ("--- LD: Leading-Dot Decimal Literals ---");
+
+   --  LD-01: .5 evaluates to 0.5
+   Check_Num ("LD-01: .5 = 0.5",        Eval (".5"),       0.5);
+
+   --  LD-02: .05 evaluates to 0.05
+   Check_Num ("LD-02: .05 = 0.05",      Eval (".05"),      0.05);
+
+   --  LD-03: arithmetic with two leading-dot literals
+   Check_Num ("LD-03: .05 + .1 = 0.15", Eval (".05 + .1"), 0.15);
+
+   --  LD-04: bare dot must still be missing (regression guard)
+   Check_Missing ("LD-04: bare dot is still missing", Eval ("."));
+
+   Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
    if Failed > 0 then
       Ada.Command_Line.Set_Exit_Status (Ada.Command_Line.Failure);
