@@ -640,6 +640,19 @@ Reset to 0 by
 \(em record number where the last caught error occurred; 0 if none.
 Reset to 0 by
 .BR NEW .
+.SS Arrays
+.BR LBOUND ( arrayname )
+\(em lower bound (first valid subscript) of the named array.
+.br
+.BR UBOUND ( arrayname )\ /\ HBOUND ( arrayname )
+\(em upper bound (last valid subscript) of the named array.
+.B HBOUND
+is the SAS\-compatible spelling;
+.B UBOUND
+is retained for compatibility.
+.br
+Both functions accept the array name as a bare identifier or as a string literal.
+Returns missing if the array does not exist.
 .SS Statistical distributions
 Each distribution family provides four function variants.
 The one\-letter prefix identifies the distribution; the suffix identifies
