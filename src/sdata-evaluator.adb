@@ -4,7 +4,7 @@
 
 with SData_Core.Variables; use SData_Core.Variables;
 with SData_Core.Config;
-with SData.Run_State;
+with SData_Core.Config.Runtime;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 with SData_Core.IO;        use SData_Core.IO;
@@ -470,7 +470,7 @@ package body SData.Evaluator is
                            when Op_Mul => return Numeric_Result_Checked (FL * FR);
                            when Op_Div =>
                               if FR = 0.0 and then
-                                 not SData.Run_State.IEEE_Divide
+                                 not SData_Core.Config.Runtime.IEEE_Divide
                               then
                                  raise SData.Script_Error with "Division by zero.";
                               end if;

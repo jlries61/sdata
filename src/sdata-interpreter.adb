@@ -15,7 +15,7 @@ with Ada.Streams.Stream_IO;
 with Ada.Exceptions;
 with SData.File_IO;
 with SData_Core.Config;         use SData_Core.Config;
-with SData.Run_State;
+with SData_Core.Config.Runtime;
 with SData_Core.IO;        use SData_Core.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Sets;
@@ -482,13 +482,13 @@ package body SData.Interpreter is
       else
          -- 2. Handle FPATH prepending
          if Cat = "USE" then
-            Base := SData.Run_State.FPath_Use;
+            Base := SData_Core.Config.Runtime.FPath_Use;
          elsif Cat = "SAVE" then
-            Base := SData.Run_State.FPath_Save;
+            Base := SData_Core.Config.Runtime.FPath_Save;
          elsif Cat = "SUBMIT" then
-            Base := SData.Run_State.FPath_Submit;
+            Base := SData_Core.Config.Runtime.FPath_Submit;
          elsif Cat = "OUTPUT" then
-            Base := SData.Run_State.FPath_Output;
+            Base := SData_Core.Config.Runtime.FPath_Output;
          end if;
 
          if Base /= Null_Unbounded_String and then To_String (Base) /= "" then
@@ -789,25 +789,25 @@ package body SData.Interpreter is
       SData_Core.Table.Clear_Index_Map;
       --  REPEAT generates records for exactly one RUN.  Subsequent RUNs
       --  must iterate the committed table, not re-use Repeat_Count.
-      SData.Run_State.Repeat_Active := False;
+      SData_Core.Config.Runtime.Repeat_Active := False;
       Set_Current_Record_Index (0);
       Apply_Pending_Mods;
-      if SData.Run_State.Save_File_Active then
+      if SData_Core.Config.Runtime.Save_File_Active then
          begin
             SData.File_IO.Open_Output
-               (Full_Path (SData.Run_State.Save_File_Path (1 .. SData.Run_State.Save_File_Len), "SAVE"),
-                SData.Run_State.Save_File_Fmt,
-                SData.Run_State.Save_Sheet_Name (1 .. SData.Run_State.Save_Sheet_Name_Len),
-                SData.Run_State.Save_DLM (1 .. SData.Run_State.Save_DLM_Len),
-                SData.Run_State.Save_Header,
-                SData.Run_State.Options_SAVEOVERWRT,
-                SData.Run_State.Save_Charset
-                   (1 .. SData.Run_State.Save_Charset_Len));
-            if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Run_State.Save_File_Path (1 .. SData.Run_State.Save_File_Len)); end if;
+               (Full_Path (SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len), "SAVE"),
+                SData_Core.Config.Runtime.Save_File_Fmt,
+                SData_Core.Config.Runtime.Save_Sheet_Name (1 .. SData_Core.Config.Runtime.Save_Sheet_Name_Len),
+                SData_Core.Config.Runtime.Save_DLM (1 .. SData_Core.Config.Runtime.Save_DLM_Len),
+                SData_Core.Config.Runtime.Save_Header,
+                SData_Core.Config.Runtime.Options_SAVEOVERWRT,
+                SData_Core.Config.Runtime.Save_Charset
+                   (1 .. SData_Core.Config.Runtime.Save_Charset_Len));
+            if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len)); end if;
          exception
             when SData.File_IO.Save_Refused => null;
          end;
-         SData.Run_State.Save_File_Active := False;
+         SData_Core.Config.Runtime.Save_File_Active := False;
       end if;
    end Commit_Step;
 
@@ -822,7 +822,7 @@ package body SData.Interpreter is
    procedure Run_One_Step (Start, Boundary : Statement_Access) is
       Global_Has_Write : constant Boolean := Has_Output_Statement (Start, Boundary);
       Num_Records      : constant Natural :=
-         (if SData.Run_State.Repeat_Active then SData.Run_State.Repeat_Count
+         (if SData_Core.Config.Runtime.Repeat_Active then SData_Core.Config.Runtime.Repeat_Count
           else (if Row_Count > 0 then Row_Count else 1));
       Step_Mode : Boolean :=
          SData_Core.Config.Debug_Level > 0 and then SData_Core.IO.Is_Interactive;
@@ -899,14 +899,14 @@ package body SData.Interpreter is
                when E : Script_Error =>
                   if SData_Core.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                     SData.Run_State.Last_Error_Code := 1;
-                     SData.Run_State.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
+                     SData_Core.Config.Runtime.Last_Error_Code := 1;
+                     SData_Core.Config.Runtime.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
                   else raise; end if;
                when E : others =>
                   if SData_Core.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                     SData.Run_State.Last_Error_Code := 1;
-                     SData.Run_State.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
+                     SData_Core.Config.Runtime.Last_Error_Code := 1;
+                     SData_Core.Config.Runtime.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
                   else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
             end;
          end if;

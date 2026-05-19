@@ -8,7 +8,7 @@ with Ada.Streams;
 with Ada.Directories;
 with Ada.Strings.UTF_Encoding;             use Ada.Strings.UTF_Encoding;
 with Ada.Strings.UTF_Encoding.Conversions;
-with SData.Run_State;
+with SData_Core.Config.Runtime;
 with Ada.Unchecked_Deallocation;
 with SData_Core.IO;                use SData_Core.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
@@ -499,9 +499,9 @@ package body SData.File_IO.CSV is
                         Charset         : String  := "") is
       use Ada.Directories;
 
-      TXTFMT_Len : constant Natural := SData.Run_State.Options_TXTFMT_Len;
+      TXTFMT_Len : constant Natural := SData_Core.Config.Runtime.Options_TXTFMT_Len;
       TXTFMT_Raw : constant String  :=
-         (if TXTFMT_Len > 0 then SData.Run_State.Options_TXTFMT (1 .. TXTFMT_Len)
+         (if TXTFMT_Len > 0 then SData_Core.Config.Runtime.Options_TXTFMT (1 .. TXTFMT_Len)
           else "AUTO");
       EOL : constant String :=
          (if    TXTFMT_Raw = "CRLF" then "" & ASCII.CR & ASCII.LF

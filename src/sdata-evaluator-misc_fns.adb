@@ -9,7 +9,7 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData_Core.Variables; use SData_Core.Variables;
 with SData_Core.Config;
-with SData.Run_State;
+with SData_Core.Config.Runtime;
 with SData.System;
 with SData_Core.IO; use SData_Core.IO;
 with SData_Core.Values; use SData_Core.Values;
@@ -61,13 +61,13 @@ package body SData.Evaluator.Misc_Fns is
    function Handle_Err_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
    begin
-      return (Kind => Val_Integer, Int_Val => SData.Run_State.Last_Error_Code);
+      return (Kind => Val_Integer, Int_Val => SData_Core.Config.Runtime.Last_Error_Code);
    end Handle_Err_Fn;
 
    function Handle_Erl_Fn (Name : String; Vals : Value_Vectors.Vector) return Value is
       pragma Unreferenced (Name, Vals);
    begin
-      return (Kind => Val_Integer, Int_Val => SData.Run_State.Last_Error_Line);
+      return (Kind => Val_Integer, Int_Val => SData_Core.Config.Runtime.Last_Error_Line);
    end Handle_Erl_Fn;
 
    function Handle_Date (Name : String; Vals : Value_Vectors.Vector) return Value is

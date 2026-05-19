@@ -106,14 +106,14 @@ begin
                   when E : Script_Error =>
                      if SData_Core.Config.Continue_On_Error then
                         Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                        SData.Run_State.Last_Error_Code := 1;
-                        SData.Run_State.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
+                        SData_Core.Config.Runtime.Last_Error_Code := 1;
+                        SData_Core.Config.Runtime.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
                      else raise; end if;
                   when E : others =>
                      if SData_Core.Config.Continue_On_Error then
                         Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                        SData.Run_State.Last_Error_Code := 1;
-                        SData.Run_State.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
+                        SData_Core.Config.Runtime.Last_Error_Code := 1;
+                        SData_Core.Config.Runtime.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
                      else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
                end;
             when others => null;

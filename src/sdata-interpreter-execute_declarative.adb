@@ -21,8 +21,8 @@ procedure Execute_Declarative (Stmt : Statement_Access) is
 begin
    case Stmt.Kind is
       when Stmt_USE =>
-         SData.Run_State.Repeat_Active := False;
-         SData.Run_State.Repeat_Count := 0;
+         SData_Core.Config.Runtime.Repeat_Active := False;
+         SData_Core.Config.Runtime.Repeat_Count := 0;
          declare
             File_Name  : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
             Expanded   : String (1 .. Max_Path_Len);
@@ -30,17 +30,17 @@ begin
             Eff_DLM     : constant String :=
                (if Stmt.DLM_Len > 0
                 then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                else SData.Run_State.Options_CSVDLM
-                        (1 .. SData.Run_State.Options_CSVDLM_Len));
+                else SData_Core.Config.Runtime.Options_CSVDLM
+                        (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
             Eff_Header  : constant Boolean :=
                (if Stmt.Header_Specified
                 then Stmt.Header_Val
-                else SData.Run_State.Options_Header);
+                else SData_Core.Config.Runtime.Options_Header);
             Eff_Charset : constant String :=
                (if Stmt.Output_CHARSET_Len > 0
                 then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
-                else SData.Run_State.Options_CHARSET
-                        (1 .. SData.Run_State.Options_CHARSET_Len));
+                else SData_Core.Config.Runtime.Options_CHARSET
+                        (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len));
          begin
             if Stmt.Is_Mock then
                Exp_Len := 4; Expanded (1 .. 4) := "MOCK";
@@ -68,43 +68,43 @@ begin
                       & " variables)", 1);
       when Stmt_SAVE =>
          if Stmt.File_Len = 0 then
-            SData.Run_State.Save_File_Active := False;
-            SData.Run_State.Save_File_Len := 0;
+            SData_Core.Config.Runtime.Save_File_Active := False;
+            SData_Core.Config.Runtime.Save_File_Len := 0;
          else
             declare
                Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
                SLen  : constant Natural := Stmt.Sheet_Name_Len;
             begin
-               SData.Run_State.Save_File_Path (1 .. Full'Length) := Full;
-               SData.Run_State.Save_File_Len := Full'Length;
-               SData.Run_State.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData_Core.Config.Output_Format);
-               SData.Run_State.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
-               SData.Run_State.Save_Sheet_Name_Len := SLen;
-               SData.Run_State.Save_File_Active := True;
+               SData_Core.Config.Runtime.Save_File_Path (1 .. Full'Length) := Full;
+               SData_Core.Config.Runtime.Save_File_Len := Full'Length;
+               SData_Core.Config.Runtime.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData_Core.Config.Output_Format);
+               SData_Core.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
+               SData_Core.Config.Runtime.Save_Sheet_Name_Len := SLen;
+               SData_Core.Config.Runtime.Save_File_Active := True;
                declare
                   Eff_DLM : constant String :=
                      (if Stmt.DLM_Len > 0
                       then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                      else SData.Run_State.Options_CSVDLM
-                              (1 .. SData.Run_State.Options_CSVDLM_Len));
+                      else SData_Core.Config.Runtime.Options_CSVDLM
+                              (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
                   EL : constant Natural := Eff_DLM'Length;
                begin
-                  SData.Run_State.Save_DLM (1 .. EL) := Eff_DLM;
-                  SData.Run_State.Save_DLM_Len := EL;
+                  SData_Core.Config.Runtime.Save_DLM (1 .. EL) := Eff_DLM;
+                  SData_Core.Config.Runtime.Save_DLM_Len := EL;
                end;
-               SData.Run_State.Save_Header :=
+               SData_Core.Config.Runtime.Save_Header :=
                   (if Stmt.Header_Specified
                    then Stmt.Header_Val
-                   else SData.Run_State.Options_Header);
+                   else SData_Core.Config.Runtime.Options_Header);
                if Stmt.Output_CHARSET_Len > 0 then
-                  SData.Run_State.Save_Charset (1 .. Stmt.Output_CHARSET_Len) :=
+                  SData_Core.Config.Runtime.Save_Charset (1 .. Stmt.Output_CHARSET_Len) :=
                      Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len);
-                  SData.Run_State.Save_Charset_Len := Stmt.Output_CHARSET_Len;
+                  SData_Core.Config.Runtime.Save_Charset_Len := Stmt.Output_CHARSET_Len;
                else
-                  SData.Run_State.Save_Charset :=
-                     SData.Run_State.Options_CHARSET;
-                  SData.Run_State.Save_Charset_Len :=
-                     SData.Run_State.Options_CHARSET_Len;
+                  SData_Core.Config.Runtime.Save_Charset :=
+                     SData_Core.Config.Runtime.Options_CHARSET;
+                  SData_Core.Config.Runtime.Save_Charset_Len :=
+                     SData_Core.Config.Runtime.Options_CHARSET_Len;
                end if;
             end;
          end if;
@@ -138,26 +138,26 @@ begin
                          RC (RC'First + 1 .. RC'Last) & " records and " &
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
-            if SData.Run_State.Save_File_Active then
+            if SData_Core.Config.Runtime.Save_File_Active then
                begin
                   SData.File_IO.Open_Output
-                     (Full_Path (SData.Run_State.Save_File_Path (1 .. SData.Run_State.Save_File_Len), "SAVE"),
-                      SData.Run_State.Save_File_Fmt,
-                      SData.Run_State.Save_Sheet_Name (1 .. SData.Run_State.Save_Sheet_Name_Len),
-                      SData.Run_State.Save_DLM (1 .. SData.Run_State.Save_DLM_Len),
-                      SData.Run_State.Save_Header,
-                      SData.Run_State.Options_SAVEOVERWRT,
-                      SData.Run_State.Save_Charset
-                         (1 .. SData.Run_State.Save_Charset_Len));
-                  if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData.Run_State.Save_File_Path (1 .. SData.Run_State.Save_File_Len)); end if;
+                     (Full_Path (SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len), "SAVE"),
+                      SData_Core.Config.Runtime.Save_File_Fmt,
+                      SData_Core.Config.Runtime.Save_Sheet_Name (1 .. SData_Core.Config.Runtime.Save_Sheet_Name_Len),
+                      SData_Core.Config.Runtime.Save_DLM (1 .. SData_Core.Config.Runtime.Save_DLM_Len),
+                      SData_Core.Config.Runtime.Save_Header,
+                      SData_Core.Config.Runtime.Options_SAVEOVERWRT,
+                      SData_Core.Config.Runtime.Save_Charset
+                         (1 .. SData_Core.Config.Runtime.Save_Charset_Len));
+                  if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len)); end if;
                exception
                   when SData.File_IO.Save_Refused => null;
                end;
-               SData.Run_State.Save_File_Active := False;
+               SData_Core.Config.Runtime.Save_File_Active := False;
             end if;
          end;
       when Stmt_BY =>
-         if SData_Core.Table.Column_Count = 0 and then not SData.Run_State.Repeat_Active then
+         if SData_Core.Table.Column_Count = 0 and then not SData_Core.Config.Runtime.Repeat_Active then
             raise Script_Error with "BY statement requires an active dataset (use USE or REPEAT first).";
          end if;
          SData_Core.Table.Clear_By_Vars;
@@ -186,8 +186,8 @@ begin
          end;
       when Stmt_REPEAT =>
          SData_Core.Table.Clear;
-         SData.Run_State.Repeat_Active := True;
-         SData.Run_State.Repeat_Count := Stmt.Count;
+         SData_Core.Config.Runtime.Repeat_Active := True;
+         SData_Core.Config.Runtime.Repeat_Count := Stmt.Count;
          Input_File_Columns.Clear;
       when Stmt_SELECT_FILTER =>
          SData.AST.Free_Expression (Select_Filter_Expr);
@@ -209,7 +209,7 @@ begin
          SData_Core.Variables.Clear_Temporary;
          SData_Core.Variables.Initialize_PDV;
          Clear_Active_Program;
-         SData.Run_State.Reset;
+         SData_Core.Config.Runtime.Reset;
       when Stmt_OPTIONS =>
          declare
             Key : constant String :=
@@ -238,15 +238,15 @@ begin
             if Key = "" then
                Put_Line ("OPTIONS MAXINTAB "    & Ada.Strings.Fixed.Trim (SData_Core.Config.Max_Table_Cells'Image, Ada.Strings.Both));
                Put_Line ("OPTIONS MAXTEMPMEM "  & Ada.Strings.Fixed.Trim (SData_Core.Config.Max_Temp_Vars'Image, Ada.Strings.Both));
-               Put_Line ("OPTIONS CSVDLM "      & Dlm_Display (SData.Run_State.Options_CSVDLM (1 .. SData.Run_State.Options_CSVDLM_Len)));
-               Put_Line ("OPTIONS HEADER "      & Bool_Display (SData.Run_State.Options_Header));
-               Put_Line ("OPTIONS SAVEOVERWRT " & Bool_Display (SData.Run_State.Options_SAVEOVERWRT));
-               Put_Line ("OPTIONS TXTFMT "      & SData.Run_State.Options_TXTFMT (1 .. SData.Run_State.Options_TXTFMT_Len));
+               Put_Line ("OPTIONS CSVDLM "      & Dlm_Display (SData_Core.Config.Runtime.Options_CSVDLM (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len)));
+               Put_Line ("OPTIONS HEADER "      & Bool_Display (SData_Core.Config.Runtime.Options_Header));
+               Put_Line ("OPTIONS SAVEOVERWRT " & Bool_Display (SData_Core.Config.Runtime.Options_SAVEOVERWRT));
+               Put_Line ("OPTIONS TXTFMT "      & SData_Core.Config.Runtime.Options_TXTFMT (1 .. SData_Core.Config.Runtime.Options_TXTFMT_Len));
                Put_Line ("OPTIONS CHARSET "     &
-                  (if SData.Run_State.Options_CHARSET_Len = 0 then "AUTO"
-                   else SData.Run_State.Options_CHARSET (1 .. SData.Run_State.Options_CHARSET_Len)));
-               Put_Line ("OPTIONS IEEE_DIVIDE " & Bool_Display (SData.Run_State.IEEE_Divide));
-               Put_Line ("OPTIONS SHELLTIMEOUT " & Ada.Strings.Fixed.Trim (SData.Run_State.Options_Shell_Timeout'Image, Ada.Strings.Both));
+                  (if SData_Core.Config.Runtime.Options_CHARSET_Len = 0 then "AUTO"
+                   else SData_Core.Config.Runtime.Options_CHARSET (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len)));
+               Put_Line ("OPTIONS IEEE_DIVIDE " & Bool_Display (SData_Core.Config.Runtime.IEEE_Divide));
+               Put_Line ("OPTIONS SHELLTIMEOUT " & Ada.Strings.Fixed.Trim (SData_Core.Config.Runtime.Options_Shell_Timeout'Image, Ada.Strings.Both));
                Put_Line ("OPTIONS DEBUG " & Ada.Strings.Fixed.Trim (SData_Core.Config.Debug_Level'Image, Ada.Strings.Both));
             elsif Key = "MAXINTAB" then
                SData_Core.Config.Max_Table_Cells := Natural'Value (Val);
@@ -257,36 +257,36 @@ begin
                   DS : constant String := Dlm_To_Str (Val);
                   DL : constant Natural := Natural'Min (DS'Length, 8);
                begin
-                  SData.Run_State.Options_CSVDLM := (others => ' ');
-                  SData.Run_State.Options_CSVDLM (1 .. DL) := DS (DS'First .. DS'First + DL - 1);
-                  SData.Run_State.Options_CSVDLM_Len := DL;
+                  SData_Core.Config.Runtime.Options_CSVDLM := (others => ' ');
+                  SData_Core.Config.Runtime.Options_CSVDLM (1 .. DL) := DS (DS'First .. DS'First + DL - 1);
+                  SData_Core.Config.Runtime.Options_CSVDLM_Len := DL;
                end;
             elsif Key = "HEADER" then
-               SData.Run_State.Options_Header := (Val_Upper = "YES");
+               SData_Core.Config.Runtime.Options_Header := (Val_Upper = "YES");
             elsif Key = "SAVEOVERWRT" then
-               SData.Run_State.Options_SAVEOVERWRT := (Val_Upper = "YES");
+               SData_Core.Config.Runtime.Options_SAVEOVERWRT := (Val_Upper = "YES");
             elsif Key = "TXTFMT" then
                declare
                   VL : constant Natural := Natural'Min (Val_Upper'Length, 8);
                begin
-                  SData.Run_State.Options_TXTFMT := (others => ' ');
-                  SData.Run_State.Options_TXTFMT (1 .. VL) :=
+                  SData_Core.Config.Runtime.Options_TXTFMT := (others => ' ');
+                  SData_Core.Config.Runtime.Options_TXTFMT (1 .. VL) :=
                      Val_Upper (Val_Upper'First .. Val_Upper'First + VL - 1);
-                  SData.Run_State.Options_TXTFMT_Len := VL;
+                  SData_Core.Config.Runtime.Options_TXTFMT_Len := VL;
                end;
             elsif Key = "CHARSET" then
                declare
                   VL : constant Natural := Natural'Min (Val'Length, 64);
                begin
-                  SData.Run_State.Options_CHARSET := (others => ' ');
-                  SData.Run_State.Options_CHARSET (1 .. VL) :=
+                  SData_Core.Config.Runtime.Options_CHARSET := (others => ' ');
+                  SData_Core.Config.Runtime.Options_CHARSET (1 .. VL) :=
                      Val (Val'First .. Val'First + VL - 1);
-                  SData.Run_State.Options_CHARSET_Len := VL;
+                  SData_Core.Config.Runtime.Options_CHARSET_Len := VL;
                end;
             elsif Key = "IEEE_DIVIDE" then
-               SData.Run_State.IEEE_Divide := (Val_Upper = "YES");
+               SData_Core.Config.Runtime.IEEE_Divide := (Val_Upper = "YES");
             elsif Key = "SHELLTIMEOUT" then
-               SData.Run_State.Options_Shell_Timeout :=
+               SData_Core.Config.Runtime.Options_Shell_Timeout :=
                   Natural'Value (Val);
             elsif Key = "DEBUG" then
                SData_Core.Config.Debug_Level := Natural'Value (Val);
