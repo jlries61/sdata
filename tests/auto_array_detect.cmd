@@ -1,2 +1,5 @@
 USE "tests/data/subscripted.csv"
-NAMES
+PRINT LBOUND(X)
+PRINT UBOUND(X)
+PRINT X(2)
+RUN
