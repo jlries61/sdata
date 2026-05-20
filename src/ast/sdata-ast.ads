@@ -100,8 +100,7 @@ package SData.AST is
       Stmt_NEW,            -- Reset environment
       Stmt_PROGRAM_DELETE, -- Delete line(s) from program buffer (immediate)
       Stmt_DISPLAY,        -- Display Data Table rows (immediate)
-      Stmt_OPTIONS,        -- Set runtime option (OPTIONS key value)
-      Stmt_VANDALIZE       -- Add noisy copy of a column (immediate)
+      Stmt_OPTIONS         -- Set runtime option (OPTIONS key value)
    );
 
    type Statement (Kind : Statement_Kind) is record
@@ -192,19 +191,6 @@ package SData.AST is
             Options_Key_Len : Natural;
             Options_Val     : String (1 .. Max_Options_Val_Len);
             Options_Val_Len : Natural;
-         when Stmt_VANDALIZE =>
-            Vand_Source_Name : String (1 .. Max_Name_Len);
-            Vand_Source_Len  : Natural;
-            Vand_Dest_Name   : String (1 .. Max_Name_Len);
-            Vand_Dest_Len    : Natural;
-            Vand_Perturb     : Boolean := False;
-            Vand_Shuffle     : Boolean := False;
-            Vand_Miss        : Boolean := False;
-            Vand_Pprob       : Float   := 1.0;
-            Vand_SD_Frac     : Float   := 0.01;
-            Vand_Sprob       : Float   := 1.0;
-            Vand_Mprob       : Float   := 0.05;
-            Vand_By_Vars     : Variable_List;
          when others =>
             null;
       end case;

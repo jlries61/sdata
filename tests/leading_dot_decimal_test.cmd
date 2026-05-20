@@ -10,15 +10,4 @@ IF .3 < .4 THEN PRINT "ok"
 PRINT MISSING(.)
 RUN
 
--- Part 2: leading-dot in VANDALIZE option arguments
--- /MISS=.0 means 0% miss probability, so X_V equals X exactly
-NEW
-REPEAT 3
-LET X = RECNO()
-RUN
-VANDALIZE X INTO X_V /MISS=.0
-RUN
-PRINT X X_V
-RUN
-
 QUIT

@@ -115,8 +115,6 @@ package body SData.AST is
             Free_Program (Stmt.Otherwise_Part);
          when Stmt_SORT | Stmt_BY =>
             Free (Stmt.Sort_Vars);
-         when Stmt_VANDALIZE =>
-            Free (Stmt.Vand_By_Vars);
          when others =>
             null;
       end case;

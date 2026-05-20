@@ -14,7 +14,6 @@ with SData_Core.Statistics;
 with SData.Parser; use SData.Parser;
 with Ada.Streams.Stream_IO;
 with Ada.Exceptions;
-with SData_Core.File_IO;
 with SData_Core.Config;         use SData_Core.Config;
 with SData_Core.Config.Runtime;
 with SData_Core.IO;        use SData_Core.IO;
@@ -26,7 +25,6 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;    use Ada.Strings.Unbounded;
 with Ada.Unchecked_Deallocation;
 with Ada.Text_IO.Unbounded_IO;
-with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 
 --  SData.Interpreter — statement executor and data step engine.
 --
@@ -87,7 +85,7 @@ package body SData.Interpreter is
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
-         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_VANDALIZE;
+         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -588,7 +586,7 @@ package body SData.Interpreter is
             Execute_Program_Delete (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
-            | Stmt_OPTIONS | Stmt_VANDALIZE =>
+            | Stmt_OPTIONS =>
             Execute_Declarative (Stmt);
          when Stmt_SUBMIT | Stmt_SYSTEM | Stmt_OUTPUT | Stmt_FPATH =>
             Execute_IO (Stmt);

@@ -326,45 +326,6 @@ and
 .B OPTIONS SHELLTIMEOUT
 for details.
 .TP
-.BR "VANDALIZE " \fIsource\fR " [INTO " \fIdest\fR "] [" /PERTURB "[=" \fIprob\fR "[," \fIsd\-frac\fR "]] [" /SHUFFLE "[=" \fIprob\fR "] [" /MISS "[=" \fIprob\fR "] [" /BY= \fIvar\fR "[," \fIvar\fR "...]]"
-Creates a noisy copy of column
-.IR source ,
-writing results to
-.I dest
-(created if absent).
-.B INTO
-.I dest
-is optional; if omitted,
-.I source
-is modified in place.
-At least one option is required.
-Option probabilities must sum to no more than 1.0.
-DIM arrays are supported (the same noise is applied to all elements).
-.RS
-.TP
-.BI /PERTURB [= prob [, sd\-frac ]]
-Add Gaussian noise to each selected value.
-.I prob
-is the probability a given value is perturbed (default 1.0);
-.I sd\-frac
-is the noise standard deviation expressed as a fraction of the column's
-standard deviation (default 0.01).
-.TP
-.BI /SHUFFLE [= prob ]
-Randomly permute values within the column (or within each BY group).
-.I prob
-is the probability any given pair of values is swapped (default 1.0).
-.TP
-.BI /MISS [= prob ]
-Set each value to missing with probability
-.I prob
-(default 0.05).
-.TP
-.BI /BY= var [, var ...]
-Stratify all operations by the named grouping variable(s).
-Operations are performed independently within each BY group.
-.RE
-.TP
 .BR HELP " [\fItopic\fR | " /ALL ]
 Display built\-in help.
 Without an argument, list all commands and functions.

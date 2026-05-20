@@ -91,56 +91,6 @@ LAG, NEXT, and BOG/EOG functions.
 Bare BY (no variables) cancels the active grouping.
 Execution: Declarative -- grouping is active for all subsequent RUNs.
 
-Command: VANDALIZE <source> [INTO <dest>]
-         [/PERTURB[=<prob>[,<sd-frac>]]]
-         [/SHUFFLE[=<prob>]]
-         [/MISS[=<prob>]]
-         [/BY=<var>[,<var>...]]
-Creates a noisy copy of a variable by applying one or more degradation
-operations.  INTO <dest> is optional; if omitted, the source variable is
-modified in place.  DIM array base names are supported as source and dest.
-
-Options:
-  /MISS[=prob]
-    Set the destination to missing with probability prob.
-    Default prob: 0.05.
-
-  /SHUFFLE[=prob]
-    Replace the destination with a value drawn uniformly at random
-    from the same column (within the active BY group if /BY is set).
-    Default prob: 1.0.
-
-  /PERTURB[=prob[,sd-frac]]
-    Add Gaussian noise: mean 0, SD = sd-frac * column_SD.
-    Requires a numeric (float) variable.
-    Default prob: 1.0.  Default sd-frac: 0.01.
-
-  /BY=var[,var...]
-    Stratify all operations by the named grouping variables.
-    Each group is treated independently (statistics and random
-    draws are confined to records within the same group).
-
-Notes:
-  At least one operation (/MISS, /SHUFFLE, /PERTURB) must be specified.
-  If more than one operation is listed, each record is assigned to at most
-  one operation; the probabilities must therefore sum to <= 1.0.
-  Records whose combined probability leaves a remainder receive no change.
-  /PERTURB is not valid for character variables.
-
-Examples:
-  VANDALIZE SCORE INTO SCORE_NOISY /PERTURB=1.0,0.05
-    Copy SCORE to SCORE_NOISY, adding Gaussian noise with SD = 5% of
-    the column standard deviation.
-
-  VANDALIZE INCOME INTO INCOME_BAD /MISS=0.10 /SHUFFLE=0.05
-    10% of records become missing; 5% get a random value from the column;
-    the remaining 85% are copied unchanged.
-
-  VANDALIZE AGE /PERTURB /BY=DEPT$
-    Perturb AGE in-place using noise calibrated within each DEPT$ group.
-
-Execution: Immediate -- operates on the current Data Table at once.
-
 Command: SORT variable(s)
 Reorders the Data Table based on the specified variables.
 Execution: Immediate -- re-orders the table at once.

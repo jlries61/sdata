@@ -8,7 +8,6 @@
 
 with SData.Lexer;           use SData.Lexer;
 with SData.AST;             use SData.AST;
-with SData_Core.Evaluator;  use SData_Core.Evaluator;
 
 package SData.Parser is
 

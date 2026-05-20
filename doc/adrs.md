@@ -475,7 +475,8 @@ Implementation uses the POSIX `timeout` utility as a command prefix: the shell i
 ---
 
 ### ADR-038: Add VANDALIZE command for generating noisy variable copies
-**Date:** 2026-05-15 | **Status:** Accepted
+**Date:** 2026-05-15 | **Status:** Superseded — VANDALIZE moved to the standalone `data-vandal` application.
+See design spec at `doc/specs/2026-05-19-data-vandal-design.md`.
 
 **Context:** Statistical workflows frequently require synthetic data generation, anonymisation of sensitive variables, and sensitivity testing. SData had no built-in facility for introducing controlled noise into table variables. Users had to write verbose multi-statement workarounds (FOR loops, conditional LETs, manual RSEED management) that did not compose cleanly with BY-group stratification. Full design rationale: `doc/specs/2026-05-15-vandalize-design.md`.
 

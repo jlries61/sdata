@@ -306,7 +306,6 @@ package body SData.Lexer is
                elsif Upper = "STEP" then T.Kind := Token_STEP;
                elsif Upper = "BREAK"     then T.Kind := Token_BREAK;
                elsif Upper = "INTO"      then T.Kind := Token_INTO;
-               elsif Upper = "VANDALIZE" then T.Kind := Token_VANDALIZE;
                else
                   T.Kind := Token_Identifier;
                end if;
