@@ -116,7 +116,6 @@ package body SData.Interpreter is
    function  Group_Flags (Logical_I     : Positive;
                           Logical_Count : Natural)
                           return Group_Flags_Result;
-   procedure Rebuild_Filter_Map;
    procedure Process_One_Record   (Logical_I        : Positive;
                                     Logical_Count    : Natural;
                                     Start            : Statement_Access;
@@ -136,12 +135,6 @@ package body SData.Interpreter is
       Hash         => Ada.Strings.Hash,
       Equivalent_Elements => "=");
    Input_File_Columns : Name_Sets.Set;
-
-   --  Walks an expression AST and adds to Names every variable name that the
-   --  expression reads at evaluation time.  Used by the SELECT filter scan to
-   --  determine the minimal set of columns that need to be loaded per row.
-   procedure Collect_Filter_Vars (Expr  : Expression_Access;
-                                   Names : in out Name_Sets.Set);
 
    --  Set of script files currently in the SUBMIT execution chain (for cycle detection).
    Submit_Chain : Name_Sets.Set;
@@ -616,56 +609,6 @@ package body SData.Interpreter is
       end loop;
    end Execute_List;
 
-   ---------------------------
-   -- Collect_Filter_Vars  --
-   ---------------------------
-   --  Walks the filter expression AST recursively, inserting into Names the
-   --  upper-cased name of every variable that the expression reads directly.
-   --  For identifier-ref functions (LAG/NEXT/OBS and variants) the first
-   --  argument is a variable name, not a read of that variable's current PDV
-   --  value — those are skipped so we don't load an irrelevant column.
-   procedure Collect_Filter_Vars (Expr  : Expression_Access;
-                                   Names : in out Name_Sets.Set) is
-   begin
-      if Expr = null then return; end if;
-      case Expr.Kind is
-         when Expr_Variable =>
-            Names.Include (To_Upper (Expr.Var_Name (1 .. Expr.Var_Len)));
-         when Expr_Binary_Op =>
-            Collect_Filter_Vars (Expr.Left,    Names);
-            Collect_Filter_Vars (Expr.Right,   Names);
-         when Expr_Unary_Op =>
-            Collect_Filter_Vars (Expr.Operand, Names);
-         when Expr_Function_Call =>
-            declare
-               FName : constant String :=
-                  To_Upper (Expr.Func_Name (1 .. Expr.Func_Len));
-               Args  : Expression_List := Expr.Arguments;
-            begin
-               if Is_Identifier_Ref_Function (FName) and then Args /= null then
-                  Args := Args.Next;  -- skip the variable-name argument
-               end if;
-               while Args /= null loop
-                  Collect_Filter_Vars (Args.Expr, Names);
-                  Args := Args.Next;
-               end loop;
-            end;
-         when Expr_Array_Access =>
-            --  The array name is itself a variable reference.
-            Names.Include (To_Upper (Expr.Arr_Name (1 .. Expr.Arr_Len)));
-            declare
-               Idx : Expression_List := Expr.Arr_Idx;
-            begin
-               while Idx /= null loop
-                  Collect_Filter_Vars (Idx.Expr, Names);
-                  Idx := Idx.Next;
-               end loop;
-            end;
-         when others =>
-            null;  -- Expr_Numeric_Literal and Expr_String_Literal: no variables.
-      end case;
-   end Collect_Filter_Vars;
-
    --  Is_First/Last_In_Group operate in logical space when a filter is active:
    --  Logical_Idx is a 1-based position into the filtered view, and
    --  Logical_To_Physical maps it to the actual table row for value comparisons.
@@ -695,65 +638,6 @@ package body SData.Interpreter is
                 not SData_Core.Table.In_Same_Group
                       (Phys_Curr, SData_Core.Table.Logical_To_Physical (Logical_I + 1)));
    end Group_Flags;
-
-   --  Rebuild_Filter_Map — re-evaluates the SELECT filter against the current
-   --  table and installs the resulting logical index map.  Called once at the
-   --  start of every RUN.  The previous map was cleared by Commit_Output_Table,
-   --  so this always works against the up-to-date physical row set.
-   --  No-op when no filter is active.
-   --
-   --  The persistent filter expression lives in
-   --  SData_Core.Config.Runtime.Select_Filter_Expr; this routine reads it.
-   procedure Rebuild_Filter_Map is
-      Filter_Expr : constant Expression_Access :=
-         SData_Core.Config.Runtime.Select_Filter_Expr;
-   begin
-      if Filter_Expr = null then return; end if;
-      declare
-         Total          : constant Natural := Row_Count;
-         Saved_Physical : constant Natural := SData_Core.Table.Get_Current_Record_Index;
-      begin
-         if Total = 0 then
-            SData_Core.Table.Clear_Index_Map;
-         else
-            declare
-               Filter_Cols : Name_Sets.Set;
-            begin
-               --  Targeted loading: only columns the filter expression actually
-               --  reads are loaded per row.  Temporary variables are excluded —
-               --  they are already in the symbol table.
-               Collect_Filter_Vars (Filter_Expr, Filter_Cols);
-               declare
-                  Passing : SData_Core.Table.Index_Array (1 .. Total);
-                  Count   : Natural := 0;
-               begin
-                  for R in 1 .. Total loop
-                     SData_Core.Table.Set_Current_Record_Index (R);
-                     for Col_Name of Filter_Cols loop
-                        if SData_Core.Table.Has_Column (Col_Name) then
-                           SData_Core.Variables.Load_PDV_One_Column (R, Col_Name);
-                        end if;
-                     end loop;
-                     if Is_True (Evaluate (Filter_Expr)) then
-                        Count := Count + 1;
-                        Passing (Count) := R;
-                        Debug_Trace ("SELECT → KEPT", 2);
-                     else
-                        Debug_Trace ("SELECT → DROPPED", 2);
-                     end if;
-                  end loop;
-                  SData_Core.Table.Set_Current_Record_Index (Saved_Physical);
-                  SData_Core.Table.Set_Index_Map (Passing (1 .. Count));
-                  Debug_Trace ("SELECT → "
-                               & Ada.Strings.Fixed.Trim (Natural'Image (Count), Ada.Strings.Both)
-                               & " of "
-                               & Ada.Strings.Fixed.Trim (Natural'Image (Total), Ada.Strings.Both)
-                               & " records kept", 2);
-               end;
-            end;
-         end if;
-      end;
-   end Rebuild_Filter_Map;
 
    --  Process_One_Record — runs one record through the data step body:
    --  sets BOG/EOG flags and FIRST./LAST. temporaries, loads the PDV,
@@ -809,7 +693,7 @@ package body SData.Interpreter is
       Initialize_PDV;
       Resolve_Expr_Indices (Start, Boundary);
       SData_Core.Table.Initialize_Output_Table;
-      Rebuild_Filter_Map;
+      SData_Core.Commands.Execute_Rebuild_Filter;
       declare
          Logical_Count : constant Natural :=
             (if SData_Core.Table.Is_Filtered then SData_Core.Table.Logical_Row_Count

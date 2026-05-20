@@ -6,14 +6,17 @@
 [debug] LET X = 3.00000
 [debug] RUN complete: 3 records, 1 variables
 RUN complete. 3 records and 1 variables processed.
-[debug] SELECT → DROPPED
-[debug] SELECT → KEPT
-[debug] SELECT → KEPT
-[debug] SELECT → 2 of 3 records kept
+[debug] SELECT: DROPPED
+[debug] SELECT: KEPT
+[debug] SELECT: KEPT
+[debug] SELECT: 2 of 3 records kept
 [debug] -- record 1 (physical 2)
 [debug] IF → TRUE
 [debug] LET FLAG = 1.00000
 [debug] -- record 2 (physical 3)
 [debug] IF → FALSE (skipping)
+[debug] SELECT: KEPT
+[debug] SELECT: KEPT
+[debug] SELECT: 2 of 2 records kept
 [debug] RUN complete: 2 records, 2 variables
 RUN complete. 2 records and 2 variables processed.
