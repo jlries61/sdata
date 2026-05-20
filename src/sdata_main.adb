@@ -165,7 +165,7 @@ procedure SData_Main is
                SData_Core.IO.Flush_Pager_Buffer;
                Ada.Text_IO.New_Line;
                exit REPL;
-            when E : SData.Script_Error =>
+            when E : SData.Script_Error | SData_Core.Script_Error =>
                Put_Line_Error ("Error: " & Exception_Message (E));
                Buffer := Null_Unbounded_String;
                SData_Core.IO.Flush_Pager_Buffer;
@@ -536,7 +536,7 @@ exception
       Put_Line_Error ("Error: incomplete block at end of script"
                       & " (missing END SELECT, END IF, NEXT, or WEND?)");
       Set_Exit_Status (Failure);
-   when E : SData.Script_Error =>
+   when E : SData.Script_Error | SData_Core.Script_Error =>
       Put_Line_Error ("Error: " & Exception_Message (E));
       Set_Exit_Status (Failure);
    when E : others =>

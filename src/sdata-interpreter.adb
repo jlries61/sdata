@@ -6,7 +6,7 @@ with SData.Help;
 with SData_Core.Table;     use SData_Core.Table;
 with SData_Core.Values;    use SData_Core.Values;
 with SData_Core.Variables; use SData_Core.Variables;
-with SData.Evaluator; use SData.Evaluator;
+with SData_Core.Evaluator; use SData_Core.Evaluator;
 with GNAT.Strings; use GNAT.Strings;
 with SData.System;
 with SData_Core.Statistics;
@@ -176,7 +176,7 @@ package body SData.Interpreter is
 
    procedure Clear_Active_Program is
    begin
-      SData.AST.Free_Expression (Select_Filter_Expr);
+      SData_Core.Evaluator.Free_Expression (Select_Filter_Expr);
       for E of Active_Program_Vec loop
          SData.AST.Free_Program (E.Stmt);
       end loop;
@@ -896,7 +896,7 @@ package body SData.Interpreter is
             begin
                Execute_Statement (Current, Outer_Ctx);
             exception
-               when E : Script_Error =>
+               when E : Script_Error | SData_Core.Script_Error =>
                   if SData_Core.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
                      SData_Core.Config.Runtime.Last_Error_Code := 1;

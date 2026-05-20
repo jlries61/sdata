@@ -6,8 +6,9 @@
 --  It takes a stream of tokens from the lexer and organizes them into an AST
 --  consisting of linked statements and expressions.
 
-with SData.Lexer; use SData.Lexer;
-with SData.AST;   use SData.AST;
+with SData.Lexer;           use SData.Lexer;
+with SData.AST;             use SData.AST;
+with SData_Core.Evaluator;  use SData_Core.Evaluator;
 
 package SData.Parser is
 

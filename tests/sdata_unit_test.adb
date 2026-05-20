@@ -2,7 +2,7 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
---  Unit tests for SData_Core.Table, SData.Evaluator pure helpers, and BY-group logic.
+--  Unit tests for SData_Core.Table, SData_Core.Evaluator pure helpers, and BY-group logic.
 --  Exercises the public API directly — no parser or interpreter involved.
 
 with Ada.Text_IO;           use Ada.Text_IO;
@@ -10,7 +10,7 @@ with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData_Core.Table;           use SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
-with SData.Evaluator;       use SData.Evaluator;
+with SData_Core.Evaluator;       use SData_Core.Evaluator;
 with SData_Core.Variables;       use SData_Core.Variables;
 
 procedure SData_Unit_Test is
@@ -386,7 +386,7 @@ begin
    Check_Float ("T-72 P row 2 value set by position = 2.72", V.Num_Val, 2.72);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Evaluator: Convert_To_Float ───────────────────────────────────
+   --  ── SData_Core.Evaluator: Convert_To_Float ───────────────────────────────────
    ---------------------------------------------------------------------------
 
    Check_Float ("E-01 Convert_To_Float numeric",
@@ -411,7 +411,7 @@ begin
    Check ("E-03 Convert_To_Float missing contract documented", True, True);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Evaluator: Get_Expected_Kind ──────────────────────────────────
+   --  ── SData_Core.Evaluator: Get_Expected_Kind ──────────────────────────────────
    ---------------------------------------------------------------------------
 
    Check_Kind ("E-04 '$' suffix → Val_String",  Get_Expected_Kind ("NAME$"), Val_String);
@@ -420,7 +420,7 @@ begin
    Check_Kind ("E-07 empty name → Val_Numeric", Get_Expected_Kind (""),      Val_Numeric);
 
    ---------------------------------------------------------------------------
-   --  ── SData.Evaluator: Is_Identifier_Ref_Function ─────────────────────────
+   --  ── SData_Core.Evaluator: Is_Identifier_Ref_Function ─────────────────────────
    ---------------------------------------------------------------------------
 
    Check ("E-08 LAG is identifier-ref",          Is_Identifier_Ref_Function ("LAG"),    True);

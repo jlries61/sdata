@@ -2,7 +2,7 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
---  Unit tests for SData.Evaluator handler families:
+--  Unit tests for SData_Core.Evaluator handler families:
 --  numeric_fns, distrib_fns, misc_fns, aggregate_fns.
 --  Calls functions via Call_Function — no parser or interpreter involved.
 
@@ -11,7 +11,7 @@ with Ada.Command_Line;
 with Ada.Numerics;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData_Core.Values;          use SData_Core.Values;
-with SData.Evaluator;       use SData.Evaluator;
+with SData_Core.Evaluator;       use SData_Core.Evaluator;
 with SData_Core.Statistics;
 pragma Warnings (Off, SData_Core.Statistics);
 with SData.AST;       use SData.AST;

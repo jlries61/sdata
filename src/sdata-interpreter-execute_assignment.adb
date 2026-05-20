@@ -180,6 +180,7 @@ exception
       raise Script_Error with "Type mismatch for variable " & Var_Name_Str
         & ": " & Ada.Exceptions.Exception_Message (E);
    when Script_Error => raise;
+   when SData_Core.Script_Error => raise;
    when E : others =>
       raise Script_Error with "Assignment failed for variable " & Var_Name_Str
         & ": " & Ada.Exceptions.Exception_Message (E);

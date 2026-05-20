@@ -103,7 +103,7 @@ begin
                   when Break_Triggered =>
                      Inspect_PDV (Logical_I, Logical_Count, Act);
                      Break_Fired := True;
-                  when E : Script_Error =>
+                  when E : Script_Error | SData_Core.Script_Error =>
                      if SData_Core.Config.Continue_On_Error then
                         Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
                         SData_Core.Config.Runtime.Last_Error_Code := 1;

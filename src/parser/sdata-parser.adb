@@ -3,6 +3,7 @@
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
 with SData_Core.IO;        use SData_Core.IO;
+with SData_Core.Evaluator; use SData_Core.Evaluator;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
 with SData_Core.Config;

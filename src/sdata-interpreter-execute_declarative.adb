@@ -190,7 +190,7 @@ begin
          SData_Core.Config.Runtime.Repeat_Count := Stmt.Count;
          Input_File_Columns.Clear;
       when Stmt_SELECT_FILTER =>
-         SData.AST.Free_Expression (Select_Filter_Expr);
+         SData_Core.Evaluator.Free_Expression (Select_Filter_Expr);
          Select_Filter_Expr := SData.AST.Copy_Expression (Stmt.Expr);
          SData_Core.Table.Clear_Index_Map;
       when Stmt_DIGITS =>
