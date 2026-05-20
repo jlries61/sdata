@@ -42,6 +42,119 @@ package body SData.Parser is
       Initialize (Ctx.Lex_Ctx, Source);
    end Initialize;
 
+   ---------------------------------------------------------------------------
+   --  Token_To_String — reconstruct the source text of a single token.
+   --
+   --  Used by Collect_Line_Text to rebuild a parseable string from the token
+   --  stream for forwarding to SData_Core.Evaluator.Parse_Expression.
+   --  String literals are re-quoted (Ada style: "..." with "" for embedded ").
+   --  Operator tokens are mapped to their canonical character sequences.
+   ---------------------------------------------------------------------------
+   function Token_To_String (T : Token) return String is
+      Raw : constant String := T.Text (1 .. T.Length);
+   begin
+      case T.Kind is
+         when Token_Identifier | Token_Numeric_Literal =>
+            return Raw;
+         when Token_String_Literal =>
+            --  Re-quote: scan for embedded '"' and double them.
+            declare
+               Buf : String (1 .. Raw'Length * 2 + 2);
+               Len : Natural := 0;
+            begin
+               Len := Len + 1; Buf (Len) := '"';
+               for Ch of Raw loop
+                  if Ch = '"' then
+                     Len := Len + 1; Buf (Len) := '"';
+                     Len := Len + 1; Buf (Len) := '"';
+                  else
+                     Len := Len + 1; Buf (Len) := Ch;
+                  end if;
+               end loop;
+               Len := Len + 1; Buf (Len) := '"';
+               return Buf (1 .. Len);
+            end;
+         --  Keywords that appear in expressions:
+         when Token_NOT  => return "NOT";
+         when Token_AND  => return "AND";
+         when Token_OR   => return "OR";
+         when Token_XOR  => return "XOR";
+         when Token_IF   => return "IF";
+         when Token_NEXT => return "NEXT";
+         --  Operators and punctuation:
+         when Token_Plus          => return "+";
+         when Token_Minus         => return "-";
+         when Token_Star          => return "*";
+         when Token_Slash         => return "/";
+         when Token_Caret         => return "**";
+         when Token_Equal         => return "=";
+         when Token_Not_Equal     => return "<>";
+         when Token_Less          => return "<";
+         when Token_Less_Equal    => return "<=";
+         when Token_Greater       => return ">";
+         when Token_Greater_Equal => return ">=";
+         when Token_Left_Paren    => return "(";
+         when Token_Right_Paren   => return ")";
+         when Token_Left_Brace    => return "(";  -- treat {} as ()
+         when Token_Right_Brace   => return ")";
+         when Token_Comma         => return ",";
+         when Token_Colon         => return ":";
+         when Token_Dot           => return ".";
+         when others => return Raw;
+      end case;
+   end Token_To_String;
+
+   ---------------------------------------------------------------------------
+   --  Collect_Select_Filter_Text — drain the token stream for a SELECT filter
+   --  expression, reconstructing tokens as a space-separated string suitable
+   --  for SData_Core.Evaluator.Parse_Expression.
+   --
+   --  Stops (without consuming) at:
+   --    Token_Newline, Token_EOF, Token_Slash, Token_Semicolon, Token_Colon,
+   --    Token_CASE, Token_WHEN, Token_OTHERWISE.
+   --
+   --  Top-level commas (outside parentheses) separate conjuncts in a SELECT
+   --  filter; they are converted to " AND " in the output so that the resulting
+   --  string parses as a single expression.  Commas inside parentheses (e.g.,
+   --  function arguments) are preserved as-is.
+   ---------------------------------------------------------------------------
+   function Collect_Select_Filter_Text (Ctx : in out Parser_Context) return String is
+      Buf         : Unbounded_String := Null_Unbounded_String;
+      Tok         : Token;
+      First_Token : Boolean := True;
+      Depth       : Natural := 0; -- parenthesis depth
+   begin
+      loop
+         declare
+            P : constant Token_Kind := Peek_Next_Token (Ctx.Lex_Ctx).Kind;
+         begin
+            exit when P = Token_Newline   or else P = Token_EOF   or else
+                      P = Token_Slash     or else P = Token_Semicolon or else
+                      P = Token_CASE      or else P = Token_WHEN  or else
+                      P = Token_OTHERWISE or else P = Token_Colon;
+         end;
+         Tok := Get_Next_Token (Ctx.Lex_Ctx);
+         --  Track paren depth so we only promote top-level commas.
+         if Tok.Kind = Token_Left_Paren or else Tok.Kind = Token_Left_Brace then
+            Depth := Depth + 1;
+         elsif Tok.Kind = Token_Right_Paren or else Tok.Kind = Token_Right_Brace then
+            if Depth > 0 then Depth := Depth - 1; end if;
+         end if;
+         --  Top-level comma → conjunct separator (AND).
+         if Tok.Kind = Token_Comma and then Depth = 0 then
+            Append (Buf, " AND");
+            First_Token := False;
+         else
+            if not First_Token then
+               Append (Buf, " ");
+            end if;
+            Append (Buf, Token_To_String (Tok));
+            First_Token := False;
+         end if;
+      end loop;
+      return To_String (Buf);
+   end Collect_Select_Filter_Text;
+
    --  Forward declarations for mutual recursion.
    function Parse_Expression (Ctx : in out Parser_Context) return Expression_Access;
    function Parse_Expression_List (Ctx : in out Parser_Context; Closing : Token_Kind) return Expression_List;
@@ -968,6 +1081,12 @@ package body SData.Parser is
             --       expression immediately followed by CASE/WHEN/OTHERWISE.
             --    3. SELECT <expr> — expression not followed by CASE/WHEN;
             --       treated as a record-filter predicate.
+            --
+            --  For case 3 (SELECT_FILTER), tokens are collected into a plain
+            --  string and parsed by SData_Core.Evaluator.Parse_Expression so
+            --  that the same parser can be used standalone by data-vandal.
+            --  Top-level commas in the token stream are converted to " AND " by
+            --  Collect_Select_Filter_Text before the string is forwarded.
             declare
                First_Branch, Last_Branch : Case_Branch := null;
                Tok_Local : Token;
@@ -988,12 +1107,18 @@ package body SData.Parser is
                   Stmt := new Statement (Stmt_SELECT_FILTER);
                   --  Stmt.Expr remains null, signalling filter cancellation.
                else
-               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_CASE and then
-                  Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_WHEN and then
-                  Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_OTHERWISE then
-                  Saved_Expr := Parse_Expression (Ctx);
-               end if;
-               
+               --  Collect the optional expression text (everything up to CASE /
+               --  WHEN / OTHERWISE / EOL / EOF), converting top-level commas to
+               --  AND conjunctions in the process.
+               declare
+                  Collected : constant String := Collect_Select_Filter_Text (Ctx);
+               begin
+                  if Collected'Length > 0 then
+                     Saved_Expr :=
+                        SData_Core.Evaluator.Parse_Expression (Collected);
+                  end if;
+               end;
+
                -- Skip separators to see if a CASE/WHEN/OTHERWISE follows.
                loop
                   Tok_Local := Peek_Next_Token (Ctx.Lex_Ctx);
@@ -1013,22 +1138,12 @@ package body SData.Parser is
                            Tok_Local.Kind = Token_OTHERWISE;
 
                if not Is_Block then
-                  -- Record filter form: SELECT <expr> [, <expr> ...]
+                  -- Record filter form: SELECT <expr>
+                  -- (Top-level commas were already converted to AND conjunctions
+                  --  by Collect_Select_Filter_Text, so no further comma loop is
+                  --  needed here.)
                   Stmt := new Statement (Stmt_SELECT_FILTER);
                   Stmt.Expr := Saved_Expr;
-
-                  while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
-                     declare
-                        Discard  : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- ','
-                        Next_E   : constant Expression_Access := Parse_Expression (Ctx);
-                        Combined : constant Expression_Access := new Expression (Expr_Binary_Op);
-                     begin
-                        Combined.Op    := Op_And;
-                        Combined.Left  := Stmt.Expr;
-                        Combined.Right := Next_E;
-                        Stmt.Expr      := Combined;
-                     end;
-                  end loop;
                else
                   -- Control structure form: SELECT [<expr>] CASE...
                   Stmt := new Statement (Stmt_SELECT);
