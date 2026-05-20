@@ -128,23 +128,10 @@ begin
                          RC (RC'First + 1 .. RC'Last) & " records and " &
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
-            if SData_Core.Config.Runtime.Save_File_Active then
-               begin
-                  SData_Core.File_IO.Open_Output
-                     (Full_Path (SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len), "SAVE"),
-                      SData_Core.Config.Runtime.Save_File_Fmt,
-                      SData_Core.Config.Runtime.Save_Sheet_Name (1 .. SData_Core.Config.Runtime.Save_Sheet_Name_Len),
-                      SData_Core.Config.Runtime.Save_DLM (1 .. SData_Core.Config.Runtime.Save_DLM_Len),
-                      SData_Core.Config.Runtime.Save_Header,
-                      SData_Core.Config.Runtime.Options_SAVEOVERWRT,
-                      SData_Core.Config.Runtime.Save_Charset
-                         (1 .. SData_Core.Config.Runtime.Save_Charset_Len));
-                  if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len)); end if;
-               exception
-                  when SData_Core.File_IO.Save_Refused => null;
-               end;
-               SData_Core.Config.Runtime.Save_File_Active := False;
-            end if;
+            --  Flush any pending SAVE and rebuild the SELECT filter map on the
+            --  freshly sorted table.  Delegating to Execute_RUN keeps the save
+            --  path in sync with the one used by explicit RUN statements.
+            SData_Core.Commands.Execute_RUN;
          end;
       when Stmt_BY =>
          if SData_Core.Table.Column_Count = 0 and then not SData_Core.Config.Runtime.Repeat_Active then
