@@ -64,32 +64,25 @@ begin
             end;
          end if;
       when Stmt_OUTPUT =>
-         if SData_Core.IO.Is_Redirected then SData_Core.IO.Close_Output; end if;
-         if Stmt.File_Len > 0 then
-            SData_Core.IO.Open_Output (Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "OUTPUT"));
-         end if;
-         if Stmt.Output_FMT_Len > 0 then
-            SData_Core.Config.Runtime.Options_TXTFMT := (others => ' ');
-            SData_Core.Config.Runtime.Options_TXTFMT (1 .. Stmt.Output_FMT_Len) :=
-               Stmt.Output_FMT_Val (1 .. Stmt.Output_FMT_Len);
-            SData_Core.Config.Runtime.Options_TXTFMT_Len := Stmt.Output_FMT_Len;
-         end if;
-         if Stmt.Output_CHARSET_Len > 0 then
-            SData_Core.Config.Runtime.Options_CHARSET := (others => ' ');
-            SData_Core.Config.Runtime.Options_CHARSET (1 .. Stmt.Output_CHARSET_Len) :=
-               Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len);
-            SData_Core.Config.Runtime.Options_CHARSET_Len := Stmt.Output_CHARSET_Len;
-         end if;
+         SData_Core.Commands.Execute_OUTPUT
+           (File_Name => (if Stmt.File_Len > 0
+                          then Stmt.File_Path (1 .. Stmt.File_Len)
+                          else ""),
+            TXTFMT    => (if Stmt.Output_FMT_Len > 0
+                          then Stmt.Output_FMT_Val (1 .. Stmt.Output_FMT_Len)
+                          else ""),
+            Charset   => (if Stmt.Output_CHARSET_Len > 0
+                          then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
+                          else ""));
       when Stmt_FPATH =>
-         declare
-            Path      : constant String  := (if Stmt.File_Len > 0 then Stmt.File_Path (1 .. Stmt.File_Len) else "");
-            Reset_All : constant Boolean := not (Stmt.Use_Flag or Stmt.Save_Flag or Stmt.Submit_Flag or Stmt.Output_Flag);
-         begin
-            if Reset_All or Stmt.Use_Flag    then SData_Core.Config.Runtime.FPath_Use    := To_Unbounded_String (Path); end if;
-            if Reset_All or Stmt.Save_Flag   then SData_Core.Config.Runtime.FPath_Save   := To_Unbounded_String (Path); end if;
-            if Reset_All or Stmt.Submit_Flag then SData_Core.Config.Runtime.FPath_Submit := To_Unbounded_String (Path); end if;
-            if Reset_All or Stmt.Output_Flag then SData_Core.Config.Runtime.FPath_Output := To_Unbounded_String (Path); end if;
-         end;
+         SData_Core.Commands.Execute_FPATH
+           (Path        => (if Stmt.File_Len > 0
+                            then Stmt.File_Path (1 .. Stmt.File_Len)
+                            else ""),
+            Use_Flag    => Stmt.Use_Flag,
+            Save_Flag   => Stmt.Save_Flag,
+            Submit_Flag => Stmt.Submit_Flag,
+            Output_Flag => Stmt.Output_Flag);
       when others => null;
    end case;
 end Execute_IO;

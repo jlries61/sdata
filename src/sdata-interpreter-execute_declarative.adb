@@ -21,13 +21,11 @@ procedure Execute_Declarative (Stmt : Statement_Access) is
 begin
    case Stmt.Kind is
       when Stmt_USE =>
-         SData_Core.Config.Runtime.Repeat_Active := False;
-         SData_Core.Config.Runtime.Repeat_Count := 0;
          declare
-            File_Name  : constant String := Stmt.File_Path (1 .. Stmt.File_Len);
-            Expanded   : String (1 .. Max_Path_Len);
-            Exp_Len    : Natural := 0;
-            Eff_DLM     : constant String :=
+            File_Name : constant String :=
+               (if Stmt.Is_Mock then "MOCK"
+                else Stmt.File_Path (1 .. Stmt.File_Len));
+            Eff_DLM   : constant String :=
                (if Stmt.DLM_Len > 0
                 then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
                 else SData_Core.Config.Runtime.Options_CSVDLM
@@ -41,21 +39,25 @@ begin
                 then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
                 else SData_Core.Config.Runtime.Options_CHARSET
                         (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len));
+            Eff_Fmt : constant SData_Core.Config.Format_Type :=
+               (if Stmt.Format_Specified then Stmt.Fmt_Override
+                else SData_Core.Config.Input_Format);
          begin
-            if Stmt.Is_Mock then
-               Exp_Len := 4; Expanded (1 .. 4) := "MOCK";
-            else
-               declare Full : constant String := Full_Path (File_Name, "USE");
-               begin Exp_Len := Full'Length; Expanded (1 .. Exp_Len) := Full; end;
-            end if;
-            SData_Core.File_IO.Open_Input (Expanded (1 .. Exp_Len),
-              (if Stmt.Format_Specified then Stmt.Fmt_Override else SData_Core.Config.Input_Format),
-              Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
-              Eff_DLM, Eff_Header, Eff_Charset,
-              Stmt.Skip_Val, Stmt.Maxrows_Val, Stmt.NSCAN_Val);
+            SData_Core.Commands.Execute_USE
+              (File_Name   => File_Name,
+               Fmt         => Eff_Fmt,
+               Sheet_Name  => Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
+               Delimiter   => Eff_DLM,
+               Read_Header => Eff_Header,
+               Charset     => Eff_Charset,
+               Skip_Rows   => Stmt.Skip_Val,
+               Max_Rows    => Stmt.Maxrows_Val,
+               Nscan_Rows  => Stmt.NSCAN_Val,
+               Is_Mock     => Stmt.Is_Mock);
          end;
+         --  Cache column names from the file so future bookkeeping can tell
+         --  the difference between original and derived columns.
          Input_File_Columns.Clear;
-         Refresh_PDV_Names;
          for I in 1 .. Column_Count loop
             Input_File_Columns.Include (Column_Name (I));
          end loop;
@@ -67,47 +69,35 @@ begin
                       & Ada.Strings.Fixed.Trim (Natural'Image (SData_Core.Table.Column_Count), Ada.Strings.Both)
                       & " variables)", 1);
       when Stmt_SAVE =>
-         if Stmt.File_Len = 0 then
-            SData_Core.Config.Runtime.Save_File_Active := False;
-            SData_Core.Config.Runtime.Save_File_Len := 0;
-         else
-            declare
-               Full  : constant String := Full_Path (Stmt.File_Path (1 .. Stmt.File_Len), "SAVE");
-               SLen  : constant Natural := Stmt.Sheet_Name_Len;
-            begin
-               SData_Core.Config.Runtime.Save_File_Path (1 .. Full'Length) := Full;
-               SData_Core.Config.Runtime.Save_File_Len := Full'Length;
-               SData_Core.Config.Runtime.Save_File_Fmt := (if Stmt.Format_Specified then Stmt.Fmt_Override else SData_Core.Config.Output_Format);
-               SData_Core.Config.Runtime.Save_Sheet_Name (1 .. SLen) := Stmt.Sheet_Name (1 .. SLen);
-               SData_Core.Config.Runtime.Save_Sheet_Name_Len := SLen;
-               SData_Core.Config.Runtime.Save_File_Active := True;
-               declare
-                  Eff_DLM : constant String :=
-                     (if Stmt.DLM_Len > 0
-                      then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                      else SData_Core.Config.Runtime.Options_CSVDLM
-                              (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
-                  EL : constant Natural := Eff_DLM'Length;
-               begin
-                  SData_Core.Config.Runtime.Save_DLM (1 .. EL) := Eff_DLM;
-                  SData_Core.Config.Runtime.Save_DLM_Len := EL;
-               end;
-               SData_Core.Config.Runtime.Save_Header :=
-                  (if Stmt.Header_Specified
-                   then Stmt.Header_Val
-                   else SData_Core.Config.Runtime.Options_Header);
-               if Stmt.Output_CHARSET_Len > 0 then
-                  SData_Core.Config.Runtime.Save_Charset (1 .. Stmt.Output_CHARSET_Len) :=
-                     Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len);
-                  SData_Core.Config.Runtime.Save_Charset_Len := Stmt.Output_CHARSET_Len;
-               else
-                  SData_Core.Config.Runtime.Save_Charset :=
-                     SData_Core.Config.Runtime.Options_CHARSET;
-                  SData_Core.Config.Runtime.Save_Charset_Len :=
-                     SData_Core.Config.Runtime.Options_CHARSET_Len;
-               end if;
-            end;
-         end if;
+         declare
+            File_Name : constant String :=
+               (if Stmt.File_Len = 0 then ""
+                else Stmt.File_Path (1 .. Stmt.File_Len));
+            Eff_DLM   : constant String :=
+               (if Stmt.DLM_Len > 0
+                then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
+                else SData_Core.Config.Runtime.Options_CSVDLM
+                        (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
+            Eff_Header : constant Boolean :=
+               (if Stmt.Header_Specified
+                then Stmt.Header_Val
+                else SData_Core.Config.Runtime.Options_Header);
+            Eff_Charset : constant String :=
+               (if Stmt.Output_CHARSET_Len > 0
+                then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
+                else "");
+            Eff_Fmt : constant SData_Core.Config.Format_Type :=
+               (if Stmt.Format_Specified then Stmt.Fmt_Override
+                else SData_Core.Config.Output_Format);
+         begin
+            SData_Core.Commands.Execute_SAVE
+              (File_Name    => File_Name,
+               Fmt          => Eff_Fmt,
+               Sheet_Name   => Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
+               Delimiter    => Eff_DLM,
+               Write_Header => Eff_Header,
+               Charset      => Eff_Charset);
+         end;
       when Stmt_SORT =>
          declare
             Curr_Var : Variable_List := Stmt.Sort_Vars;
@@ -190,9 +180,12 @@ begin
          SData_Core.Config.Runtime.Repeat_Count := Stmt.Count;
          Input_File_Columns.Clear;
       when Stmt_SELECT_FILTER =>
-         SData_Core.Evaluator.Free_Expression (Select_Filter_Expr);
-         Select_Filter_Expr := SData.AST.Copy_Expression (Stmt.Expr);
-         SData_Core.Table.Clear_Index_Map;
+         --  Pass a deep copy of the AST expression; the runtime now owns the
+         --  installed filter expression and frees it when superseded or when
+         --  NEW resets state.  The AST node still owns Stmt.Expr and frees it
+         --  when the program buffer is cleared.
+         SData_Core.Commands.Execute_SELECT
+            (SData.AST.Copy_Expression (Stmt.Expr));
       when Stmt_DIGITS =>
          SData_Core.Config.Print_Digits := Stmt.Digits_Count;
       when Stmt_RSEED =>

@@ -3,6 +3,7 @@
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
 with SData.Help;
+with SData_Core.Commands;
 with SData_Core.Table;     use SData_Core.Table;
 with SData_Core.Values;    use SData_Core.Values;
 with SData_Core.Variables; use SData_Core.Variables;
@@ -161,10 +162,11 @@ package body SData.Interpreter is
    Pending_Mods      : Column_Mod_List := null;
    Pending_Mods_Tail : Column_Mod_List := null;
 
-   --  Persistent SELECT filter expression.  Set by Stmt_SELECT_FILTER and
-   --  cleared by NEW.  The filter map is rebuilt from this expression at the
-   --  start of every RUN so that it is always valid against the current table.
-   Select_Filter_Expr : Expression_Access := null;
+   --  Persistent SELECT filter expression now lives in
+   --  SData_Core.Config.Runtime.Select_Filter_Expr, managed by
+   --  SData_Core.Commands.Execute_SELECT.  The filter map is rebuilt from
+   --  that expression at the start of every RUN so that it is always valid
+   --  against the current table.
 
 
 
@@ -176,7 +178,8 @@ package body SData.Interpreter is
 
    procedure Clear_Active_Program is
    begin
-      SData_Core.Evaluator.Free_Expression (Select_Filter_Expr);
+      SData_Core.Evaluator.Free_Expression
+         (SData_Core.Config.Runtime.Select_Filter_Expr);
       for E of Active_Program_Vec loop
          SData.AST.Free_Program (E.Stmt);
       end loop;
@@ -266,54 +269,36 @@ package body SData.Interpreter is
    end Clear_Pending_Mods;
 
    --  Apply_Pending_Mods — two-pass KEEP-then-DROP logic.
-   --  Pass 1: if any Mod_Keep entry exists, build a keep list and drop every
-   --          column NOT in that list (implementing KEEP semantics).
-   --  Pass 2: apply any explicit Mod_Drop entries.
+   --  Pass 1: if any Mod_Keep entry exists, gather the keep list into a
+   --          Name_Vectors.Vector and delegate to Execute_KEEP (which drops
+   --          every column NOT in the list).
+   --  Pass 2: gather Mod_Drop entries and delegate to Execute_DROP.
    --  This ordering ensures KEEP and DROP can coexist without surprises.
    procedure Apply_Pending_Mods is
-      Keep_Mods_Exist : Boolean := False;
-      Keep_List : Name_Sets.Set;
-      Curr : Column_Mod_List := Pending_Mods;
+      Keep_Names : Name_Vectors.Vector;
+      Drop_Names : Name_Vectors.Vector;
+      Has_Keep   : Boolean := False;
+      Curr       : Column_Mod_List := Pending_Mods;
    begin
-      -- First, check for KEEP statements and build a keep list
       while Curr /= null loop
-         if Curr.Kind = Mod_Keep then
-            Keep_Mods_Exist := True;
-            Keep_List.Include (Curr.Name(1 .. Curr.Len));
-         end if;
+         case Curr.Kind is
+            when Mod_Keep =>
+               Has_Keep := True;
+               Keep_Names.Append
+                  (To_Unbounded_String (Curr.Name (1 .. Curr.Len)));
+            when Mod_Drop =>
+               Drop_Names.Append
+                  (To_Unbounded_String (Curr.Name (1 .. Curr.Len)));
+         end case;
          Curr := Curr.Next;
       end loop;
 
-      -- If there was a KEEP statement, drop everything not in the list.
-      -- Snapshot names first: Drop_Column modifies Column_Order, so iterating
-      -- Column_Name(I) live while dropping would corrupt the index sequence.
-      if Keep_Mods_Exist then
-         declare
-            Snapshot : Name_Vectors.Vector;
-         begin
-            for I in 1 .. Column_Count loop
-               Snapshot.Append (To_Unbounded_String (Column_Name (I)));
-            end loop;
-            for Name of Snapshot loop
-               declare
-                  Col_Name : constant String := To_String (Name);
-               begin
-                  if not Keep_List.Contains (Col_Name) then
-                     Drop_Column (Col_Name);
-                  end if;
-               end;
-            end loop;
-         end;
+      if Has_Keep then
+         SData_Core.Commands.Execute_KEEP (Keep_Names);
       end if;
-
-      -- Now handle explicit drops
-      Curr := Pending_Mods;
-      while Curr /= null loop
-         if Curr.Kind = Mod_Drop then
-            Drop_Column (Curr.Name (1 .. Curr.Len));
-         end if;
-         Curr := Curr.Next;
-      end loop;
+      if not Drop_Names.Is_Empty then
+         SData_Core.Commands.Execute_DROP (Drop_Names);
+      end if;
 
       Clear_Pending_Mods;
    end Apply_Pending_Mods;
@@ -716,9 +701,14 @@ package body SData.Interpreter is
    --  start of every RUN.  The previous map was cleared by Commit_Output_Table,
    --  so this always works against the up-to-date physical row set.
    --  No-op when no filter is active.
+   --
+   --  The persistent filter expression lives in
+   --  SData_Core.Config.Runtime.Select_Filter_Expr; this routine reads it.
    procedure Rebuild_Filter_Map is
+      Filter_Expr : constant Expression_Access :=
+         SData_Core.Config.Runtime.Select_Filter_Expr;
    begin
-      if Select_Filter_Expr = null then return; end if;
+      if Filter_Expr = null then return; end if;
       declare
          Total          : constant Natural := Row_Count;
          Saved_Physical : constant Natural := SData_Core.Table.Get_Current_Record_Index;
@@ -732,7 +722,7 @@ package body SData.Interpreter is
                --  Targeted loading: only columns the filter expression actually
                --  reads are loaded per row.  Temporary variables are excluded —
                --  they are already in the symbol table.
-               Collect_Filter_Vars (Select_Filter_Expr, Filter_Cols);
+               Collect_Filter_Vars (Filter_Expr, Filter_Cols);
                declare
                   Passing : SData_Core.Table.Index_Array (1 .. Total);
                   Count   : Natural := 0;
@@ -744,7 +734,7 @@ package body SData.Interpreter is
                            SData_Core.Variables.Load_PDV_One_Column (R, Col_Name);
                         end if;
                      end loop;
-                     if Is_True (Evaluate (Select_Filter_Expr)) then
+                     if Is_True (Evaluate (Filter_Expr)) then
                         Count := Count + 1;
                         Passing (Count) := R;
                         Debug_Trace ("SELECT → KEPT", 2);
@@ -792,23 +782,10 @@ package body SData.Interpreter is
       SData_Core.Config.Runtime.Repeat_Active := False;
       Set_Current_Record_Index (0);
       Apply_Pending_Mods;
-      if SData_Core.Config.Runtime.Save_File_Active then
-         begin
-            SData_Core.File_IO.Open_Output
-               (Full_Path (SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len), "SAVE"),
-                SData_Core.Config.Runtime.Save_File_Fmt,
-                SData_Core.Config.Runtime.Save_Sheet_Name (1 .. SData_Core.Config.Runtime.Save_Sheet_Name_Len),
-                SData_Core.Config.Runtime.Save_DLM (1 .. SData_Core.Config.Runtime.Save_DLM_Len),
-                SData_Core.Config.Runtime.Save_Header,
-                SData_Core.Config.Runtime.Options_SAVEOVERWRT,
-                SData_Core.Config.Runtime.Save_Charset
-                   (1 .. SData_Core.Config.Runtime.Save_Charset_Len));
-            if not SData_Core.Config.Quiet_Mode then Put_Line ("Dataset saved: " & SData_Core.Config.Runtime.Save_File_Path (1 .. SData_Core.Config.Runtime.Save_File_Len)); end if;
-         exception
-            when SData_Core.File_IO.Save_Refused => null;
-         end;
-         SData_Core.Config.Runtime.Save_File_Active := False;
-      end if;
+      --  Delegate the end-of-step shared work (filter rebuild against the
+      --  newly committed table, plus pending-SAVE flush) to sdata-core so
+      --  the same semantics are available to other front ends.
+      SData_Core.Commands.Execute_RUN;
    end Commit_Step;
 
    --  Resolve_Expr_Indices — walk every Expr_Variable node reachable from the

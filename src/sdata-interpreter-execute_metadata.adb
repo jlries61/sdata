@@ -78,9 +78,13 @@ begin
          end;
       when Stmt_ARRAY =>
          if Stmt.Arr_Name_Len = 0 then
-            List_Virtual_Arrays;
+            --  ARRAY with no name: list all defined virtual arrays.
+            SData_Core.Commands.Execute_ARRAY ("", Name_Vectors.Empty_Vector);
          elsif Stmt.Arr_Vars = null then
-            Undefine_Virtual_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len));
+            --  ARRAY <name>: undefine the named virtual array.
+            SData_Core.Commands.Execute_ARRAY
+               (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len),
+                Name_Vectors.Empty_Vector);
          else
             declare
                V        : Name_Vectors.Vector;
@@ -129,7 +133,8 @@ begin
                   Resolve_Range (Curr_Var.Var);
                   Curr_Var := Curr_Var.Next;
                end loop;
-               Define_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len), V);
+               SData_Core.Commands.Execute_ARRAY
+                  (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len), V);
             exception
                when E : others =>
                   raise Script_Error with "Error defining array " & Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
@@ -149,7 +154,9 @@ begin
             Start_Idx : constant Integer := Eval_Bound (Stmt.Arr_Start_Expr, "Lower");
             End_Idx   : constant Integer := Eval_Bound (Stmt.Arr_End_Expr, "Upper");
          begin
-            Dim_Array (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len), Start_Idx, End_Idx, Stmt.Is_Temporary_Dim);
+            SData_Core.Commands.Execute_DIM
+               (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len),
+                Start_Idx, End_Idx, Stmt.Is_Temporary_Dim);
          exception
             when E : others =>
                raise Script_Error with "Error defining array " & Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len) & ": " & Ada.Exceptions.Exception_Message (E);
