@@ -491,3 +491,62 @@ See design spec at `doc/specs/2026-05-19-data-vandal-design.md`.
 - **DIM array support via `SData.Variables` API.** When source is a DIM array base name, VANDALIZE iterates over elements using `SData.Variables.Has_Array` / `Get_Array_Bounds`, building element column names in parenthesis notation (`X(1)`, `X(2)`, …) consistent with the existing DIM naming convention.
 
 **Consequences:** Users can generate noisy copies of any permanent variable with a single statement, with control over operation type, probability, and BY-group stratification. The `Expr_Missing` AST kind is a permanent addition that correctly represents the `.` missing-value literal; it resolves a pre-existing latent issue in `INF(.)` parsing. Nine integration tests cover errors, MISS, SHUFFLE, PERTURB, BY groups, in-place replacement, combined operations, and DIM arrays.
+
+---
+
+### ADR-039: Extract sdata-core as a shared Alire library
+**Date:** 2026-05-21 | **Status:** Accepted
+
+**Context:** A standalone `data-vandal` application was needed (see ADR-038 supersession and the data-vandal design spec at `doc/specs/2026-05-19-data-vandal-design.md`). VANDALIZE itself is a thin layer over the table, evaluator, and command-execution machinery that already existed in sdata; rebuilding any of that in data-vandal would have meant maintaining two copies of the data layer, two evaluators, two CSV/ODF/OOXML parsers, etc. The alternative — leaving everything in sdata and adding a second binary target — would have bound data-vandal's release cadence to sdata's and pulled the entire sdata command set into data-vandal's executable.
+
+**Decision:** Factor sdata's data layer, evaluator, and the execution bodies of the commands shared between sdata and data-vandal into a separate Alire library crate named `sdata_core`. Both sdata and data-vandal depend on it. During development, both consumers use a path pin (`[[pins]] sdata_core = { path = "../sdata-core" }`) plus a normal version constraint (`sdata_core = "^0.1.0"`); the pin overrides version resolution for local builds while the constraint defines what a future Alire-index-published consumer would require.
+
+The packages moved into sdata-core: `Table`, `Values`, `Variables`, `Statistics`, `CSV`, `IO`, `File_IO` (and its `CSV`/`ODF`/`OOXML`/`Helpers` children), `Config`, `Config.Runtime`, `Signals`, `Evaluator` (and its `Aggregate_Fns`/`Distrib_Fns`/`Misc_Fns`/`Nav_Fns`/`Numeric_Fns`/`String_Fns` children), `System`, plus the `sdata_privilege.c` privilege-detection stub. A new package `SData_Core.Commands` exposes one `Execute_*` procedure per command shared between consumers (USE, SAVE, FPATH, OUTPUT, SELECT, KEEP, DROP, ARRAY, DIM, RUN, plus the post-Task-16 `Execute_OUTPUT_Table` and `Execute_Rebuild_Filter`).
+
+**Consequences:** sdata shed roughly 11 000 lines of source (now in sdata-core) and gained one dependency line. data-vandal's main package is ~2 200 lines plus its share of sdata-core. The two binaries can be released on independent schedules: sdata-core 0.1.0 + sdata 0.8.0 + data-vandal 0.1.0 ship as the first set of tagged versions. The path-pin convention can be lifted by publishing sdata-core to the Alire community index when it stabilises; this requires a one-line change in each consumer's `alire.toml`. sdata's 140 integration tests pass unchanged; data-vandal's 11 native VANDALIZE tests verify the executor was ported faithfully.
+
+---
+
+### ADR-040: sdata-core contains no lexer, AST, or parser
+**Date:** 2026-05-21 | **Status:** Accepted
+
+**Context:** A natural first instinct when factoring sdata-core out (ADR-039) was to put the lexer, AST, and parser in the shared library too — those are mechanical components and both consumers need them. Ada enumeration types are closed: `Token_Kind`, `Statement_Kind`, and `Expression_Kind` cannot be extended after definition. If sdata-core owned them, every token sdata uses (LET, IF, FOR, WHILE, SORT, BREAK, …) would also be in data-vandal's binary, and every new sdata command would be a breaking change for data-vandal — or vice versa. The alternative of representing tokens as `Unbounded_String` and statements as a tagged hierarchy would have worked but at significant runtime cost and away from idiomatic Ada.
+
+**Decision:** Each application owns its complete lexer, AST, and parser. sdata-core owns the data layer, the evaluator, and the command execution procedures. `SData_Core.Commands.Execute_*` procedures accept plain Ada values (paths, name vectors, expression accesses) — never AST node types. The expression parser is shared via a string-based entry point: `SData_Core.Evaluator.Parse_Expression (Text : String) return Expression_Access`. Each consumer's parser reconstructs the SELECT-filter expression text from its own token stream and hands the string off to `Parse_Expression`; the returned expression tree then flows back through `Execute_SELECT`.
+
+**Consequences:** sdata's lexer/AST/parser are unchanged in concept (just renamed `SData.*`); data-vandal owns its own small lexer (16 keywords + the operators needed for SELECT expressions), AST (11 statement kinds), and parser (~700 lines). The two applications can add or rename commands independently. The shared `Parse_Expression` keeps both consumers honest about expression-language compatibility: a SELECT filter that parses in sdata parses identically in data-vandal because the same evaluator parses both. The cost is the small overhead of reconstructing tokens into a string and re-tokenising inside `Parse_Expression`, which is negligible compared to the cost of evaluating the filter against table rows.
+
+---
+
+### ADR-041: Auto-detect subscripted columns as arrays at USE time; narrow DIM
+**Date:** 2026-05-21 | **Status:** Accepted
+
+**Context:** SData's `DIM` command pre-declares subscripted-variable groups: `DIM X 1 5` reserves columns `X(1) .. X(5)` so that later expressions like `X(I)` can index into them. When a dataset is loaded that already contains columns named `X(1)`, `X(2)`, `X(3)`, however, the user previously had to also issue `DIM X 1 3` to make `X(I)` work — even though the information was already in the column names. data-vandal exposes the same expression language but has no `DIM` command, so without auto-detection there would be no way to vandalise array columns at all.
+
+**Decision:** Add `SData_Core.Variables.Register_Subscripted_Columns`, called automatically from `SData_Core.Commands.Execute_USE` after every successful file load. It scans column names for the `name(n)` pattern (n a positive integer), groups by base name, and registers each group as a DIM array spanning `min(n) .. max(n)`. Gaps in the subscript sequence are permitted. Both sdata and data-vandal receive this automatically; no user command is required.
+
+SData retains `DIM` but its scope narrows to creating subscripted variables that do not yet exist in the loaded data (e.g., to extend an existing group, or to pre-declare a group that an upcoming LET statement will populate). data-vandal has no `DIM` and never needs one — it consumes existing arrays only.
+
+**Consequences:** Existing sdata scripts are unaffected: `DIM X 1 5` before `USE` pre-declares; `DIM X 1 5` after `USE` extends (or no-ops if the array already covers that range). New sdata scripts can drop the redundant `DIM` after a `USE` that loads subscripted columns. data-vandal can vandalise array sources (`VANDALIZE X /MISS=1.0` where X(1..3) are loaded columns) with no setup. Auto-detection is conservative: only column names matching the strict `<base>(<positive-int>)` pattern register as arrays, so names like `f(x)`, `cos(theta)`, or `count_2024` are left alone.
+
+---
+
+### ADR-042: Add Execute_OUTPUT_Table as a parallel sdata-core entry point
+**Date:** 2026-05-21 | **Status:** Accepted
+
+**Context:** The data-vandal design spec (§4.1) requires that `RUN` write the table to the OUTPUT path when no explicit SAVE is pending. sdata's existing `OUTPUT` command, however, does something different: it redirects PRINT-style console output to a file. The two semantics are incompatible — overloading the same `Execute_OUTPUT` procedure to mean both would break sdata's existing behaviour and confuse the code path that flushes the table on RUN.
+
+**Decision:** Add a second sdata-core entry point, `SData_Core.Commands.Execute_OUTPUT_Table (File_Name, TXTFMT)`, that captures a table-output destination in new runtime fields (`Output_Table_Path`, `Output_Table_Len`, `Output_Table_Active`, `Output_Table_Fmt`). A new helper, `Flush_Pending_Output_Table`, is wired into `Execute_RUN` after `Flush_Pending_Save`; if an explicit SAVE is pending it wins, otherwise the table is written to the OUTPUT_Table destination. sdata's existing `Execute_OUTPUT` (text redirection) is unchanged. data-vandal's `Stmt_OUTPUT` dispatches to `Execute_OUTPUT_Table`; sdata's continues to dispatch to `Execute_OUTPUT`.
+
+**Consequences:** Both applications get the semantics their respective specs and user bases expect, with no conditional behaviour in sdata-core. The two destination states (`Save_File_*` for one-shot SAVE; `Output_Table_*` for persistent OUTPUT) coexist cleanly. The `Output_Table_Active` flag intentionally stays set after a flush so that repeated `RUN`s keep writing to the same destination — OUTPUT is a setting, not a one-shot. The cost is a small duplication in the two `Flush_*` helpers (path resolution, format selection, header writing); a future cleanup could factor a common writer if it grows further.
+
+---
+
+### ADR-043: Per-application version constants
+**Date:** 2026-05-21 | **Status:** Accepted
+
+**Context:** When `SData.Config` moved into sdata-core (as part of ADR-039), the `Version_Major/Minor/Patch/Str` and `Copyright_*` constants moved with it. That left sdata's user-facing version banner ("SData version 0.7.1") sourced from a package shared with data-vandal, even though data-vandal had its own version (0.1.0) and sdata-core had a third one (0.1.0 in its `alire.toml`). The `bump-version.sh` script broke when it could no longer find `src/sdata-config.ads` in sdata, and a single set of constants could no longer correctly identify any of the three crates.
+
+**Decision:** Each consumer of sdata-core owns its own version constants in its own package. sdata's live in `SData.Version` (`src/sdata-version.ads` in the sdata crate); data-vandal has its own (currently a hard-coded string in main, sufficient until it grows complexity). sdata-core's own version lives only in its `alire.toml` — no Ada constants, because no code in sdata-core currently needs to display "sdata-core version X.Y.Z". Each crate's `alire.toml` carries its own `version =` field; `[[depends-on]]` constraints in consumers pin the required sdata-core range (currently `^0.1.0`). The `bump-version.sh` script targets `src/sdata-version.ads` instead of the removed `src/sdata-config.ads`.
+
+**Consequences:** sdata, sdata-core, and data-vandal can release on independent schedules without their version numbers drifting in confusing lockstep. The Alire path-pin (used during development) overrides version resolution for local builds; the version constraint takes effect for consumers fetching from the index. Each release tag stands on a coherent set of versions: `sdata-core v0.1.0` + `sdata v0.8.0` + `data-vandal v0.1.0` is the first such set. Future sdata-core releases will require touching consumer `alire.toml`s to bump the constraint floor (`^0.1.0` → `^0.2.0` if breaking), which is the explicit acknowledgement those bumps deserve.
