@@ -1,10 +1,14 @@
 # Makefile for SData
 
-VERSION          := 0.8.0
-ZIPADA_VERSION   := 61.0.0
-XMLADA_VERSION   := 26.0.0
-MATHPAQS_VERSION := 20260205.0.0
-SQLITE3_TARBALL  := ada_sqlite3_0.1.1_2edbcebd
+VERSION             := 0.8.0
+SDATA_CORE_VERSION  := 0.1.0
+ZIPADA_VERSION      := 61.0.0
+XMLADA_VERSION      := 26.0.0
+MATHPAQS_VERSION    := 20260205.0.0
+SQLITE3_TARBALL     := ada_sqlite3_0.1.1_2edbcebd
+
+# Path to the sibling sdata-core checkout for packaging targets.
+SDATA_CORE_REPO     := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../sdata-core)
 
 GPR_FILE = sdata.gpr
 # Use GPRBUILD from the environment or command line if set; otherwise detect
@@ -51,7 +55,8 @@ INSTALL_DIR  = $(DESTDIR)$(BINDIR)
 MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 DOC_DIR      = $(DESTDIR)$(DOCDIR)
 
-.PHONY: all build clean run check fuzz-corpus gnatcheck install srpm pkg msi
+.PHONY: all build clean run check fuzz-corpus gnatcheck install srpm pkg msi \
+        sdata-core-tarball
 
 all: build
 
@@ -194,6 +199,35 @@ fuzz-corpus: build
 	fi; \
 	echo "Corpus regression: all OK"
 
+# Build a self-contained sdata-core source tarball for inclusion in the
+# srpm / dsc / slackware packages.  Uses 'git archive' on the sibling
+# sdata-core checkout, then injects a minimal config/sdata_core_config.gpr
+# stub so the tarball builds without Alire (which normally generates
+# config/ on first 'alr build').  Output: sdata-core-$(SDATA_CORE_VERSION).tar.gz
+# in the current directory.
+sdata-core-tarball:
+	@if [ ! -d "$(SDATA_CORE_REPO)" ]; then \
+	    echo "ERROR: sdata-core not found at $(SDATA_CORE_REPO)"; \
+	    echo "  Clone the sibling repo first: git clone <url> $(SDATA_CORE_REPO)"; \
+	    exit 1; \
+	  fi
+	@if [ -n "$$(cd "$(SDATA_CORE_REPO)" && git status --untracked-files=no --porcelain)" ]; then \
+	    echo "ERROR: sdata-core working tree not clean ($(SDATA_CORE_REPO))."; \
+	    echo "  Commit changes before packaging."; \
+	    exit 1; \
+	  fi
+	@TEMP=$$(mktemp -d); \
+	 BASE="sdata-core-$(SDATA_CORE_VERSION)"; \
+	 mkdir "$$TEMP/$$BASE"; \
+	 (cd "$(SDATA_CORE_REPO)" && git archive --format=tar HEAD) | \
+	   tar -x -C "$$TEMP/$$BASE/"; \
+	 mkdir -p "$$TEMP/$$BASE/config"; \
+	 printf 'abstract project Sdata_Core_Config is\n   Build_Profile        := "release";\n   Ada_Compiler_Switches := ();\nend Sdata_Core_Config;\n' > "$$TEMP/$$BASE/config/sdata_core_config.gpr"; \
+	 (cd "$$TEMP" && tar czf "sdata-core-$(SDATA_CORE_VERSION).tar.gz" "$$BASE"); \
+	 mv "$$TEMP/sdata-core-$(SDATA_CORE_VERSION).tar.gz" .; \
+	 rm -rf "$$TEMP"
+	@echo "sdata-core tarball created: sdata-core-$(SDATA_CORE_VERSION).tar.gz"
+
 srpm: clean
 	@echo "Creating source tarball..."
 	@{ \
@@ -216,6 +250,9 @@ srpm: clean
 	   fi; \
 	   cp "$$TARBALL_DIR/$$tb" rpmbuild/SOURCES/; \
 	 done
+	@# Bundle sdata-core (path-pin sibling) as a regular source tarball.
+	@$(MAKE) --no-print-directory sdata-core-tarball
+	@mv sdata-core-$(SDATA_CORE_VERSION).tar.gz rpmbuild/SOURCES/
 	@rpmbuild -bs rpmbuild/SPECS/sdata.spec --define "_topdir $(CURDIR)/rpmbuild"
 	@mv rpmbuild/SRPMS/sdata-$(VERSION)-1.src.rpm .
 	@rm -rf rpmbuild
@@ -233,6 +270,9 @@ dsc: clean
 	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz; do \
 	   tar xzf "$$TARBALL_DIR/$$tb" -C "$$SRC_DIR/"; \
 	 done; \
+	 $(MAKE) --no-print-directory sdata-core-tarball >/dev/null; \
+	 tar xzf "$$CUR_DIR/sdata-core-$(SDATA_CORE_VERSION).tar.gz" -C "$$SRC_DIR/"; \
+	 rm -f "$$CUR_DIR/sdata-core-$(SDATA_CORE_VERSION).tar.gz"; \
 	 cd "$$TEMP_DIR" && tar czf "sdata_$(VERSION).orig.tar.gz" "$$BASE_DIR"; \
 	 cd "$$SRC_DIR" && dpkg-source -b .; \
 	 mv "$$TEMP_DIR"/sdata_$(VERSION)* "$$CUR_DIR/" ; \
@@ -257,6 +297,8 @@ slackware: clean
 	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz; do \
 	   cp "$$TARBALL_DIR/$$tb" "$$TEMP_DIR/"; \
 	 done; \
+	 $(MAKE) --no-print-directory sdata-core-tarball >/dev/null; \
+	 mv "sdata-core-$(SDATA_CORE_VERSION).tar.gz" "$$TEMP_DIR/"; \
 	 cd "$$TEMP_DIR" && tar czf sdata-$(VERSION)-slackbuild.tar.gz *; \
 	 mv "$$TEMP_DIR/sdata-$(VERSION)-slackbuild.tar.gz" "$$CUR_DIR/"; \
 	 rm -rf "$$TEMP_DIR"

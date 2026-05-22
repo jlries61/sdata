@@ -3,6 +3,10 @@ Version:        0.8.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
+# Bundled sdata-core version (path-pin sibling during development).
+# Keep in sync with SDATA_CORE_VERSION in the Makefile.
+%global sdata_core_version 0.1.0
+
 License:        GPLv3
 URL:            https://github.com/jlries61/sdata
 Source0:        %{name}-%{version}.tar.gz
@@ -10,6 +14,7 @@ Source1:        zipada-61.0.0.tar.gz
 Source2:        xmlada-26.0.0.tar.gz
 Source3:        mathpaqs-20260205.0.0.tar.gz
 Source4:        ada_sqlite3_0.1.1_2edbcebd.tar.gz
+Source5:        sdata-core-%{sdata_core_version}.tar.gz
 
 # GNAT (Ada compiler) package name differs across RPM distributions:
 #   gcc-ada   — openSUSE, SLES
@@ -32,6 +37,9 @@ tar xzf %{SOURCE1} -C %{_builddir}
 tar xzf %{SOURCE2} -C %{_builddir}
 tar xzf %{SOURCE3} -C %{_builddir}
 tar xzf %{SOURCE4} -C %{_builddir}
+# sdata-core is path-pinned in alire.toml; bundled here as a regular tarball
+# since 'alr build' is not used in the RPM environment.
+tar xzf %{SOURCE5} -C %{_builddir}
 
 # Suppress strict style checks and warnings in the ada_sqlite3 dependency to reduce build log noise.
 sed -i 's/"-gnaty.*"/"-gnatws"/g' %{_builddir}/ada_sqlite3_0.1.1_2edbcebd/config/ada_sqlite3_config.gpr
@@ -40,7 +48,8 @@ sed -i 's/"-gnatwa"/"-gnatws"/g' %{_builddir}/ada_sqlite3_0.1.1_2edbcebd/config/
 %build
 # Point gprbuild at the vendored dependency .gpr files.
 # xmlada keeps dom and input_sources in separate subdirectories.
-export GPR_PROJECT_PATH="%{_builddir}/zipada_61.0.0_54fc9836:%{_builddir}/xmlada_26.0.0_b140ed4a/dom:%{_builddir}/xmlada_26.0.0_b140ed4a/input_sources:%{_builddir}/mathpaqs_20260205.0.0_abed7ef9:%{_builddir}/ada_sqlite3_0.1.1_2edbcebd"
+# sdata-core's .gpr lives at the root of its unpacked tarball.
+export GPR_PROJECT_PATH="%{_builddir}/zipada_61.0.0_54fc9836:%{_builddir}/xmlada_26.0.0_b140ed4a/dom:%{_builddir}/xmlada_26.0.0_b140ed4a/input_sources:%{_builddir}/mathpaqs_20260205.0.0_abed7ef9:%{_builddir}/ada_sqlite3_0.1.1_2edbcebd:%{_builddir}/sdata-core-%{sdata_core_version}"
 make %{?_smp_mflags}
 
 %install
