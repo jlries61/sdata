@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.7.1
+Version:        0.8.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -56,6 +56,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu May 21 2026 John L. Ries <john@theyarnbard.com> - 0.8.0-1
+- Extract VANDALIZE into standalone data-vandal application; introduce sdata-core shared library.
+
 * Mon May 18 2026 John L. Ries <john@theyarnbard.com> - 0.7.1-1
 - feat: VANDALIZE supports virtual arrays (ARRAY command) as source
 

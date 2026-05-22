@@ -1,3 +1,9 @@
+sdata (0.8.0-1) unstable; urgency=medium
+
+  * Extract VANDALIZE into standalone data-vandal application; introduce sdata-core shared library.
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 21 May 2026 17:09:35 -0700
+
 sdata (0.7.1-1) unstable; urgency=medium
 
   * feat: VANDALIZE supports virtual arrays (ARRAY command) as source
