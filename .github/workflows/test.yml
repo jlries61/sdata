@@ -14,8 +14,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout sdata
         uses: actions/checkout@v4
+        with:
+          path: sdata
+
+      # sdata depends on sdata-core via an Alire path pin (see sdata/alire.toml).
+      # Check it out as a sibling so '../sdata-core' resolves from sdata's
+      # working directory.  Once sdata-core publishes to the Alire community
+      # index, this step can be removed and the path pin replaced with a
+      # plain version dependency.
+      - name: Checkout sdata-core
+        uses: actions/checkout@v4
+        with:
+          repository: jlries61/sdata-core
+          ref: main
+          path: sdata-core
 
       - name: Set up Alire
         uses: alire-project/setup-alire@v3
@@ -26,7 +40,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/share/alire
-          key: alire-${{ runner.os }}-${{ hashFiles('alire.toml') }}
+          key: alire-${{ runner.os }}-${{ hashFiles('sdata/alire.toml', 'sdata-core/alire.toml') }}
           restore-keys: |
             alire-${{ runner.os }}-
 
@@ -34,13 +48,17 @@ jobs:
         run: sudo apt-get update -o Acquire::Languages=none && sudo apt-get install -y --no-install-recommends libsqlite3-dev
 
       - name: Build
+        working-directory: sdata
         run: alr build
 
       - name: Verify binaries
+        working-directory: sdata
         run: test -x bin/sdata && test -x bin/csv_unit_test && test -x bin/sdata_unit_test
 
       - name: Run test suite
+        working-directory: sdata
         run: alr exec -- make check
 
       - name: Fuzz corpus regression
+        working-directory: sdata
         run: alr exec -- make fuzz-corpus
