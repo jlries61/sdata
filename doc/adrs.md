@@ -47,6 +47,12 @@ that might relitigate a settled question.
 | ADR-035 | Adopt IEEE 754 infinity as a first-class evaluator value | 2026-05-07 | Accepted |
 | ADR-036 | Set MAXINTAB default to 50 000 000 cells with a static value rather than runtime memory detection | 2026-05-07 | Accepted |
 | ADR-037 | Add configurable SYSTEM/SHELL timeout defaulting to 300 s in batch mode, unlimited in interactive | 2026-05-13 | Accepted |
+| ADR-038 | Add VANDALIZE command for generating noisy variable copies | 2026-05-15 | Superseded |
+| ADR-039 | Extract sdata-core as a shared Alire library | 2026-05-21 | Accepted |
+| ADR-040 | sdata-core contains no lexer, AST, or parser | 2026-05-21 | Accepted |
+| ADR-041 | Auto-detect subscripted columns as arrays at USE time; narrow DIM | 2026-05-21 | Accepted |
+| ADR-042 | Add Execute_OUTPUT_Table as a parallel sdata-core entry point | 2026-05-21 | Accepted |
+| ADR-043 | Per-application version constants | 2026-05-21 | Accepted |
 
 ---
 
