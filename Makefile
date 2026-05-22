@@ -21,7 +21,14 @@ GPR_FILE = sdata.gpr
 # where GPR_PROJECT_PATH is provided externally (e.g. RPM spec).
 ALR      := $(firstword $(shell which alr 2>/dev/null))
 GPRBUILD ?= $(firstword $(shell which gprbuild 2>/dev/null) gprbuild)
-ifneq ($(ALR),)
+# If GPR_PROJECT_PATH was supplied by the calling environment (e.g. by the
+# RPM/Debian/Slackware spec), the caller has already wired in every dependency
+# path and 'alr exec' must NOT be invoked — alire would try to resolve the
+# alire.toml path pin to ../sdata-core, which doesn't exist in a packaging
+# BUILD directory.  In that case, fall through to bare gprbuild.
+ifeq ($(origin GPR_PROJECT_PATH),environment)
+  BUILD_CMD = $(GPRBUILD) -P $(GPR_FILE)
+else ifneq ($(ALR),)
   BUILD_CMD = $(ALR) exec -- $(GPRBUILD) -P $(GPR_FILE)
 else
   BUILD_CMD = $(GPRBUILD) -P $(GPR_FILE)
