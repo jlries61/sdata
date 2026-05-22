@@ -72,10 +72,16 @@ echo "Summary: $SUMMARY"
 echo ""
 
 # ---------------------------------------------------------------------------
-# Helper: in-place sed that works on both GNU and BSD sed
+# Helper: in-place sed that works on both GNU and BSD sed.
+# The tmp+rename pattern creates "$2.tmp" with default umask, which would
+# silently drop the executable bit from scripts like slackware/sdata.SlackBuild.
+# Detect +x on the original and reapply after the rename.
 # ---------------------------------------------------------------------------
 sedi() {
+    if [ -x "$2" ]; then was_exec=1; else was_exec=0; fi
     sed "$1" "$2" > "$2.tmp" && mv "$2.tmp" "$2"
+    [ "$was_exec" = 1 ] && chmod +x "$2"
+    return 0
 }
 
 # ---------------------------------------------------------------------------

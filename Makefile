@@ -311,6 +311,7 @@ slackware: clean
 	 TEMP_DIR=$$(mktemp -d); \
 	 cp sdata-$(VERSION).tar.gz "$$TEMP_DIR/"; \
 	 cp slackware/* "$$TEMP_DIR/"; \
+	 chmod +x "$$TEMP_DIR/sdata.SlackBuild"; \
 	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz; do \
 	   cp "$$TARBALL_DIR/$$tb" "$$TEMP_DIR/"; \
 	 done; \
