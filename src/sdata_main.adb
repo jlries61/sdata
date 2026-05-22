@@ -16,6 +16,7 @@ with Ada.Unchecked_Deallocation;
 with Ada.Exceptions; use Ada.Exceptions;
 with SData.Parser; use SData.Parser;
 with SData.AST; use SData.AST;
+with SData.Version;
 
 with SData.Interpreter; use SData.Interpreter;
 with SData_Core.Config;         use SData_Core.Config;
@@ -104,8 +105,8 @@ procedure SData_Main is
       --  Print the banner directly (bypasses pager buffer — it should
       --  always appear immediately, not be held until the first command).
       Ada.Text_IO.Put_Line ("SData Statistical Interpreter version "
-                            & SData_Core.Config.Version_Str);
-      Ada.Text_IO.Put_Line (SData_Core.Config.Copyright_Str
+                            & SData.Version.Version_Str);
+      Ada.Text_IO.Put_Line (SData.Version.Copyright_Str
                             & ". License GPLv3+. Run 'sdata --copyright' for details.");
       Ada.Text_IO.Put_Line ("Interactive Console. Type QUIT to exit.");
       Buffer := Null_Unbounded_String;
@@ -212,10 +213,10 @@ begin
             Print_Usage;
             return;
          elsif Arg = "-v" or Arg = "--version" then
-            Put_Line ("SData version " & Version_Str);
+            Put_Line ("SData version " & SData.Version.Version_Str);
             return;
          elsif Arg = "--copyright" then
-            Ada.Text_IO.Put_Line (SData_Core.Config.Copyright_Notice);
+            Ada.Text_IO.Put_Line (SData.Version.Copyright_Notice);
             return;
          elsif Arg = "-q" then
             Quiet_Mode := True;

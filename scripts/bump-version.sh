@@ -41,18 +41,18 @@ MINOR=$(echo "$NEW_VER" | cut -d. -f2)
 PATCH=$(echo "$NEW_VER" | cut -d. -f3)
 
 # Detect current version from the canonical source (numeric constants)
-OLD_MAJOR=$(grep 'Version_Major' "$ROOT/src/sdata-config.ads" \
+OLD_MAJOR=$(grep 'Version_Major' "$ROOT/src/sdata-version.ads" \
             | grep -o '[0-9]*;' | tr -d ';')
-OLD_MINOR=$(grep 'Version_Minor' "$ROOT/src/sdata-config.ads" \
+OLD_MINOR=$(grep 'Version_Minor' "$ROOT/src/sdata-version.ads" \
             | grep -o '[0-9]*;' | tr -d ';')
-OLD_PATCH=$(grep 'Version_Patch' "$ROOT/src/sdata-config.ads" \
+OLD_PATCH=$(grep 'Version_Patch' "$ROOT/src/sdata-version.ads" \
             | grep -o '[0-9]*;' | tr -d ';')
 OLD_VER="$OLD_MAJOR.$OLD_MINOR.$OLD_PATCH"
 
 case "$OLD_VER" in
     [0-9]*.[0-9]*.[0-9]*)  ;;
     *)
-        echo "Error: could not detect current version from sdata-config.ads (got '$OLD_VER')" >&2
+        echo "Error: could not detect current version from sdata-version.ads (got '$OLD_VER')" >&2
         exit 1
         ;;
 esac
@@ -79,9 +79,9 @@ sedi() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. sdata-config.ads  (update the three numeric constants; Version_Str is derived)
+# 1. sdata-version.ads  (update the three numeric constants; Version_Str is derived)
 # ---------------------------------------------------------------------------
-FILE="$ROOT/src/sdata-config.ads"
+FILE="$ROOT/src/sdata-version.ads"
 sedi "s/Version_Major : constant Natural := [0-9]*/Version_Major : constant Natural := $MAJOR/" "$FILE"
 sedi "s/Version_Minor : constant Natural := [0-9]*/Version_Minor : constant Natural := $MINOR/" "$FILE"
 sedi "s/Version_Patch : constant Natural := [0-9]*/Version_Patch : constant Natural := $PATCH/" "$FILE"
@@ -171,7 +171,7 @@ echo ""
 # Verify no old version strings remain in tracked files
 # ---------------------------------------------------------------------------
 REMAINING=$(grep -rl "$OLD_VER" \
-    "$ROOT/src/sdata-config.ads" \
+    "$ROOT/src/sdata-version.ads" \
     "$ROOT/Makefile" \
     "$ROOT/alire.toml" \
     "$ROOT/slackware/sdata.SlackBuild" \
@@ -213,7 +213,7 @@ case "$DO_COMMIT" in
     [yY]*)
         cd "$ROOT"
         git add \
-            src/sdata-config.ads \
+            src/sdata-version.ads \
             Makefile \
             alire.toml \
             slackware/sdata.SlackBuild \
