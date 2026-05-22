@@ -44,6 +44,7 @@ tar xzf $CWD/zipada-61.0.0.tar.gz
 tar xzf $CWD/xmlada-26.0.0.tar.gz
 tar xzf $CWD/mathpaqs-20260205.0.0.tar.gz
 tar xzf $CWD/ada_sqlite3_0.1.1_2edbcebd.tar.gz
+tar xzf $CWD/sdata-core-0.1.0.tar.gz
 
 chown -R root:root .
 find -L . \
@@ -58,6 +59,7 @@ ZIPADA_DIR="zipada_61.0.0_54fc9836"
 XMLADA_DIR="xmlada_26.0.0_b140ed4a"
 MATHPAQS_DIR="mathpaqs_20260205.0.0_abed7ef9"
 SQLITE3_DIR="ada_sqlite3_0.1.1_2edbcebd"
+SDATA_CORE_DIR="sdata-core-0.1.0"
 
 mkdir -p obj bin
 
@@ -66,12 +68,14 @@ mkdir -p obj bin
 cd obj
 
 # gnatmake only drives the Ada front-end; compile the C helper manually.
-gcc $SLKCFLAGS -c ../src/sdata_privilege.c -o sdata_privilege.o
+# sdata_privilege.c moved into sdata-core during the v0.8.0 refactor.
+gcc $SLKCFLAGS -c "../$SDATA_CORE_DIR/src/sdata_privilege.c" -o sdata_privilege.o
 
 gnatmake \
   ../src/sdata_main.adb \
   -o ../bin/sdata \
   -aI../src -aI../src/ast -aI../src/lexer -aI../src/parser \
+  -aI"../$SDATA_CORE_DIR/src" \
   -aI"../$ZIPADA_DIR/zip_lib" \
   -aI"../$XMLADA_DIR/unicode" \
   -aI"../$XMLADA_DIR/sax" \
