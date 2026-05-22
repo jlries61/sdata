@@ -9,27 +9,73 @@ abstraction is the *data step*.
 
 ---
 
+## Repository Layout
+
+Since v0.8.0, sdata is split across three sibling crates:
+
+```
+~/Develop/
+├── sdata/          this repository — interactive interpreter (sdata binary)
+├── sdata-core/     shared Alire library — data layer, evaluator, command exec
+└── data-vandal/    sister application — controlled data degradation (former VANDALIZE)
+```
+
+`sdata` and `data-vandal` both depend on `sdata-core` via an Alire path pin
+during development and a `^0.1.0` version constraint that takes effect when
+sdata-core eventually ships to the Alire community index. The three crates
+release on independent schedules; see [ADR-039](adrs.md), [ADR-040](adrs.md),
+and [ADR-043](adrs.md) for the rationale.
+
+The remainder of this document describes the sdata application. For the
+shared layer's contract, read `~/Develop/sdata-core/src/sdata_core.ads` and
+`sdata_core-commands.ads`; for the data-vandal application, see the design
+spec at `doc/specs/2026-05-19-data-vandal-design.md` and that crate's
+own README.
+
+---
+
 ## Package Map
+
+Packages prefixed `SData.*` live in this repository; `SData_Core.*` packages
+live in `sdata-core/`. The `SData_Core.Commands` package exposes one
+`Execute_*` procedure per command shared with data-vandal — both applications
+dispatch through it instead of duplicating the execution logic.
 
 ```
 sdata_main
-  └── SData.Interpreter      statement executor and data step engine
+  └── SData.Interpreter      statement executor and data step engine (this crate)
         │   Subunits: execute_assignment, execute_print,
         │             execute_control_flow, execute_metadata,
         │             execute_declarative, execute_io,
         │             resolve_expr_indices, inspect_pdv,
         │             process_one_record
-        ├── SData.Parser      token stream → AST
-        │     └── SData.Lexer keyword/token recogniser
-        ├── SData.Evaluator   AST expression → Value
-        │     └── SData.Variables  symbol table (temporary + permanent vars)
-        ├── SData.Table       in-memory 2-D tabular store
-        ├── SData.File_IO     CSV / ODF / OOXML read-write
-        ├── SData.Help        data-driven HELP topic dispatcher
-        ├── SData.Statistics  aggregate and statistical functions
-        ├── SData.System      SYSTEM command wrapper
-        └── SData.Values      core Value variant type (Numeric | String | Missing)
+        ├── SData.Parser           token stream → AST          (this crate)
+        │     └── SData.Lexer      keyword/token recogniser    (this crate)
+        ├── SData.AST              statement AST node types    (this crate)
+        ├── SData.Help             HELP topic dispatcher       (this crate)
+        ├── SData.Version          version + copyright strings (this crate; ADR-043)
+        ├── SData.System           sdata-only SYSTEM wrapper   (this crate)
+        └── SData_Core.Commands    shared command execution    (sdata-core)
+              ├── SData_Core.Evaluator   AST expression → Value          (sdata-core)
+              │     ├── Aggregate_Fns / Distrib_Fns / Misc_Fns           (sdata-core)
+              │     └── Nav_Fns / Numeric_Fns / String_Fns               (sdata-core)
+              ├── SData_Core.Variables   PDV + symbol table              (sdata-core)
+              ├── SData_Core.Table       in-memory 2-D tabular store     (sdata-core)
+              ├── SData_Core.File_IO     CSV / ODF / OOXML read-write    (sdata-core)
+              ├── SData_Core.Statistics  aggregate / statistical funcs   (sdata-core)
+              ├── SData_Core.Values      core Value variant type         (sdata-core)
+              ├── SData_Core.Config      static configuration constants  (sdata-core)
+              │     └── Runtime          mutable interpreter state       (sdata-core)
+              ├── SData_Core.IO          stdin/stdout/pager I/O          (sdata-core)
+              ├── SData_Core.Signals     SIGINT/SIGTERM cleanup          (sdata-core)
+              └── SData_Core.System      shell execution + privilege     (sdata-core)
 ```
+
+Ada enumeration types are closed, so `Token_Kind`, `Statement_Kind`, and
+`Expression_Kind` cannot be shared across applications. sdata-core therefore
+contains no lexer, AST, or parser — each consumer owns its complete grammar
+and hands string-form expressions to `SData_Core.Evaluator.Parse_Expression`
+for SELECT-filter compilation. See [ADR-040](adrs.md) for the full rationale.
 
 ---
 
@@ -57,7 +103,7 @@ interpreter encounters them and shape the data step that follows.
 | `UNHOLD [var …]` | Cancel one or all holds |
 | `ARRAY name v1 v2 …` | Bind an indexed alias over existing variables |
 | `RENAME old=new …` | Rename columns in the active dataset |
-| `DIM var[n]` | Pre-allocate a numeric array |
+| `DIM var[n]` | Pre-allocate a numeric array (creates new arrays only; columns matching `name(n)` in loaded data are auto-registered at `USE` time per [ADR-041](adrs.md)) |
 
 ### Tier 2 — Immediate
 
@@ -162,21 +208,23 @@ invisible:
 Script file / REPL input
         │
         ▼
-  SData.Lexer          characters → tokens
+  SData.Lexer               characters → tokens             (this crate)
         │
         ▼
-  SData.Parser         tokens → Statement AST list
+  SData.Parser              tokens → Statement AST list     (this crate)
         │
         ▼
-  SData.Interpreter    dispatches by tier
-    ├── Declarative → configure state immediately
+  SData.Interpreter         dispatches by tier              (this crate)
+    ├── Declarative → SData_Core.Commands.Execute_*  for shared commands
+    │               (USE / SAVE / FPATH / OUTPUT / SELECT / KEEP / DROP
+    │                / ARRAY / DIM / RUN); local subunits for the rest
     ├── Immediate   → act immediately (RUN triggers the data step)
     └── Deferred    → queue; execute once per record inside Run_One_Step
                            │
                            ▼
-                     SData.Evaluator   expression nodes → Values
-                     SData.Variables   symbol lookup / write-back
-                     SData.Table       row read / output flush
+                     SData_Core.Evaluator   expression nodes → Values  (sdata-core)
+                     SData_Core.Variables   symbol lookup / write-back  (sdata-core)
+                     SData_Core.Table       row read / output flush     (sdata-core)
 ```
 
 ---
@@ -223,7 +271,8 @@ decisions.
 ## Architecture Decision Records
 
 Significant design choices — language selection, execution model, table storage strategy,
-CLI conventions, test approach, and per-session architectural calls — are recorded in
-`doc/adrs.md` (33 decisions, ADR-001 through ADR-033). Each entry captures the context,
-the decision, the alternatives considered, and the rationale. Consult it before proposing
-a structural change that might relitigate a settled question.
+CLI conventions, test approach, the sdata-core / data-vandal split, and per-session
+architectural calls — are recorded in `doc/adrs.md` (ADR-001 through ADR-043, with a few
+unused numbers in the sequence). Each entry captures the context, the decision, the
+alternatives considered, and the rationale. Consult it before proposing a structural
+change that might relitigate a settled question.
