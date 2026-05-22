@@ -54,7 +54,10 @@ make %{?_smp_mflags}
 
 %install
 rm -rf %{buildroot}
-make install DESTDIR=%{buildroot} PREFIX=/usr
+# Override DOCDIR so it matches RPM's %{_docdir} convention (which differs
+# between distros: /usr/share/doc on Fedora/RHEL, /usr/share/doc/packages
+# on openSUSE).
+make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 
 %files
 %license LICENSE
