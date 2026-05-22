@@ -27,18 +27,43 @@ SData is written in Ada 2012 and requires:
 
 ### Ada Library Dependencies
 
-SData depends on three Ada libraries:
+SData depends on a sibling Alire library crate, `sdata-core`, that holds the
+data layer, evaluator, and command-execution machinery shared with the
+[data-vandal](#related-projects) application. `sdata-core` in turn depends on
+four Ada libraries:
 
-| Library   | Version        | Purpose                    |
-|-----------|----------------|----------------------------|
-| Zip-Ada   | 61.0.0         | ZIP/ODF archive handling   |
-| XML/Ada   | 26.0.0         | XML parsing (ODF/OOXML)    |
-| MathPaqs  | 20260205.0.0   | Numerical/random functions |
+| Library      | Version        | Purpose                              |
+|--------------|----------------|--------------------------------------|
+| sdata-core   | ^0.1.0         | Shared data layer and evaluator      |
+| Zip-Ada      | 61.0.0         | ZIP/ODF archive handling             |
+| XML/Ada      | 26.0.0         | XML parsing (ODF/OOXML)              |
+| MathPaqs     | 20260205.0.0   | Numerical/random functions           |
+| ada_sqlite3  | 0.1.1          | SQLite spillover for large tables    |
 
-If you use [Alire](https://alire.ada.dev/), dependencies are resolved
-automatically. Otherwise, obtain the library source tarballs and place them in
-a sibling directory so that the Makefile can auto-detect them, or set
-`GPR_PROJECT_PATH` manually.
+If you use [Alire](https://alire.ada.dev/), the four upstream libraries are
+resolved automatically, but `sdata-core` is currently consumed via a local path
+pin: clone it as a sibling directory next to `sdata`:
+
+```
+~/Develop/
+├── sdata/
+└── sdata-core/
+```
+
+Without Alire, obtain the library source tarballs and place them in a sibling
+directory so that the Makefile can auto-detect them, or set `GPR_PROJECT_PATH`
+manually; `sdata-core` similarly needs to be on `GPR_PROJECT_PATH`.
+
+### Related Projects
+
+- **sdata-core** — the shared Alire library crate (data layer, evaluator,
+  command execution) consumed by both sdata and data-vandal. Versioned and
+  released independently of sdata. See [ADR-039](doc/adrs.md) and the design
+  spec at `doc/specs/2026-05-19-data-vandal-design.md`.
+- **data-vandal** — a standalone interpreter for controlled data degradation
+  (the former `VANDALIZE` command, extracted into its own application in
+  v0.8.0). See [ADR-038](doc/adrs.md) (now superseded) and the data-vandal
+  repository for the application's own README.
 
 ## Building
 
@@ -215,11 +240,11 @@ scripts/bump-version.sh <new-version> "<changelog-summary>"
 For example:
 
 ```sh
-scripts/bump-version.sh 0.8.0 "Add spreadsheet formula evaluation and multi-sheet support."
+scripts/bump-version.sh 0.8.1 "Fix path resolution in FPATH SUBMIT handler."
 ```
 
 The script validates the `N.N.N` version format, detects the current version
-from `src/sdata-config.ads`, and warns if any old version strings remain after
+from `src/sdata-version.ads`, and warns if any old version strings remain after
 the update (expected in changelog history).
 
 ## Quick Start
