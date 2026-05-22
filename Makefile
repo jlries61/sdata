@@ -229,7 +229,14 @@ sdata-core-tarball:
 	 (cd "$(SDATA_CORE_REPO)" && git archive --format=tar HEAD) | \
 	   tar -x -C "$$TEMP/$$BASE/"; \
 	 mkdir -p "$$TEMP/$$BASE/config"; \
-	 printf 'abstract project Sdata_Core_Config is\n   Build_Profile        := "release";\n   Ada_Compiler_Switches := ();\nend Sdata_Core_Config;\n' > "$$TEMP/$$BASE/config/sdata_core_config.gpr"; \
+	 { \
+	   echo 'with "mathpaqs_project_tree.gpr";'; \
+	   echo ''; \
+	   echo 'abstract project Sdata_Core_Config is'; \
+	   echo '   Build_Profile        := "release";'; \
+	   echo '   Ada_Compiler_Switches := ();'; \
+	   echo 'end Sdata_Core_Config;'; \
+	 } > "$$TEMP/$$BASE/config/sdata_core_config.gpr"; \
 	 (cd "$$TEMP" && tar czf "sdata-core-$(SDATA_CORE_VERSION).tar.gz" "$$BASE"); \
 	 mv "$$TEMP/sdata-core-$(SDATA_CORE_VERSION).tar.gz" .; \
 	 rm -rf "$$TEMP"
