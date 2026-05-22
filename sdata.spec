@@ -45,6 +45,14 @@ tar xzf %{SOURCE5} -C %{_builddir}
 sed -i 's/"-gnaty.*"/"-gnatws"/g' %{_builddir}/ada_sqlite3_0.1.1_2edbcebd/config/ada_sqlite3_config.gpr
 sed -i 's/"-gnatwa"/"-gnatws"/g' %{_builddir}/ada_sqlite3_0.1.1_2edbcebd/config/ada_sqlite3_config.gpr
 
+# mathpaqs's graph/ subdirectory imports the APDF library (pdf_out_project_tree.gpr).
+# sdata-core only consumes mathpaqs's probas/random/stats packages, never the
+# graph code, so we drop the APDF dependency rather than bundle a transitive
+# library we don't use.  Also remove "graph" from Source_Dirs so gprbuild
+# doesn't try to compile it.
+sed -i 's|^with "pdf_out_project_tree.gpr";|-- with "pdf_out_project_tree.gpr";|' %{_builddir}/mathpaqs_20260205.0.0_abed7ef9/mathpaqs_project_tree.gpr
+sed -i 's|"graph"|--  "graph"|' %{_builddir}/mathpaqs_20260205.0.0_abed7ef9/mathpaqs_project_tree.gpr
+
 %build
 # Point gprbuild at the vendored dependency .gpr files.
 # xmlada keeps dom and input_sources in separate subdirectories.
