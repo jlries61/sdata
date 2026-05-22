@@ -230,7 +230,10 @@ sdata-core-tarball:
 	   tar -x -C "$$TEMP/$$BASE/"; \
 	 mkdir -p "$$TEMP/$$BASE/config"; \
 	 { \
-	   echo 'with "mathpaqs_project_tree.gpr";'; \
+	   echo '--  Use mathpaqs.gpr (the standalone variant that bundles its own'; \
+	   echo '--  APDF copy in graph_pdf/) rather than mathpaqs_project_tree.gpr'; \
+	   echo '--  which would import a separate apdf project we do not bundle.'; \
+	   echo 'with "mathpaqs.gpr";'; \
 	   echo ''; \
 	   echo 'abstract project Sdata_Core_Config is'; \
 	   echo '   Build_Profile        := "release";'; \
