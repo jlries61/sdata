@@ -4,6 +4,26 @@ Ada 2012 CLI interpreter for tabular data processing, inspired by Systat BASIC's
 data step model. Operates on a 2-D table of rows and columns (float, integer,
 character). Single-process; batch and interactive modes.
 
+## Repository Layout (Important)
+
+Since v0.8.0, this is one of three sibling crates:
+
+```
+~/Develop/
+├── sdata/          this repository — interactive interpreter
+├── sdata-core/     shared Alire library — data layer, evaluator, command exec
+└── data-vandal/    sister application — controlled data degradation
+```
+
+`sdata-core` is consumed via a path pin (`alire.toml`). Most data-layer,
+evaluator, and shared command-execution code lives there now — **when touching
+table / variables / evaluator / file I/O, modify `~/Develop/sdata-core/src/`,
+not this crate**. This crate owns the sdata lexer, AST, parser, and the
+sdata-only command implementations (LET, SET, PRINT, IF, FOR, WHILE, SORT,
+SUBMIT, BREAK, etc.). Build sdata-core too if you touch it: `cd ~/Develop/sdata-core && alr build`.
+
+See ADR-039 through ADR-043 in `doc/adrs.md` for the split rationale.
+
 ## Build & Test
 
 ```bash
@@ -13,11 +33,14 @@ make check           # build + run all tests (unit + integration)
 ```
 
 `make check` runs:
-1. `bin/csv_unit_test` — 71 tests for `SData.CSV` functions
-2. `bin/sdata_unit_test` — 122 tests for `SData.Table`, `SData.Variables` / PDV pipeline
-3. 131 `.cmd` integration tests in `tests/`
+1. `bin/csv_unit_test` — 71 tests for `SData_Core.CSV` functions
+2. `bin/sdata_unit_test` — 122 tests for `SData_Core.Table` / `SData_Core.Variables` / PDV pipeline
+3. 140 `.cmd` integration tests in `tests/`
 
-All 131 integration tests must pass before committing. Never use `--no-verify`.
+All 140 integration tests must pass before committing. Never use `--no-verify`.
+
+If a sdata-core change is involved, run `cd ~/Develop/sdata-core && alr build`
+first, then `cd ~/Develop/sdata && make check` to catch regressions in both layers.
 
 ## Key Architecture
 
@@ -38,31 +61,66 @@ lookups.
 index map (`Filter_Map`) at the start of each `Run_One_Step`. All navigation
 functions (RECNO, BOF, EOF, BOG, EOG, LAG, NEXT) operate in logical space.
 
-**BY groups:** `SData.Table` is the sole source of truth for BY variable names.
-Use `By_Var_Count` / `By_Var_Name(I)` accessors; do not add a local copy in the
-interpreter.
+**BY groups:** `SData_Core.Table` is the sole source of truth for BY variable
+names. Use `By_Var_Count` / `By_Var_Name(I)` accessors; do not add a local copy
+in the interpreter.
+
+**Shared command execution:** `SData_Core.Commands.Execute_*` procedures
+implement USE, SAVE, FPATH, OUTPUT, SELECT, KEEP, DROP, ARRAY, DIM, RUN, and
+their related helpers (`Execute_OUTPUT_Table`, `Execute_Rebuild_Filter`). sdata's
+interpreter delegates to these rather than duplicating the logic. data-vandal
+calls the same procedures. When changing one of these commands' semantics, edit
+sdata-core and confirm both `make check` (sdata, 140 tests) and
+`cd ~/Develop/data-vandal && make check` (data-vandal, 11 tests) still pass.
 
 ## Source Layout
 
+This crate (sdata-only code):
+
 ```
 src/
-  sdata-interpreter.adb       -- command dispatch, data step loop (~2,269 lines)
-  sdata-evaluator.adb         -- expression evaluator + child packages
-  sdata-evaluator-distrib_fns.adb  -- statistical distribution functions
-  sdata-file_io.adb           -- CSV/ODF/OOXML parsers (~1,758 lines)
-  sdata-csv.adb               -- CSV tokenizer (split, unquote, type inference)
-  sdata-table.adb             -- column-store table + SQLite spill
-  sdata-variables.adb         -- PDV, temp/permanent symbols, hold semantics
-  sdata-help.adb              -- HELP system
+  sdata-interpreter.adb       -- command dispatch, data step loop
+  sdata-interpreter-execute_declarative.adb  -- declarative-command subunits
+  sdata-interpreter-execute_assignment.adb   -- LET/SET handlers
+  sdata-interpreter-execute_io.adb           -- PRINT/WRITE/SUBMIT handlers
+  sdata-interpreter-execute_metadata.adb     -- NAMES/DROP/KEEP/ARRAY/DIM
+  sdata-interpreter-execute_control_flow.adb -- IF/FOR/WHILE
+  sdata-interpreter-process_one_record.adb   -- per-record deferred dispatch
+  sdata-lexer.adb / sdata-lexer.ads          -- token recogniser
+  sdata-parser.adb / sdata-parser.ads        -- AST builder
+  sdata-ast.adb / sdata-ast.ads              -- statement AST node types
+  sdata-help.adb              -- HELP topic dispatcher
+  sdata-version.ads           -- Version_*/Copyright_* constants (per ADR-043)
+  sdata-system.adb            -- sdata-only SYSTEM wrapper
 tests/
-  csv_unit_test.adb           -- SData.CSV unit tests
-  sdata_unit_test.adb         -- SData.Variables / PDV unit tests
-  *.cmd                       -- integration test scripts
+  csv_unit_test.adb           -- SData_Core.CSV unit tests
+  sdata_unit_test.adb         -- SData_Core.Variables / PDV unit tests
+  *.cmd                       -- integration test scripts (140)
 doc/
   SOFTWARE_STANDARDS_REVIEW.md  -- living standards audit (annotated)
-  adrs.md                     -- 30 ADRs (ADR-001–030)
-  architecture.md             -- pointer to ADR document
+  adrs.md                     -- 43 ADRs (ADR-001 through ADR-043; some gaps)
+  architecture.md             -- package map, execution model, repo layout
   specs/                      -- design specs for completed features
+  plans/                      -- implementation plans (step-by-step task lists)
+```
+
+Shared code (in `~/Develop/sdata-core/src/`):
+
+```
+sdata_core-commands.{ads,adb}     -- shared Execute_* procedures (USE, SAVE, etc.)
+sdata_core-table.{ads,adb}        -- column-store table + SQLite spill
+sdata_core-variables.{ads,adb}    -- PDV, temp/permanent symbols, hold semantics,
+                                  --   Register_Subscripted_Columns (per ADR-041)
+sdata_core-values.{ads,adb}       -- Value variant type + IEEE 754 infinity
+sdata_core-evaluator.{ads,adb}    -- expression evaluator + Parse_Expression
+sdata_core-evaluator-*.{ads,adb}  -- aggregate/distrib/misc/nav/numeric/string fns
+sdata_core-file_io.{ads,adb}      -- CSV/ODF/OOXML read-write
+sdata_core-csv.{ads,adb}          -- CSV tokeniser
+sdata_core-statistics.{ads,adb}   -- aggregate / statistical helpers
+sdata_core-config.{ads,adb}       -- static config + Config.Runtime mutable state
+sdata_core-io.{ads,adb}           -- stdin/stdout/pager I/O
+sdata_core-signals.{ads,adb}      -- SIGINT/SIGTERM cleanup
+sdata_core-system.{ads,adb}       -- shell execution + privilege detection
 ```
 
 ## Reference Documents
@@ -81,8 +139,9 @@ language-visible behaviour.
 
 **Architecture Decision Records** — `doc/adrs.md`
 
-Markdown; read directly. Documents all 30 ADRs (ADR-001–030) with rationale and
-status. Check for a relevant ADR before proposing a design change.
+Markdown; read directly. Documents 43 ADRs (ADR-001 through ADR-043, with a few
+unused numbers) with rationale and status. ADRs 039–043 cover the sdata-core /
+data-vandal split. Check for a relevant ADR before proposing a design change.
 
 **Man page** — `man/man1/sdata.1`
 
@@ -120,9 +179,11 @@ project record. They belong in git alongside the code they describe.
 scripts/bump-version.sh <new-version> "<changelog summary>"
 ```
 
-Updates 9 files: `src/sdata-config.ads`, `alire.toml`, `Makefile`, `sdata.spec`,
+Updates 9 files: `src/sdata-version.ads`, `alire.toml`, `Makefile`, `sdata.spec`,
 `slackware/sdata.{SlackBuild,info}`, `man/man1/sdata.1`, `README.md`,
-`debian/changelog`. Commit the result, then create an annotated tag:
+`debian/changelog`. (sdata-core has its own independent version in
+`~/Develop/sdata-core/alire.toml`; do not bump them together — see ADR-043.)
+Commit the result, then create an annotated tag:
 
 ```bash
 git tag -a v<new-version> -m "Version <new-version>"
@@ -132,7 +193,8 @@ git tag -a v<new-version> -m "Version <new-version>"
 
 - Phases 1–4: **complete** (core, control flow, distributions/aggregates, spreadsheet I/O)
 - Phase 5 (Polish): **complete** — disk spillover, interactive improvements, pager, HELP, LIST, ERR/ERL, error messages, performance, documentation
-- Phase 6 (Testing): **ongoing** — 131 integration tests, unit tests expanding (496 across 5 modules)
+- Phase 6 (Testing): **ongoing** — 140 integration tests, unit tests expanding (496 across 5 modules)
+- v0.8.0 milestone (2026-05-21): VANDALIZE extracted into `data-vandal`; sdata-core shared library created (ADRs 039–043)
 
 Full plan: `doc/feasibility_assessment.md`
 
