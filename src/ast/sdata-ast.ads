@@ -188,9 +188,9 @@ package SData.AST is
             Delete_To   : Positive := 1;
          when Stmt_OPTIONS =>
             Options_Key     : String (1 .. Max_Name_Len);
-            Options_Key_Len : Natural;
+            Options_Key_Len : Natural := 0;
             Options_Val     : String (1 .. Max_Options_Val_Len);
-            Options_Val_Len : Natural;
+            Options_Val_Len : Natural := 0;
          when others =>
             null;
       end case;
