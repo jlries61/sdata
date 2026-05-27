@@ -163,8 +163,7 @@ begin
          end;
       when Stmt_REPEAT =>
          SData_Core.Table.Clear;
-         SData_Core.Config.Runtime.Repeat_Active := True;
-         SData_Core.Config.Runtime.Repeat_Count := Stmt.Count;
+         SData_Core.Commands.Execute_REPEAT (Stmt.Count);
          Input_File_Columns.Clear;
       when Stmt_SELECT_FILTER =>
          --  Pass a deep copy of the AST expression; the runtime now owns the
@@ -189,7 +188,7 @@ begin
          SData_Core.Variables.Clear_Temporary;
          SData_Core.Variables.Initialize_PDV;
          Clear_Active_Program;
-         SData_Core.Config.Runtime.Reset;
+         SData_Core.Commands.Execute_NEW;
       when Stmt_OPTIONS =>
          declare
             Key : constant String :=
@@ -233,41 +232,22 @@ begin
             elsif Key = "MAXTEMPMEM" then
                SData_Core.Config.Max_Temp_Vars := Natural'Value (Val);
             elsif Key = "CSVDLM" then
-               declare
-                  DS : constant String := Dlm_To_Str (Val);
-                  DL : constant Natural := Natural'Min (DS'Length, 8);
-               begin
-                  SData_Core.Config.Runtime.Options_CSVDLM := (others => ' ');
-                  SData_Core.Config.Runtime.Options_CSVDLM (1 .. DL) := DS (DS'First .. DS'First + DL - 1);
-                  SData_Core.Config.Runtime.Options_CSVDLM_Len := DL;
-               end;
+               SData_Core.Commands.Execute_OPTIONS_CSVDLM (Dlm_To_Str (Val));
             elsif Key = "HEADER" then
-               SData_Core.Config.Runtime.Options_Header := (Val_Upper = "YES");
+               SData_Core.Commands.Execute_OPTIONS_Header (Val_Upper = "YES");
             elsif Key = "SAVEOVERWRT" then
-               SData_Core.Config.Runtime.Options_SAVEOVERWRT := (Val_Upper = "YES");
+               SData_Core.Commands.Execute_OPTIONS_SAVEOVERWRT
+                  (Val_Upper = "YES");
             elsif Key = "TXTFMT" then
-               declare
-                  VL : constant Natural := Natural'Min (Val_Upper'Length, 8);
-               begin
-                  SData_Core.Config.Runtime.Options_TXTFMT := (others => ' ');
-                  SData_Core.Config.Runtime.Options_TXTFMT (1 .. VL) :=
-                     Val_Upper (Val_Upper'First .. Val_Upper'First + VL - 1);
-                  SData_Core.Config.Runtime.Options_TXTFMT_Len := VL;
-               end;
+               SData_Core.Commands.Execute_OPTIONS_TXTFMT (Val_Upper);
             elsif Key = "CHARSET" then
-               declare
-                  VL : constant Natural := Natural'Min (Val'Length, 64);
-               begin
-                  SData_Core.Config.Runtime.Options_CHARSET := (others => ' ');
-                  SData_Core.Config.Runtime.Options_CHARSET (1 .. VL) :=
-                     Val (Val'First .. Val'First + VL - 1);
-                  SData_Core.Config.Runtime.Options_CHARSET_Len := VL;
-               end;
+               SData_Core.Commands.Execute_OPTIONS_CHARSET (Val);
             elsif Key = "IEEE_DIVIDE" then
-               SData_Core.Config.Runtime.IEEE_Divide := (Val_Upper = "YES");
+               SData_Core.Commands.Execute_OPTIONS_IEEE_Divide
+                  (Val_Upper = "YES");
             elsif Key = "SHELLTIMEOUT" then
-               SData_Core.Config.Runtime.Options_Shell_Timeout :=
-                  Natural'Value (Val);
+               SData_Core.Commands.Execute_OPTIONS_Shell_Timeout
+                  (Natural'Value (Val));
             elsif Key = "DEBUG" then
                SData_Core.Config.Debug_Level := Natural'Value (Val);
             else
