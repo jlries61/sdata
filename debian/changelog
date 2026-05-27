@@ -1,3 +1,9 @@
+sdata (0.8.1-1) unstable; urgency=medium
+
+  * Packaging fixes for sdata-core split (RPM, Debian, Slackware); AST Options_Key_Len/Val_Len initialization fix.
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 26 May 2026 17:37:54 -0700
+
 sdata (0.8.0-1) unstable; urgency=medium
 
   * Extract VANDALIZE into standalone data-vandal application; introduce sdata-core shared library.

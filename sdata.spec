@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.8.0
+Version:        0.8.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue May 26 2026 John L. Ries <john@theyarnbard.com> - 0.8.1-1
+- Packaging fixes for sdata-core split (RPM, Debian, Slackware); AST Options_Key_Len/Val_Len initialization fix.
+
 * Thu May 21 2026 John L. Ries <john@theyarnbard.com> - 0.8.0-1
 - Extract VANDALIZE into standalone data-vandal application; introduce sdata-core shared library.
 
