@@ -661,7 +661,7 @@ package body SData.Interpreter is
       SData_Core.Table.Clear_Index_Map;
       --  REPEAT generates records for exactly one RUN.  Subsequent RUNs
       --  must iterate the committed table, not re-use Repeat_Count.
-      SData_Core.Config.Runtime.Repeat_Active := False;
+      SData_Core.Commands.Execute_REPEAT (0);
       Set_Current_Record_Index (0);
       Apply_Pending_Mods;
       --  Delegate the end-of-step shared work (filter rebuild against the
@@ -758,14 +758,14 @@ package body SData.Interpreter is
                when E : Script_Error | SData_Core.Script_Error =>
                   if SData_Core.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                     SData_Core.Config.Runtime.Last_Error_Code := 1;
-                     SData_Core.Config.Runtime.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
+                     SData_Core.Commands.Execute_Record_Error
+                        (1, SData_Core.Table.Get_Current_Record_Index);
                   else raise; end if;
                when E : others =>
                   if SData_Core.Config.Continue_On_Error then
                      Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                     SData_Core.Config.Runtime.Last_Error_Code := 1;
-                     SData_Core.Config.Runtime.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
+                     SData_Core.Commands.Execute_Record_Error
+                        (1, SData_Core.Table.Get_Current_Record_Index);
                   else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
             end;
          end if;
