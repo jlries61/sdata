@@ -656,6 +656,266 @@ package body SData.Parser is
       return First;
    end Parse_Rename_List;
 
+   ------------------------
+   -- Parse_Spec_Options --
+   ------------------------
+   --  Parses a parenthesised per-dataset/per-target option block of the form:
+   --    "(" option { "," option } ")"
+   --
+   --  Supported options:
+   --    KEEP   = name_list
+   --    DROP   = name_list
+   --    RENAME = ( old=new { "," old=new } )
+   --    IN     = identifier        (USE only; error if Allow_IN is False)
+   --    IF     = expression        (SAVE only; error if Allow_IF is False)
+   --    FMT    = CSV|ODF|ODS|OOXML|XLSX
+   --    HEADER = YES|NO
+   --    CHARSET = string           (may be multi-token: e.g. UTF-16 LE)
+   --    DLM    = string
+   --    SHEET  = string
+   --    NSCAN  = integer           (USE only; error if Allow_USE_Only is False)
+   --    SKIP   = integer           (USE only; error if Allow_USE_Only is False)
+   --    MAXROWS = integer          (USE only; error if Allow_USE_Only is False)
+   --
+   --  On entry: peeked token is Token_Left_Paren (not yet consumed).
+   --  On exit:  Token_Right_Paren has been consumed.
+   procedure Parse_Spec_Options
+     (Ctx            : in out Parser_Context;
+      Opts           : in out Spec_Options;
+      Allow_IN       : Boolean;
+      Allow_IF       : Boolean;
+      Allow_USE_Only : Boolean)
+   is
+      Tok : Token;
+   begin
+      --  Consume the opening paren.
+      declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+
+      loop
+         --  Skip commas between options.
+         while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+         end loop;
+
+         Tok := Peek_Next_Token (Ctx.Lex_Ctx);
+
+         case Tok.Kind is
+
+            when Token_Right_Paren =>
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               exit;
+
+            when Token_KEEP =>
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  Put_Line_Error ("Error: Expected '=' after KEEP in spec option");
+               end if;
+               Opts.Keep_Vars := Parse_Variable_List (Ctx);
+
+            when Token_DROP =>
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  Put_Line_Error ("Error: Expected '=' after DROP in spec option");
+               end if;
+               Opts.Drop_Vars := Parse_Variable_List (Ctx);
+
+            when Token_RENAME =>
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  Put_Line_Error ("Error: Expected '=' after RENAME in spec option");
+               end if;
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Left_Paren then
+                  Put_Line_Error ("Error: Expected '(' after RENAME= in spec option");
+               end if;
+               Opts.Rename_Pairs := Parse_Rename_List (Ctx);
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
+                  Put_Line_Error ("Error: Expected ')' after RENAME pairs in spec option");
+               end if;
+
+            when Token_IN =>
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               if not Allow_IN then
+                  Put_Line_Error ("Error: IN= not allowed in SAVE spec options");
+               end if;
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  Put_Line_Error ("Error: Expected '=' after IN in spec option");
+               end if;
+               declare
+                  Id : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Id.Kind /= Token_Identifier then
+                     Put_Line_Error ("Error: Expected identifier after IN= in spec option");
+                  end if;
+                  Opts.IN_Name_Len := Id.Length;
+                  Opts.IN_Name (1 .. Id.Length) := Id.Text (1 .. Id.Length);
+               end;
+
+            when Token_IF =>
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               if not Allow_IF then
+                  Put_Line_Error ("Error: IF= not allowed in USE spec options");
+               end if;
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  Put_Line_Error ("Error: Expected '=' after IF in spec option");
+               end if;
+               Opts.IF_Expr := Parse_Expression (Ctx);
+
+            when Token_Identifier =>
+               --  Generic keyword=value options: FMT, HEADER, CHARSET, DLM,
+               --  NSCAN, SKIP, MAXROWS, SHEET.
+               declare
+                  Key_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  Key_Up  : constant String :=
+                     To_Upper (Key_Tok.Text (1 .. Key_Tok.Length));
+               begin
+                  if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                     Put_Line_Error
+                       ("Error: Expected '=' after " & Key_Up & " in spec option");
+                  end if;
+
+                  if Key_Up = "FMT" then
+                     declare
+                        Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        Val_Str : constant String :=
+                           To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+                     begin
+                        Opts.Format_Specified := True;
+                        if Val_Str = "CSV" then
+                           Opts.Fmt_Override := SData_Core.Config.CSV;
+                        elsif Val_Str = "ODF" or else Val_Str = "ODS" then
+                           Opts.Fmt_Override := SData_Core.Config.ODF;
+                        elsif Val_Str = "OOXML" or else Val_Str = "XLSX" then
+                           Opts.Fmt_Override := SData_Core.Config.OOXML;
+                        else
+                           Put_Line_Error
+                             ("Error: Unknown format """ & Val_Str &
+                              """ in spec option FMT=");
+                        end if;
+                     end;
+
+                  elsif Key_Up = "HEADER" then
+                     declare
+                        Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        Val_Str : constant String :=
+                           To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+                     begin
+                        Opts.Header_Specified := True;
+                        Opts.Header_Val := (Val_Str = "YES");
+                     end;
+
+                  elsif Key_Up = "CHARSET" then
+                     --  Consume multi-token charset names (e.g. UTF-16 LE).
+                     declare
+                        Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        Buf     : String (1 .. Max_Charset_Len) := (others => ' ');
+                        Len     : Natural := Val_Tok.Length;
+                        P2      : Token;
+                     begin
+                        Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
+                        P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                        if P2.Kind = Token_Minus then
+                           declare
+                              Discard2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              Mid_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              M_Len    : constant Natural := Mid_Tok.Length;
+                              pragma Unreferenced (Discard2);
+                           begin
+                              Buf (Len + 1) := '-';
+                              Buf (Len + 2 .. Len + 1 + M_Len) :=
+                                 Mid_Tok.Text (1 .. M_Len);
+                              Len := Len + 1 + M_Len;
+                              P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                              if P2.Kind = Token_Identifier then
+                                 declare
+                                    S_Upper : constant String :=
+                                       To_Upper (P2.Text (1 .. P2.Length));
+                                 begin
+                                    if S_Upper = "LE" or else S_Upper = "BE" then
+                                       declare
+                                          Suf_Tok : constant Token :=
+                                             Get_Next_Token (Ctx.Lex_Ctx);
+                                          S_Len   : constant Natural := Suf_Tok.Length;
+                                       begin
+                                          Buf (Len + 1 .. Len + S_Len) :=
+                                             Suf_Tok.Text (1 .. S_Len);
+                                          Len := Len + S_Len;
+                                       end;
+                                    end if;
+                                 end;
+                              end if;
+                           end;
+                        end if;
+                        Opts.Charset_Val (1 .. Len) := Buf (1 .. Len);
+                        Opts.Charset_Len := Len;
+                     end;
+
+                  elsif Key_Up = "DLM" then
+                     declare
+                        Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        VLen    : constant Natural :=
+                           Natural'Min (Val_Tok.Length, Max_Delimiter_Len);
+                     begin
+                        Opts.DLM_Val (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                        Opts.DLM_Len := VLen;
+                     end;
+
+                  elsif Key_Up = "SHEET" then
+                     declare
+                        Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        VLen    : constant Natural :=
+                           Natural'Min (Val_Tok.Length, Max_Sheet_Name_Len);
+                     begin
+                        Opts.Sheet_Name (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                        Opts.Sheet_Name_Len := VLen;
+                     end;
+
+                  elsif Key_Up = "NSCAN"
+                     or else Key_Up = "SKIP"
+                     or else Key_Up = "MAXROWS"
+                  then
+                     if not Allow_USE_Only then
+                        Put_Line_Error
+                          ("Error: " & Key_Up & "= not allowed in SAVE spec options");
+                     end if;
+                     declare
+                        Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        N       : constant Natural :=
+                           Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                     begin
+                        if Key_Up = "NSCAN" then
+                           Opts.NSCAN_Val := N;
+                        elsif Key_Up = "SKIP" then
+                           Opts.Skip_Val := N;
+                        else
+                           Opts.Maxrows_Val := N;
+                        end if;
+                     end;
+
+                  else
+                     Put_Line_Error
+                       ("Error: Unknown spec option """ & Key_Up & """");
+                  end if;
+               end;
+
+            when Token_EOF | Token_Newline =>
+               Put_Line_Error
+                 ("Error: Unexpected end of input inside spec option list");
+               exit;
+
+            when others =>
+               declare
+                  Bad_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  Put_Line_Error
+                    ("Error: Unexpected token """ &
+                     Bad_Tok.Text (1 .. Bad_Tok.Length) &
+                     """ in spec option list");
+               end;
+
+         end case;
+      end loop;
+   end Parse_Spec_Options;
+
    ---------------------
    -- Parse_Statement --
    ---------------------
