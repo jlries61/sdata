@@ -2,7 +2,9 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
-with Ada.Characters.Handling; use Ada.Characters.Handling;
+with Ada.Characters.Handling;    use Ada.Characters.Handling;
+with Ada.Containers.Indefinite_Hashed_Sets;
+with Ada.Strings.Hash;
 
 package body SData.Transient_Table is
 
@@ -182,5 +184,217 @@ package body SData.Transient_Table is
          end loop;
       end loop;
    end Install_To_Current;
+
+   ---------------------------------------------------------------------------
+   --  Column projection / mutation
+   ---------------------------------------------------------------------------
+
+   procedure Apply_Keep
+     (T : in out Table; Names : Name_Vectors.Vector)
+   is
+      package U is new Ada.Containers.Indefinite_Hashed_Sets
+        (Element_Type        => String,
+         Hash                => Ada.Strings.Hash,
+         Equivalent_Elements => "=");
+      Keep_Set : U.Set;
+   begin
+      for N of Names loop
+         Keep_Set.Include (To_Upper (To_String (N)));
+      end loop;
+      for I in reverse 1 .. Natural (T.Cols.Length) loop
+         if not Keep_Set.Contains
+                  (To_Upper (To_String (T.Cols (I).Name)))
+         then
+            T.Cols.Delete (I);
+            T.Data.Delete (I);
+         end if;
+      end loop;
+   end Apply_Keep;
+
+   ---------------------------------------------------------------------------
+
+   procedure Apply_Drop
+     (T : in out Table; Names : Name_Vectors.Vector)
+   is
+   begin
+      for N of Names loop
+         declare
+            Idx : constant Natural :=
+              Column_Index_Upper (T, To_Upper (To_String (N)));
+         begin
+            if Idx /= 0 then
+               T.Cols.Delete (Idx);
+               T.Data.Delete (Idx);
+            end if;
+         end;
+      end loop;
+   end Apply_Drop;
+
+   ---------------------------------------------------------------------------
+
+   procedure Apply_Rename
+     (T : in out Table; Pairs : Rename_Map_Vectors.Vector)
+   is
+      package U is new Ada.Containers.Indefinite_Hashed_Sets
+        (Element_Type        => String,
+         Hash                => Ada.Strings.Hash,
+         Equivalent_Elements => "=");
+      Seen_Old : U.Set;
+      Seen_New : U.Set;
+   begin
+      --  Validate: no duplicate source names, no duplicate target names.
+      for P of Pairs loop
+         declare
+            Old_Up : constant String := To_Upper (To_String (P.Old_Name));
+            New_Up : constant String := To_Upper (To_String (P.New_Name));
+         begin
+            if Seen_Old.Contains (Old_Up) then
+               raise Rename_Error
+                 with "Apply_Rename: duplicate source name "
+                      & To_String (P.Old_Name);
+            end if;
+            Seen_Old.Include (Old_Up);
+
+            if Seen_New.Contains (New_Up) then
+               raise Rename_Error
+                 with "Apply_Rename: duplicate target name "
+                      & To_String (P.New_Name);
+            end if;
+            Seen_New.Include (New_Up);
+         end;
+      end loop;
+
+      --  Validate: no target name collides with a non-renamed existing column.
+      for I in 1 .. Natural (T.Cols.Length) loop
+         declare
+            Col_Up : constant String :=
+              To_Upper (To_String (T.Cols (I).Name));
+         begin
+            if Seen_New.Contains (Col_Up)
+              and then not Seen_Old.Contains (Col_Up)
+            then
+               raise Rename_Error
+                 with "Apply_Rename: target name collides with existing column "
+                      & To_String (T.Cols (I).Name);
+            end if;
+         end;
+      end loop;
+
+      --  Apply: simultaneous rename evaluated against original names.
+      for I in 1 .. Natural (T.Cols.Length) loop
+         declare
+            Col_Up : constant String :=
+              To_Upper (To_String (T.Cols (I).Name));
+         begin
+            for P of Pairs loop
+               if To_Upper (To_String (P.Old_Name)) = Col_Up then
+                  declare
+                     Entry_Val : Col_Entry := T.Cols (I);
+                  begin
+                     Entry_Val.Name := P.New_Name;
+                     T.Cols.Replace_Element (I, Entry_Val);
+                  end;
+                  exit;
+               end if;
+            end loop;
+         end;
+      end loop;
+   end Apply_Rename;
+
+   ---------------------------------------------------------------------------
+
+   procedure Sort_By
+     (T : in out Table; Keys : Name_Vectors.Vector)
+   is
+      N_Rows : constant Natural := T.N_Rows;
+   begin
+      if N_Rows < 2 then
+         return;
+      end if;
+
+      --  Build list of resolved key column indices (silently skip unknowns).
+      declare
+         type Index_Array is array (Positive range <>) of Natural;
+         Max_Keys  : constant Positive := Positive (Keys.Length) + 1;
+         Key_Idxs  : Index_Array (1 .. Max_Keys) := (others => 0);
+         N_Keys    : Natural := 0;
+
+         --  Permutation array: Perm(i) = physical row to place at position i.
+         type Perm_Array is array (Positive range <>) of Positive;
+         Perm : Perm_Array (1 .. N_Rows);
+
+         function Less (A, B : Positive) return Boolean is
+         --  Returns True when the row at physical index A sorts before B.
+         begin
+            for K in 1 .. N_Keys loop
+               declare
+                  Idx : constant Natural := Key_Idxs (K);
+                  VA  : constant SData_Core.Values.Value :=
+                    T.Data (Idx).Element (A);
+                  VB  : constant SData_Core.Values.Value :=
+                    T.Data (Idx).Element (B);
+               begin
+                  if SData_Core.Values."<" (VA, VB) then
+                     return True;
+                  elsif SData_Core.Values."<" (VB, VA) then
+                     return False;
+                  end if;
+                  --  Equal on this key; continue to next.
+               end;
+            end loop;
+            return False;
+         end Less;
+
+      begin
+         --  Resolve key column indices.
+         for K of Keys loop
+            declare
+               Idx : constant Natural :=
+                 Column_Index_Upper (T, To_Upper (To_String (K)));
+            begin
+               if Idx /= 0 then
+                  N_Keys := N_Keys + 1;
+                  Key_Idxs (N_Keys) := Idx;
+               end if;
+            end;
+         end loop;
+
+         if N_Keys = 0 then
+            return;
+         end if;
+
+         --  Initialize permutation to identity.
+         for I in 1 .. N_Rows loop
+            Perm (I) := I;
+         end loop;
+
+         --  Insertion sort on the permutation array.
+         for I in 2 .. N_Rows loop
+            declare
+               Key_Val : constant Positive := Perm (I);
+               J       : Natural := I - 1;
+            begin
+               while J >= 1 and then Less (Key_Val, Perm (J)) loop
+                  Perm (J + 1) := Perm (J);
+                  J := J - 1;
+               end loop;
+               Perm (J + 1) := Key_Val;
+            end;
+         end loop;
+
+         --  Materialize the permutation: build new data column by column.
+         for C in 1 .. Natural (T.Data.Length) loop
+            declare
+               Old_Col : constant Value_Vectors.Vector := T.Data (C);
+               New_Col : Value_Vectors.Vector;
+            begin
+               for I in 1 .. N_Rows loop
+                  New_Col.Append (Old_Col.Element (Perm (I)));
+               end loop;
+               T.Data.Replace_Element (C, New_Col);
+            end;
+         end loop;
+      end;
+   end Sort_By;
 
 end SData.Transient_Table;

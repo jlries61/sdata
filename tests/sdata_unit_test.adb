@@ -694,6 +694,146 @@ begin
    end;
 
    ---------------------------------------------------------------------------
+   --  ── SData.Transient_Table: Apply_Keep / Apply_Drop / Apply_Rename / Sort_By
+   ---------------------------------------------------------------------------
+
+   --  TT-21: Apply_Keep drops non-listed columns
+   declare
+      TT    : SData.Transient_Table.Table;
+      Names : SData.Transient_Table.Name_Vectors.Vector;
+   begin
+      TT.Add_Column ("A", SData_Core.Table.Col_Numeric);
+      TT.Add_Column ("B", SData_Core.Table.Col_Numeric);
+      TT.Add_Column ("C", SData_Core.Table.Col_Numeric);
+      Names.Append (To_Unbounded_String ("A"));
+      Names.Append (To_Unbounded_String ("C"));
+      SData.Transient_Table.Apply_Keep (TT, Names);
+      Check ("TT-21 Apply_Keep column count = 2", TT.Column_Count, 2);
+      Check ("TT-21b Apply_Keep has A",  TT.Has_Column ("A"), True);
+      Check ("TT-21c Apply_Keep no B",   TT.Has_Column ("B"), False);
+      Check ("TT-21d Apply_Keep has C",  TT.Has_Column ("C"), True);
+   end;
+
+   --  TT-22: Apply_Drop removes listed columns
+   declare
+      TT    : SData.Transient_Table.Table;
+      Names : SData.Transient_Table.Name_Vectors.Vector;
+   begin
+      TT.Add_Column ("A", SData_Core.Table.Col_Numeric);
+      TT.Add_Column ("B", SData_Core.Table.Col_Numeric);
+      Names.Append (To_Unbounded_String ("A"));
+      SData.Transient_Table.Apply_Drop (TT, Names);
+      Check ("TT-22 Apply_Drop column count = 1", TT.Column_Count, 1);
+      Check ("TT-22b Apply_Drop no A",  TT.Has_Column ("A"), False);
+      Check ("TT-22c Apply_Drop has B", TT.Has_Column ("B"), True);
+   end;
+
+   --  TT-23: Apply_Rename simultaneous chain (a=b, b=c) — no collision
+   declare
+      TT    : SData.Transient_Table.Table;
+      Pairs : SData.Transient_Table.Rename_Map_Vectors.Vector;
+   begin
+      TT.Add_Column ("A", SData_Core.Table.Col_Numeric);
+      TT.Add_Column ("B", SData_Core.Table.Col_Numeric);
+      --  Rename A→B and B→C simultaneously (original names used for lookup).
+      Pairs.Append ((Old_Name => To_Unbounded_String ("A"),
+                     New_Name => To_Unbounded_String ("B")));
+      Pairs.Append ((Old_Name => To_Unbounded_String ("B"),
+                     New_Name => To_Unbounded_String ("C")));
+      SData.Transient_Table.Apply_Rename (TT, Pairs);
+      Check ("TT-23 Simultaneous rename col count = 2", TT.Column_Count, 2);
+      Check ("TT-23b Rename: A→B present",  TT.Has_Column ("B"), True);
+      Check ("TT-23c Rename: B→C present",  TT.Has_Column ("C"), True);
+      Check ("TT-23d Rename: A gone",        TT.Has_Column ("A"), False);
+   end;
+
+   --  TT-24: Apply_Rename raises Rename_Error on duplicate source name
+   declare
+      TT     : SData.Transient_Table.Table;
+      Pairs  : SData.Transient_Table.Rename_Map_Vectors.Vector;
+      Raised : Boolean := False;
+   begin
+      TT.Add_Column ("A", SData_Core.Table.Col_Numeric);
+      TT.Add_Column ("B", SData_Core.Table.Col_Numeric);
+      Pairs.Append ((Old_Name => To_Unbounded_String ("A"),
+                     New_Name => To_Unbounded_String ("X")));
+      Pairs.Append ((Old_Name => To_Unbounded_String ("A"),
+                     New_Name => To_Unbounded_String ("Y")));
+      begin
+         SData.Transient_Table.Apply_Rename (TT, Pairs);
+      exception
+         when SData.Transient_Table.Rename_Error => Raised := True;
+      end;
+      Check ("TT-24 Rename_Error on duplicate source", Raised, True);
+   end;
+
+   --  TT-25: Apply_Rename raises Rename_Error on duplicate target name
+   declare
+      TT     : SData.Transient_Table.Table;
+      Pairs  : SData.Transient_Table.Rename_Map_Vectors.Vector;
+      Raised : Boolean := False;
+   begin
+      TT.Add_Column ("A", SData_Core.Table.Col_Numeric);
+      TT.Add_Column ("B", SData_Core.Table.Col_Numeric);
+      Pairs.Append ((Old_Name => To_Unbounded_String ("A"),
+                     New_Name => To_Unbounded_String ("Z")));
+      Pairs.Append ((Old_Name => To_Unbounded_String ("B"),
+                     New_Name => To_Unbounded_String ("Z")));
+      begin
+         SData.Transient_Table.Apply_Rename (TT, Pairs);
+      exception
+         when SData.Transient_Table.Rename_Error => Raised := True;
+      end;
+      Check ("TT-25 Rename_Error on duplicate target", Raised, True);
+   end;
+
+   --  TT-26: Apply_Rename raises Rename_Error when target collides with
+   --          an existing non-renamed column
+   declare
+      TT     : SData.Transient_Table.Table;
+      Pairs  : SData.Transient_Table.Rename_Map_Vectors.Vector;
+      Raised : Boolean := False;
+   begin
+      TT.Add_Column ("A", SData_Core.Table.Col_Numeric);
+      TT.Add_Column ("B", SData_Core.Table.Col_Numeric);
+      --  Rename A→B but B is not being renamed → collision.
+      Pairs.Append ((Old_Name => To_Unbounded_String ("A"),
+                     New_Name => To_Unbounded_String ("B")));
+      begin
+         SData.Transient_Table.Apply_Rename (TT, Pairs);
+      exception
+         when SData.Transient_Table.Rename_Error => Raised := True;
+      end;
+      Check ("TT-26 Rename_Error target collides with existing", Raised, True);
+   end;
+
+   --  TT-27: Sort_By orders rows ascending by key column
+   declare
+      TT   : SData.Transient_Table.Table;
+      Keys : SData.Transient_Table.Name_Vectors.Vector;
+      VV   : SData_Core.Values.Value;
+   begin
+      TT.Add_Column ("K", SData_Core.Table.Col_Integer);
+      TT.Add_Row;
+      TT.Set_Value (1, "K", (Kind => SData_Core.Values.Val_Integer,
+                              Int_Val => 3));
+      TT.Add_Row;
+      TT.Set_Value (2, "K", (Kind => SData_Core.Values.Val_Integer,
+                              Int_Val => 1));
+      TT.Add_Row;
+      TT.Set_Value (3, "K", (Kind => SData_Core.Values.Val_Integer,
+                              Int_Val => 2));
+      Keys.Append (To_Unbounded_String ("K"));
+      SData.Transient_Table.Sort_By (TT, Keys);
+      VV := TT.Get_Value (1, "K");
+      Check ("TT-27a Sort_By row 1 = 1", VV.Int_Val, 1);
+      VV := TT.Get_Value (2, "K");
+      Check ("TT-27b Sort_By row 2 = 2", VV.Int_Val, 2);
+      VV := TT.Get_Value (3, "K");
+      Check ("TT-27c Sort_By row 3 = 3", VV.Int_Val, 3);
+   end;
+
+   ---------------------------------------------------------------------------
    --  ── Summary ─────────────────────────────────────────────────────────────
    ---------------------------------------------------------------------------
 

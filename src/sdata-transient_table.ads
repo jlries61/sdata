@@ -56,6 +56,44 @@ package SData.Transient_Table is
    function Snapshot_From_Current return Table;
    procedure Install_To_Current (T : Table);
 
+   --  Column projection / mutation
+
+   package Name_Vectors is new Ada.Containers.Vectors
+     (Index_Type => Positive, Element_Type => Unbounded_String);
+
+   type Rename_Pair is record
+      Old_Name : Unbounded_String;
+      New_Name : Unbounded_String;
+   end record;
+   package Rename_Map_Vectors is new Ada.Containers.Vectors
+     (Index_Type => Positive, Element_Type => Rename_Pair);
+
+   --  Keep only the listed columns (case-insensitive). Names not in
+   --  the table are silently ignored (matches the standalone KEEP
+   --  command semantics).
+   procedure Apply_Keep
+     (T : in out Table; Names : Name_Vectors.Vector);
+
+   --  Drop the listed columns. Names not present are silently ignored.
+   procedure Apply_Drop
+     (T : in out Table; Names : Name_Vectors.Vector);
+
+   --  Apply a set of rename pairs simultaneously (all renames are
+   --  evaluated against the original names). Raises Rename_Error if
+   --  any pair has a duplicate source name, any pair has a duplicate
+   --  target name, or a target name collides with an existing
+   --  non-renamed column.
+   procedure Apply_Rename
+     (T : in out Table; Pairs : Rename_Map_Vectors.Vector);
+
+   --  Sort rows ascending by the named columns (lexicographic on the
+   --  composite key). Names that do not exist in the table are
+   --  silently skipped (sorting proceeds on remaining keys).
+   procedure Sort_By
+     (T : in out Table; Keys : Name_Vectors.Vector);
+
+   Rename_Error : exception;
+
 private
    type Col_Entry is record
       Name : Unbounded_String;
