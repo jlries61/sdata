@@ -54,6 +54,7 @@ package body SData.AST is
       end loop;
       Opts.Rename_Pairs := null;
       SData_Core.Evaluator.Free_Expression (Opts.IF_Expr);
+      Opts.IF_Expr := null;
    end Free_Spec_Options;
 
    procedure Free_Expr_List (List : in out SData_Core.Evaluator.Expression_List) is
