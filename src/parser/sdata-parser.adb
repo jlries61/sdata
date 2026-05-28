@@ -916,6 +916,468 @@ package body SData.Parser is
       end loop;
    end Parse_Spec_Options;
 
+   --------------------
+   -- Parse_USE_Stmt --
+   --------------------
+   --  Parses the body of a USE statement.  Accepts the new multi-dataset
+   --  grammar:
+   --
+   --    USE dataset_spec { , dataset_spec }
+   --        [ /BY=var_list ] [ /INTERLEAVE | /JOIN ]
+   --        [ /FMT=... /HEADER=... /CHARSET=... /DLM=... /NSCAN=... /SKIP=...
+   --          /MAXROWS=... ]    (legacy single-dataset slash-options only)
+   --
+   --    dataset_spec := filename [ AS alias ] [ ( per_dataset_options ) ]
+   --                  | MOCK
+   --
+   --  On entry: the USE keyword has already been consumed.
+   --  Stmt must be a freshly allocated Statement (Stmt_USE).
+   --
+   --  After this procedure, Stmt.Dataset_List is always populated (even for a
+   --  single-dataset USE).  For single-dataset (Mode = MM_Single) the legacy
+   --  fields (File_Path, File_Len, Is_Mock, Format_Specified, …) are also set
+   --  so that the existing Execute_USE path continues to work unchanged.
+   procedure Parse_USE_Stmt
+     (Ctx  : in out Parser_Context;
+      Stmt : Statement_Access)
+   is
+      --  -----------------------------------------------------------------------
+      --  Local helper: parse one filename token into a Dataset_Spec.
+      --  Handles MOCK keyword, unquoted→uppercase rule, and [sheet] syntax.
+      --  On entry, the filename token has NOT been consumed yet.
+      --  On exit, Spec.File_Path / Spec.File_Len / Spec.Is_Mock /
+      --  Spec.Opts.Sheet_Name / Spec.Opts.Sheet_Name_Len are filled in.
+      --  -----------------------------------------------------------------------
+      procedure Parse_Filename_Into (Spec : Dataset_Spec_Access) is
+         File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+      begin
+         if File_Tok.Kind = Token_MOCK then
+            Spec.Is_Mock  := True;
+            Spec.File_Len := 0;
+         else
+            Spec.File_Len := File_Tok.Length;
+            Spec.File_Path (1 .. File_Tok.Length) :=
+               File_Tok.Text (1 .. File_Tok.Length);
+            --  Unquoted filenames → uppercase (matches original rule).
+            if File_Tok.Kind /= Token_String_Literal then
+               for I in 1 .. Spec.File_Len loop
+                  Spec.File_Path (I) := To_Upper (Spec.File_Path (I));
+               end loop;
+            end if;
+            --  Sheet selection: "filename[sheetname]" bracket syntax.
+            if Spec.File_Len > 2
+               and then Spec.File_Path (Spec.File_Len) = ']'
+            then
+               declare
+                  Open_Pos : Natural := 0;
+               begin
+                  for I in reverse 1 .. Spec.File_Len - 1 loop
+                     if Spec.File_Path (I) = '[' then
+                        Open_Pos := I;
+                        exit;
+                     end if;
+                  end loop;
+                  if Open_Pos > 0 then
+                     declare
+                        SLen : constant Natural :=
+                           Natural'Min (Spec.File_Len - Open_Pos - 1,
+                                        Max_Sheet_Name_Len);
+                     begin
+                        Spec.Opts.Sheet_Name (1 .. SLen) :=
+                           Spec.File_Path (Open_Pos + 1 .. Open_Pos + SLen);
+                        Spec.Opts.Sheet_Name_Len := SLen;
+                        Spec.File_Len := Open_Pos - 1;
+                     end;
+                  end if;
+               end;
+            end if;
+         end if;
+      end Parse_Filename_Into;
+
+      --  -----------------------------------------------------------------------
+      --  Local helper: is any non-default option set in Opts?
+      --  Used to decide whether a legacy slash-option is permissible.
+      --  -----------------------------------------------------------------------
+      function Has_Paren_Opts (Opts : Spec_Options) return Boolean is
+      begin
+         return Opts.Format_Specified
+            or else Opts.Header_Specified
+            or else Opts.Charset_Len > 0
+            or else Opts.DLM_Len > 0
+            or else Opts.NSCAN_Val > 0
+            or else Opts.Skip_Val > 0
+            or else Opts.Maxrows_Val > 0
+            or else Opts.Sheet_Name_Len > 0
+            or else Opts.Keep_Vars /= null
+            or else Opts.Drop_Vars /= null
+            or else Opts.Rename_Pairs /= null
+            or else Opts.IN_Name_Len > 0;
+      end Has_Paren_Opts;
+
+      --  -----------------------------------------------------------------------
+      --  State
+      --  -----------------------------------------------------------------------
+      Saw_BY         : Boolean := False;
+      Saw_INTERLEAVE : Boolean := False;
+      Saw_JOIN       : Boolean := False;
+      Had_Error      : Boolean := False;
+      --  True if the first (and only, for single-dataset) spec had an explicit
+      --  "(" ... ")" per-dataset options block.  Used to decide whether legacy
+      --  slash-options are permissible (they are only allowed when there is no
+      --  paren block, so that the two syntax forms don't mix).
+      First_Had_Paren_Block : Boolean := False;
+      Peeked         : Token;
+
+   begin  -- Parse_USE_Stmt
+
+      --  -----------------------------------------------------------------------
+      --  Parse the dataset list.
+      --  A USE with no path at all (bare "USE") is legal: File_Len stays 0.
+      --  -----------------------------------------------------------------------
+      Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+      if Peeked.Kind = Token_Newline
+         or else Peeked.Kind = Token_Semicolon
+         or else Peeked.Kind = Token_EOF
+      then
+         --  Bare USE — no datasets.  Leave Dataset_List empty and Mode MM_Single.
+         Stmt.Mode := MM_Single;
+         Stmt.File_Len := 0;
+         return;
+      end if;
+
+      if Peeked.Kind /= Token_Slash then
+         --  We have at least one dataset spec to parse.
+         loop
+            declare
+               Spec : constant Dataset_Spec_Access := new Dataset_Spec;
+            begin
+               Parse_Filename_Into (Spec);
+
+               --  Optional AS alias.
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_AS then
+                  declare
+                     Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  AS
+                     Alias_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     pragma Unreferenced (Discard);
+                  begin
+                     if Alias_Tok.Kind /= Token_Identifier then
+                        Put_Line_Error
+                          ("Error: Expected identifier after AS in USE");
+                        Had_Error := True;
+                     else
+                        Spec.Alias_Len := Alias_Tok.Length;
+                        Spec.Alias (1 .. Alias_Tok.Length) :=
+                           Alias_Tok.Text (1 .. Alias_Tok.Length);
+                     end if;
+                  end;
+               end if;
+
+               --  Optional per-dataset paren options block.
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren then
+                  --  Track whether the very first spec had an explicit paren block.
+                  if Stmt.Dataset_List.Is_Empty then
+                     First_Had_Paren_Block := True;
+                  end if;
+                  Parse_Spec_Options
+                    (Ctx,
+                     Spec.Opts,
+                     Allow_IN       => True,
+                     Allow_IF       => False,
+                     Allow_USE_Only => True);
+               end if;
+
+               Stmt.Dataset_List.Append (Spec);
+            end;
+
+            --  Continue only if there is a comma (more datasets).
+            Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+            exit when Peeked.Kind /= Token_Comma;
+            declare
+               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  ,
+               pragma Unreferenced (Discard);
+            begin null; end;
+         end loop;
+      end if;
+
+      --  -----------------------------------------------------------------------
+      --  Parse whole-statement slash-options.
+      --  -----------------------------------------------------------------------
+      loop
+         Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+         exit when Peeked.Kind /= Token_Slash;
+
+         declare
+            Discard  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  /
+            Flag_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Flag_Name : constant String :=
+               To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+            pragma Unreferenced (Discard);
+         begin
+            if Flag_Tok.Kind = Token_BY or else Flag_Name = "BY" then
+               --  /BY=var_list
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Equal then
+                  declare
+                     Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     pragma Unreferenced (Eq);
+                  begin
+                     Stmt.By_Vars := Parse_Variable_List (Ctx);
+                  end;
+               else
+                  Put_Line_Error ("Error: Expected '=' after /BY in USE");
+                  Had_Error := True;
+               end if;
+               Saw_BY := True;
+
+            elsif Flag_Tok.Kind = Token_INTERLEAVE or else Flag_Name = "INTERLEAVE" then
+               Saw_INTERLEAVE := True;
+
+            elsif Flag_Tok.Kind = Token_JOIN or else Flag_Name = "JOIN" then
+               Saw_JOIN := True;
+
+            else
+               --  Legacy per-dataset slash-options: only allowed when there is
+               --  exactly one dataset and it had no paren-option block.
+               declare
+                  N : constant Natural := Natural (Stmt.Dataset_List.Length);
+               begin
+                  if N /= 1 or else First_Had_Paren_Block then
+                     Put_Line_Error
+                       ("Error: /" & Flag_Name &
+                        " is only allowed with a single dataset and" &
+                        " no per-dataset paren options");
+                     Had_Error := True;
+                  else
+                     --  Apply the legacy slash-option to the spec.
+                     declare
+                        Spec : constant Dataset_Spec_Access :=
+                           Stmt.Dataset_List.First_Element;
+                     begin
+                        Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+                        if Peeked.Kind = Token_Equal then
+                           declare
+                              Eq_Tok  : constant Token :=
+                                 Get_Next_Token (Ctx.Lex_Ctx);
+                              Val_Tok : constant Token :=
+                                 Get_Next_Token (Ctx.Lex_Ctx);
+                              Val_Str : constant String :=
+                                 To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+                              pragma Unreferenced (Eq_Tok);
+                           begin
+                              if Flag_Name = "FMT" then
+                                 Spec.Opts.Format_Specified := True;
+                                 if Val_Str = "CSV" then
+                                    Spec.Opts.Fmt_Override :=
+                                       SData_Core.Config.CSV;
+                                 elsif Val_Str = "ODF"
+                                       or else Val_Str = "ODS"
+                                 then
+                                    Spec.Opts.Fmt_Override :=
+                                       SData_Core.Config.ODF;
+                                 elsif Val_Str = "OOXML"
+                                       or else Val_Str = "XLSX"
+                                 then
+                                    Spec.Opts.Fmt_Override :=
+                                       SData_Core.Config.OOXML;
+                                 end if;
+
+                              elsif Flag_Name = "HEADER"
+                                 or else Flag_Tok.Kind = Token_HEADER
+                              then
+                                 Spec.Opts.Header_Specified := True;
+                                 Spec.Opts.Header_Val := (Val_Str = "YES");
+
+                              elsif Flag_Name = "CHARSET" then
+                                 --  Multi-token charset (e.g. UTF-16 LE).
+                                 declare
+                                    Buf : String (1 .. Max_Charset_Len) :=
+                                       (others => ' ');
+                                    Len : Natural := Val_Tok.Length;
+                                    P2  : Token;
+                                 begin
+                                    Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
+                                    P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                    if P2.Kind = Token_Minus then
+                                       declare
+                                          Discard2 : constant Token :=
+                                             Get_Next_Token (Ctx.Lex_Ctx);
+                                          Mid_Tok  : constant Token :=
+                                             Get_Next_Token (Ctx.Lex_Ctx);
+                                          M_Len    : constant Natural :=
+                                             Mid_Tok.Length;
+                                          pragma Unreferenced (Discard2);
+                                       begin
+                                          Buf (Len + 1) := '-';
+                                          Buf (Len + 2 .. Len + 1 + M_Len) :=
+                                             Mid_Tok.Text (1 .. M_Len);
+                                          Len := Len + 1 + M_Len;
+                                          P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                          if P2.Kind = Token_Identifier then
+                                             declare
+                                                S_Upper : constant String :=
+                                                   To_Upper
+                                                     (P2.Text (1 .. P2.Length));
+                                             begin
+                                                if S_Upper = "LE"
+                                                   or else S_Upper = "BE"
+                                                then
+                                                   declare
+                                                      Suf_Tok : constant Token :=
+                                                         Get_Next_Token
+                                                           (Ctx.Lex_Ctx);
+                                                      S_Len : constant Natural :=
+                                                         Suf_Tok.Length;
+                                                   begin
+                                                      Buf (Len + 1 ..
+                                                           Len + S_Len) :=
+                                                         Suf_Tok.Text
+                                                           (1 .. S_Len);
+                                                      Len := Len + S_Len;
+                                                   end;
+                                                end if;
+                                             end;
+                                          end if;
+                                       end;
+                                    end if;
+                                    Spec.Opts.Charset_Val (1 .. Len) :=
+                                       Buf (1 .. Len);
+                                    Spec.Opts.Charset_Len := Len;
+                                 end;
+
+                              elsif Flag_Name = "DLM" then
+                                 declare
+                                    VLen : constant Natural :=
+                                       Natural'Min (Val_Tok.Length,
+                                                    Max_Delimiter_Len);
+                                 begin
+                                    Spec.Opts.DLM_Val (1 .. VLen) :=
+                                       Val_Tok.Text (1 .. VLen);
+                                    Spec.Opts.DLM_Len := VLen;
+                                 end;
+
+                              elsif Flag_Name = "SHEET" then
+                                 declare
+                                    VLen : constant Natural :=
+                                       Natural'Min (Val_Tok.Length,
+                                                    Max_Sheet_Name_Len);
+                                 begin
+                                    Spec.Opts.Sheet_Name (1 .. VLen) :=
+                                       Val_Tok.Text (1 .. VLen);
+                                    Spec.Opts.Sheet_Name_Len := VLen;
+                                 end;
+
+                              elsif Flag_Name = "NSCAN" then
+                                 Spec.Opts.NSCAN_Val :=
+                                    Natural'Value
+                                      (Val_Tok.Text (1 .. Val_Tok.Length));
+
+                              elsif Flag_Name = "SKIP" then
+                                 Spec.Opts.Skip_Val :=
+                                    Natural'Value
+                                      (Val_Tok.Text (1 .. Val_Tok.Length));
+
+                              elsif Flag_Name = "MAXROWS" then
+                                 Spec.Opts.Maxrows_Val :=
+                                    Natural'Value
+                                      (Val_Tok.Text (1 .. Val_Tok.Length));
+
+                              else
+                                 Put_Line_Error
+                                   ("Error: Unknown USE option /" &
+                                    Flag_Name & "=");
+                              end if;
+                           end;
+                        end if;
+                     end;
+                  end if;
+               end;
+            end if;
+         end;
+      end loop;
+
+      --  -----------------------------------------------------------------------
+      --  Validate mode combinations.
+      --  -----------------------------------------------------------------------
+      if not Had_Error then
+         if Saw_INTERLEAVE and then Saw_JOIN then
+            Put_Line_Error
+              ("Error: /INTERLEAVE and /JOIN cannot both be specified in USE");
+            Had_Error := True;
+         elsif (Saw_INTERLEAVE or else Saw_JOIN) and then not Saw_BY then
+            Put_Line_Error
+              ("Error: /INTERLEAVE and /JOIN require /BY= in USE");
+            Had_Error := True;
+         elsif Natural (Stmt.Dataset_List.Length) = 1
+               and then (Saw_INTERLEAVE or else Saw_JOIN)
+         then
+            Put_Line_Error
+              ("Error: /INTERLEAVE and /JOIN require multiple datasets in USE");
+            Had_Error := True;
+         end if;
+      end if;
+
+      --  -----------------------------------------------------------------------
+      --  Determine Merge_Mode and populate Stmt fields.
+      --  -----------------------------------------------------------------------
+      if Had_Error then
+         Stmt.Mode := MM_Single;
+         return;
+      end if;
+
+      if Natural (Stmt.Dataset_List.Length) <= 1 then
+         --  Single-dataset (or zero-dataset bare USE): legacy path.
+         Stmt.Mode := MM_Single;
+         if not Stmt.Dataset_List.Is_Empty then
+            declare
+               Spec : constant Dataset_Spec_Access :=
+                  Stmt.Dataset_List.First_Element;
+            begin
+               --  Copy filename fields.
+               Stmt.File_Len := Spec.File_Len;
+               Stmt.File_Path (1 .. Spec.File_Len) :=
+                  Spec.File_Path (1 .. Spec.File_Len);
+               Stmt.Is_Mock := Spec.Is_Mock;
+
+               --  Copy format options from Spec.Opts to legacy Stmt fields.
+               Stmt.Format_Specified := Spec.Opts.Format_Specified;
+               Stmt.Fmt_Override     := Spec.Opts.Fmt_Override;
+               Stmt.Header_Specified := Spec.Opts.Header_Specified;
+               Stmt.Header_Val       := Spec.Opts.Header_Val;
+               Stmt.NSCAN_Val        := Spec.Opts.NSCAN_Val;
+               Stmt.Skip_Val         := Spec.Opts.Skip_Val;
+               Stmt.Maxrows_Val      := Spec.Opts.Maxrows_Val;
+
+               --  Sheet name.
+               Stmt.Sheet_Name_Len := Spec.Opts.Sheet_Name_Len;
+               Stmt.Sheet_Name (1 .. Spec.Opts.Sheet_Name_Len) :=
+                  Spec.Opts.Sheet_Name (1 .. Spec.Opts.Sheet_Name_Len);
+
+               --  Delimiter.
+               Stmt.DLM_Len := Spec.Opts.DLM_Len;
+               Stmt.DLM_Path (1 .. Spec.Opts.DLM_Len) :=
+                  Spec.Opts.DLM_Val (1 .. Spec.Opts.DLM_Len);
+
+               --  Charset → Output_CHARSET_Val (existing field used for USE).
+               Stmt.Output_CHARSET_Len := Spec.Opts.Charset_Len;
+               Stmt.Output_CHARSET_Val (1 .. Spec.Opts.Charset_Len) :=
+                  Spec.Opts.Charset_Val (1 .. Spec.Opts.Charset_Len);
+            end;
+         end if;
+
+      else
+         --  Multi-dataset.
+         if Saw_INTERLEAVE then
+            Stmt.Mode := MM_Interleave;
+         elsif Saw_JOIN then
+            Stmt.Mode := MM_Join;
+         elsif Saw_BY then
+            Stmt.Mode := MM_Match;
+         else
+            Stmt.Mode := MM_Positional;
+         end if;
+      end if;
+
+   end Parse_USE_Stmt;
+
    ---------------------
    -- Parse_Statement --
    ---------------------
@@ -1059,19 +1521,22 @@ package body SData.Parser is
                end loop;
             end;
 
-         when Token_USE | Token_SAVE | Token_SUBMIT | Token_SYSTEM | Token_FPATH =>
+         when Token_USE =>
+            Stmt := new Statement (Stmt_USE);
+            Parse_USE_Stmt (Ctx, Stmt);
+
+         when Token_SAVE | Token_SUBMIT | Token_SYSTEM | Token_FPATH =>
             declare
                File_Tok : Token;
                Peeked   : Token;
             begin
-               if Tok.Kind = Token_USE then Stmt := new Statement (Stmt_USE);
-               elsif Tok.Kind = Token_SAVE then Stmt := new Statement (Stmt_SAVE);
+               if Tok.Kind = Token_SAVE then Stmt := new Statement (Stmt_SAVE);
                elsif Tok.Kind = Token_SUBMIT then Stmt := new Statement (Stmt_SUBMIT);
                elsif Tok.Kind = Token_SYSTEM then Stmt := new Statement (Stmt_SYSTEM);
                else Stmt := new Statement (Stmt_FPATH); end if;
-               
+
                Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
-               
+
                if Peeked.Kind = Token_Newline or else Peeked.Kind = Token_Semicolon or else Peeked.Kind = Token_EOF then
                   Stmt.File_Len := 0;
                elsif Peeked.Kind = Token_Slash then
@@ -1079,47 +1544,13 @@ package body SData.Parser is
                   Stmt.File_Len := 0;
                else
                   File_Tok := Get_Next_Token (Ctx.Lex_Ctx);
-                  
-                  if Tok.Kind = Token_USE and then File_Tok.Kind = Token_MOCK then
-                     Stmt.Is_Mock := True;
-                     Stmt.File_Len := 0;
-                  else
-                     Stmt.File_Len := File_Tok.Length;
-                     Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
-                     -- Rule: Unquoted filenames converted to uppercase
-                     if File_Tok.Kind /= Token_String_Literal then
-                        for I in 1 .. Stmt.File_Len loop
-                           Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
-                        end loop;
-                     end if;
-                     --  Sheet selection: "filename[sheetname]" syntax.
-                     --  If the filename ends with [...], extract the bracket
-                     --  contents as the sheet name and remove them from the path.
-                     if Stmt.File_Len > 2
-                        and then Stmt.File_Path (Stmt.File_Len) = ']'
-                     then
-                        declare
-                           Open_Pos : Natural := 0;
-                        begin
-                           for I in reverse 1 .. Stmt.File_Len - 1 loop
-                              if Stmt.File_Path (I) = '[' then
-                                 Open_Pos := I;
-                                 exit;
-                              end if;
-                           end loop;
-                           if Open_Pos > 0 then
-                              declare
-                                 SLen : constant Natural :=
-                                    Natural'Min (Stmt.File_Len - Open_Pos - 1, 64);
-                              begin
-                                 Stmt.Sheet_Name (1 .. SLen) :=
-                                    Stmt.File_Path (Open_Pos + 1 .. Open_Pos + SLen);
-                                 Stmt.Sheet_Name_Len := SLen;
-                                 Stmt.File_Len := Open_Pos - 1;
-                              end;
-                           end if;
-                        end;
-                     end if;
+                  Stmt.File_Len := File_Tok.Length;
+                  Stmt.File_Path (1 .. File_Tok.Length) := File_Tok.Text (1 .. File_Tok.Length);
+                  -- Rule: Unquoted filenames converted to uppercase
+                  if File_Tok.Kind /= Token_String_Literal then
+                     for I in 1 .. Stmt.File_Len loop
+                        Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
+                     end loop;
                   end if;
                end if;
 
@@ -1152,12 +1583,12 @@ package body SData.Parser is
                      end loop;
                   end;
                else
-                  -- For USE/SAVE/SUBMIT/SYSTEM/OUTPUT, parse optional slashes/params
+                  -- For SAVE/SUBMIT/SYSTEM, parse optional slashes/params
                   loop
                      Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
                      if Peeked.Kind = Token_Slash then
-                        declare 
-                           Discard  : Token := Get_Next_Token (Ctx.Lex_Ctx); 
+                        declare
+                           Discard  : Token := Get_Next_Token (Ctx.Lex_Ctx);
                            Flag_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                            Flag_Name : constant String := To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
                         begin
@@ -1174,18 +1605,23 @@ package body SData.Parser is
                                     elsif Val_Str = "ODF" or else Val_Str = "ODS" then Stmt.Fmt_Override := SData_Core.Config.ODF;
                                     elsif Val_Str = "OOXML" or else Val_Str = "XLSX" then Stmt.Fmt_Override := SData_Core.Config.OOXML;
                                     end if;
-                                 elsif Flag_Name = "NSCAN" then
-                                    Stmt.NSCAN_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
-                                 elsif Flag_Name = "SKIP" then
-                                    Stmt.Skip_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
-                                 elsif Flag_Name = "MAXROWS" then
-                                    Stmt.Maxrows_Val := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
-                                 elsif Flag_Name = "HEADER" then
-                                    Stmt.Header_Specified := True;
-                                    Stmt.Header_Val := (Val_Str = "YES");
                                  elsif Flag_Name = "DLM" then
                                     Stmt.DLM_Len := Val_Tok.Length;
                                     Stmt.DLM_Path (1 .. Val_Tok.Length) := Val_Tok.Text (1 .. Val_Tok.Length);
+                                 elsif Flag_Name = "HEADER"
+                                    or else Flag_Tok.Kind = Token_HEADER
+                                 then
+                                    Stmt.Header_Specified := True;
+                                    Stmt.Header_Val := (Val_Str = "YES");
+                                 elsif Flag_Name = "SHEET" then
+                                    declare
+                                       VLen : constant Natural :=
+                                          Natural'Min (Val_Tok.Length, Max_Sheet_Name_Len);
+                                    begin
+                                       Stmt.Sheet_Name (1 .. VLen) :=
+                                          Val_Tok.Text (1 .. VLen);
+                                       Stmt.Sheet_Name_Len := VLen;
+                                    end;
                                  elsif Flag_Name = "CHARSET" then
                                     --  Consume multi-token charset names (e.g. UTF - 16 LE)
                                     declare
