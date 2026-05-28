@@ -12,6 +12,7 @@ with SData_Core.Table;           use SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
 with SData_Core.Evaluator;       use SData_Core.Evaluator;
 with SData_Core.Variables;       use SData_Core.Variables;
+with SData.Transient_Table;
 
 procedure SData_Unit_Test is
    Passed : Natural := 0;
@@ -583,6 +584,114 @@ begin
    V := SData_Core.Table.Get_Value (1, "X");
    Check       ("V-32 Committed value kind",  V.Kind = Val_Numeric, True);
    Check_Float ("V-33 Committed value",       V.Num_Val, 42.0);
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Transient_Table tests ──────────────────────────────────────────
+   ---------------------------------------------------------------------------
+
+   --  TT-01/02: empty table has zero columns and rows
+   declare
+      T : SData.Transient_Table.Table;
+   begin
+      Check ("TT-01 Empty table column count", T.Column_Count, 0);
+      Check ("TT-02 Empty table row count",    T.Row_Count,    0);
+   end;
+
+   --  TT-03..06: Add_Column creates a column with the named type
+   declare
+      T : SData.Transient_Table.Table;
+   begin
+      T.Add_Column ("X", SData_Core.Table.Col_Numeric);
+      Check ("TT-03 After Add_Column count = 1",
+             T.Column_Count, 1);
+      Check ("TT-04 Has_Column finds added column",
+             T.Has_Column ("X"), True);
+      Check ("TT-05 Has_Column is case-insensitive",
+             T.Has_Column ("x"), True);
+      Check ("TT-06 Column type preserved",
+             T.Get_Column_Type ("X") = SData_Core.Table.Col_Numeric, True);
+   end;
+
+   --  TT-07..12: Add_Row + Set_Value + Get_Value round-trip
+   declare
+      T  : SData.Transient_Table.Table;
+      VV : SData_Core.Values.Value;
+   begin
+      T.Add_Column ("NUM",  SData_Core.Table.Col_Numeric);
+      T.Add_Column ("INT%", SData_Core.Table.Col_Integer);
+      T.Add_Column ("STR$", SData_Core.Table.Col_String);
+      T.Add_Row;
+      Check ("TT-07 Row_Count = 1 after Add_Row", T.Row_Count, 1);
+      --  Fresh row: all values missing.
+      VV := T.Get_Value (1, "NUM");
+      Check ("TT-08 Fresh cell is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Numeric round-trip.
+      T.Set_Value (1, "NUM",
+                   (Kind => SData_Core.Values.Val_Numeric, Num_Val => 2.72));
+      VV := T.Get_Value (1, "NUM");
+      Check ("TT-09 Numeric kind preserved",
+             VV.Kind = SData_Core.Values.Val_Numeric, True);
+      Check_Float ("TT-10 Numeric value preserved", VV.Num_Val, 2.72);
+      --  Integer round-trip.
+      T.Set_Value (1, "INT%",
+                   (Kind => SData_Core.Values.Val_Integer, Int_Val => 7));
+      VV := T.Get_Value (1, "INT%");
+      Check ("TT-11 Integer value preserved", VV.Int_Val, 7);
+      --  String round-trip.
+      T.Set_Value (1, "STR$",
+                   (Kind    => SData_Core.Values.Val_String,
+                    Str_Val => To_Unbounded_String ("hello")));
+      VV := T.Get_Value (1, "STR$");
+      Check ("TT-12 String value preserved",
+             To_String (VV.Str_Val), "hello");
+   end;
+
+   --  TT-13..16: Snapshot_From_Current copies the current SData_Core.Table
+   declare
+      T : SData.Transient_Table.Table;
+   begin
+      SData_Core.Table.Clear;
+      SData_Core.Table.Add_Column ("A",  SData_Core.Table.Col_Numeric);
+      SData_Core.Table.Add_Column ("B%", SData_Core.Table.Col_Integer);
+      SData_Core.Table.Add_Row;
+      SData_Core.Table.Set_Value
+        (1, "A",  (Kind => SData_Core.Values.Val_Numeric, Num_Val => 1.5));
+      SData_Core.Table.Set_Value
+        (1, "B%", (Kind => SData_Core.Values.Val_Integer, Int_Val => 9));
+
+      T := SData.Transient_Table.Snapshot_From_Current;
+      Check ("TT-13 Snapshot column count = 2",  T.Column_Count, 2);
+      Check ("TT-14 Snapshot row count = 1",      T.Row_Count, 1);
+      V := T.Get_Value (1, "A");
+      Check_Float ("TT-15 Snapshot numeric value", V.Num_Val, 1.5);
+      V := T.Get_Value (1, "B%");
+      Check ("TT-16 Snapshot integer value", V.Int_Val, 9);
+   end;
+
+   --  TT-17..20: Install_To_Current replaces the current table
+   declare
+      T : SData.Transient_Table.Table;
+   begin
+      T.Add_Column ("P",  SData_Core.Table.Col_Numeric);
+      T.Add_Column ("Q%", SData_Core.Table.Col_Integer);
+      T.Add_Row;
+      T.Set_Value (1, "P",
+                   (Kind => SData_Core.Values.Val_Numeric, Num_Val => 3.14));
+      T.Set_Value (1, "Q%",
+                   (Kind => SData_Core.Values.Val_Integer, Int_Val => 42));
+
+      SData_Core.Table.Clear;
+      SData.Transient_Table.Install_To_Current (T);
+      Check ("TT-17 Install column count = 2",
+             SData_Core.Table.Column_Count, 2);
+      Check ("TT-18 Install row count = 1",
+             SData_Core.Table.Row_Count, 1);
+      V := SData_Core.Table.Get_Value (1, "P");
+      Check_Float ("TT-19 Install numeric value", V.Num_Val, 3.14);
+      V := SData_Core.Table.Get_Value (1, "Q%");
+      Check ("TT-20 Install integer value", V.Int_Val, 42);
+   end;
 
    ---------------------------------------------------------------------------
    --  ── Summary ─────────────────────────────────────────────────────────────
