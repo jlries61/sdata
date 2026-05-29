@@ -139,6 +139,25 @@ package body SData.Interpreter is
    --  Set of script files currently in the SUBMIT execution chain (for cycle detection).
    Submit_Chain : Name_Sets.Set;
 
+   --  Multi-target SAVE registration. When non-empty, supersedes the
+   --  single-target Save_File_* fields in SData_Core.Config.Runtime
+   --  for the duration of the next RUN. Cleared by RUN flush, by an
+   --  empty SAVE statement, or by NEW.
+   type Save_Target is record
+      File_Path : Unbounded_String;
+      Alias     : Unbounded_String;        --  empty = no alias
+      Opts      : SData.AST.Spec_Options;
+   end record;
+   type Save_Target_Access is access all Save_Target;
+   package Save_Target_Vectors is new Ada.Containers.Vectors
+     (Index_Type => Positive, Element_Type => Save_Target_Access);
+   Registered_Saves : Save_Target_Vectors.Vector;
+
+   --  Reset per record; set True by any WRITE that fires during the
+   --  iteration; consulted at end-of-record to decide whether to
+   --  auto-flush.
+   Write_Fired_This_Iter : Boolean := False;
+
    --  Column modifications state.
    type Column_Mod_Kind is (Mod_Keep, Mod_Drop);
    type Column_Mod_Node;
@@ -295,6 +314,27 @@ package body SData.Interpreter is
 
       Clear_Pending_Mods;
    end Apply_Pending_Mods;
+
+   procedure Clear_Registered_Saves is
+   begin
+      for T of Registered_Saves loop
+         --  Opts shares ownership of access fields (Keep_Vars, Drop_Vars,
+         --  Rename_Pairs, IF_Expr) with the AST. The AST owns and frees
+         --  them via Free_Program; we just null our references.
+         T.Opts.Keep_Vars     := null;
+         T.Opts.Drop_Vars     := null;
+         T.Opts.Rename_Pairs  := null;
+         T.Opts.IF_Expr       := null;
+         declare
+            procedure Free is new Ada.Unchecked_Deallocation
+              (Save_Target, Save_Target_Access);
+            Tmp : Save_Target_Access := T;
+         begin
+            Free (Tmp);
+         end;
+      end loop;
+      Registered_Saves.Clear;
+   end Clear_Registered_Saves;
 
    --  Splits Name into an alphabetic prefix and trailing integer suffix.
    --  Returns True on success; Prefix and Num are set on success only.
