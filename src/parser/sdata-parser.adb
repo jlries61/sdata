@@ -668,8 +668,8 @@ package body SData.Parser is
    --    RENAME = ( old=new { "," old=new } )
    --    IN     = identifier        (USE only; error if Allow_IN is False)
    --    IF     = expression        (SAVE only; error if Allow_IF is False)
-   --    FMT    = CSV|ODF|ODS|OOXML|XLSX
    --    HEADER = YES|NO
+   --    FMT    = CSV|ODF|ODS|OOXML|XLSX
    --    CHARSET = string           (may be multi-token: e.g. UTF-16 LE)
    --    DLM    = string
    --    SHEET  = string
@@ -760,6 +760,27 @@ package body SData.Parser is
                end if;
                Opts.IF_Expr := Parse_Expression (Ctx);
 
+            when Token_HEADER =>
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  Put_Line_Error ("Error: Expected '=' after HEADER in spec option");
+               end if;
+               declare
+                  Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  Val_Str : constant String :=
+                     To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+               begin
+                  Opts.Header_Specified := True;
+                  if Val_Str = "YES" then
+                     Opts.Header_Val := True;
+                  elsif Val_Str = "NO" then
+                     Opts.Header_Val := False;
+                  else
+                     Put_Line_Error ("Error: Invalid HEADER value " & Val_Str
+                                     & " (expected YES or NO)");
+                  end if;
+               end;
+
             when Token_Identifier =>
                --  Generic keyword=value options: FMT, HEADER, CHARSET, DLM,
                --  NSCAN, SKIP, MAXROWS, SHEET.
@@ -791,16 +812,6 @@ package body SData.Parser is
                              ("Error: Unknown format """ & Val_Str &
                               """ in spec option FMT=");
                         end if;
-                     end;
-
-                  elsif Key_Up = "HEADER" then
-                     declare
-                        Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                        Val_Str : constant String :=
-                           To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
-                     begin
-                        Opts.Header_Specified := True;
-                        Opts.Header_Val := (Val_Str = "YES");
                      end;
 
                   elsif Key_Up = "CHARSET" then
