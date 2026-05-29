@@ -1371,6 +1371,351 @@ package body SData.Parser is
    end Parse_USE_Stmt;
 
    ---------------------
+   -- Parse_SAVE_Stmt --
+   ---------------------
+   --
+   --  Parses the SAVE statement with multi-target grammar:
+   --
+   --    SAVE save_spec [, save_spec ...] [ /HEADER=... /CHARSET=... /DLM=... /FMT=... /SHEET=... ]
+   --
+   --  save_spec := filename[[sheet]] [AS alias] [ ( per_target_options ) ]
+   --
+   --  Legacy single-target form (no paren block) with slash-options is preserved.
+   --  Empty SAVE (no filename) clears pending saves — preserved.
+   --
+   --  After parsing:
+   --    - Stmt.Save_List has one entry per spec.
+   --    - For single-target: legacy Stmt fields are also populated for backward compat.
+   --
+   procedure Parse_SAVE_Stmt
+     (Ctx  : in out Parser_Context;
+      Stmt : Statement_Access)
+   is
+      --  -----------------------------------------------------------------------
+      --  Local helper: parse one filename token into a Save_Spec.
+      --  Handles unquoted→uppercase rule, [sheet] bracket syntax.
+      --  On entry, the filename token has NOT been consumed yet.
+      --  On exit, Spec.File_Path / Spec.File_Len /
+      --  Spec.Opts.Sheet_Name / Spec.Opts.Sheet_Name_Len are filled in.
+      --  -----------------------------------------------------------------------
+      procedure Parse_Filename_Into_Save (Spec : Save_Spec_Access) is
+         File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+      begin
+         Spec.File_Len := File_Tok.Length;
+         Spec.File_Path (1 .. File_Tok.Length) :=
+            File_Tok.Text (1 .. File_Tok.Length);
+         --  Unquoted filenames → uppercase (matches original rule).
+         if File_Tok.Kind /= Token_String_Literal then
+            for I in 1 .. Spec.File_Len loop
+               Spec.File_Path (I) := To_Upper (Spec.File_Path (I));
+            end loop;
+         end if;
+         --  Sheet selection: "filename[sheetname]" bracket syntax.
+         if Spec.File_Len > 2
+            and then Spec.File_Path (Spec.File_Len) = ']'
+         then
+            declare
+               Open_Pos : Natural := 0;
+            begin
+               for I in reverse 1 .. Spec.File_Len - 1 loop
+                  if Spec.File_Path (I) = '[' then
+                     Open_Pos := I;
+                     exit;
+                  end if;
+               end loop;
+               if Open_Pos > 0 then
+                  declare
+                     SLen : constant Natural :=
+                        Natural'Min (Spec.File_Len - Open_Pos - 1,
+                                     Max_Sheet_Name_Len);
+                  begin
+                     Spec.Opts.Sheet_Name (1 .. SLen) :=
+                        Spec.File_Path (Open_Pos + 1 .. Open_Pos + SLen);
+                     Spec.Opts.Sheet_Name_Len := SLen;
+                     Spec.File_Len := Open_Pos - 1;
+                  end;
+               end if;
+            end;
+         end if;
+      end Parse_Filename_Into_Save;
+
+      --  -----------------------------------------------------------------------
+      --  State
+      --  -----------------------------------------------------------------------
+      Had_Error             : Boolean := False;
+      --  True if the first (and only, for single-target) spec had an explicit
+      --  "(" ... ")" per-target options block.  Used to decide whether legacy
+      --  slash-options are permissible.
+      First_Had_Paren_Block : Boolean := False;
+      Peeked                : Token;
+
+   begin  -- Parse_SAVE_Stmt
+
+      --  -----------------------------------------------------------------------
+      --  Parse the target list.
+      --  A SAVE with no path (bare "SAVE") means clear pending saves.
+      --  -----------------------------------------------------------------------
+      Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+      if Peeked.Kind = Token_Newline
+         or else Peeked.Kind = Token_Semicolon
+         or else Peeked.Kind = Token_EOF
+      then
+         --  Bare SAVE — clear pending saves.  Leave Save_List empty.
+         Stmt.File_Len := 0;
+         return;
+      end if;
+
+      if Peeked.Kind /= Token_Slash then
+         --  We have at least one target spec to parse.
+         loop
+            declare
+               Spec : constant Save_Spec_Access := new Save_Spec;
+            begin
+               Parse_Filename_Into_Save (Spec);
+
+               --  Optional AS alias.
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_AS then
+                  declare
+                     Discard   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  AS
+                     Alias_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     pragma Unreferenced (Discard);
+                  begin
+                     if Alias_Tok.Kind /= Token_Identifier then
+                        Put_Line_Error
+                          ("Error: Expected identifier after AS in SAVE");
+                        Had_Error := True;
+                     else
+                        Spec.Alias_Len := Alias_Tok.Length;
+                        Spec.Alias (1 .. Alias_Tok.Length) :=
+                           Alias_Tok.Text (1 .. Alias_Tok.Length);
+                     end if;
+                  end;
+               end if;
+
+               --  Optional per-target paren options block.
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren then
+                  --  Track whether the very first spec had an explicit paren block.
+                  if Stmt.Save_List.Is_Empty then
+                     First_Had_Paren_Block := True;
+                  end if;
+                  Parse_Spec_Options
+                    (Ctx,
+                     Spec.Opts,
+                     Allow_IN       => False,
+                     Allow_IF       => True,
+                     Allow_USE_Only => False);
+               end if;
+
+               Stmt.Save_List.Append (Spec);
+            end;
+
+            --  Continue only if there is a comma (more targets).
+            Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+            exit when Peeked.Kind /= Token_Comma;
+            declare
+               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  ,
+               pragma Unreferenced (Discard);
+            begin null; end;
+         end loop;
+      end if;
+
+      --  -----------------------------------------------------------------------
+      --  Parse whole-statement slash-options.
+      --  These are only allowed when there is exactly one spec and it had no
+      --  paren block (backward compatibility with legacy single-target SAVE).
+      --  -----------------------------------------------------------------------
+      loop
+         Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+         exit when Peeked.Kind /= Token_Slash;
+
+         declare
+            Discard   : Token := Get_Next_Token (Ctx.Lex_Ctx);  --  /
+            Flag_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Flag_Name : constant String :=
+               To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+            pragma Unreferenced (Discard);
+         begin
+            --  Slash-options are legacy single-target only.
+            declare
+               N : constant Natural := Natural (Stmt.Save_List.Length);
+            begin
+               if N /= 1 or else First_Had_Paren_Block then
+                  Put_Line_Error
+                    ("Error: /" & Flag_Name &
+                     " is only allowed with a single target and" &
+                     " no per-target paren options");
+                  Had_Error := True;
+               else
+                  --  Apply the legacy slash-option to the single spec's Opts.
+                  declare
+                     Spec : constant Save_Spec_Access :=
+                        Stmt.Save_List.First_Element;
+                  begin
+                     Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+                     if Peeked.Kind = Token_Equal then
+                        declare
+                           Eq_Tok  : constant Token :=
+                              Get_Next_Token (Ctx.Lex_Ctx);
+                           Val_Tok : constant Token :=
+                              Get_Next_Token (Ctx.Lex_Ctx);
+                           Val_Str : constant String :=
+                              To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+                           pragma Unreferenced (Eq_Tok);
+                        begin
+                           if Flag_Name = "FMT" then
+                              Spec.Opts.Format_Specified := True;
+                              if Val_Str = "CSV" then
+                                 Spec.Opts.Fmt_Override :=
+                                    SData_Core.Config.CSV;
+                              elsif Val_Str = "ODF"
+                                    or else Val_Str = "ODS"
+                              then
+                                 Spec.Opts.Fmt_Override :=
+                                    SData_Core.Config.ODF;
+                              elsif Val_Str = "OOXML"
+                                    or else Val_Str = "XLSX"
+                              then
+                                 Spec.Opts.Fmt_Override :=
+                                    SData_Core.Config.OOXML;
+                              end if;
+
+                           elsif Flag_Name = "HEADER"
+                              or else Flag_Tok.Kind = Token_HEADER
+                           then
+                              Spec.Opts.Header_Specified := True;
+                              Spec.Opts.Header_Val := (Val_Str = "YES");
+
+                           elsif Flag_Name = "CHARSET" then
+                              --  Multi-token charset (e.g. UTF-16 LE).
+                              declare
+                                 Buf : String (1 .. Max_Charset_Len) :=
+                                    (others => ' ');
+                                 Len : Natural := Val_Tok.Length;
+                                 P2  : Token;
+                              begin
+                                 Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
+                                 P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                 if P2.Kind = Token_Minus then
+                                    declare
+                                       Discard2 : constant Token :=
+                                          Get_Next_Token (Ctx.Lex_Ctx);
+                                       Mid_Tok  : constant Token :=
+                                          Get_Next_Token (Ctx.Lex_Ctx);
+                                       M_Len    : constant Natural :=
+                                          Mid_Tok.Length;
+                                       pragma Unreferenced (Discard2);
+                                    begin
+                                       Buf (Len + 1) := '-';
+                                       Buf (Len + 2 .. Len + 1 + M_Len) :=
+                                          Mid_Tok.Text (1 .. M_Len);
+                                       Len := Len + 1 + M_Len;
+                                       P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                                       if P2.Kind = Token_Identifier then
+                                          declare
+                                             S_Upper : constant String :=
+                                                To_Upper
+                                                  (P2.Text (1 .. P2.Length));
+                                          begin
+                                             if S_Upper = "LE"
+                                                or else S_Upper = "BE"
+                                             then
+                                                declare
+                                                   Suf_Tok : constant Token :=
+                                                      Get_Next_Token
+                                                        (Ctx.Lex_Ctx);
+                                                   S_Len : constant Natural :=
+                                                      Suf_Tok.Length;
+                                                begin
+                                                   Buf (Len + 1 ..
+                                                        Len + S_Len) :=
+                                                      Suf_Tok.Text
+                                                        (1 .. S_Len);
+                                                   Len := Len + S_Len;
+                                                end;
+                                             end if;
+                                          end;
+                                       end if;
+                                    end;
+                                 end if;
+                                 Spec.Opts.Charset_Val (1 .. Len) :=
+                                    Buf (1 .. Len);
+                                 Spec.Opts.Charset_Len := Len;
+                              end;
+
+                           elsif Flag_Name = "DLM" then
+                              declare
+                                 VLen : constant Natural :=
+                                    Natural'Min (Val_Tok.Length,
+                                                 Max_Delimiter_Len);
+                              begin
+                                 Spec.Opts.DLM_Val (1 .. VLen) :=
+                                    Val_Tok.Text (1 .. VLen);
+                                 Spec.Opts.DLM_Len := VLen;
+                              end;
+
+                           elsif Flag_Name = "SHEET" then
+                              declare
+                                 VLen : constant Natural :=
+                                    Natural'Min (Val_Tok.Length,
+                                                 Max_Sheet_Name_Len);
+                              begin
+                                 Spec.Opts.Sheet_Name (1 .. VLen) :=
+                                    Val_Tok.Text (1 .. VLen);
+                                 Spec.Opts.Sheet_Name_Len := VLen;
+                              end;
+
+                           else
+                              Put_Line_Error
+                                ("Error: Unknown SAVE option /" &
+                                 Flag_Name & "=");
+                           end if;
+                        end;
+                     end if;
+                  end;
+               end if;
+            end;
+         end;
+      end loop;
+
+      --  -----------------------------------------------------------------------
+      --  Populate legacy Stmt fields for single-target (back-compat).
+      --  Also populate legacy fields even for multi-target so downstream code
+      --  that only reads Stmt.File_Path for single-target continues to work.
+      --  -----------------------------------------------------------------------
+      if not Had_Error and then not Stmt.Save_List.Is_Empty then
+         if Natural (Stmt.Save_List.Length) = 1 then
+            --  Single-target: copy Spec fields into legacy Stmt fields.
+            declare
+               Spec : constant Save_Spec_Access :=
+                  Stmt.Save_List.First_Element;
+            begin
+               Stmt.File_Len := Spec.File_Len;
+               Stmt.File_Path (1 .. Spec.File_Len) :=
+                  Spec.File_Path (1 .. Spec.File_Len);
+
+               Stmt.Format_Specified := Spec.Opts.Format_Specified;
+               Stmt.Fmt_Override     := Spec.Opts.Fmt_Override;
+               Stmt.Header_Specified := Spec.Opts.Header_Specified;
+               Stmt.Header_Val       := Spec.Opts.Header_Val;
+
+               Stmt.Sheet_Name_Len := Spec.Opts.Sheet_Name_Len;
+               Stmt.Sheet_Name (1 .. Spec.Opts.Sheet_Name_Len) :=
+                  Spec.Opts.Sheet_Name (1 .. Spec.Opts.Sheet_Name_Len);
+
+               Stmt.DLM_Len := Spec.Opts.DLM_Len;
+               Stmt.DLM_Path (1 .. Spec.Opts.DLM_Len) :=
+                  Spec.Opts.DLM_Val (1 .. Spec.Opts.DLM_Len);
+
+               Stmt.Output_CHARSET_Len := Spec.Opts.Charset_Len;
+               Stmt.Output_CHARSET_Val (1 .. Spec.Opts.Charset_Len) :=
+                  Spec.Opts.Charset_Val (1 .. Spec.Opts.Charset_Len);
+            end;
+         end if;
+      end if;
+
+   end Parse_SAVE_Stmt;
+
+   ---------------------
    -- Parse_Statement --
    ---------------------
    function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access is
@@ -1517,13 +1862,16 @@ package body SData.Parser is
             Stmt := new Statement (Stmt_USE);
             Parse_USE_Stmt (Ctx, Stmt);
 
-         when Token_SAVE | Token_SUBMIT | Token_SYSTEM | Token_FPATH =>
+         when Token_SAVE =>
+            Stmt := new Statement (Stmt_SAVE);
+            Parse_SAVE_Stmt (Ctx, Stmt);
+
+         when Token_SUBMIT | Token_SYSTEM | Token_FPATH =>
             declare
                File_Tok : Token;
                Peeked   : Token;
             begin
-               if Tok.Kind = Token_SAVE then Stmt := new Statement (Stmt_SAVE);
-               elsif Tok.Kind = Token_SUBMIT then Stmt := new Statement (Stmt_SUBMIT);
+               if Tok.Kind = Token_SUBMIT then Stmt := new Statement (Stmt_SUBMIT);
                elsif Tok.Kind = Token_SYSTEM then Stmt := new Statement (Stmt_SYSTEM);
                else Stmt := new Statement (Stmt_FPATH); end if;
 
@@ -1604,7 +1952,7 @@ package body SData.Parser is
                      end loop;
                   end;
                else
-                  -- For SAVE/SUBMIT/SYSTEM, parse optional slashes/params
+                  -- For SUBMIT/SYSTEM, parse optional slashes/params
                   loop
                      Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
                      if Peeked.Kind = Token_Slash then
