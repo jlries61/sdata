@@ -8,6 +8,7 @@
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with SData_Core.Config.Runtime;
 with SData_Core.Table;           use SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
 with SData_Core.Evaluator;       use SData_Core.Evaluator;
@@ -1697,6 +1698,395 @@ begin
       VV := Result.Get_Value (6, "LA%");
       Check ("CI-03u Row 6 LA% is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
+   end;
+
+   ---------------------------------------------------------------------------
+   --  ── Combine_Join tests (CJ-*) ────────────────────────────────────────────
+   ---------------------------------------------------------------------------
+
+   Put_Line ("--- Combine_Join tests ---");
+
+   --  CJ-01: 1:1 join. A: ID=[1,2] LX$=['a','b']; B: ID=[1,2] RY%=[10,20].
+   --  Both keys present in both inputs. Result: 2 rows, same as 1-to-1 match.
+   --  Row 1: ID=1, LX='a', RY=10
+   --  Row 2: ID=2, LX='b', RY=20
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Column ("LX$", SData_Core.Table.Col_String);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      A_Ptr.Set_Value (1, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("a")));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      A_Ptr.Set_Value (2, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("b")));
+
+      B_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Column ("RY%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      B_Ptr.Set_Value (1, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 10));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      B_Ptr.Set_Value (2, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 20));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+      By_Vars.Append (To_Unbounded_String ("ID%"));
+
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+
+      Check ("CJ-01 1:1 join row count = 2",
+             Result.Row_Count, 2);
+      Check ("CJ-01b No warnings",
+             Natural (Warnings.Length), 0);
+      VV := Result.Get_Value (1, "ID%");
+      Check ("CJ-01c Row 1 ID% = 1", VV.Int_Val, 1);
+      VV := Result.Get_Value (1, "LX$");
+      Check ("CJ-01d Row 1 LX$ = a", To_String (VV.Str_Val), "a");
+      VV := Result.Get_Value (1, "RY%");
+      Check ("CJ-01e Row 1 RY% = 10", VV.Int_Val, 10);
+      VV := Result.Get_Value (2, "ID%");
+      Check ("CJ-01f Row 2 ID% = 2", VV.Int_Val, 2);
+      VV := Result.Get_Value (2, "LX$");
+      Check ("CJ-01g Row 2 LX$ = b", To_String (VV.Str_Val), "b");
+      VV := Result.Get_Value (2, "RY%");
+      Check ("CJ-01h Row 2 RY% = 20", VV.Int_Val, 20);
+   end;
+
+   --  CJ-02: N:M join.
+   --  A: ID%=[1,1,2] LX$=['a','b','c']; B: ID%=[1,2,2] RY%=[10,20,21].
+   --  ID=1: A_size=2, B_size=1 → 2 rows (a×10, b×10)
+   --  ID=2: A_size=1, B_size=2 → 2 rows (c×20, c×21)
+   --  Total: 4 rows.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Column ("LX$", SData_Core.Table.Col_String);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      A_Ptr.Set_Value (1, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("a")));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      A_Ptr.Set_Value (2, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("b")));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (3, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      A_Ptr.Set_Value (3, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("c")));
+
+      B_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Column ("RY%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      B_Ptr.Set_Value (1, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 10));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      B_Ptr.Set_Value (2, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 20));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (3, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      B_Ptr.Set_Value (3, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 21));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+      By_Vars.Append (To_Unbounded_String ("ID%"));
+
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+
+      Check ("CJ-02 N:M join row count = 4",
+             Result.Row_Count, 4);
+      Check ("CJ-02b No warnings",
+             Natural (Warnings.Length), 0);
+      --  ID=1 group: (a,10) then (b,10)
+      VV := Result.Get_Value (1, "ID%");
+      Check ("CJ-02c Row 1 ID% = 1", VV.Int_Val, 1);
+      VV := Result.Get_Value (1, "LX$");
+      Check ("CJ-02d Row 1 LX$ = a", To_String (VV.Str_Val), "a");
+      VV := Result.Get_Value (1, "RY%");
+      Check ("CJ-02e Row 1 RY% = 10", VV.Int_Val, 10);
+      VV := Result.Get_Value (2, "ID%");
+      Check ("CJ-02f Row 2 ID% = 1", VV.Int_Val, 1);
+      VV := Result.Get_Value (2, "LX$");
+      Check ("CJ-02g Row 2 LX$ = b", To_String (VV.Str_Val), "b");
+      VV := Result.Get_Value (2, "RY%");
+      Check ("CJ-02h Row 2 RY% = 10", VV.Int_Val, 10);
+      --  ID=2 group: (c,20) then (c,21)
+      VV := Result.Get_Value (3, "ID%");
+      Check ("CJ-02i Row 3 ID% = 2", VV.Int_Val, 2);
+      VV := Result.Get_Value (3, "LX$");
+      Check ("CJ-02j Row 3 LX$ = c", To_String (VV.Str_Val), "c");
+      VV := Result.Get_Value (3, "RY%");
+      Check ("CJ-02k Row 3 RY% = 20", VV.Int_Val, 20);
+      VV := Result.Get_Value (4, "ID%");
+      Check ("CJ-02l Row 4 ID% = 2", VV.Int_Val, 2);
+      VV := Result.Get_Value (4, "LX$");
+      Check ("CJ-02m Row 4 LX$ = c", To_String (VV.Str_Val), "c");
+      VV := Result.Get_Value (4, "RY%");
+      Check ("CJ-02n Row 4 RY% = 21", VV.Int_Val, 21);
+   end;
+
+   --  CJ-03: Unmatched keys dropped (inner join semantics).
+   --  A: ID%=[1,2,3]; B: ID%=[2,3,4].
+   --  ID=1 only in A → dropped; ID=2 and ID=3 in both → kept; ID=4 only in B → dropped.
+   --  Total: 2 rows.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Column ("LA%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      A_Ptr.Set_Value (1, "LA%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 100));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      A_Ptr.Set_Value (2, "LA%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 200));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (3, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 3));
+      A_Ptr.Set_Value (3, "LA%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 300));
+
+      B_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Column ("LB%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      B_Ptr.Set_Value (1, "LB%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 20));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 3));
+      B_Ptr.Set_Value (2, "LB%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 30));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (3, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 4));
+      B_Ptr.Set_Value (3, "LB%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 40));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+      By_Vars.Append (To_Unbounded_String ("ID%"));
+
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+
+      Check ("CJ-03 Unmatched dropped row count = 2",
+             Result.Row_Count, 2);
+      Check ("CJ-03b No warnings",
+             Natural (Warnings.Length), 0);
+      --  Row 1: ID=2 (first matched key)
+      VV := Result.Get_Value (1, "ID%");
+      Check ("CJ-03c Row 1 ID% = 2", VV.Int_Val, 2);
+      VV := Result.Get_Value (1, "LA%");
+      Check ("CJ-03d Row 1 LA% = 200", VV.Int_Val, 200);
+      VV := Result.Get_Value (1, "LB%");
+      Check ("CJ-03e Row 1 LB% = 20", VV.Int_Val, 20);
+      --  Row 2: ID=3
+      VV := Result.Get_Value (2, "ID%");
+      Check ("CJ-03f Row 2 ID% = 3", VV.Int_Val, 3);
+      VV := Result.Get_Value (2, "LA%");
+      Check ("CJ-03g Row 2 LA% = 300", VV.Int_Val, 300);
+      VV := Result.Get_Value (2, "LB%");
+      Check ("CJ-03h Row 2 LB% = 30", VV.Int_Val, 30);
+   end;
+
+   --  CJ-04: JOIN_WARN_THRESHOLD trip.
+   --  Set threshold to 5. A: ID%=[1,1,1] LX$=['a','b','c'];
+   --  B: ID%=[1,1,1] RY%=[10,11,12]. Product = 3*3 = 9 > 5.
+   --  Expected: 1 warning, 9 output rows.
+   --  Threshold is reset to 1_000_000 at end to avoid poisoning later tests.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+   begin
+      A_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Column ("LX$", SData_Core.Table.Col_String);
+      for Row in 1 .. 3 loop
+         A_Ptr.Add_Row;
+         A_Ptr.Set_Value (Row, "ID%",
+                          (Kind => SData_Core.Values.Val_Integer,
+                           Int_Val => 1));
+      end loop;
+      A_Ptr.Set_Value (1, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("a")));
+      A_Ptr.Set_Value (2, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("b")));
+      A_Ptr.Set_Value (3, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("c")));
+
+      B_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Column ("RY%", SData_Core.Table.Col_Integer);
+      for Row in 1 .. 3 loop
+         B_Ptr.Add_Row;
+         B_Ptr.Set_Value (Row, "ID%",
+                          (Kind => SData_Core.Values.Val_Integer,
+                           Int_Val => 1));
+      end loop;
+      B_Ptr.Set_Value (1, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 10));
+      B_Ptr.Set_Value (2, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 11));
+      B_Ptr.Set_Value (3, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 12));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+      By_Vars.Append (To_Unbounded_String ("ID%"));
+
+      SData_Core.Config.Runtime.Options_Join_Warn_Threshold := 5;
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+      SData_Core.Config.Runtime.Options_Join_Warn_Threshold := 1_000_000;
+
+      Check ("CJ-04 Threshold trip row count = 9",
+             Result.Row_Count, 9);
+      Check ("CJ-04b Exactly 1 warning emitted",
+             Natural (Warnings.Length), 1);
+   end;
+
+   --  CJ-05: Three-way join, fully matched.
+   --  A: ID%=[1,2] LA%=[10,20]; B: ID%=[1,2] LB%=[100,200]; C: ID%=[1,2] LC%=[1000,2000].
+   --  All keys in all three → 2 rows with all columns.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      C_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Column ("LA%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      A_Ptr.Set_Value (1, "LA%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 10));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      A_Ptr.Set_Value (2, "LA%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 20));
+
+      B_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Column ("LB%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      B_Ptr.Set_Value (1, "LB%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 100));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      B_Ptr.Set_Value (2, "LB%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 200));
+
+      C_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      C_Ptr.Add_Column ("LC%", SData_Core.Table.Col_Integer);
+      C_Ptr.Add_Row;
+      C_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      C_Ptr.Set_Value (1, "LC%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1000));
+      C_Ptr.Add_Row;
+      C_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      C_Ptr.Set_Value (2, "LC%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2000));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+      Inputs.Append (C_Ptr);
+      By_Vars.Append (To_Unbounded_String ("ID%"));
+
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+
+      Check ("CJ-05 Three-way join row count = 2",
+             Result.Row_Count, 2);
+      Check ("CJ-05b No warnings",
+             Natural (Warnings.Length), 0);
+      VV := Result.Get_Value (1, "ID%");
+      Check ("CJ-05c Row 1 ID% = 1", VV.Int_Val, 1);
+      VV := Result.Get_Value (1, "LA%");
+      Check ("CJ-05d Row 1 LA% = 10", VV.Int_Val, 10);
+      VV := Result.Get_Value (1, "LB%");
+      Check ("CJ-05e Row 1 LB% = 100", VV.Int_Val, 100);
+      VV := Result.Get_Value (1, "LC%");
+      Check ("CJ-05f Row 1 LC% = 1000", VV.Int_Val, 1000);
+      VV := Result.Get_Value (2, "ID%");
+      Check ("CJ-05g Row 2 ID% = 2", VV.Int_Val, 2);
+      VV := Result.Get_Value (2, "LA%");
+      Check ("CJ-05h Row 2 LA% = 20", VV.Int_Val, 20);
+      VV := Result.Get_Value (2, "LB%");
+      Check ("CJ-05i Row 2 LB% = 200", VV.Int_Val, 200);
+      VV := Result.Get_Value (2, "LC%");
+      Check ("CJ-05j Row 2 LC% = 2000", VV.Int_Val, 2000);
    end;
 
    ---------------------------------------------------------------------------

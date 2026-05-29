@@ -2,6 +2,7 @@
 --  License: GNU General Public License v3 or later
 
 with Ada.Characters.Handling; use Ada.Characters.Handling;
+with SData_Core.Config.Runtime;
 with SData_Core.Values;
 
 package body SData.Merge is
@@ -135,6 +136,77 @@ package body SData.Merge is
       return Found;
    end Find_Min_Key;
 
+   --  For the BY-key at the current cursor of each input, collect all
+   --  consecutive rows with the same key into [Group_Start, Group_Start+Group_Size).
+   --  Cursors are advanced past each group. Group_Size = 0 for inputs whose
+   --  cursor is exhausted or whose current key differs from Reference_Idx.
+   procedure Consume_Group
+     (Cursors       : in out Cursor_Array;
+      Inputs        : Table_Vectors.Vector;
+      By_Vars       : SData.Transient_Table.Name_Vectors.Vector;
+      Reference_Idx : Positive;
+      Group_Start   : out Cursor_Array;
+      Group_Size    : out Cursor_Array)
+   is
+      Ref_Start_Row : constant Positive := Cursors (Reference_Idx);
+   begin
+      for I in Cursors'Range loop
+         Group_Start (I) := 0;
+         Group_Size  (I) := 0;
+         if Cursors (I) <=
+            SData.Transient_Table.Row_Count (Inputs (I).all)
+            and then Key_Compare
+                       (By_Vars,
+                        Inputs (I), Cursors (I),
+                        Inputs (Reference_Idx), Ref_Start_Row) = 0
+         then
+            Group_Start (I) := Cursors (I);
+            while Cursors (I) <=
+                     SData.Transient_Table.Row_Count (Inputs (I).all)
+               and then Key_Compare
+                          (By_Vars,
+                           Inputs (I), Cursors (I),
+                           Inputs (Reference_Idx), Ref_Start_Row) = 0
+            loop
+               Group_Size (I) := Group_Size (I) + 1;
+               Cursors (I) := Cursors (I) + 1;
+            end loop;
+         end if;
+      end loop;
+   end Consume_Group;
+
+   --  Return a human-readable string describing the BY-key values at (T, Row).
+   function By_Group_Key_String
+     (By_Vars : SData.Transient_Table.Name_Vectors.Vector;
+      T       : Table_Access;
+      Row     : Positive) return String
+   is
+      R     : Unbounded_String;
+      First : Boolean := True;
+   begin
+      for K of By_Vars loop
+         if not First then R := R & ", "; end if;
+         R := R & To_String (K) & "=";
+         declare
+            Vv : constant SData_Core.Values.Value :=
+                    T.Get_Value (Row, To_String (K));
+         begin
+            case Vv.Kind is
+               when SData_Core.Values.Val_Numeric =>
+                  R := R & Vv.Num_Val'Image;
+               when SData_Core.Values.Val_Integer =>
+                  R := R & Vv.Int_Val'Image;
+               when SData_Core.Values.Val_String =>
+                  R := R & "'" & To_String (Vv.Str_Val) & "'";
+               when SData_Core.Values.Val_Missing =>
+                  R := R & ".";
+            end case;
+         end;
+         First := False;
+      end loop;
+      return To_String (R);
+   end By_Group_Key_String;
+
    --  Filter the Schema_Warnings produced by Build_Schema into the
    --  caller's Warnings vector, suppressing collision warnings for
    --  BY-variable columns (which are intentionally shared).
@@ -250,67 +322,6 @@ package body SData.Merge is
       N_Inputs : constant Positive := Positive (Inputs.Length);
       Cursors  : Cursor_Array (1 .. N_Inputs) := (others => 1);
 
-      procedure Consume_Group
-        (Reference_Idx : Positive;
-         Group_Start   : out Cursor_Array;
-         Group_Size    : out Cursor_Array)
-      is
-         Ref_Start_Row : constant Positive := Cursors (Reference_Idx);
-      begin
-         for I in Cursors'Range loop
-            Group_Start (I) := 0;
-            Group_Size  (I) := 0;
-            if Cursors (I) <=
-               SData.Transient_Table.Row_Count (Inputs (I).all)
-               and then Key_Compare
-                          (By_Vars,
-                           Inputs (I), Cursors (I),
-                           Inputs (Reference_Idx), Ref_Start_Row) = 0
-            then
-               Group_Start (I) := Cursors (I);
-               while Cursors (I) <=
-                        SData.Transient_Table.Row_Count (Inputs (I).all)
-                  and then Key_Compare
-                             (By_Vars,
-                              Inputs (I), Cursors (I),
-                              Inputs (Reference_Idx), Ref_Start_Row) = 0
-               loop
-                  Group_Size (I) := Group_Size (I) + 1;
-                  Cursors (I) := Cursors (I) + 1;
-               end loop;
-            end if;
-         end loop;
-      end Consume_Group;
-
-      function By_Group_Key_String
-        (T : Table_Access; Row : Positive) return String
-      is
-         R     : Unbounded_String;
-         First : Boolean := True;
-      begin
-         for K of By_Vars loop
-            if not First then R := R & ", "; end if;
-            R := R & To_String (K) & "=";
-            declare
-               Vv : constant SData_Core.Values.Value :=
-                       T.Get_Value (Row, To_String (K));
-            begin
-               case Vv.Kind is
-                  when SData_Core.Values.Val_Numeric =>
-                     R := R & Vv.Num_Val'Image;
-                  when SData_Core.Values.Val_Integer =>
-                     R := R & Vv.Int_Val'Image;
-                  when SData_Core.Values.Val_String =>
-                     R := R & "'" & To_String (Vv.Str_Val) & "'";
-                  when SData_Core.Values.Val_Missing =>
-                     R := R & ".";
-               end case;
-            end;
-            First := False;
-         end loop;
-         return To_String (R);
-      end By_Group_Key_String;
-
    begin
       --  Build schema via a temporary Warnings vector so we can filter out
       --  spurious collision warnings for BY-key columns (shared by all inputs
@@ -334,7 +345,8 @@ package body SData.Merge is
                Group_Key_T  : constant Table_Access := Inputs (Min_Idx);
                Group_Key_R  : constant Positive := Cursors (Min_Idx);
             begin
-               Consume_Group (Min_Idx, Group_Start, Group_Size);
+               Consume_Group (Cursors, Inputs, By_Vars, Min_Idx,
+                              Group_Start, Group_Size);
                for I in Group_Size'Range loop
                   if Group_Size (I) > Max_Size then
                      Max_Size := Group_Size (I);
@@ -347,7 +359,8 @@ package body SData.Merge is
                   Warnings.Append
                     (To_Unbounded_String
                        ("N:M overlap in match merge at BY group with key=("
-                          & By_Group_Key_String (Group_Key_T, Group_Key_R)
+                          & By_Group_Key_String (By_Vars, Group_Key_T,
+                                                 Group_Key_R)
                           & ")"));
                end if;
                for R_Off in 0 .. Max_Size - 1 loop
@@ -449,17 +462,133 @@ package body SData.Merge is
       return Result;
    end Combine_Interleave;
 
+   --  ---- Combine_Join -----------------------------------------------
+   --  Cartesian inner join by BY-key.  For each BY-key present in every
+   --  input (intersection), emit N1 × N2 × ... × Nk rows covering all
+   --  combinations of the per-input groups.  BY-key groups absent from
+   --  any single input are silently dropped (inner-join semantics).
+   --  If the product exceeds OPTIONS JOIN_WARN_THRESHOLD (and threshold
+   --  > 0) one warning is emitted per offending BY-group.
+
    function Combine_Join
      (Inputs   : Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
       Warnings : in out Warning_Vectors.Vector)
       return SData.Transient_Table.Table
    is
-      pragma Unreferenced (Inputs, By_Vars, Warnings);
-      R : SData.Transient_Table.Table;
+      Result    : SData.Transient_Table.Table;
+      Sources   : Source_Vectors.Vector;
+      N_Inputs  : constant Positive := Positive (Inputs.Length);
+      Cursors   : Cursor_Array (1 .. N_Inputs) := (others => 1);
+      Threshold : constant Natural :=
+                     SData_Core.Config.Runtime.Options_Join_Warn_Threshold;
    begin
-      raise Program_Error with "Combine_Join not yet implemented";
-      return R;
+      --  Build schema, suppressing BY-var collision warnings.
+      declare
+         Schema_Warnings : Warning_Vectors.Vector;
+      begin
+         Build_Schema (Result, Sources, Inputs, Schema_Warnings);
+         Forward_Schema_Warnings (By_Vars, Schema_Warnings, Warnings);
+      end;
+
+      loop
+         declare
+            Min_Idx : Positive;
+         begin
+            exit when not Find_Min_Key (By_Vars, Inputs, Cursors, Min_Idx);
+            declare
+               Group_Start  : Cursor_Array (1 .. N_Inputs);
+               Group_Size   : Cursor_Array (1 .. N_Inputs);
+               All_Present  : Boolean := True;
+               Product      : Long_Long_Integer := 1;
+               Group_Key_T  : constant Table_Access := Inputs (Min_Idx);
+               Group_Key_R  : constant Positive := Cursors (Min_Idx);
+               Skip_Group   : Boolean := False;
+            begin
+               Consume_Group (Cursors, Inputs, By_Vars, Min_Idx,
+                              Group_Start, Group_Size);
+               for I in Group_Size'Range loop
+                  if Group_Size (I) = 0 then
+                     All_Present := False;
+                  else
+                     Product :=
+                        Product * Long_Long_Integer (Group_Size (I));
+                  end if;
+               end loop;
+               if not All_Present then
+                  Skip_Group := True;
+               end if;
+               if not Skip_Group then
+                  if Threshold > 0
+                     and then Product > Long_Long_Integer (Threshold)
+                  then
+                     Warnings.Append
+                       (To_Unbounded_String
+                          ("/JOIN BY-group product ("
+                             & Long_Long_Integer'Image (Product)
+                             & " ) exceeds OPTIONS JOIN_WARN_THRESHOLD"
+                             & " at BY-key=("
+                             & By_Group_Key_String
+                                 (By_Vars, Group_Key_T, Group_Key_R)
+                             & ")"));
+                  end if;
+
+                  --  Cartesian product: multi-index counter, rightmost varies
+                  --  fastest.  Idx(I) ranges 0 .. Group_Size(I)-1.
+                  declare
+                     Idx  : Cursor_Array (1 .. N_Inputs) := (others => 0);
+                     Done : Boolean := False;
+                  begin
+                     while not Done loop
+                        Result.Add_Row;
+                        declare
+                           R_Out : constant Positive :=
+                              SData.Transient_Table.Row_Count (Result);
+                        begin
+                           for C in 1 .. Natural (Sources.Length) loop
+                              declare
+                                 Src   : constant Col_Source := Sources (C);
+                                 T     : constant Table_Access :=
+                                           Inputs (Src.Table_Idx);
+                                 R_In  : constant Positive :=
+                                           Group_Start (Src.Table_Idx)
+                                           + Idx (Src.Table_Idx);
+                                 V     : constant SData_Core.Values.Value :=
+                                           T.Get_Value
+                                             (R_In,
+                                              To_String (Src.Col_Name));
+                              begin
+                                 Result.Set_Value
+                                   (R_Out,
+                                    SData.Transient_Table.Column_Name
+                                      (Result, C),
+                                    V);
+                              end;
+                           end loop;
+                        end;
+                        --  Increment multi-index counter
+                        declare
+                           Carry : Boolean := True;
+                           I     : Natural := N_Inputs;
+                        begin
+                           while Carry and then I >= 1 loop
+                              Idx (I) := Idx (I) + 1;
+                              if Idx (I) >= Group_Size (I) then
+                                 Idx (I) := 0;
+                                 I := I - 1;
+                              else
+                                 Carry := False;
+                              end if;
+                           end loop;
+                           Done := Carry;
+                        end;
+                     end loop;
+                  end;
+               end if;
+            end;
+         end;
+      end loop;
+      return Result;
    end Combine_Join;
 
 end SData.Merge;
