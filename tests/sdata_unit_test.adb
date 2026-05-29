@@ -13,6 +13,7 @@ with SData_Core.Values;          use SData_Core.Values;
 with SData_Core.Evaluator;       use SData_Core.Evaluator;
 with SData_Core.Variables;       use SData_Core.Variables;
 with SData.Transient_Table;
+with SData.Merge;
 
 procedure SData_Unit_Test is
    Passed : Natural := 0;
@@ -831,6 +832,135 @@ begin
       Check ("TT-27b Sort_By row 2 = 2", VV.Int_Val, 2);
       VV := TT.Get_Value (3, "K");
       Check ("TT-27c Sort_By row 3 = 3", VV.Int_Val, 3);
+   end;
+
+   ---------------------------------------------------------------------------
+   --  ── SData.Merge: Combine_Positional ──────────────────────────────────────
+   ---------------------------------------------------------------------------
+
+   --  CP-01..06: two tables, equal row counts, disjoint columns, no collisions
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("X", SData_Core.Table.Col_Numeric);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "X",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 1.0));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "X",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 2.0));
+
+      B_Ptr.Add_Column ("Y$", SData_Core.Table.Col_String);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "Y$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("a")));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (2, "Y$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("b")));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Positional (Inputs, Warnings);
+
+      Check ("CP-01 Result row count = 2",    Result.Row_Count, 2);
+      Check ("CP-02 Result column count = 2", Result.Column_Count, 2);
+      Check ("CP-03 No warnings",             Natural (Warnings.Length), 0);
+
+      VV := Result.Get_Value (1, "X");
+      Check_Float ("CP-04 X row 1 = 1.0", VV.Num_Val, 1.0);
+      VV := Result.Get_Value (2, "X");
+      Check_Float ("CP-05 X row 2 = 2.0", VV.Num_Val, 2.0);
+      VV := Result.Get_Value (1, "Y$");
+      Check ("CP-06 Y$ row 1 = a",
+             To_String (VV.Str_Val), "a");
+   end;
+
+   --  CP-07..11: mismatched row counts — shorter side padded with missing
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("X%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "X%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 10));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "X%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 20));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (3, "X%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 30));
+
+      B_Ptr.Add_Column ("Y%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "Y%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 100));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Positional (Inputs, Warnings);
+
+      Check ("CP-07 Result row count = 3", Result.Row_Count, 3);
+      VV := Result.Get_Value (1, "Y%");
+      Check ("CP-08 Y% row 1 = 100", VV.Int_Val, 100);
+      VV := Result.Get_Value (2, "Y%");
+      Check ("CP-09 Y% row 2 is missing (padded)",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (3, "Y%");
+      Check ("CP-10 Y% row 3 is missing (padded)",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (3, "X%");
+      Check ("CP-11 X% row 3 = 30", VV.Int_Val, 30);
+   end;
+
+   --  CP-12..14: column-name collision — rightmost wins, one warning
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("Z%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "Z%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+
+      B_Ptr.Add_Column ("Z%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "Z%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 99));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Positional (Inputs, Warnings);
+
+      Check ("CP-12 Collision: result row count = 1", Result.Row_Count, 1);
+      Check ("CP-13 Collision: exactly 1 warning",
+             Natural (Warnings.Length), 1);
+      VV := Result.Get_Value (1, "Z%");
+      Check ("CP-14 Collision: Z% = 99 (rightmost wins)", VV.Int_Val, 99);
    end;
 
    ---------------------------------------------------------------------------
