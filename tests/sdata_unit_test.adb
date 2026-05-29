@@ -1368,6 +1368,338 @@ begin
    end;
 
    ---------------------------------------------------------------------------
+   --  ── Combine_Interleave tests (CI-*) ─────────────────────────────────────
+   ---------------------------------------------------------------------------
+
+   --  CI-01: Two inputs, disjoint BY keys.
+   --  A: ID%=[1,3] LX$=['a','b']; B: ID%=[2,4] RY%=[10,20].
+   --  Interleave by ID% → 4 rows alternating A/B values.
+   --  Row 1: ID=1, LX='a', RY=missing
+   --  Row 2: ID=2, LX=missing, RY=10
+   --  Row 3: ID=3, LX='b', RY=missing
+   --  Row 4: ID=4, LX=missing, RY=20
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Column ("LX$", SData_Core.Table.Col_String);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      A_Ptr.Set_Value (1, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("a")));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 3));
+      A_Ptr.Set_Value (2, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("b")));
+
+      B_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Column ("RY%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      B_Ptr.Set_Value (1, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 10));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 4));
+      B_Ptr.Set_Value (2, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 20));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+      By_Vars.Append (To_Unbounded_String ("ID%"));
+
+      Result := SData.Merge.Combine_Interleave (Inputs, By_Vars, Warnings);
+
+      Check ("CI-01 Disjoint-keys row count = 4",
+             Result.Row_Count, 4);
+      Check ("CI-01b No warnings",
+             Natural (Warnings.Length), 0);
+      --  Row 1: ID=1 from A
+      VV := Result.Get_Value (1, "ID%");
+      Check ("CI-01c Row 1 ID% = 1", VV.Int_Val, 1);
+      VV := Result.Get_Value (1, "LX$");
+      Check ("CI-01d Row 1 LX$ = a", To_String (VV.Str_Val), "a");
+      VV := Result.Get_Value (1, "RY%");
+      Check ("CI-01e Row 1 RY% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 2: ID=2 from B
+      VV := Result.Get_Value (2, "ID%");
+      Check ("CI-01f Row 2 ID% = 2", VV.Int_Val, 2);
+      VV := Result.Get_Value (2, "LX$");
+      Check ("CI-01g Row 2 LX$ is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (2, "RY%");
+      Check ("CI-01h Row 2 RY% = 10", VV.Int_Val, 10);
+      --  Row 3: ID=3 from A
+      VV := Result.Get_Value (3, "ID%");
+      Check ("CI-01i Row 3 ID% = 3", VV.Int_Val, 3);
+      VV := Result.Get_Value (3, "LX$");
+      Check ("CI-01j Row 3 LX$ = b", To_String (VV.Str_Val), "b");
+      VV := Result.Get_Value (3, "RY%");
+      Check ("CI-01k Row 3 RY% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 4: ID=4 from B
+      VV := Result.Get_Value (4, "ID%");
+      Check ("CI-01l Row 4 ID% = 4", VV.Int_Val, 4);
+      VV := Result.Get_Value (4, "LX$");
+      Check ("CI-01m Row 4 LX$ is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (4, "RY%");
+      Check ("CI-01n Row 4 RY% = 20", VV.Int_Val, 20);
+   end;
+
+   --  CI-02: Two inputs, overlapping BY keys.
+   --  A: ID%=[1,2,3] LX$=['a','b','c']; B: ID%=[2,3,4] RY%=[10,11,12].
+   --  Interleave → 6 rows; when both have same key, A emits first (leftmost).
+   --  Row 1: ID=1 from A, LX='a', RY=missing
+   --  Row 2: ID=2 from A, LX='b', RY=missing
+   --  Row 3: ID=2 from B, LX=missing, RY=10
+   --  Row 4: ID=3 from A, LX='c', RY=missing
+   --  Row 5: ID=3 from B, LX=missing, RY=11
+   --  Row 6: ID=4 from B, LX=missing, RY=12
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Column ("LX$", SData_Core.Table.Col_String);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      A_Ptr.Set_Value (1, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("a")));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      A_Ptr.Set_Value (2, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("b")));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (3, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 3));
+      A_Ptr.Set_Value (3, "LX$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("c")));
+
+      B_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Column ("RY%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      B_Ptr.Set_Value (1, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 10));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 3));
+      B_Ptr.Set_Value (2, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 11));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (3, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 4));
+      B_Ptr.Set_Value (3, "RY%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 12));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+      By_Vars.Append (To_Unbounded_String ("ID%"));
+
+      Result := SData.Merge.Combine_Interleave (Inputs, By_Vars, Warnings);
+
+      Check ("CI-02 Overlapping-keys row count = 6",
+             Result.Row_Count, 6);
+      Check ("CI-02b No warnings",
+             Natural (Warnings.Length), 0);
+      --  Row 1: ID=1 from A
+      VV := Result.Get_Value (1, "ID%");
+      Check ("CI-02c Row 1 ID% = 1", VV.Int_Val, 1);
+      VV := Result.Get_Value (1, "LX$");
+      Check ("CI-02d Row 1 LX$ = a", To_String (VV.Str_Val), "a");
+      VV := Result.Get_Value (1, "RY%");
+      Check ("CI-02e Row 1 RY% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 2: ID=2 from A (tie-break: leftmost = A wins)
+      VV := Result.Get_Value (2, "ID%");
+      Check ("CI-02f Row 2 ID% = 2", VV.Int_Val, 2);
+      VV := Result.Get_Value (2, "LX$");
+      Check ("CI-02g Row 2 LX$ = b", To_String (VV.Str_Val), "b");
+      VV := Result.Get_Value (2, "RY%");
+      Check ("CI-02h Row 2 RY% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 3: ID=2 from B
+      VV := Result.Get_Value (3, "ID%");
+      Check ("CI-02i Row 3 ID% = 2", VV.Int_Val, 2);
+      VV := Result.Get_Value (3, "LX$");
+      Check ("CI-02j Row 3 LX$ is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (3, "RY%");
+      Check ("CI-02k Row 3 RY% = 10", VV.Int_Val, 10);
+      --  Row 4: ID=3 from A (tie-break: A wins again)
+      VV := Result.Get_Value (4, "ID%");
+      Check ("CI-02l Row 4 ID% = 3", VV.Int_Val, 3);
+      VV := Result.Get_Value (4, "LX$");
+      Check ("CI-02m Row 4 LX$ = c", To_String (VV.Str_Val), "c");
+      VV := Result.Get_Value (4, "RY%");
+      Check ("CI-02n Row 4 RY% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 5: ID=3 from B
+      VV := Result.Get_Value (5, "ID%");
+      Check ("CI-02o Row 5 ID% = 3", VV.Int_Val, 3);
+      VV := Result.Get_Value (5, "LX$");
+      Check ("CI-02p Row 5 LX$ is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (5, "RY%");
+      Check ("CI-02q Row 5 RY% = 11", VV.Int_Val, 11);
+      --  Row 6: ID=4 from B
+      VV := Result.Get_Value (6, "ID%");
+      Check ("CI-02r Row 6 ID% = 4", VV.Int_Val, 4);
+      VV := Result.Get_Value (6, "LX$");
+      Check ("CI-02s Row 6 LX$ is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (6, "RY%");
+      Check ("CI-02t Row 6 RY% = 12", VV.Int_Val, 12);
+   end;
+
+   --  CI-03: Three-way interleave with disjoint keys.
+   --  A: ID%=[1,4]; B: ID%=[2,5]; C: ID%=[3,6].
+   --  Output order should be [1,2,3,4,5,6] (6 rows total).
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      C_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs   : SData.Merge.Table_Vectors.Vector;
+      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Column ("LA%", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 1));
+      A_Ptr.Set_Value (1, "LA%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 100));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 4));
+      A_Ptr.Set_Value (2, "LA%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 400));
+
+      B_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Column ("LB%", SData_Core.Table.Col_Integer);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 2));
+      B_Ptr.Set_Value (1, "LB%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 200));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 5));
+      B_Ptr.Set_Value (2, "LB%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 500));
+
+      C_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
+      C_Ptr.Add_Column ("LC%", SData_Core.Table.Col_Integer);
+      C_Ptr.Add_Row;
+      C_Ptr.Set_Value (1, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 3));
+      C_Ptr.Set_Value (1, "LC%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 300));
+      C_Ptr.Add_Row;
+      C_Ptr.Set_Value (2, "ID%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 6));
+      C_Ptr.Set_Value (2, "LC%",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 600));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+      Inputs.Append (C_Ptr);
+      By_Vars.Append (To_Unbounded_String ("ID%"));
+
+      Result := SData.Merge.Combine_Interleave (Inputs, By_Vars, Warnings);
+
+      Check ("CI-03 Three-way row count = 6",
+             Result.Row_Count, 6);
+      Check ("CI-03b No warnings",
+             Natural (Warnings.Length), 0);
+      --  Row 1: ID=1 from A
+      VV := Result.Get_Value (1, "ID%");
+      Check ("CI-03c Row 1 ID% = 1", VV.Int_Val, 1);
+      VV := Result.Get_Value (1, "LA%");
+      Check ("CI-03d Row 1 LA% = 100", VV.Int_Val, 100);
+      VV := Result.Get_Value (1, "LB%");
+      Check ("CI-03e Row 1 LB% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (1, "LC%");
+      Check ("CI-03f Row 1 LC% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 2: ID=2 from B
+      VV := Result.Get_Value (2, "ID%");
+      Check ("CI-03g Row 2 ID% = 2", VV.Int_Val, 2);
+      VV := Result.Get_Value (2, "LB%");
+      Check ("CI-03h Row 2 LB% = 200", VV.Int_Val, 200);
+      VV := Result.Get_Value (2, "LA%");
+      Check ("CI-03i Row 2 LA% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 3: ID=3 from C
+      VV := Result.Get_Value (3, "ID%");
+      Check ("CI-03j Row 3 ID% = 3", VV.Int_Val, 3);
+      VV := Result.Get_Value (3, "LC%");
+      Check ("CI-03k Row 3 LC% = 300", VV.Int_Val, 300);
+      VV := Result.Get_Value (3, "LA%");
+      Check ("CI-03l Row 3 LA% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 4: ID=4 from A
+      VV := Result.Get_Value (4, "ID%");
+      Check ("CI-03m Row 4 ID% = 4", VV.Int_Val, 4);
+      VV := Result.Get_Value (4, "LA%");
+      Check ("CI-03n Row 4 LA% = 400", VV.Int_Val, 400);
+      VV := Result.Get_Value (4, "LB%");
+      Check ("CI-03o Row 4 LB% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 5: ID=5 from B
+      VV := Result.Get_Value (5, "ID%");
+      Check ("CI-03p Row 5 ID% = 5", VV.Int_Val, 5);
+      VV := Result.Get_Value (5, "LB%");
+      Check ("CI-03q Row 5 LB% = 500", VV.Int_Val, 500);
+      VV := Result.Get_Value (5, "LA%");
+      Check ("CI-03r Row 5 LA% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      --  Row 6: ID=6 from C
+      VV := Result.Get_Value (6, "ID%");
+      Check ("CI-03s Row 6 ID% = 6", VV.Int_Val, 6);
+      VV := Result.Get_Value (6, "LC%");
+      Check ("CI-03t Row 6 LC% = 600", VV.Int_Val, 600);
+      VV := Result.Get_Value (6, "LA%");
+      Check ("CI-03u Row 6 LA% is missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+   end;
+
+   ---------------------------------------------------------------------------
    --  ── Summary ─────────────────────────────────────────────────────────────
    ---------------------------------------------------------------------------
 
