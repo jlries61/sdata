@@ -169,8 +169,7 @@ package body SData.Interpreter is
 
    procedure Clear_Active_Program is
    begin
-      SData_Core.Evaluator.Free_Expression
-         (SData_Core.Config.Runtime.Select_Filter_Expr);
+      SData_Core.Config.Runtime.Clear_Select_Filter;
       for E of Active_Program_Vec loop
          SData.AST.Free_Program (E.Stmt);
       end loop;
