@@ -118,11 +118,241 @@ package body SData.Merge is
       Warnings : in out Warning_Vectors.Vector)
       return SData.Transient_Table.Table
    is
-      pragma Unreferenced (Inputs, By_Vars, Warnings);
-      R : SData.Transient_Table.Table;
+      Result   : SData.Transient_Table.Table;
+      Sources  : Source_Vectors.Vector;
+      N_Inputs : constant Positive := Positive (Inputs.Length);
+      type Cursor_Array is array (Positive range <>) of Natural;
+      Cursors  : Cursor_Array (1 .. N_Inputs) := (others => 1);
+
+      function Key_Compare
+        (TI : Table_Access; RI : Positive;
+         TJ : Table_Access; RJ : Positive) return Integer
+      is
+      begin
+         for K of By_Vars loop
+            declare
+               Name : constant String := To_String (K);
+               VI   : constant SData_Core.Values.Value :=
+                         TI.Get_Value (RI, Name);
+               VJ   : constant SData_Core.Values.Value :=
+                         TJ.Get_Value (RJ, Name);
+            begin
+               if SData_Core.Values."<" (VI, VJ) then return -1;
+               elsif SData_Core.Values."<" (VJ, VI) then return 1;
+               end if;
+            end;
+         end loop;
+         return 0;
+      end Key_Compare;
+
+      function Find_Min_Key (Min_Idx : out Positive) return Boolean is
+         Found : Boolean := False;
+      begin
+         Min_Idx := 1;
+         for I in Cursors'Range loop
+            if Cursors (I) <=
+               SData.Transient_Table.Row_Count (Inputs (I).all)
+            then
+               if not Found then
+                  Min_Idx := I;
+                  Found := True;
+               elsif Key_Compare
+                       (Inputs (I), Cursors (I),
+                        Inputs (Min_Idx), Cursors (Min_Idx)) < 0
+               then
+                  Min_Idx := I;
+               end if;
+            end if;
+         end loop;
+         return Found;
+      end Find_Min_Key;
+
+      procedure Consume_Group
+        (Reference_Idx : Positive;
+         Group_Start   : out Cursor_Array;
+         Group_Size    : out Cursor_Array)
+      is
+         Ref_Start_Row : constant Positive := Cursors (Reference_Idx);
+      begin
+         for I in Cursors'Range loop
+            Group_Start (I) := 0;
+            Group_Size  (I) := 0;
+            if Cursors (I) <=
+               SData.Transient_Table.Row_Count (Inputs (I).all)
+               and then Key_Compare
+                          (Inputs (I), Cursors (I),
+                           Inputs (Reference_Idx), Ref_Start_Row) = 0
+            then
+               Group_Start (I) := Cursors (I);
+               while Cursors (I) <=
+                        SData.Transient_Table.Row_Count (Inputs (I).all)
+                  and then Key_Compare
+                             (Inputs (I), Cursors (I),
+                              Inputs (Reference_Idx), Ref_Start_Row) = 0
+               loop
+                  Group_Size (I) := Group_Size (I) + 1;
+                  Cursors (I) := Cursors (I) + 1;
+               end loop;
+            end if;
+         end loop;
+      end Consume_Group;
+
+      function By_Group_Key_String
+        (T : Table_Access; Row : Positive) return String
+      is
+         R     : Unbounded_String;
+         First : Boolean := True;
+      begin
+         for K of By_Vars loop
+            if not First then R := R & ", "; end if;
+            R := R & To_String (K) & "=";
+            declare
+               Vv : constant SData_Core.Values.Value :=
+                       T.Get_Value (Row, To_String (K));
+            begin
+               case Vv.Kind is
+                  when SData_Core.Values.Val_Numeric =>
+                     R := R & Vv.Num_Val'Image;
+                  when SData_Core.Values.Val_Integer =>
+                     R := R & Vv.Int_Val'Image;
+                  when SData_Core.Values.Val_String =>
+                     R := R & "'" & To_String (Vv.Str_Val) & "'";
+                  when SData_Core.Values.Val_Missing =>
+                     R := R & ".";
+               end case;
+            end;
+            First := False;
+         end loop;
+         return To_String (R);
+      end By_Group_Key_String;
+
    begin
-      raise Program_Error with "Combine_Match not yet implemented";
-      return R;
+      --  Build schema via a temporary Warnings vector so we can filter out
+      --  spurious collision warnings for BY-key columns (shared by all inputs
+      --  by definition) before passing the real caller Warnings vector.
+      declare
+         Schema_Warnings : Warning_Vectors.Vector;
+      begin
+         Build_Schema (Result, Sources, Inputs, Schema_Warnings);
+         for W of Schema_Warnings loop
+            declare
+               Is_By_Collision : Boolean := False;
+               Msg             : constant String := To_String (W);
+            begin
+               --  Build_Schema formats collision warnings as
+               --  "column name collision: <Name> (last dataset wins)".
+               --  Suppress the warning if <Name> is a BY variable.
+               for K of By_Vars loop
+                  declare
+                     KUp  : constant String :=
+                               Ada.Characters.Handling.To_Upper (To_String (K));
+                     Pfx  : constant String := "column name collision: ";
+                  begin
+                     if Msg'Length > Pfx'Length
+                        and then Msg (Msg'First .. Msg'First + Pfx'Length - 1)
+                                    = Pfx
+                     then
+                        declare
+                           After_Pfx : constant String :=
+                              Msg (Msg'First + Pfx'Length .. Msg'Last);
+                           --  After_Pfx starts with the column name; find
+                           --  the space that follows the name.
+                           Space_Pos : Natural := 0;
+                        begin
+                           for J in After_Pfx'Range loop
+                              if After_Pfx (J) = ' ' then
+                                 Space_Pos := J;
+                                 exit;
+                              end if;
+                           end loop;
+                           if Space_Pos > After_Pfx'First then
+                              declare
+                                 Col_Name_In_Msg : constant String :=
+                                    Ada.Characters.Handling.To_Upper
+                                       (After_Pfx
+                                          (After_Pfx'First
+                                           .. Space_Pos - 1));
+                              begin
+                                 if Col_Name_In_Msg = KUp then
+                                    Is_By_Collision := True;
+                                 end if;
+                              end;
+                           end if;
+                        end;
+                     end if;
+                  end;
+               end loop;
+               if not Is_By_Collision then
+                  Warnings.Append (W);
+               end if;
+            end;
+         end loop;
+      end;
+      loop
+         declare
+            Min_Idx : Positive;
+         begin
+            exit when not Find_Min_Key (Min_Idx);
+            declare
+               Group_Start  : Cursor_Array (1 .. N_Inputs);
+               Group_Size   : Cursor_Array (1 .. N_Inputs);
+               Max_Size     : Natural := 0;
+               Multi_Count  : Natural := 0;
+               Group_Key_T  : constant Table_Access := Inputs (Min_Idx);
+               Group_Key_R  : constant Positive := Cursors (Min_Idx);
+            begin
+               Consume_Group (Min_Idx, Group_Start, Group_Size);
+               for I in Group_Size'Range loop
+                  if Group_Size (I) > Max_Size then
+                     Max_Size := Group_Size (I);
+                  end if;
+                  if Group_Size (I) > 1 then
+                     Multi_Count := Multi_Count + 1;
+                  end if;
+               end loop;
+               if Multi_Count >= 2 then
+                  Warnings.Append
+                    (To_Unbounded_String
+                       ("N:M overlap in match merge at BY group with key=("
+                          & By_Group_Key_String (Group_Key_T, Group_Key_R)
+                          & ")"));
+               end if;
+               for R_Off in 0 .. Max_Size - 1 loop
+                  Result.Add_Row;
+                  declare
+                     R_Out : constant Positive :=
+                                SData.Transient_Table.Row_Count (Result);
+                  begin
+                     for C in 1 .. Natural (Sources.Length) loop
+                        declare
+                           Src  : constant Col_Source := Sources (C);
+                           T    : constant Table_Access := Inputs (Src.Table_Idx);
+                           GS   : constant Natural := Group_Size (Src.Table_Idx);
+                           Vv   : SData_Core.Values.Value;
+                           R_In : Natural;
+                        begin
+                           if GS = 0 then
+                              Vv := (Kind => SData_Core.Values.Val_Missing);
+                           else
+                              if R_Off < GS then
+                                 R_In := Group_Start (Src.Table_Idx) + R_Off;
+                              else
+                                 R_In := Group_Start (Src.Table_Idx) + GS - 1;
+                              end if;
+                              Vv := T.Get_Value (R_In, To_String (Src.Col_Name));
+                           end if;
+                           Result.Set_Value
+                             (R_Out,
+                              SData.Transient_Table.Column_Name (Result, C),
+                              Vv);
+                        end;
+                     end loop;
+                  end;
+               end loop;
+            end;
+         end;
+      end loop;
+      return Result;
    end Combine_Match;
 
    function Combine_Interleave
