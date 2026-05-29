@@ -2350,6 +2350,17 @@ package body SData.Parser is
 
          when Token_WRITE =>
             Stmt := new Statement (Stmt_WRITE);
+            --  Optional target list: WRITE [target [, target ...]]
+            --  Each target is an identifier (alias) or implicitly a filename.
+            --  Empty list (bare WRITE) preserves legacy semantics (write to all
+            --  registered SAVE targets).
+            declare
+               Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if Peeked.Kind = Token_Identifier then
+                  Stmt.Write_Targets := Parse_Variable_List (Ctx);
+               end if;
+            end;
 
          when Token_RSEED =>
             Stmt := new Statement (Stmt_RSEED);
