@@ -995,26 +995,6 @@ package body SData.Parser is
       end Parse_Filename_Into;
 
       --  -----------------------------------------------------------------------
-      --  Local helper: is any non-default option set in Opts?
-      --  Used to decide whether a legacy slash-option is permissible.
-      --  -----------------------------------------------------------------------
-      function Has_Paren_Opts (Opts : Spec_Options) return Boolean is
-      begin
-         return Opts.Format_Specified
-            or else Opts.Header_Specified
-            or else Opts.Charset_Len > 0
-            or else Opts.DLM_Len > 0
-            or else Opts.NSCAN_Val > 0
-            or else Opts.Skip_Val > 0
-            or else Opts.Maxrows_Val > 0
-            or else Opts.Sheet_Name_Len > 0
-            or else Opts.Keep_Vars /= null
-            or else Opts.Drop_Vars /= null
-            or else Opts.Rename_Pairs /= null
-            or else Opts.IN_Name_Len > 0;
-      end Has_Paren_Opts;
-
-      --  -----------------------------------------------------------------------
       --  State
       --  -----------------------------------------------------------------------
       Saw_BY         : Boolean := False;
@@ -1097,6 +1077,18 @@ package body SData.Parser is
                pragma Unreferenced (Discard);
             begin null; end;
          end loop;
+      end if;
+
+      --  -----------------------------------------------------------------------
+      --  Reject slash-options with no datasets (e.g. "USE /BY=X").
+      --  A bare USE (no datasets, no options) is allowed; slash-options
+      --  require at least one dataset to operate on.
+      --  -----------------------------------------------------------------------
+      if Stmt.Dataset_List.Is_Empty
+         and then Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash
+      then
+         Put_Line_Error ("Error: USE requires at least one dataset");
+         Had_Error := True;
       end if;
 
       --  -----------------------------------------------------------------------
@@ -1551,6 +1543,35 @@ package body SData.Parser is
                      for I in 1 .. Stmt.File_Len loop
                         Stmt.File_Path (I) := To_Upper (Stmt.File_Path (I));
                      end loop;
+                  end if;
+                  --  Sheet selection: "filename[sheetname]" syntax.
+                  --  If the filename ends with [...], extract the bracket
+                  --  contents as the sheet name and remove them from the path.
+                  if Stmt.File_Len > 2
+                     and then Stmt.File_Path (Stmt.File_Len) = ']'
+                  then
+                     declare
+                        Open_Pos : Natural := 0;
+                     begin
+                        for I in reverse 1 .. Stmt.File_Len - 1 loop
+                           if Stmt.File_Path (I) = '[' then
+                              Open_Pos := I;
+                              exit;
+                           end if;
+                        end loop;
+                        if Open_Pos > 0 then
+                           declare
+                              SLen : constant Natural :=
+                                 Natural'Min (Stmt.File_Len - Open_Pos - 1,
+                                             Max_Sheet_Name_Len);
+                           begin
+                              Stmt.Sheet_Name (1 .. SLen) :=
+                                 Stmt.File_Path (Open_Pos + 1 .. Open_Pos + SLen);
+                              Stmt.Sheet_Name_Len := SLen;
+                              Stmt.File_Len := Open_Pos - 1;
+                           end;
+                        end if;
+                     end;
                   end if;
                end if;
 
