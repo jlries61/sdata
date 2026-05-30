@@ -781,6 +781,41 @@ package body SData.Interpreter is
                                   Pause_After      : Boolean := False;
                                   Action           : out Step_Action) is separate;
 
+   --  Convert_Variable_List — helper used by both Execute_Declarative (USE
+   --  multi-dataset) and Commit_Step (SAVE projection).  Converts an AST
+   --  Variable_List linked list to a Transient_Table Name_Vectors.Vector.
+   procedure Convert_Variable_List
+     (V    : SData.AST.Variable_List;
+      Outv : in out SData.Transient_Table.Name_Vectors.Vector)
+   is
+      Cur : SData.AST.Variable_List := V;
+   begin
+      while Cur /= null loop
+         Outv.Append
+           (To_Unbounded_String
+              (Cur.Var.Start_Name (1 .. Cur.Var.Start_Len)));
+         Cur := Cur.Next;
+      end loop;
+   end Convert_Variable_List;
+
+   --  Convert_Rename_List — convert an AST Rename_List linked list to a
+   --  Transient_Table Rename_Map_Vectors.Vector.
+   procedure Convert_Rename_List
+     (R    : SData.AST.Rename_List;
+      Outv : in out SData.Transient_Table.Rename_Map_Vectors.Vector)
+   is
+      Cur : SData.AST.Rename_List := R;
+   begin
+      while Cur /= null loop
+         Outv.Append
+           ((Old_Name => To_Unbounded_String
+                           (Cur.Old_Name (1 .. Cur.Old_Len)),
+             New_Name => To_Unbounded_String
+                           (Cur.New_Name (1 .. Cur.New_Len))));
+         Cur := Cur.Next;
+      end loop;
+   end Convert_Rename_List;
+
    --  Commit_Step — finalizes a completed data step: commits the output table,
    --  resets filter/repeat state, applies pending column modifications, and
    --  writes to disk if a SAVE was deferred until after RUN.
@@ -801,56 +836,109 @@ package body SData.Interpreter is
       --  the same semantics are available to other front ends.
       SData_Core.Commands.Execute_RUN;
 
-      --  Multi-target SAVE flush (MVP): if Registered_Saves is non-empty,
-      --  write the current table to each target in turn.  Per-target IF=
-      --  filter evaluation and explicit WRITE-target routing are not yet
-      --  honored here — they are tracked as Required Follow-on B/C.
+      --  Multi-target SAVE flush: if Registered_Saves is non-empty, write the
+      --  current table to each target, applying per-target KEEP/DROP/RENAME as
+      --  an output projection (Follow-on B).  The live global table is never
+      --  mutated — a snapshot copy is projected for each target and the
+      --  original is restored after the loop.
       --  Note: Write_Fired_This_Iter / Pending_Writes_This_Iter are already
       --  reset per-record in Process_One_Record; we reset them here too for
       --  safety at step boundaries.
       if Natural (Registered_Saves.Length) > 0 then
-         for T of Registered_Saves loop
-            declare
-               Raw_Path  : constant String := To_String (T.File_Path);
-               Full      : constant String := Full_Path (Raw_Path, "SAVE");
-               Eff_Fmt   : constant SData_Core.Config.Format_Type :=
-                  (if T.Opts.Format_Specified
-                   then T.Opts.Fmt_Override
-                   else SData_Core.Config.Output_Format);
-               Eff_DLM   : constant String :=
-                  (if T.Opts.DLM_Len > 0
-                   then T.Opts.DLM_Val (1 .. T.Opts.DLM_Len)
-                   else SData_Core.Config.Runtime.Options_CSVDLM
-                           (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
-               Eff_Header : constant Boolean :=
-                  (if T.Opts.Header_Specified
-                   then T.Opts.Header_Val
-                   else SData_Core.Config.Runtime.Options_Header);
-               Eff_Charset : constant String :=
-                  (if T.Opts.Charset_Len > 0
-                   then T.Opts.Charset_Val (1 .. T.Opts.Charset_Len)
-                   else SData_Core.Config.Runtime.Options_CHARSET
-                           (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len));
-               Sheet      : constant String :=
-                  T.Opts.Sheet_Name (1 .. T.Opts.Sheet_Name_Len);
-            begin
+         declare
+            --  Capture the committed table once; used as the starting point
+            --  for each target's projection and to restore after the loop.
+            Baseline : constant SData.Transient_Table.Table :=
+                          SData.Transient_Table.Snapshot_From_Current;
+         begin
+            for T of Registered_Saves loop
+               declare
+                  Raw_Path   : constant String := To_String (T.File_Path);
+                  Full       : constant String := Full_Path (Raw_Path, "SAVE");
+                  Eff_Fmt    : constant SData_Core.Config.Format_Type :=
+                     (if T.Opts.Format_Specified
+                      then T.Opts.Fmt_Override
+                      else SData_Core.Config.Output_Format);
+                  Eff_DLM    : constant String :=
+                     (if T.Opts.DLM_Len > 0
+                      then T.Opts.DLM_Val (1 .. T.Opts.DLM_Len)
+                      else SData_Core.Config.Runtime.Options_CSVDLM
+                              (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
+                  Eff_Header : constant Boolean :=
+                     (if T.Opts.Header_Specified
+                      then T.Opts.Header_Val
+                      else SData_Core.Config.Runtime.Options_Header);
+                  Eff_Charset : constant String :=
+                     (if T.Opts.Charset_Len > 0
+                      then T.Opts.Charset_Val (1 .. T.Opts.Charset_Len)
+                      else SData_Core.Config.Runtime.Options_CHARSET
+                              (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len));
+                  Sheet      : constant String :=
+                     T.Opts.Sheet_Name (1 .. T.Opts.Sheet_Name_Len);
+                  --  Start with a value copy of Baseline; apply projection.
+                  Projected  : SData.Transient_Table.Table := Baseline;
                begin
-                  SData_Core.File_IO.Open_Output
-                    (File_Name       => Full,
-                     Fmt             => Eff_Fmt,
-                     Sheet_Name      => Sheet,
-                     Delimiter       => Eff_DLM,
-                     Write_Header    => Eff_Header,
-                     Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
-                     Charset         => Eff_Charset);
-                  if not SData_Core.Config.Quiet_Mode then
-                     Put_Line ("Dataset saved: " & Full);
+                  --  KEEP and DROP are mutually exclusive; guard is redundant
+                  --  with validation at SAVE-parse time but enforced here too.
+                  if T.Opts.Keep_Vars /= null
+                     and then T.Opts.Drop_Vars /= null
+                  then
+                     raise SData_Core.Script_Error
+                       with "KEEP and DROP cannot both be specified on SAVE";
                   end if;
-               exception
-                  when SData_Core.File_IO.Save_Refused => null;
+
+                  --  Apply RENAME → KEEP → DROP on the snapshot copy.
+                  if T.Opts.Rename_Pairs /= null then
+                     declare
+                        Pairs : SData.Transient_Table.Rename_Map_Vectors.Vector;
+                     begin
+                        Convert_Rename_List (T.Opts.Rename_Pairs, Pairs);
+                        Projected.Apply_Rename (Pairs);
+                     end;
+                  end if;
+
+                  if T.Opts.Keep_Vars /= null then
+                     declare
+                        Names : SData.Transient_Table.Name_Vectors.Vector;
+                     begin
+                        Convert_Variable_List (T.Opts.Keep_Vars, Names);
+                        Projected.Apply_Keep (Names);
+                     end;
+                  end if;
+
+                  if T.Opts.Drop_Vars /= null then
+                     declare
+                        Names : SData.Transient_Table.Name_Vectors.Vector;
+                     begin
+                        Convert_Variable_List (T.Opts.Drop_Vars, Names);
+                        Projected.Apply_Drop (Names);
+                     end;
+                  end if;
+
+                  --  Install the projected snapshot as the active table and
+                  --  write it; then restore the baseline.
+                  SData.Transient_Table.Install_To_Current (Projected);
+                  begin
+                     SData_Core.File_IO.Open_Output
+                       (File_Name       => Full,
+                        Fmt             => Eff_Fmt,
+                        Sheet_Name      => Sheet,
+                        Delimiter       => Eff_DLM,
+                        Write_Header    => Eff_Header,
+                        Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
+                        Charset         => Eff_Charset);
+                     if not SData_Core.Config.Quiet_Mode then
+                        Put_Line ("Dataset saved: " & Full);
+                     end if;
+                  exception
+                     when SData_Core.File_IO.Save_Refused => null;
+                  end;
+                  --  Restore baseline so the next target projects from the
+                  --  full committed table, not from a prior target's projection.
+                  SData.Transient_Table.Install_To_Current (Baseline);
                end;
-            end;
-         end loop;
+            end loop;
+         end;
          Clear_Registered_Saves;
       end if;
 
