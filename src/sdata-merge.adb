@@ -322,6 +322,18 @@ package body SData.Merge is
       N_Inputs : constant Positive := Positive (Inputs.Length);
       Cursors  : Cursor_Array (1 .. N_Inputs) := (others => 1);
 
+      --  Returns True when Name (case-insensitive) is one of the BY vars.
+      function Is_By_Var (Name : String) return Boolean is
+         Up : constant String := To_Upper (Name);
+      begin
+         for B of By_Vars loop
+            if To_Upper (To_String (B)) = Up then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end Is_By_Var;
+
    begin
       --  Build schema via a temporary Warnings vector so we can filter out
       --  spurious collision warnings for BY-key columns (shared by all inputs
@@ -378,7 +390,34 @@ package body SData.Merge is
                            R_In : Natural;
                         begin
                            if GS = 0 then
-                              Vv := (Kind => SData_Core.Values.Val_Missing);
+                              --  Owning input has no rows for this BY key.
+                              --  For BY-var columns the key value is still
+                              --  present in whichever input drove the group;
+                              --  preserve it rather than emitting missing.
+                              if Is_By_Var (To_String (Src.Col_Name)) then
+                                 declare
+                                    By_Source : Natural := 0;
+                                    By_T      : Table_Access;
+                                 begin
+                                    for I in Group_Size'Range loop
+                                       if Group_Size (I) > 0 then
+                                          By_Source := I;
+                                          exit;
+                                       end if;
+                                    end loop;
+                                    if By_Source /= 0 then
+                                       By_T := Inputs (By_Source);
+                                       Vv   := By_T.Get_Value
+                                               (Group_Start (By_Source),
+                                                To_String (Src.Col_Name));
+                                    else
+                                       Vv := (Kind =>
+                                                SData_Core.Values.Val_Missing);
+                                    end if;
+                                 end;
+                              else
+                                 Vv := (Kind => SData_Core.Values.Val_Missing);
+                              end if;
                            else
                               if R_Off < GS then
                                  R_In := Group_Start (Src.Table_Idx) + R_Off;
