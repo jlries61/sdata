@@ -133,4 +133,8 @@ begin
    if not Ctx.Deleted and then not Global_Has_Write then
       SData_Core.Variables.Flush_PDV_To_Output;
    end if;
+
+   --  Reset per-record WRITE routing state so each record starts clean.
+   Write_Fired_This_Iter    := False;
+   Pending_Writes_This_Iter.Clear;
 end Process_One_Record;

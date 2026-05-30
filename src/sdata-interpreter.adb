@@ -27,6 +27,7 @@ with Ada.Unchecked_Deallocation;
 with Ada.Text_IO.Unbounded_IO;
 with SData.Transient_Table;
 with SData.Merge;
+with SData_Core.File_IO;
 
 --  SData.Interpreter — statement executor and data step engine.
 --
@@ -799,6 +800,62 @@ package body SData.Interpreter is
       --  newly committed table, plus pending-SAVE flush) to sdata-core so
       --  the same semantics are available to other front ends.
       SData_Core.Commands.Execute_RUN;
+
+      --  Multi-target SAVE flush (MVP): if Registered_Saves is non-empty,
+      --  write the current table to each target in turn.  Per-target IF=
+      --  filter evaluation and explicit WRITE-target routing are not yet
+      --  honored here — they are tracked as Required Follow-on B/C.
+      --  Note: Write_Fired_This_Iter / Pending_Writes_This_Iter are already
+      --  reset per-record in Process_One_Record; we reset them here too for
+      --  safety at step boundaries.
+      if Natural (Registered_Saves.Length) > 0 then
+         for T of Registered_Saves loop
+            declare
+               Raw_Path  : constant String := To_String (T.File_Path);
+               Full      : constant String := Full_Path (Raw_Path, "SAVE");
+               Eff_Fmt   : constant SData_Core.Config.Format_Type :=
+                  (if T.Opts.Format_Specified
+                   then T.Opts.Fmt_Override
+                   else SData_Core.Config.Output_Format);
+               Eff_DLM   : constant String :=
+                  (if T.Opts.DLM_Len > 0
+                   then T.Opts.DLM_Val (1 .. T.Opts.DLM_Len)
+                   else SData_Core.Config.Runtime.Options_CSVDLM
+                           (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
+               Eff_Header : constant Boolean :=
+                  (if T.Opts.Header_Specified
+                   then T.Opts.Header_Val
+                   else SData_Core.Config.Runtime.Options_Header);
+               Eff_Charset : constant String :=
+                  (if T.Opts.Charset_Len > 0
+                   then T.Opts.Charset_Val (1 .. T.Opts.Charset_Len)
+                   else SData_Core.Config.Runtime.Options_CHARSET
+                           (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len));
+               Sheet      : constant String :=
+                  T.Opts.Sheet_Name (1 .. T.Opts.Sheet_Name_Len);
+            begin
+               begin
+                  SData_Core.File_IO.Open_Output
+                    (File_Name       => Full,
+                     Fmt             => Eff_Fmt,
+                     Sheet_Name      => Sheet,
+                     Delimiter       => Eff_DLM,
+                     Write_Header    => Eff_Header,
+                     Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
+                     Charset         => Eff_Charset);
+                  if not SData_Core.Config.Quiet_Mode then
+                     Put_Line ("Dataset saved: " & Full);
+                  end if;
+               exception
+                  when SData_Core.File_IO.Save_Refused => null;
+               end;
+            end;
+         end loop;
+         Clear_Registered_Saves;
+      end if;
+
+      Write_Fired_This_Iter    := False;
+      Pending_Writes_This_Iter.Clear;
    end Commit_Step;
 
    --  Resolve_Expr_Indices — walk every Expr_Variable node reachable from the
