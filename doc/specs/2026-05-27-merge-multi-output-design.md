@@ -103,9 +103,12 @@ auto-flush for the iteration.
 
 ### Lexical notes
 
-- `AS`, `INTERLEAVE`, `JOIN` are contextual keywords — they have keyword
-  meaning only inside a `USE`/`SAVE` statement and remain valid as user
-  variable names elsewhere. The parser, not the lexer, decides.
+- `AS`, `IN`, `INTERLEAVE`, `JOIN` are **reserved keywords**. The lexer
+  recognises them unconditionally; they may not be used as user variable
+  names or column identifiers. (An earlier draft of this spec described
+  them as contextual; the policy was tightened to reserved before
+  shipping, to prevent users from accidentally shadowing language
+  features. The reserved-keyword status is enforced at the lexer level.)
 - Within a per-dataset or per-target option paren block, options are
   separated by commas. KEEP / DROP value lists are space-separated column
   names (matching the existing standalone `KEEP`/`DROP` command syntax).
@@ -233,8 +236,9 @@ empty `SAVE` statement, by end-of-program, or by a successful `RUN` flush.
 
 **Lexer** (`src/sdata-lexer.adb`):
 
-- `AS`, `INTERLEAVE`, `JOIN`, `IN`, `RENAME` recognised in dataset-spec context
-  (some already known as standalone-command keywords).
+- `AS`, `INTERLEAVE`, `JOIN`, `IN` added as new reserved keyword tokens
+  alongside the existing `RENAME` keyword. The lexer recognises them
+  unconditionally.
 - Existing paren-token lexing is reused.
 
 **Interpreter:**
