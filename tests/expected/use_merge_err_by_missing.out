@@ -1,0 +1,2 @@
+Dataset opened: tests/data/merge_a.csv
+Error: /BY=NoSuchVar is not present in dataset tests/data/merge_a.csv

@@ -1,0 +1,7 @@
+Dataset opened: tests/data/merge_a_13.csv
+Dataset opened: tests/data/merge_b_24.csv
+1.00000 10.00000 .
+2.00000 . 200.00000
+3.00000 30.00000 .
+4.00000 . 400.00000
+RUN complete. 4 records and 3 variables processed.

@@ -7,10 +7,12 @@ with SData_Core.Evaluator;
 
 package body SData.AST is
 
-   procedure Free_Var_Node  is new Ada.Unchecked_Deallocation (Variable_List_Node,   Variable_List);
-   procedure Free_Ren_Node  is new Ada.Unchecked_Deallocation (Rename_Pair_Node,     Rename_List);
-   procedure Free_Br_Node   is new Ada.Unchecked_Deallocation (Case_Branch_Node,     Case_Branch);
-   procedure Free_Stmt_Node is new Ada.Unchecked_Deallocation (Statement,            Statement_Access);
+   procedure Free_Var_Node      is new Ada.Unchecked_Deallocation (Variable_List_Node,   Variable_List);
+   procedure Free_Ren_Node      is new Ada.Unchecked_Deallocation (Rename_Pair_Node,     Rename_List);
+   procedure Free_Br_Node       is new Ada.Unchecked_Deallocation (Case_Branch_Node,     Case_Branch);
+   procedure Free_Stmt_Node     is new Ada.Unchecked_Deallocation (Statement,            Statement_Access);
+   procedure Free_Dataset_Spec  is new Ada.Unchecked_Deallocation (Dataset_Spec,         Dataset_Spec_Access);
+   procedure Free_Save_Spec     is new Ada.Unchecked_Deallocation (Save_Spec,            Save_Spec_Access);
 
    --  Forward declarations to resolve mutual recursion:
    --    Free(Statement_Access) <-> Free_Program
@@ -24,6 +26,36 @@ package body SData.AST is
    --  Function_Call, Array_Access, and the Expression_List chains).
    --  We also need a local wrapper for Expression_List for use in statement
    --  fields that hold expression lists directly (Print_Args, etc.).
+
+   --  Free heap-allocated members of a Spec_Options record.
+   procedure Free_Spec_Options (Opts : in out Spec_Options) is
+      KV : Variable_List := Opts.Keep_Vars;
+      DV : Variable_List := Opts.Drop_Vars;
+      RP : Rename_List   := Opts.Rename_Pairs;
+      VN : Variable_List;
+      RN : Rename_List;
+   begin
+      while KV /= null loop
+         VN := KV.Next;
+         Free_Var_Node (KV);
+         KV := VN;
+      end loop;
+      Opts.Keep_Vars := null;
+      while DV /= null loop
+         VN := DV.Next;
+         Free_Var_Node (DV);
+         DV := VN;
+      end loop;
+      Opts.Drop_Vars := null;
+      while RP /= null loop
+         RN := RP.Next;
+         Free_Ren_Node (RP);
+         RP := RN;
+      end loop;
+      Opts.Rename_Pairs := null;
+      SData_Core.Evaluator.Free_Expression (Opts.IF_Expr);
+      Opts.IF_Expr := null;
+   end Free_Spec_Options;
 
    procedure Free_Expr_List (List : in out SData_Core.Evaluator.Expression_List) is
       use SData_Core.Evaluator;
@@ -84,8 +116,36 @@ package body SData.AST is
       case Stmt.Kind is
          when Stmt_PRINT =>
             Free_Expr_List (Stmt.Print_Args);
+         when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_SYSTEM
+            | Stmt_HELP | Stmt_OUTPUT | Stmt_FPATH =>
+            --  Free Dataset_List entries (USE multi-dataset).
+            for I in Stmt.Dataset_List.First_Index .. Stmt.Dataset_List.Last_Index loop
+               declare
+                  DS : Dataset_Spec_Access := Stmt.Dataset_List (I);
+               begin
+                  if DS /= null then
+                     Free_Spec_Options (DS.Opts);
+                     Free_Dataset_Spec (DS);
+                  end if;
+               end;
+            end loop;
+            Stmt.Dataset_List.Clear;
+            --  Free By_Vars (multi-dataset USE).
+            Free (Stmt.By_Vars);
+            --  Free Save_List entries (SAVE multi-target).
+            for I in Stmt.Save_List.First_Index .. Stmt.Save_List.Last_Index loop
+               declare
+                  SS : Save_Spec_Access := Stmt.Save_List (I);
+               begin
+                  if SS /= null then
+                     Free_Spec_Options (SS.Opts);
+                     Free_Save_Spec (SS);
+                  end if;
+               end;
+            end loop;
+            Stmt.Save_List.Clear;
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD
-            | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM =>
+            | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
             Free (Stmt.Vars);
             Free (Stmt.Arr_Vars);
             SData_Core.Evaluator.Free_Expression (Stmt.Arr_Start_Expr);
@@ -115,6 +175,8 @@ package body SData.AST is
             Free_Program (Stmt.Otherwise_Part);
          when Stmt_SORT | Stmt_BY =>
             Free (Stmt.Sort_Vars);
+         when Stmt_WRITE =>
+            Free (Stmt.Write_Targets);
          when others =>
             null;
       end case;
