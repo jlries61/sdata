@@ -348,33 +348,121 @@ begin
          end;
       when Stmt_SAVE =>
          declare
-            File_Name : constant String :=
-               (if Stmt.File_Len = 0 then ""
-                else Stmt.File_Path (1 .. Stmt.File_Len));
-            Eff_DLM   : constant String :=
-               (if Stmt.DLM_Len > 0
-                then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                else SData_Core.Config.Runtime.Options_CSVDLM
-                        (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
-            Eff_Header : constant Boolean :=
-               (if Stmt.Header_Specified
-                then Stmt.Header_Val
-                else SData_Core.Config.Runtime.Options_Header);
-            Eff_Charset : constant String :=
-               (if Stmt.Output_CHARSET_Len > 0
-                then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
-                else "");
-            Eff_Fmt : constant SData_Core.Config.Format_Type :=
-               (if Stmt.Format_Specified then Stmt.Fmt_Override
-                else SData_Core.Config.Output_Format);
+            procedure Legacy_Execute_SAVE is
+               File_Name : constant String :=
+                  (if Stmt.File_Len = 0 then ""
+                   else Stmt.File_Path (1 .. Stmt.File_Len));
+               Eff_DLM   : constant String :=
+                  (if Stmt.DLM_Len > 0
+                   then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
+                   else SData_Core.Config.Runtime.Options_CSVDLM
+                           (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
+               Eff_Header : constant Boolean :=
+                  (if Stmt.Header_Specified
+                   then Stmt.Header_Val
+                   else SData_Core.Config.Runtime.Options_Header);
+               Eff_Charset : constant String :=
+                  (if Stmt.Output_CHARSET_Len > 0
+                   then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
+                   else "");
+               Eff_Fmt : constant SData_Core.Config.Format_Type :=
+                  (if Stmt.Format_Specified then Stmt.Fmt_Override
+                   else SData_Core.Config.Output_Format);
+            begin
+               SData_Core.Commands.Execute_SAVE
+                 (File_Name    => File_Name,
+                  Fmt          => Eff_Fmt,
+                  Sheet_Name   => Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
+                  Delimiter    => Eff_DLM,
+                  Write_Header => Eff_Header,
+                  Charset      => Eff_Charset);
+            end Legacy_Execute_SAVE;
          begin
-            SData_Core.Commands.Execute_SAVE
-              (File_Name    => File_Name,
-               Fmt          => Eff_Fmt,
-               Sheet_Name   => Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
-               Delimiter    => Eff_DLM,
-               Write_Header => Eff_Header,
-               Charset      => Eff_Charset);
+            --  Empty SAVE: clear everything (both legacy and multi-target).
+            --  The parser leaves Save_List empty and File_Len = 0 for bare SAVE.
+            if Natural (Stmt.Save_List.Length) = 0 then
+               Clear_Registered_Saves;
+               SData_Core.Config.Runtime.Save_File_Active := False;
+               return;
+            end if;
+
+            --  Single-target legacy path: the parser always puts the file into
+            --  Save_List (Length = 1) and also copies it into the legacy Stmt
+            --  fields.  Delegate to the legacy handler so that single-target
+            --  SAVE continues to work exactly as before.
+            if Natural (Stmt.Save_List.Length) = 1 then
+               Legacy_Execute_SAVE;
+               return;
+            end if;
+
+            --  Multi-target (Save_List.Length >= 2): replace prior registrations.
+            Clear_Registered_Saves;
+
+            --  Validate aliases, file paths, and KEEP+DROP exclusivity.
+            declare
+               package U is new Ada.Containers.Indefinite_Hashed_Sets
+                 (Element_Type        => String,
+                  Hash                => Ada.Strings.Hash,
+                  Equivalent_Elements => "=");
+               Seen_Alias : U.Set;
+               Seen_File  : U.Set;
+            begin
+               for Spec_Idx in 1 .. Natural (Stmt.Save_List.Length) loop
+                  declare
+                     Spec : constant Save_Spec_Access :=
+                               Stmt.Save_List (Spec_Idx);
+                  begin
+                     if Spec.Alias_Len > 0 then
+                        declare
+                           A : constant String :=
+                              To_Upper (Spec.Alias (1 .. Spec.Alias_Len));
+                        begin
+                           if Seen_Alias.Contains (A) then
+                              raise SData_Core.Script_Error
+                                 with "duplicate SAVE alias: "
+                                    & Spec.Alias (1 .. Spec.Alias_Len);
+                           end if;
+                           Seen_Alias.Include (A);
+                        end;
+                     end if;
+                     declare
+                        F : constant String :=
+                           To_Upper (Spec.File_Path (1 .. Spec.File_Len));
+                     begin
+                        if Seen_File.Contains (F) then
+                           raise SData_Core.Script_Error
+                              with "duplicate SAVE file: "
+                                 & Spec.File_Path (1 .. Spec.File_Len);
+                        end if;
+                        Seen_File.Include (F);
+                     end;
+                     if Spec.Opts.Keep_Vars /= null
+                        and then Spec.Opts.Drop_Vars /= null
+                     then
+                        raise SData_Core.Script_Error
+                           with "KEEP and DROP cannot both be specified on SAVE";
+                     end if;
+                  end;
+               end loop;
+            end;
+
+            --  Register each target.
+            for Spec_Idx in 1 .. Natural (Stmt.Save_List.Length) loop
+               declare
+                  Spec : constant Save_Spec_Access :=
+                            Stmt.Save_List (Spec_Idx);
+                  T    : constant Save_Target_Access := new Save_Target;
+               begin
+                  T.File_Path :=
+                     To_Unbounded_String (Spec.File_Path (1 .. Spec.File_Len));
+                  if Spec.Alias_Len > 0 then
+                     T.Alias :=
+                        To_Unbounded_String (Spec.Alias (1 .. Spec.Alias_Len));
+                  end if;
+                  T.Opts := Spec.Opts;
+                  Registered_Saves.Append (T);
+               end;
+            end loop;
          end;
       when Stmt_SORT =>
          declare
