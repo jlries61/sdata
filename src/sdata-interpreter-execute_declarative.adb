@@ -609,6 +609,7 @@ begin
          SData_Core.Variables.Clear_Temporary;
          SData_Core.Variables.Initialize_PDV;
          Clear_Active_Program;
+         Clear_Target_Buffers;
          Clear_Registered_Saves;
          SData_Core.Commands.Execute_NEW;
       when Stmt_OPTIONS =>

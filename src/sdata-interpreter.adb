@@ -161,11 +161,129 @@ package body SData.Interpreter is
 
    --  Targets that received a WRITE in the current iteration.
    --  Populated by Execute_Statement (Stmt_WRITE); consumed and cleared by
-   --  the end-of-record handler (Task 19).  Stores Save_Target_Access values
+   --  the end-of-record handler.  Stores Save_Target_Access values
    --  rather than indices so the handler doesn't need to re-look them up.
    package Pending_Write_Vectors is new Ada.Containers.Vectors
      (Index_Type => Positive, Element_Type => Save_Target_Access);
    Pending_Writes_This_Iter : Pending_Write_Vectors.Vector;
+
+   --  Per-target accumulator buffers (Follow-on C: per-record routing).
+   --  One buffer per registered SAVE target; populated record-by-record
+   --  during the data step; flushed to disk at end of Commit_Step.
+   type Target_Buffer is record
+      Target      : Save_Target_Access;
+      Buffer      : SData.Transient_Table.Table;
+      Initialized : Boolean := False;  --  schema lazily set on first append
+   end record;
+   type Target_Buffer_Access is access all Target_Buffer;
+   package Target_Buffer_Vectors is new Ada.Containers.Vectors
+     (Index_Type => Positive, Element_Type => Target_Buffer_Access);
+   Target_Buffers : Target_Buffer_Vectors.Vector;
+
+   --  Initialize_Target_Buffers — create one empty Target_Buffer per
+   --  registered SAVE target.  Called at the start of Run_One_Step when
+   --  Registered_Saves is non-empty.  Schema is lazily populated on first
+   --  record append (Append_Pdv_To_Buffer).
+   procedure Initialize_Target_Buffers is
+      procedure Free_TB is new Ada.Unchecked_Deallocation
+        (Target_Buffer, Target_Buffer_Access);
+   begin
+      --  Clear any stale buffers first.
+      for B of Target_Buffers loop
+         declare Tmp : Target_Buffer_Access := B; begin Free_TB (Tmp); end;
+      end loop;
+      Target_Buffers.Clear;
+      for T of Registered_Saves loop
+         declare
+            B : constant Target_Buffer_Access := new Target_Buffer;
+         begin
+            B.Target      := T;
+            B.Initialized := False;
+            Target_Buffers.Append (B);
+         end;
+      end loop;
+   end Initialize_Target_Buffers;
+
+   --  Append_Pdv_To_Buffer — copy the current PDV state into B.Buffer.
+   --  On first call (B.Initialized = False) the PDV schema (all current PDV
+   --  slot names, including LET-derived columns) is captured from
+   --  SData_Core.Variables.Get_PDV_Names.  This mirrors the columns that
+   --  Flush_PDV_To_Output would write to the output table.
+   procedure Append_Pdv_To_Buffer (B : Target_Buffer_Access) is
+      --  Get_PDV_Names returns a heap-allocated list of all current PDV slot
+      --  names (including LET-derived columns), mirroring the columns that
+      --  Flush_PDV_To_Output would write.  Freed at the end of this procedure.
+      PDV_List : GNAT.Strings.String_List_Access :=
+                    SData_Core.Variables.Get_PDV_Names;
+      PDV_N    : constant Natural :=
+                    (if PDV_List = null then 0 else PDV_List.all'Length);
+   begin
+      if not B.Initialized then
+         --  Lazy schema initialization from the PDV name list.  Column type
+         --  is inferred from the current slot value (same logic as
+         --  Flush_PDV_To_Output).
+         for I in 1 .. PDV_N loop
+            declare
+               Name : constant String := PDV_List.all (I).all;
+               V    : constant SData_Core.Values.Value :=
+                         SData_Core.Variables.Get_PDV_Value (I);
+               Typ  : SData_Core.Table.Column_Type :=
+                         SData_Core.Table.Col_Numeric;
+            begin
+               if V.Kind = SData_Core.Values.Val_Integer then
+                  Typ := SData_Core.Table.Col_Integer;
+               elsif V.Kind = SData_Core.Values.Val_String then
+                  Typ := SData_Core.Table.Col_String;
+               end if;
+               B.Buffer.Add_Column (Name, Typ);
+            end;
+         end loop;
+         B.Initialized := True;
+      end if;
+      --  Append a new row and populate it from the current PDV slot values.
+      B.Buffer.Add_Row;
+      declare
+         R_Out : constant Positive :=
+            SData.Transient_Table.Row_Count (B.Buffer);
+      begin
+         for I in 1 .. PDV_N loop
+            declare
+               Name : constant String := PDV_List.all (I).all;
+               V    : constant SData_Core.Values.Value :=
+                         SData_Core.Variables.Get_PDV_Value (I);
+            begin
+               if B.Buffer.Has_Column (Name) then
+                  B.Buffer.Set_Value (R_Out, Name, V);
+               end if;
+            end;
+         end loop;
+      end;
+      --  Free the heap-allocated String_List returned by Get_PDV_Names.
+      GNAT.Strings.Free (PDV_List);
+   end Append_Pdv_To_Buffer;
+
+   --  Clear_Target_Buffers — free and clear the Target_Buffers vector.
+   --  Called after Commit_Step write loop and by the NEW handler.
+   procedure Clear_Target_Buffers is
+      procedure Free_TB is new Ada.Unchecked_Deallocation
+        (Target_Buffer, Target_Buffer_Access);
+   begin
+      for B of Target_Buffers loop
+         declare Tmp : Target_Buffer_Access := B; begin Free_TB (Tmp); end;
+      end loop;
+      Target_Buffers.Clear;
+   end Clear_Target_Buffers;
+
+   --  Should_Write — evaluate a target's IF= expression.
+   --  Returns True when the expression is absent or evaluates to non-zero /
+   --  non-missing (i.e. the record should be routed to this target).
+   function Should_Write (T : Save_Target_Access) return Boolean is
+   begin
+      if T.Opts.IF_Expr = null then
+         return True;
+      end if;
+      return Is_True (Evaluate (T.Opts.IF_Expr));
+   end Should_Write;
 
    --  Column modifications state.
    type Column_Mod_Kind is (Mod_Keep, Mod_Drop);
@@ -644,17 +762,7 @@ package body SData.Interpreter is
                   return null;
                end Find_Target;
 
-               --  Helper: evaluate a target's IF= expression; returns True
-               --  when the expression is absent or evaluates to non-zero/non-missing.
-               function Should_Write (T : Save_Target_Access) return Boolean is
-               begin
-                  if T.Opts.IF_Expr = null then
-                     return True;
-                  end if;
-                  return Is_True (Evaluate (T.Opts.IF_Expr));
-               end Should_Write;
-
-               --  Helper: enqueue T for the end-of-record writer (Task 19).
+               --  Helper: enqueue T for the end-of-record writer.
                procedure Note_Target_Write (T : Save_Target_Access) is
                begin
                   Pending_Writes_This_Iter.Append (T);
@@ -836,23 +944,41 @@ package body SData.Interpreter is
       --  the same semantics are available to other front ends.
       SData_Core.Commands.Execute_RUN;
 
-      --  Multi-target SAVE flush: if Registered_Saves is non-empty, write the
-      --  current table to each target, applying per-target KEEP/DROP/RENAME as
-      --  an output projection (Follow-on B).  The live global table is never
-      --  mutated — a snapshot copy is projected for each target and the
-      --  original is restored after the loop.
-      --  Note: Write_Fired_This_Iter / Pending_Writes_This_Iter are already
-      --  reset per-record in Process_One_Record; we reset them here too for
-      --  safety at step boundaries.
+      --  Multi-target SAVE flush (Follow-on C): per-record routing.
+      --  Each target's buffer was filled during the data step by
+      --  Process_One_Record.  Here we write each buffer to disk, applying
+      --  per-target KEEP/DROP/RENAME projection (Follow-on B), then restore
+      --  the global table to the committed baseline.
+      --
+      --  Per spec §5: targets with empty (or uninitialized) buffers still
+      --  produce a header-only file.  For an uninitialized buffer (no schema
+      --  captured because no record was routed there), we fall back to the
+      --  committed table's schema with zero data rows.
       if Natural (Registered_Saves.Length) > 0 then
          declare
-            --  Capture the committed table once; used as the starting point
-            --  for each target's projection and to restore after the loop.
+            --  Committed table snapshot; used to restore the global table
+            --  after the write loop.
             Baseline : constant SData.Transient_Table.Table :=
                           SData.Transient_Table.Snapshot_From_Current;
+
+            --  Build a zero-row table that mirrors the committed table's
+            --  schema.  Used as fallback for targets whose IF= condition was
+            --  never satisfied (buffer uninitialized) so that the output
+            --  file receives a header-only file rather than all rows.
+            Empty_Schema : SData.Transient_Table.Table;
          begin
-            for T of Registered_Saves loop
+            for I in 1 .. SData_Core.Table.Column_Count loop
                declare
+                  CName : constant String := SData_Core.Table.Column_Name (I);
+               begin
+                  Empty_Schema.Add_Column
+                    (CName, SData_Core.Table.Get_Column_Type (CName));
+               end;
+            end loop;
+
+            for B of Target_Buffers loop
+               declare
+                  T          : constant Save_Target_Access := B.Target;
                   Raw_Path   : constant String := To_String (T.File_Path);
                   Full       : constant String := Full_Path (Raw_Path, "SAVE");
                   Eff_Fmt    : constant SData_Core.Config.Format_Type :=
@@ -875,8 +1001,11 @@ package body SData.Interpreter is
                               (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len));
                   Sheet      : constant String :=
                      T.Opts.Sheet_Name (1 .. T.Opts.Sheet_Name_Len);
-                  --  Start with a value copy of Baseline; apply projection.
-                  Projected  : SData.Transient_Table.Table := Baseline;
+                  --  Use the per-target accumulator buffer as the output
+                  --  source.  Fall back to Empty_Schema (header-only) when
+                  --  the buffer was never initialized (no records routed).
+                  Projected  : SData.Transient_Table.Table :=
+                     (if B.Initialized then B.Buffer else Empty_Schema);
                begin
                   --  KEEP and DROP are mutually exclusive; guard is redundant
                   --  with validation at SAVE-parse time but enforced here too.
@@ -887,7 +1016,7 @@ package body SData.Interpreter is
                        with "KEEP and DROP cannot both be specified on SAVE";
                   end if;
 
-                  --  Apply RENAME → KEEP → DROP on the snapshot copy.
+                  --  Apply RENAME → KEEP → DROP on the buffer copy.
                   if T.Opts.Rename_Pairs /= null then
                      declare
                         Pairs : SData.Transient_Table.Rename_Map_Vectors.Vector;
@@ -915,8 +1044,8 @@ package body SData.Interpreter is
                      end;
                   end if;
 
-                  --  Install the projected snapshot as the active table and
-                  --  write it; then restore the baseline.
+                  --  Install the projected buffer as the active table, write,
+                  --  then restore baseline before the next iteration.
                   SData.Transient_Table.Install_To_Current (Projected);
                   begin
                      SData_Core.File_IO.Open_Output
@@ -933,12 +1062,11 @@ package body SData.Interpreter is
                   exception
                      when SData_Core.File_IO.Save_Refused => null;
                   end;
-                  --  Restore baseline so the next target projects from the
-                  --  full committed table, not from a prior target's projection.
                   SData.Transient_Table.Install_To_Current (Baseline);
                end;
             end loop;
          end;
+         Clear_Target_Buffers;
          Clear_Registered_Saves;
       end if;
 
@@ -968,6 +1096,12 @@ package body SData.Interpreter is
       Resolve_Expr_Indices (Start, Boundary);
       SData_Core.Table.Initialize_Output_Table;
       SData_Core.Commands.Execute_Rebuild_Filter;
+      --  If multi-target SAVE is active, allocate per-target accumulator
+      --  buffers.  Records are routed into these during Process_One_Record;
+      --  Commit_Step writes each buffer to disk and then clears them.
+      if Natural (Registered_Saves.Length) > 0 then
+         Initialize_Target_Buffers;
+      end if;
       declare
          Logical_Count : constant Natural :=
             (if SData_Core.Table.Is_Filtered then SData_Core.Table.Logical_Row_Count
