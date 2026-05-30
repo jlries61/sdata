@@ -158,6 +158,14 @@ package body SData.Interpreter is
    --  auto-flush.
    Write_Fired_This_Iter : Boolean := False;
 
+   --  Targets that received a WRITE in the current iteration.
+   --  Populated by Execute_Statement (Stmt_WRITE); consumed and cleared by
+   --  the end-of-record handler (Task 19).  Stores Save_Target_Access values
+   --  rather than indices so the handler doesn't need to re-look them up.
+   package Pending_Write_Vectors is new Ada.Containers.Vectors
+     (Index_Type => Positive, Element_Type => Save_Target_Access);
+   Pending_Writes_This_Iter : Pending_Write_Vectors.Vector;
+
    --  Column modifications state.
    type Column_Mod_Kind is (Mod_Keep, Mod_Drop);
    type Column_Mod_Node;
@@ -611,8 +619,89 @@ package body SData.Interpreter is
                raise Break_Triggered;
             end if;
          when Stmt_WRITE =>
-            SData_Core.Variables.Flush_PDV_To_Output;
-            SData_Core.Table.Set_Record_Explicitly_Written (True);
+            --  Route to named SAVE targets (multi-target path) or fall back
+            --  to legacy single-output flush (no Registered_Saves).
+            --
+            --  Helper: look up a target by alias (first) then file path
+            --  (second), case-insensitive.  Returns null when not found.
+            declare
+               function Find_Target (Name : String) return Save_Target_Access is
+                  U : constant String := To_Upper (Name);
+               begin
+                  for T of Registered_Saves loop
+                     if Length (T.Alias) > 0
+                        and then To_Upper (To_String (T.Alias)) = U
+                     then
+                        return T;
+                     end if;
+                  end loop;
+                  for T of Registered_Saves loop
+                     if To_Upper (To_String (T.File_Path)) = U then
+                        return T;
+                     end if;
+                  end loop;
+                  return null;
+               end Find_Target;
+
+               --  Helper: evaluate a target's IF= expression; returns True
+               --  when the expression is absent or evaluates to non-zero/non-missing.
+               function Should_Write (T : Save_Target_Access) return Boolean is
+               begin
+                  if T.Opts.IF_Expr = null then
+                     return True;
+                  end if;
+                  return Is_True (Evaluate (T.Opts.IF_Expr));
+               end Should_Write;
+
+               --  Helper: enqueue T for the end-of-record writer (Task 19).
+               procedure Note_Target_Write (T : Save_Target_Access) is
+               begin
+                  Pending_Writes_This_Iter.Append (T);
+               end Note_Target_Write;
+
+            begin
+               if Natural (Registered_Saves.Length) = 0 then
+                  --  Legacy single-SAVE path — unchanged behaviour.
+                  SData_Core.Variables.Flush_PDV_To_Output;
+               else
+                  --  Multi-target path.
+                  if Stmt.Write_Targets = null then
+                     --  Bare WRITE: write to every registered target that
+                     --  passes its IF= filter.
+                     for T of Registered_Saves loop
+                        if Should_Write (T) then
+                           Note_Target_Write (T);
+                        end if;
+                     end loop;
+                  else
+                     --  Named targets: WRITE target1 [, target2 ...].
+                     declare
+                        Cur : Variable_List := Stmt.Write_Targets;
+                     begin
+                        while Cur /= null loop
+                           declare
+                              Name : constant String :=
+                                 Cur.Var.Start_Name (1 .. Cur.Var.Start_Len);
+                              T    : constant Save_Target_Access :=
+                                 Find_Target (Name);
+                           begin
+                              if T = null then
+                                 raise SData_Core.Script_Error
+                                    with "WRITE: target not registered: " & Name;
+                              end if;
+                              if Should_Write (T) then
+                                 Note_Target_Write (T);
+                              end if;
+                           end;
+                           Cur := Cur.Next;
+                        end loop;
+                     end;
+                  end if;
+               end if;
+
+               Write_Fired_This_Iter := True;
+               SData_Core.Table.Set_Record_Explicitly_Written (True);
+            end;
          when Stmt_ECHO =>
             SData_Core.IO.Set_Local_Echo (Stmt.Echo_State);
          when Stmt_LET | Stmt_SET =>
