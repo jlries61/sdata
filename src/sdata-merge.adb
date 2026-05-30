@@ -271,25 +271,54 @@ package body SData.Merge is
       end loop;
    end Forward_Schema_Warnings;
 
+   --  ---- Provenance helper -------------------------------------------
+   --  Append one Row_Provenance entry to Provenance for an output row.
+   --  Contributors(I) is True iff input I (1-based, length = N_Inputs)
+   --  contributed a real value row (not padding/missing) to this output row.
+   procedure Append_Provenance
+     (Provenance   : in out Provenance_Vectors.Vector;
+      N_Inputs     : Positive;
+      Contributed  : Boolean_Vectors.Vector)
+   is
+      Prov : Row_Provenance;
+   begin
+      pragma Assert (Natural (Contributed.Length) = N_Inputs);
+      Prov.Contributors := Contributed;
+      Provenance.Append (Prov);
+   end Append_Provenance;
+
    --  ---- Combine_Positional -----------------------------------------
 
    function Combine_Positional
-     (Inputs   : Table_Vectors.Vector;
-      Warnings : in out Warning_Vectors.Vector)
+     (Inputs     : Table_Vectors.Vector;
+      Warnings   : in out Warning_Vectors.Vector;
+      Provenance : in out Provenance_Vectors.Vector)
       return SData.Transient_Table.Table
    is
       Result   : SData.Transient_Table.Table;
       Sources  : Source_Vectors.Vector;
+      N_Inputs : constant Positive := Positive (Inputs.Length);
       Max_Rows : Natural := 0;
    begin
       Build_Schema (Result, Sources, Inputs, Warnings);
-      for I in 1 .. Natural (Inputs.Length) loop
+      for I in 1 .. N_Inputs loop
          if SData.Transient_Table.Row_Count (Inputs (I).all) > Max_Rows then
             Max_Rows := SData.Transient_Table.Row_Count (Inputs (I).all);
          end if;
       end loop;
       for R in 1 .. Max_Rows loop
          Result.Add_Row;
+         --  Build provenance for this row: input I contributed iff
+         --  its row count covers row R.
+         declare
+            Contrib : Boolean_Vectors.Vector;
+         begin
+            for I in 1 .. N_Inputs loop
+               Contrib.Append
+                 (R <= SData.Transient_Table.Row_Count (Inputs (I).all));
+            end loop;
+            Append_Provenance (Provenance, N_Inputs, Contrib);
+         end;
          for C in 1 .. Natural (Sources.Length) loop
             declare
                Src : constant Col_Source := Sources (C);
@@ -312,9 +341,10 @@ package body SData.Merge is
    --  ---- Combine_Match ----------------------------------------------
 
    function Combine_Match
-     (Inputs   : Table_Vectors.Vector;
-      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : in out Warning_Vectors.Vector)
+     (Inputs     : Table_Vectors.Vector;
+      By_Vars    : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings   : in out Warning_Vectors.Vector;
+      Provenance : in out Provenance_Vectors.Vector)
       return SData.Transient_Table.Table
    is
       Result   : SData.Transient_Table.Table;
@@ -381,6 +411,16 @@ package body SData.Merge is
                      R_Out : constant Positive :=
                                 SData.Transient_Table.Row_Count (Result);
                   begin
+                     --  Provenance: input I contributed iff it has at least
+                     --  one row in this BY group (Group_Size(I) > 0).
+                     declare
+                        Contrib : Boolean_Vectors.Vector;
+                     begin
+                        for I in 1 .. N_Inputs loop
+                           Contrib.Append (Group_Size (I) > 0);
+                        end loop;
+                        Append_Provenance (Provenance, N_Inputs, Contrib);
+                     end;
                      for C in 1 .. Natural (Sources.Length) loop
                         declare
                            Src  : constant Col_Source := Sources (C);
@@ -448,9 +488,10 @@ package body SData.Merge is
    --  Row count = sum of all input row counts.
 
    function Combine_Interleave
-     (Inputs   : Table_Vectors.Vector;
-      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : in out Warning_Vectors.Vector)
+     (Inputs     : Table_Vectors.Vector;
+      By_Vars    : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings   : in out Warning_Vectors.Vector;
+      Provenance : in out Provenance_Vectors.Vector)
       return SData.Transient_Table.Table
    is
       Result   : SData.Transient_Table.Table;
@@ -478,6 +519,16 @@ package body SData.Merge is
                T_Src : constant Table_Access := Inputs (Min_Idx);
                R_In  : constant Positive := Cursors (Min_Idx);
             begin
+               --  Provenance: only Min_Idx contributed this row; all others
+               --  are missing.
+               declare
+                  Contrib : Boolean_Vectors.Vector;
+               begin
+                  for I in 1 .. N_Inputs loop
+                     Contrib.Append (I = Min_Idx);
+                  end loop;
+                  Append_Provenance (Provenance, N_Inputs, Contrib);
+               end;
                for C in 1 .. Natural (Sources.Length) loop
                   declare
                      Col_Name : constant String :=
@@ -510,9 +561,10 @@ package body SData.Merge is
    --  > 0) one warning is emitted per offending BY-group.
 
    function Combine_Join
-     (Inputs   : Table_Vectors.Vector;
-      By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : in out Warning_Vectors.Vector)
+     (Inputs     : Table_Vectors.Vector;
+      By_Vars    : SData.Transient_Table.Name_Vectors.Vector;
+      Warnings   : in out Warning_Vectors.Vector;
+      Provenance : in out Provenance_Vectors.Vector)
       return SData.Transient_Table.Table
    is
       Result    : SData.Transient_Table.Table;
@@ -584,6 +636,16 @@ package body SData.Merge is
                            R_Out : constant Positive :=
                               SData.Transient_Table.Row_Count (Result);
                         begin
+                           --  Provenance: for /JOIN inner join, every input
+                           --  contributed (only fully-matched groups reach here).
+                           declare
+                              Contrib : Boolean_Vectors.Vector;
+                           begin
+                              for I in 1 .. N_Inputs loop
+                                 Contrib.Append (True);
+                              end loop;
+                              Append_Provenance (Provenance, N_Inputs, Contrib);
+                           end;
                            for C in 1 .. Natural (Sources.Length) loop
                               declare
                                  Src   : constant Col_Source := Sources (C);

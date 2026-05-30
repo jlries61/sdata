@@ -123,10 +123,11 @@ begin
                     (SData.Transient_Table.Table,
                      SData.Merge.Table_Access);
 
-                  Snapshots : SData.Merge.Table_Vectors.Vector;
-                  Warnings  : SData.Merge.Warning_Vectors.Vector;
-                  Combined  : SData.Transient_Table.Table;
-                  By_Names  : SData.Transient_Table.Name_Vectors.Vector;
+                  Snapshots  : SData.Merge.Table_Vectors.Vector;
+                  Warnings   : SData.Merge.Warning_Vectors.Vector;
+                  Combined   : SData.Transient_Table.Table;
+                  By_Names   : SData.Transient_Table.Name_Vectors.Vector;
+                  Provenance : SData.Merge.Provenance_Vectors.Vector;
 
                   --  Free every snapshot accumulated so far and clear the
                   --  vector.  Called on both the success path and from the
@@ -270,10 +271,8 @@ begin
                               Snap_Ptr.Sort_By (By_Names);
                            end if;
 
-                           --  IN= variable registration is deferred to
-                           --  Required Follow-on A (per-row provenance).
-                           --  Spec.Opts.IN_Name_Len is accepted by the
-                           --  parser but not yet wired here.
+                           --  IN= provenance columns are added after the
+                           --  combiner runs (see below).
                         end;
                      end loop;
 
@@ -281,19 +280,74 @@ begin
                      case Stmt.Mode is
                         when MM_Positional =>
                            Combined := SData.Merge.Combine_Positional
-                                         (Snapshots, Warnings);
+                                         (Snapshots, Warnings, Provenance);
                         when MM_Match =>
                            Combined := SData.Merge.Combine_Match
-                                         (Snapshots, By_Names, Warnings);
+                                         (Snapshots, By_Names, Warnings,
+                                          Provenance);
                         when MM_Interleave =>
                            Combined := SData.Merge.Combine_Interleave
-                                         (Snapshots, By_Names, Warnings);
+                                         (Snapshots, By_Names, Warnings,
+                                          Provenance);
                         when MM_Join =>
                            Combined := SData.Merge.Combine_Join
-                                         (Snapshots, By_Names, Warnings);
+                                         (Snapshots, By_Names, Warnings,
+                                          Provenance);
                         when MM_Single =>
                            null;  --  not reached; handled by the outer if
                      end case;
+
+                     --  Materialise IN= columns as Integer columns in
+                     --  Combined.  For each dataset spec that carries an
+                     --  IN= name, add one Integer column populated 1/0
+                     --  row-by-row from the Provenance bitmask.
+                     --
+                     --  If the requested IN= column name already exists in
+                     --  Combined (collision with a real data column) we raise
+                     --  Script_Error rather than silently overwriting data.
+                     for Spec_Idx in 1 .. Natural (Stmt.Dataset_List.Length)
+                     loop
+                        declare
+                           Spec : constant Dataset_Spec_Access :=
+                                     Stmt.Dataset_List (Spec_Idx);
+                        begin
+                           if Spec.Opts.IN_Name_Len > 0 then
+                              declare
+                                 IN_Name : constant String :=
+                                    Spec.Opts.IN_Name
+                                       (1 .. Spec.Opts.IN_Name_Len);
+                              begin
+                                 if Combined.Has_Column (IN_Name) then
+                                    raise SData_Core.Script_Error
+                                      with "IN= name """ & IN_Name
+                                           & """ collides with an existing"
+                                           & " column in the combined table";
+                                 end if;
+                                 Combined.Add_Column
+                                   (IN_Name, SData_Core.Table.Col_Integer);
+                                 for R in 1 ..
+                                    SData.Transient_Table.Row_Count (Combined)
+                                 loop
+                                    declare
+                                       Bit : constant Boolean :=
+                                          Spec_Idx <=
+                                             Natural (Provenance.Length)
+                                          and then
+                                             Provenance (R).Contributors
+                                                (Spec_Idx);
+                                       Val : constant SData_Core.Values.Value
+                                          := (Kind =>
+                                                SData_Core.Values.Val_Integer,
+                                              Int_Val =>
+                                                (if Bit then 1 else 0));
+                                    begin
+                                       Combined.Set_Value (R, IN_Name, Val);
+                                    end;
+                                 end loop;
+                              end;
+                           end if;
+                        end;
+                     end loop;
 
                      --  Install the combined result as the active global table.
                      SData.Transient_Table.Install_To_Current (Combined);

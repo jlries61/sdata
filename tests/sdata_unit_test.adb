@@ -846,7 +846,8 @@ begin
       B_Ptr    : constant SData.Merge.Table_Access :=
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -871,7 +872,7 @@ begin
       Inputs.Append (A_Ptr);
       Inputs.Append (B_Ptr);
 
-      Result := SData.Merge.Combine_Positional (Inputs, Warnings);
+      Result := SData.Merge.Combine_Positional (Inputs, Warnings, Provenance);
 
       Check ("CP-01 Result row count = 2",    Result.Row_Count, 2);
       Check ("CP-02 Result column count = 2", Result.Column_Count, 2);
@@ -893,7 +894,8 @@ begin
       B_Ptr    : constant SData.Merge.Table_Access :=
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -916,7 +918,7 @@ begin
       Inputs.Append (A_Ptr);
       Inputs.Append (B_Ptr);
 
-      Result := SData.Merge.Combine_Positional (Inputs, Warnings);
+      Result := SData.Merge.Combine_Positional (Inputs, Warnings, Provenance);
 
       Check ("CP-07 Result row count = 3", Result.Row_Count, 3);
       VV := Result.Get_Value (1, "Y%");
@@ -938,7 +940,8 @@ begin
       B_Ptr    : constant SData.Merge.Table_Access :=
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -955,7 +958,7 @@ begin
       Inputs.Append (A_Ptr);
       Inputs.Append (B_Ptr);
 
-      Result := SData.Merge.Combine_Positional (Inputs, Warnings);
+      Result := SData.Merge.Combine_Positional (Inputs, Warnings, Provenance);
 
       Check ("CP-12 Collision: result row count = 1", Result.Row_Count, 1);
       Check ("CP-13 Collision: exactly 1 warning",
@@ -979,7 +982,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1026,7 +1030,7 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CM-01 1:1 merge row count = 3",
              Result.Row_Count, 3);
@@ -1057,7 +1061,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1105,7 +1110,7 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CM-02 1:M merge row count = 4",
              Result.Row_Count, 4);
@@ -1144,7 +1149,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1180,7 +1186,7 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CM-03 N:M merge row count = 2",
              Result.Row_Count, 2);
@@ -1211,7 +1217,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1247,7 +1254,7 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CM-04 Unmatched-keys row count = 3",
              Result.Row_Count, 3);
@@ -1288,7 +1295,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1342,7 +1350,7 @@ begin
       Inputs.Append (C_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Match (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CM-05 Three-way merge row count = 2",
              Result.Row_Count, 2);
@@ -1386,7 +1394,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1422,7 +1431,7 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Interleave (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Interleave (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CI-01 Disjoint-keys row count = 4",
              Result.Row_Count, 4);
@@ -1478,7 +1487,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1525,7 +1535,7 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Interleave (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Interleave (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CI-02 Overlapping-keys row count = 6",
              Result.Row_Count, 6);
@@ -1593,7 +1603,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1641,7 +1652,7 @@ begin
       Inputs.Append (C_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Interleave (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Interleave (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CI-03 Three-way row count = 6",
              Result.Row_Count, 6);
@@ -1717,7 +1728,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1753,7 +1765,7 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CJ-01 1:1 join row count = 2",
              Result.Row_Count, 2);
@@ -1785,7 +1797,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1832,7 +1845,7 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CJ-02 N:M join row count = 4",
              Result.Row_Count, 4);
@@ -1877,7 +1890,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -1921,7 +1935,7 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CJ-03 Unmatched dropped row count = 2",
              Result.Row_Count, 2);
@@ -1955,7 +1969,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
    begin
       A_Ptr.Add_Column ("ID%", SData_Core.Table.Col_Integer);
@@ -1996,7 +2011,7 @@ begin
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
       SData_Core.Config.Runtime.Options_Join_Warn_Threshold := 5;
-      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings, Provenance);
       SData_Core.Config.Runtime.Options_Join_Warn_Threshold := 1_000_000;
 
       Check ("CJ-04 Threshold trip row count = 9",
@@ -2017,7 +2032,8 @@ begin
                     new SData.Transient_Table.Table;
       Inputs   : SData.Merge.Table_Vectors.Vector;
       By_Vars  : SData.Transient_Table.Name_Vectors.Vector;
-      Warnings : SData.Merge.Warning_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
    begin
@@ -2065,7 +2081,7 @@ begin
       Inputs.Append (C_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings);
+      Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings, Provenance);
 
       Check ("CJ-05 Three-way join row count = 2",
              Result.Row_Count, 2);
