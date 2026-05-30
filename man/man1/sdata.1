@@ -347,18 +347,6 @@ Aliases must be unique within a
 .B SAVE
 statement.
 Two targets may not write the same filename.
-.PP
-\fBNOTE (MVP scope):\fR
-In the current release, multi-target
-.B SAVE
-writes the committed table to every registered target at end of
-.BR RUN .
-Per-target
-.B IF=
-filters and per-record routing via
-.B "WRITE target"
-are parsed and stored but not yet fully enforced at write time; these
-capabilities are tracked as follow-on work.
 Single-target
 .B SAVE
 retains full existing semantics.
@@ -585,14 +573,15 @@ Multiple
 statements in a single iteration are allowed; writing the same target
 twice produces two output records (matching SAS OUTPUT semantics).
 Naming an unregistered target is a runtime error.
-.PP
-\fBNOTE (MVP scope):\fR
-Target arguments are parsed in the current release; full per-target routing
-(where a
+A bare
 .B WRITE
-without arguments writes only to matching-IF= targets) is tracked as a
-follow-on.
-The no-argument form retains full current semantics.
+with non-empty
+.B SAVE
+registrations writes to every target whose
+.B IF=
+filter passes; bare
+.B WRITE
+with no registrations retains the legacy single-output flush.
 .TP
 .BR KEEP " | " DROP " \fIvar\fR [\fIvar\fR ...]"
 Retain or remove columns from the output table after the next
