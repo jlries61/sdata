@@ -927,6 +927,164 @@ package body SData.Parser is
       end loop;
    end Parse_Spec_Options;
 
+   ---------------------------------------------------------------------------
+   --  Apply_Legacy_Slash_Option
+   --
+   --  Parses one /FLAG=VALUE legacy slash-option and applies it to Opts.
+   --  On entry, the "/" and flag name token have already been consumed;
+   --  Flag_Tok is the flag name token, Flag_Name is its uppercased text.
+   --  This procedure peeks for "=", consumes it and the value, and applies
+   --  the recognised option to Opts.
+   --
+   --  Recognised for both USE and SAVE:
+   --    FMT  HEADER  CHARSET  DLM  SHEET
+   --  Recognised for USE only (Allow_USE_Only = True):
+   --    NSCAN  SKIP  MAXROWS
+   --
+   --  Unknown flag names produce an error message.  The caller is responsible
+   --  for guarding against multi-dataset / paren-block conflicts before calling
+   --  this procedure; it only handles the option dispatch itself.
+   ---------------------------------------------------------------------------
+   procedure Apply_Legacy_Slash_Option
+     (Ctx            : in out Parser_Context;
+      Flag_Tok       : Token;
+      Flag_Name      : String;
+      Opts           : in out Spec_Options;
+      Allow_USE_Only : Boolean;
+      Context_Name   : String)
+   is
+      Peeked : Token;
+   begin
+      Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+      if Peeked.Kind = Token_Equal then
+         declare
+            Eq_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Val_Str : constant String :=
+               To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+            pragma Unreferenced (Eq_Tok);
+         begin
+            if Flag_Name = "FMT" then
+               Opts.Format_Specified := True;
+               if Val_Str = "CSV" then
+                  Opts.Fmt_Override := SData_Core.Config.CSV;
+               elsif Val_Str = "ODF" or else Val_Str = "ODS" then
+                  Opts.Fmt_Override := SData_Core.Config.ODF;
+               elsif Val_Str = "OOXML" or else Val_Str = "XLSX" then
+                  Opts.Fmt_Override := SData_Core.Config.OOXML;
+               end if;
+
+            elsif Flag_Name = "HEADER"
+               or else Flag_Tok.Kind = Token_HEADER
+            then
+               Opts.Header_Specified := True;
+               Opts.Header_Val := (Val_Str = "YES");
+
+            elsif Flag_Name = "CHARSET" then
+               --  Multi-token charset (e.g. UTF-16 LE).
+               declare
+                  Buf : String (1 .. Max_Charset_Len) := (others => ' ');
+                  Len : Natural := Val_Tok.Length;
+                  P2  : Token;
+               begin
+                  Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
+                  P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                  if P2.Kind = Token_Minus then
+                     declare
+                        Discard2 : constant Token :=
+                           Get_Next_Token (Ctx.Lex_Ctx);
+                        Mid_Tok  : constant Token :=
+                           Get_Next_Token (Ctx.Lex_Ctx);
+                        M_Len    : constant Natural := Mid_Tok.Length;
+                        pragma Unreferenced (Discard2);
+                     begin
+                        Buf (Len + 1) := '-';
+                        Buf (Len + 2 .. Len + 1 + M_Len) :=
+                           Mid_Tok.Text (1 .. M_Len);
+                        Len := Len + 1 + M_Len;
+                        P2 := Peek_Next_Token (Ctx.Lex_Ctx);
+                        if P2.Kind = Token_Identifier then
+                           declare
+                              S_Upper : constant String :=
+                                 To_Upper (P2.Text (1 .. P2.Length));
+                           begin
+                              if S_Upper = "LE" or else S_Upper = "BE" then
+                                 declare
+                                    Suf_Tok : constant Token :=
+                                       Get_Next_Token (Ctx.Lex_Ctx);
+                                    S_Len   : constant Natural :=
+                                       Suf_Tok.Length;
+                                 begin
+                                    Buf (Len + 1 .. Len + S_Len) :=
+                                       Suf_Tok.Text (1 .. S_Len);
+                                    Len := Len + S_Len;
+                                 end;
+                              end if;
+                           end;
+                        end if;
+                     end;
+                  end if;
+                  Opts.Charset_Val (1 .. Len) := Buf (1 .. Len);
+                  Opts.Charset_Len := Len;
+               end;
+
+            elsif Flag_Name = "DLM" then
+               declare
+                  VLen : constant Natural :=
+                     Natural'Min (Val_Tok.Length, Max_Delimiter_Len);
+               begin
+                  Opts.DLM_Val (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                  Opts.DLM_Len := VLen;
+               end;
+
+            elsif Flag_Name = "SHEET" then
+               declare
+                  VLen : constant Natural :=
+                     Natural'Min (Val_Tok.Length, Max_Sheet_Name_Len);
+               begin
+                  Opts.Sheet_Name (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                  Opts.Sheet_Name_Len := VLen;
+               end;
+
+            elsif Flag_Name = "NSCAN" then
+               if Allow_USE_Only then
+                  Opts.NSCAN_Val :=
+                     Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+               else
+                  Put_Line_Error
+                    ("Error: NSCAN= not allowed in " & Context_Name &
+                     " slash-options");
+               end if;
+
+            elsif Flag_Name = "SKIP" then
+               if Allow_USE_Only then
+                  Opts.Skip_Val :=
+                     Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+               else
+                  Put_Line_Error
+                    ("Error: SKIP= not allowed in " & Context_Name &
+                     " slash-options");
+               end if;
+
+            elsif Flag_Name = "MAXROWS" then
+               if Allow_USE_Only then
+                  Opts.Maxrows_Val :=
+                     Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+               else
+                  Put_Line_Error
+                    ("Error: MAXROWS= not allowed in " & Context_Name &
+                     " slash-options");
+               end if;
+
+            else
+               Put_Line_Error
+                 ("Error: Unknown " & Context_Name & " option /" &
+                  Flag_Name & "=");
+            end if;
+         end;
+      end if;
+   end Apply_Legacy_Slash_Option;
+
    --------------------
    -- Parse_USE_Stmt --
    --------------------
@@ -1150,147 +1308,13 @@ package body SData.Parser is
                         " no per-dataset paren options");
                      Had_Error := True;
                   else
-                     --  Apply the legacy slash-option to the spec.
-                     declare
-                        Spec : constant Dataset_Spec_Access :=
-                           Stmt.Dataset_List.First_Element;
-                     begin
-                        Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
-                        if Peeked.Kind = Token_Equal then
-                           declare
-                              Eq_Tok  : constant Token :=
-                                 Get_Next_Token (Ctx.Lex_Ctx);
-                              Val_Tok : constant Token :=
-                                 Get_Next_Token (Ctx.Lex_Ctx);
-                              Val_Str : constant String :=
-                                 To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
-                              pragma Unreferenced (Eq_Tok);
-                           begin
-                              if Flag_Name = "FMT" then
-                                 Spec.Opts.Format_Specified := True;
-                                 if Val_Str = "CSV" then
-                                    Spec.Opts.Fmt_Override :=
-                                       SData_Core.Config.CSV;
-                                 elsif Val_Str = "ODF"
-                                       or else Val_Str = "ODS"
-                                 then
-                                    Spec.Opts.Fmt_Override :=
-                                       SData_Core.Config.ODF;
-                                 elsif Val_Str = "OOXML"
-                                       or else Val_Str = "XLSX"
-                                 then
-                                    Spec.Opts.Fmt_Override :=
-                                       SData_Core.Config.OOXML;
-                                 end if;
-
-                              elsif Flag_Name = "HEADER"
-                                 or else Flag_Tok.Kind = Token_HEADER
-                              then
-                                 Spec.Opts.Header_Specified := True;
-                                 Spec.Opts.Header_Val := (Val_Str = "YES");
-
-                              elsif Flag_Name = "CHARSET" then
-                                 --  Multi-token charset (e.g. UTF-16 LE).
-                                 declare
-                                    Buf : String (1 .. Max_Charset_Len) :=
-                                       (others => ' ');
-                                    Len : Natural := Val_Tok.Length;
-                                    P2  : Token;
-                                 begin
-                                    Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
-                                    P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                    if P2.Kind = Token_Minus then
-                                       declare
-                                          Discard2 : constant Token :=
-                                             Get_Next_Token (Ctx.Lex_Ctx);
-                                          Mid_Tok  : constant Token :=
-                                             Get_Next_Token (Ctx.Lex_Ctx);
-                                          M_Len    : constant Natural :=
-                                             Mid_Tok.Length;
-                                          pragma Unreferenced (Discard2);
-                                       begin
-                                          Buf (Len + 1) := '-';
-                                          Buf (Len + 2 .. Len + 1 + M_Len) :=
-                                             Mid_Tok.Text (1 .. M_Len);
-                                          Len := Len + 1 + M_Len;
-                                          P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                          if P2.Kind = Token_Identifier then
-                                             declare
-                                                S_Upper : constant String :=
-                                                   To_Upper
-                                                     (P2.Text (1 .. P2.Length));
-                                             begin
-                                                if S_Upper = "LE"
-                                                   or else S_Upper = "BE"
-                                                then
-                                                   declare
-                                                      Suf_Tok : constant Token :=
-                                                         Get_Next_Token
-                                                           (Ctx.Lex_Ctx);
-                                                      S_Len : constant Natural :=
-                                                         Suf_Tok.Length;
-                                                   begin
-                                                      Buf (Len + 1 ..
-                                                           Len + S_Len) :=
-                                                         Suf_Tok.Text
-                                                           (1 .. S_Len);
-                                                      Len := Len + S_Len;
-                                                   end;
-                                                end if;
-                                             end;
-                                          end if;
-                                       end;
-                                    end if;
-                                    Spec.Opts.Charset_Val (1 .. Len) :=
-                                       Buf (1 .. Len);
-                                    Spec.Opts.Charset_Len := Len;
-                                 end;
-
-                              elsif Flag_Name = "DLM" then
-                                 declare
-                                    VLen : constant Natural :=
-                                       Natural'Min (Val_Tok.Length,
-                                                    Max_Delimiter_Len);
-                                 begin
-                                    Spec.Opts.DLM_Val (1 .. VLen) :=
-                                       Val_Tok.Text (1 .. VLen);
-                                    Spec.Opts.DLM_Len := VLen;
-                                 end;
-
-                              elsif Flag_Name = "SHEET" then
-                                 declare
-                                    VLen : constant Natural :=
-                                       Natural'Min (Val_Tok.Length,
-                                                    Max_Sheet_Name_Len);
-                                 begin
-                                    Spec.Opts.Sheet_Name (1 .. VLen) :=
-                                       Val_Tok.Text (1 .. VLen);
-                                    Spec.Opts.Sheet_Name_Len := VLen;
-                                 end;
-
-                              elsif Flag_Name = "NSCAN" then
-                                 Spec.Opts.NSCAN_Val :=
-                                    Natural'Value
-                                      (Val_Tok.Text (1 .. Val_Tok.Length));
-
-                              elsif Flag_Name = "SKIP" then
-                                 Spec.Opts.Skip_Val :=
-                                    Natural'Value
-                                      (Val_Tok.Text (1 .. Val_Tok.Length));
-
-                              elsif Flag_Name = "MAXROWS" then
-                                 Spec.Opts.Maxrows_Val :=
-                                    Natural'Value
-                                      (Val_Tok.Text (1 .. Val_Tok.Length));
-
-                              else
-                                 Put_Line_Error
-                                   ("Error: Unknown USE option /" &
-                                    Flag_Name & "=");
-                              end if;
-                           end;
-                        end if;
-                     end;
+                     Apply_Legacy_Slash_Option
+                       (Ctx,
+                        Flag_Tok,
+                        Flag_Name,
+                        Stmt.Dataset_List.First_Element.Opts,
+                        Allow_USE_Only => True,
+                        Context_Name   => "USE");
                   end if;
                end;
             end if;
@@ -1557,132 +1581,13 @@ package body SData.Parser is
                      " no per-target paren options");
                   Had_Error := True;
                else
-                  --  Apply the legacy slash-option to the single spec's Opts.
-                  declare
-                     Spec : constant Save_Spec_Access :=
-                        Stmt.Save_List.First_Element;
-                  begin
-                     Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
-                     if Peeked.Kind = Token_Equal then
-                        declare
-                           Eq_Tok  : constant Token :=
-                              Get_Next_Token (Ctx.Lex_Ctx);
-                           Val_Tok : constant Token :=
-                              Get_Next_Token (Ctx.Lex_Ctx);
-                           Val_Str : constant String :=
-                              To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
-                           pragma Unreferenced (Eq_Tok);
-                        begin
-                           if Flag_Name = "FMT" then
-                              Spec.Opts.Format_Specified := True;
-                              if Val_Str = "CSV" then
-                                 Spec.Opts.Fmt_Override :=
-                                    SData_Core.Config.CSV;
-                              elsif Val_Str = "ODF"
-                                    or else Val_Str = "ODS"
-                              then
-                                 Spec.Opts.Fmt_Override :=
-                                    SData_Core.Config.ODF;
-                              elsif Val_Str = "OOXML"
-                                    or else Val_Str = "XLSX"
-                              then
-                                 Spec.Opts.Fmt_Override :=
-                                    SData_Core.Config.OOXML;
-                              end if;
-
-                           elsif Flag_Name = "HEADER"
-                              or else Flag_Tok.Kind = Token_HEADER
-                           then
-                              Spec.Opts.Header_Specified := True;
-                              Spec.Opts.Header_Val := (Val_Str = "YES");
-
-                           elsif Flag_Name = "CHARSET" then
-                              --  Multi-token charset (e.g. UTF-16 LE).
-                              declare
-                                 Buf : String (1 .. Max_Charset_Len) :=
-                                    (others => ' ');
-                                 Len : Natural := Val_Tok.Length;
-                                 P2  : Token;
-                              begin
-                                 Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
-                                 P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                 if P2.Kind = Token_Minus then
-                                    declare
-                                       Discard2 : constant Token :=
-                                          Get_Next_Token (Ctx.Lex_Ctx);
-                                       Mid_Tok  : constant Token :=
-                                          Get_Next_Token (Ctx.Lex_Ctx);
-                                       M_Len    : constant Natural :=
-                                          Mid_Tok.Length;
-                                       pragma Unreferenced (Discard2);
-                                    begin
-                                       Buf (Len + 1) := '-';
-                                       Buf (Len + 2 .. Len + 1 + M_Len) :=
-                                          Mid_Tok.Text (1 .. M_Len);
-                                       Len := Len + 1 + M_Len;
-                                       P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                       if P2.Kind = Token_Identifier then
-                                          declare
-                                             S_Upper : constant String :=
-                                                To_Upper
-                                                  (P2.Text (1 .. P2.Length));
-                                          begin
-                                             if S_Upper = "LE"
-                                                or else S_Upper = "BE"
-                                             then
-                                                declare
-                                                   Suf_Tok : constant Token :=
-                                                      Get_Next_Token
-                                                        (Ctx.Lex_Ctx);
-                                                   S_Len : constant Natural :=
-                                                      Suf_Tok.Length;
-                                                begin
-                                                   Buf (Len + 1 ..
-                                                        Len + S_Len) :=
-                                                      Suf_Tok.Text
-                                                        (1 .. S_Len);
-                                                   Len := Len + S_Len;
-                                                end;
-                                             end if;
-                                          end;
-                                       end if;
-                                    end;
-                                 end if;
-                                 Spec.Opts.Charset_Val (1 .. Len) :=
-                                    Buf (1 .. Len);
-                                 Spec.Opts.Charset_Len := Len;
-                              end;
-
-                           elsif Flag_Name = "DLM" then
-                              declare
-                                 VLen : constant Natural :=
-                                    Natural'Min (Val_Tok.Length,
-                                                 Max_Delimiter_Len);
-                              begin
-                                 Spec.Opts.DLM_Val (1 .. VLen) :=
-                                    Val_Tok.Text (1 .. VLen);
-                                 Spec.Opts.DLM_Len := VLen;
-                              end;
-
-                           elsif Flag_Name = "SHEET" then
-                              declare
-                                 VLen : constant Natural :=
-                                    Natural'Min (Val_Tok.Length,
-                                                 Max_Sheet_Name_Len);
-                              begin
-                                 Spec.Opts.Sheet_Name (1 .. VLen) :=
-                                    Val_Tok.Text (1 .. VLen);
-                                 Spec.Opts.Sheet_Name_Len := VLen;
-                              end;
-
-                           else
-                              Put_Line_Error
-                                ("Error: Unknown SAVE option /" &
-                                 Flag_Name & "=");
-                           end if;
-                        end;
-                     end if;
-                  end;
+                  Apply_Legacy_Slash_Option
+                    (Ctx,
+                     Flag_Tok,
+                     Flag_Name,
+                     Stmt.Save_List.First_Element.Opts,
+                     Allow_USE_Only => False,
+                     Context_Name   => "SAVE");
                end if;
             end;
          end;
