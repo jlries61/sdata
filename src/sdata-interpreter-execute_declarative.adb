@@ -127,6 +127,21 @@ begin
                   Warnings  : SData.Merge.Warning_Vectors.Vector;
                   Combined  : SData.Transient_Table.Table;
                   By_Names  : SData.Transient_Table.Name_Vectors.Vector;
+
+                  --  Free every snapshot accumulated so far and clear the
+                  --  vector.  Called on both the success path and from the
+                  --  exception handler so that no heap allocation leaks
+                  --  regardless of where an exception is raised.
+                  procedure Free_All_Snapshots is
+                     Tmp : SData.Merge.Table_Access;
+                  begin
+                     for Ptr of Snapshots loop
+                        Tmp := Ptr;
+                        Free_Snap (Tmp);
+                     end loop;
+                     Snapshots.Clear;
+                  end Free_All_Snapshots;
+
                begin
                   --  Convert statement-level BY vars once (Match/Interleave/
                   --  Join modes only).
@@ -137,212 +152,198 @@ begin
                      Convert_Variable_List (Stmt.By_Vars, By_Names);
                   end if;
 
-                  --  Process each dataset spec.
-                  for Spec_Idx in 1 .. Natural (Stmt.Dataset_List.Length) loop
-                     declare
-                        Spec     : constant Dataset_Spec_Access :=
-                                      Stmt.Dataset_List (Spec_Idx);
-                        Snap_Ptr : SData.Merge.Table_Access :=
-                                      new SData.Transient_Table.Table;
-                        Eff_DLM  : constant String :=
-                           (if Spec.Opts.DLM_Len > 0
-                            then Dlm_To_Str
-                                   (Spec.Opts.DLM_Val
-                                       (1 .. Spec.Opts.DLM_Len))
-                            else SData_Core.Config.Runtime.Options_CSVDLM
-                                    (1 .. SData_Core.Config.Runtime
-                                             .Options_CSVDLM_Len));
-                        Eff_Header : constant Boolean :=
-                           (if Spec.Opts.Header_Specified
-                            then Spec.Opts.Header_Val
-                            else SData_Core.Config.Runtime.Options_Header);
-                        Eff_Charset : constant String :=
-                           (if Spec.Opts.Charset_Len > 0
-                            then Spec.Opts.Charset_Val
-                                    (1 .. Spec.Opts.Charset_Len)
-                            else SData_Core.Config.Runtime.Options_CHARSET
-                                    (1 .. SData_Core.Config.Runtime
-                                             .Options_CHARSET_Len));
-                        Eff_Fmt : constant SData_Core.Config.Format_Type :=
-                           (if Spec.Opts.Format_Specified
-                            then Spec.Opts.Fmt_Override
-                            else SData_Core.Config.Input_Format);
-                     begin
-                        --  Load file into the global table.
-                        SData_Core.Commands.Execute_USE
-                          (File_Name   =>
-                              (if Spec.Is_Mock then "MOCK"
-                               else Spec.File_Path (1 .. Spec.File_Len)),
-                           Fmt         => Eff_Fmt,
-                           Sheet_Name  => Spec.Opts.Sheet_Name
-                                            (1 .. Spec.Opts.Sheet_Name_Len),
-                           Delimiter   => Eff_DLM,
-                           Read_Header => Eff_Header,
-                           Charset     => Eff_Charset,
-                           Skip_Rows   => Spec.Opts.Skip_Val,
-                           Max_Rows    => Spec.Opts.Maxrows_Val,
-                           Nscan_Rows  => Spec.Opts.NSCAN_Val,
-                           Is_Mock     => Spec.Is_Mock);
+                  begin
+                     --  Process each dataset spec.
+                     for Spec_Idx in 1 .. Natural (Stmt.Dataset_List.Length) loop
+                        declare
+                           Spec     : constant Dataset_Spec_Access :=
+                                         Stmt.Dataset_List (Spec_Idx);
+                           Snap_Ptr : constant SData.Merge.Table_Access :=
+                                         new SData.Transient_Table.Table;
+                           Eff_DLM  : constant String :=
+                              (if Spec.Opts.DLM_Len > 0
+                               then Dlm_To_Str
+                                      (Spec.Opts.DLM_Val
+                                          (1 .. Spec.Opts.DLM_Len))
+                               else SData_Core.Config.Runtime.Options_CSVDLM
+                                       (1 .. SData_Core.Config.Runtime
+                                                .Options_CSVDLM_Len));
+                           Eff_Header : constant Boolean :=
+                              (if Spec.Opts.Header_Specified
+                               then Spec.Opts.Header_Val
+                               else SData_Core.Config.Runtime.Options_Header);
+                           Eff_Charset : constant String :=
+                              (if Spec.Opts.Charset_Len > 0
+                               then Spec.Opts.Charset_Val
+                                       (1 .. Spec.Opts.Charset_Len)
+                               else SData_Core.Config.Runtime.Options_CHARSET
+                                       (1 .. SData_Core.Config.Runtime
+                                                .Options_CHARSET_Len));
+                           Eff_Fmt : constant SData_Core.Config.Format_Type :=
+                              (if Spec.Opts.Format_Specified
+                               then Spec.Opts.Fmt_Override
+                               else SData_Core.Config.Input_Format);
+                        begin
+                           --  Track the allocation immediately so the
+                           --  exception handler always sees it.
+                           Snapshots.Append (Snap_Ptr);
 
-                        --  Snapshot the global table into a transient copy.
-                        Snap_Ptr.all :=
-                           SData.Transient_Table.Snapshot_From_Current;
+                           --  Load file into the global table.
+                           SData_Core.Commands.Execute_USE
+                             (File_Name   =>
+                                 (if Spec.Is_Mock then "MOCK"
+                                  else Spec.File_Path (1 .. Spec.File_Len)),
+                              Fmt         => Eff_Fmt,
+                              Sheet_Name  => Spec.Opts.Sheet_Name
+                                               (1 .. Spec.Opts.Sheet_Name_Len),
+                              Delimiter   => Eff_DLM,
+                              Read_Header => Eff_Header,
+                              Charset     => Eff_Charset,
+                              Skip_Rows   => Spec.Opts.Skip_Val,
+                              Max_Rows    => Spec.Opts.Maxrows_Val,
+                              Nscan_Rows  => Spec.Opts.NSCAN_Val,
+                              Is_Mock     => Spec.Is_Mock);
 
-                        --  Apply per-dataset RENAME / KEEP / DROP.
-                        if Spec.Opts.Keep_Vars /= null
-                           and then Spec.Opts.Drop_Vars /= null
-                        then
-                           Free_Snap (Snap_Ptr);
-                           for P of Snapshots loop
+                           --  Snapshot the global table into a transient copy.
+                           Snap_Ptr.all :=
+                              SData.Transient_Table.Snapshot_From_Current;
+
+                           --  Apply per-dataset RENAME / KEEP / DROP.
+                           if Spec.Opts.Keep_Vars /= null
+                              and then Spec.Opts.Drop_Vars /= null
+                           then
+                              raise SData_Core.Script_Error
+                                with "KEEP and DROP cannot both be specified"
+                                     & " on the same USE dataset spec";
+                           end if;
+
+                           if Spec.Opts.Rename_Pairs /= null then
                               declare
-                                 Tmp : SData.Merge.Table_Access := P;
+                                 Pairs : SData.Transient_Table
+                                            .Rename_Map_Vectors.Vector;
                               begin
-                                 Free_Snap (Tmp);
+                                 Convert_Rename_List
+                                   (Spec.Opts.Rename_Pairs, Pairs);
+                                 Snap_Ptr.Apply_Rename (Pairs);
                               end;
-                           end loop;
-                           raise SData_Core.Script_Error
-                             with "KEEP and DROP cannot both be specified"
-                                  & " on the same USE dataset spec";
-                        end if;
+                           end if;
 
-                        if Spec.Opts.Rename_Pairs /= null then
-                           declare
-                              Pairs : SData.Transient_Table
-                                         .Rename_Map_Vectors.Vector;
-                           begin
-                              Convert_Rename_List
-                                (Spec.Opts.Rename_Pairs, Pairs);
-                              Snap_Ptr.Apply_Rename (Pairs);
-                           end;
-                        end if;
+                           if Spec.Opts.Keep_Vars /= null then
+                              declare
+                                 Names : SData.Transient_Table
+                                            .Name_Vectors.Vector;
+                              begin
+                                 Convert_Variable_List
+                                   (Spec.Opts.Keep_Vars, Names);
+                                 Snap_Ptr.Apply_Keep (Names);
+                              end;
+                           end if;
 
-                        if Spec.Opts.Keep_Vars /= null then
-                           declare
-                              Names : SData.Transient_Table
-                                         .Name_Vectors.Vector;
-                           begin
-                              Convert_Variable_List
-                                (Spec.Opts.Keep_Vars, Names);
-                              Snap_Ptr.Apply_Keep (Names);
-                           end;
-                        end if;
+                           if Spec.Opts.Drop_Vars /= null then
+                              declare
+                                 Names : SData.Transient_Table
+                                            .Name_Vectors.Vector;
+                              begin
+                                 Convert_Variable_List
+                                   (Spec.Opts.Drop_Vars, Names);
+                                 Snap_Ptr.Apply_Drop (Names);
+                              end;
+                           end if;
 
-                        if Spec.Opts.Drop_Vars /= null then
-                           declare
-                              Names : SData.Transient_Table
-                                         .Name_Vectors.Vector;
-                           begin
-                              Convert_Variable_List
-                                (Spec.Opts.Drop_Vars, Names);
-                              Snap_Ptr.Apply_Drop (Names);
-                           end;
-                        end if;
+                           --  For Match/Interleave/Join: verify BY vars are
+                           --  present and sort the snapshot.
+                           if Stmt.Mode = MM_Match
+                              or else Stmt.Mode = MM_Interleave
+                              or else Stmt.Mode = MM_Join
+                           then
+                              for N of By_Names loop
+                                 if not Snap_Ptr.Has_Column
+                                           (To_String (N))
+                                 then
+                                    raise SData_Core.Script_Error
+                                      with "/BY=" & To_String (N)
+                                           & " is not present in dataset "
+                                           & Spec.File_Path
+                                               (1 .. Spec.File_Len);
+                                 end if;
+                              end loop;
+                              Snap_Ptr.Sort_By (By_Names);
+                           end if;
 
-                        --  For Match/Interleave/Join: verify BY vars are
-                        --  present and sort the snapshot.
-                        if Stmt.Mode = MM_Match
-                           or else Stmt.Mode = MM_Interleave
-                           or else Stmt.Mode = MM_Join
-                        then
-                           for N of By_Names loop
-                              if not Snap_Ptr.Has_Column
-                                        (To_String (N))
-                              then
-                                 Free_Snap (Snap_Ptr);
-                                 for P of Snapshots loop
-                                    declare
-                                       Tmp : SData.Merge.Table_Access := P;
-                                    begin
-                                       Free_Snap (Tmp);
-                                    end;
-                                 end loop;
-                                 raise SData_Core.Script_Error
-                                   with "/BY=" & To_String (N)
-                                        & " is not present in dataset "
-                                        & Spec.File_Path
-                                            (1 .. Spec.File_Len);
-                              end if;
-                           end loop;
-                           Snap_Ptr.Sort_By (By_Names);
-                        end if;
+                           --  IN= variable registration is deferred to
+                           --  Required Follow-on A (per-row provenance).
+                           --  Spec.Opts.IN_Name_Len is accepted by the
+                           --  parser but not yet wired here.
+                        end;
+                     end loop;
 
-                        --  IN= variable registration is deferred to
-                        --  Required Follow-on A (per-row provenance).
-                        --  Spec.Opts.IN_Name_Len is accepted by the
-                        --  parser but not yet wired here.
+                     --  Combine all snapshots into one result table.
+                     case Stmt.Mode is
+                        when MM_Positional =>
+                           Combined := SData.Merge.Combine_Positional
+                                         (Snapshots, Warnings);
+                        when MM_Match =>
+                           Combined := SData.Merge.Combine_Match
+                                         (Snapshots, By_Names, Warnings);
+                        when MM_Interleave =>
+                           Combined := SData.Merge.Combine_Interleave
+                                         (Snapshots, By_Names, Warnings);
+                        when MM_Join =>
+                           Combined := SData.Merge.Combine_Join
+                                         (Snapshots, By_Names, Warnings);
+                        when MM_Single =>
+                           null;  --  not reached; handled by the outer if
+                     end case;
 
-                        Snapshots.Append (Snap_Ptr);
-                     end;
-                  end loop;
+                     --  Install the combined result as the active global table.
+                     SData.Transient_Table.Install_To_Current (Combined);
 
-                  --  Combine all snapshots into one result table.
-                  case Stmt.Mode is
-                     when MM_Positional =>
-                        Combined := SData.Merge.Combine_Positional
-                                      (Snapshots, Warnings);
-                     when MM_Match =>
-                        Combined := SData.Merge.Combine_Match
-                                      (Snapshots, By_Names, Warnings);
-                     when MM_Interleave =>
-                        Combined := SData.Merge.Combine_Interleave
-                                      (Snapshots, By_Names, Warnings);
-                     when MM_Join =>
-                        Combined := SData.Merge.Combine_Join
-                                      (Snapshots, By_Names, Warnings);
-                     when MM_Single =>
-                        null;  --  not reached; handled by the outer if
-                  end case;
+                     --  Refresh the PDV to reflect the new merged schema.
+                     SData_Core.Variables.Refresh_PDV_Names;
+                     SData_Core.Variables.Register_Subscripted_Columns;
 
-                  --  Install the combined result as the active global table.
-                  SData.Transient_Table.Install_To_Current (Combined);
+                     --  Free per-input snapshot heap allocations.
+                     Free_All_Snapshots;
 
-                  --  Refresh the PDV to reflect the new merged schema.
-                  SData_Core.Variables.Refresh_PDV_Names;
-                  SData_Core.Variables.Register_Subscripted_Columns;
+                     --  Emit accumulated warnings to stderr.
+                     for W of Warnings loop
+                        SData_Core.IO.Put_Line_Error
+                          ("warning: " & To_String (W));
+                     end loop;
 
-                  --  Free per-input snapshot heap allocations.
-                  for P of Snapshots loop
-                     declare
-                        Tmp : SData.Merge.Table_Access := P;
-                     begin
-                        Free_Snap (Tmp);
-                     end;
-                  end loop;
+                     --  Cancel any active REPEAT state (mirrors legacy
+                     --  Execute_USE behavior).
+                     SData_Core.Config.Runtime.Repeat_Active := False;
+                     SData_Core.Config.Runtime.Repeat_Count  := 0;
 
-                  --  Emit accumulated warnings to stderr.
-                  for W of Warnings loop
-                     SData_Core.IO.Put_Line_Error
-                       ("warning: " & To_String (W));
-                  end loop;
+                     --  Cache merged column names for bookkeeping.
+                     Input_File_Columns.Clear;
+                     for I in 1 .. Column_Count loop
+                        Input_File_Columns.Include (Column_Name (I));
+                     end loop;
 
-                  --  Cancel any active REPEAT state (mirrors legacy
-                  --  Execute_USE behavior).
-                  SData_Core.Config.Runtime.Repeat_Active := False;
-                  SData_Core.Config.Runtime.Repeat_Count  := 0;
-
-                  --  Cache merged column names for bookkeeping.
-                  Input_File_Columns.Clear;
-                  for I in 1 .. Column_Count loop
-                     Input_File_Columns.Include (Column_Name (I));
-                  end loop;
-
-                  Debug_Trace ("USE (multi): merged "
-                               & Ada.Strings.Fixed.Trim
-                                    (Natural'Image
-                                       (Natural
-                                          (Stmt.Dataset_List.Length)),
-                                     Ada.Strings.Both)
-                               & " datasets ("
-                               & Ada.Strings.Fixed.Trim
-                                    (Natural'Image
-                                       (SData_Core.Table.Row_Count),
-                                     Ada.Strings.Both)
-                               & " records, "
-                               & Ada.Strings.Fixed.Trim
-                                    (Natural'Image
-                                       (SData_Core.Table.Column_Count),
-                                     Ada.Strings.Both)
-                               & " variables)", 1);
+                     Debug_Trace ("USE (multi): merged "
+                                  & Ada.Strings.Fixed.Trim
+                                       (Natural'Image
+                                          (Natural
+                                             (Stmt.Dataset_List.Length)),
+                                        Ada.Strings.Both)
+                                  & " datasets ("
+                                  & Ada.Strings.Fixed.Trim
+                                       (Natural'Image
+                                          (SData_Core.Table.Row_Count),
+                                        Ada.Strings.Both)
+                                  & " records, "
+                                  & Ada.Strings.Fixed.Trim
+                                       (Natural'Image
+                                          (SData_Core.Table.Column_Count),
+                                        Ada.Strings.Both)
+                                  & " variables)", 1);
+                  exception
+                     when others =>
+                        Free_All_Snapshots;
+                        raise;
+                  end;
                end;
             end if;
          end;
