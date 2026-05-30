@@ -594,6 +594,7 @@ begin
                Put_Line ("OPTIONS IEEE_DIVIDE " & Bool_Display (SData_Core.Config.Runtime.IEEE_Divide));
                Put_Line ("OPTIONS SHELLTIMEOUT " & Ada.Strings.Fixed.Trim (SData_Core.Config.Runtime.Options_Shell_Timeout'Image, Ada.Strings.Both));
                Put_Line ("OPTIONS DEBUG " & Ada.Strings.Fixed.Trim (SData_Core.Config.Debug_Level'Image, Ada.Strings.Both));
+               Put_Line ("OPTIONS JOIN_WARN_THRESHOLD " & Ada.Strings.Fixed.Trim (SData_Core.Config.Runtime.Options_Join_Warn_Threshold'Image, Ada.Strings.Both));
             elsif Key = "MAXINTAB" then
                SData_Core.Config.Max_Table_Cells := Natural'Value (Val);
             elsif Key = "MAXTEMPMEM" then
@@ -617,6 +618,9 @@ begin
                   (Natural'Value (Val));
             elsif Key = "DEBUG" then
                SData_Core.Config.Debug_Level := Natural'Value (Val);
+            elsif Key = "JOIN_WARN_THRESHOLD" then
+               SData_Core.Commands.Execute_OPTIONS_Join_Warn_Threshold
+                  (Natural'Value (Val));
             else
                Put_Line_Error ("Warning: Unknown OPTIONS key: " & Key);
             end if;
