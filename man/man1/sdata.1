@@ -178,33 +178,190 @@ Statements fall into three categories:
 Execute immediately and configure state for the next data step.
 .RS
 .TP
-.B USE \fIfile\fR[\fB[\fIsheet\fB]\fR] [\fB/FMT=\fIformat\fR] [\fB/DLM=\fIdelim\fR] [\fB/HEADER=YES|NO\fR] [\fB/CHARSET=\fIenc\fR] [\fB/NSCAN=\fIn\fR] [\fB/SKIP=\fIn\fR] [\fB/MAXROWS=\fIn\fR]
-Load a dataset from a CSV, ODF, or OOXML file.
+.B USE \fIspec\fR[\fB,\fR \fIspec\fR ...] [\fB/BY=\fIvar\fR ...] [\fB/INTERLEAVE\fR|\fB/JOIN\fR]
+Load one or more datasets and install the result as the current table.
+Each \fIspec\fR has the form:
+.RS
+.IP
+\fIfile\fR[\fB[\fIsheet\fB]\fR] [\fBAS\fR \fIalias\fR] [\fB(\fIper\-dataset\-opts\fB)\fR]
+.RE
+.PP
 For ODF and OOXML workbooks, an optional sheet name may be appended in
 brackets immediately after the filename (e.g.\&
 .BR """sales.xlsx[Q1]""" ).
 If omitted, the first sheet is used.
-.B /DLM=
-overrides the field delimiter for CSV files (default comma; multi-character delimiters are supported).
-.B /CHARSET=
-specifies the character encoding (e.g.\& UTF-8, UTF-16, ASCII).
-.B /NSCAN=\fIn\fR
-sets how many rows are scanned to infer column types (default 20; CSV only).
-.B /SKIP=\fIn\fR
-skips the first
+.PP
+When a single \fIspec\fR is given the existing slash-option syntax is also
+accepted on the command line (e.g.\&
+.BR "USE foo.csv /HEADER=NO" ).
+.PP
+\fBMerge modes\fR (when two or more specs are given):
+.RS
+.TP
+.I (no /BY= option)
+Positional merge.
+Rows are combined by position; shorter datasets are padded with missing values.
+.TP
+.BI /BY= "var ..."
+Match merge (full outer).
+Inputs are auto-sorted by the BY variables; corresponding BY-group rows are
+aligned.
+A warning is emitted for each BY group in which two or more inputs each
+contribute more than one row.
+.TP
+.BI "/BY=" "var ..." " /INTERLEAVE"
+Interleave.
+All rows from every input are retained, emitted in BY-sorted order.
+.TP
+.BI "/BY=" "var ..." " /JOIN"
+Cartesian inner join.
+Every combination of rows within each BY group is produced.
+Unmatched BY groups are dropped.
+A warning is emitted if a group\(cqs Cartesian product exceeds
+.BR "OPTIONS JOIN_WARN_THRESHOLD" .
+.RE
+.PP
+\fBPer-dataset options\fR (inside the parenthesis block for each \fIspec\fR):
+.RS
+.TP
+.BI KEEP= "name ..."
+Retain only the named columns from this input.
+.TP
+.BI DROP= "name ..."
+Remove the named columns from this input.
+.B KEEP
+and
+.B DROP
+may not both appear for the same dataset.
+.TP
+.BI RENAME= "(" "old=new" " [, " "old=new" " ...]" ")"
+Rename columns in this input.
+All pairs are applied simultaneously (based on original names), matching SAS
+semantics.
+.B RENAME
+is applied before
+.B KEEP
+and
+.BR DROP .
+.TP
+.BI IN= varname
+Create a temporary integer variable set to 1 for records that originate from
+this dataset and 0 for records padded from other datasets.
+.TP
+.BI FMT= format
+Override the input format for this dataset
+.RB ( CSV ", " ODF ", " OOXML ).
+.TP
+.BI HEADER= YES|NO
+Whether the first row is a header (default YES).
+.TP
+.BI CHARSET= enc
+Character encoding (e.g.\& UTF\-8, UTF\-16, ASCII).
+.TP
+.BI DLM= delim
+Field delimiter for CSV files (default comma; multi-character delimiters
+are supported).
+.TP
+.BI NSCAN= n
+Number of rows scanned to infer column types (default 20; CSV only).
+.TP
+.BI SKIP= n
+Skip the first
 .I n
 data rows after the header before reading.
-.B /MAXROWS=\fIn\fR
-limits the number of data rows loaded.
 .TP
-.B SAVE \fIfile\fR[\fB[\fIsheet\fB]\fR] [\fB/FMT=\fIformat\fR] [\fB/HEADER=YES|NO\fR]
-Queue the current data table to be saved after the next
+.BI MAXROWS= n
+Limit the number of data rows loaded from this dataset.
+.RE
+.PP
+\fBColumn\-name collisions\fR across inputs (excluding BY variables) are resolved
+by last-dataset-wins.
+One warning is emitted per colliding name (not per row).
+Use
+.B RENAME=
+to resolve collisions explicitly.
+.TP
+.B SAVE \fIspec\fR[\fB,\fR \fIspec\fR ...]
+Register one or more output targets to be written at the end of the next
 .BR RUN .
+Each \fIspec\fR has the form:
+.RS
+.IP
+\fIfile\fR[\fB[\fIsheet\fB]\fR] [\fBAS\fR \fIalias\fR] [\fB(\fIper\-target\-opts\fB)\fR]
+.RE
+.PP
 For ODF and OOXML output, an optional sheet name in brackets sets the
 name of the sheet in the output workbook (e.g.\&
 .BR """report.ods[Summary]""" ).
 If omitted, the sheet is named
 .BR Sheet1 .
+A subsequent
+.B SAVE
+replaces the current registration list.
+A bare
+.B SAVE
+(no arguments) cancels all pending registrations.
+.PP
+\fBPer-target options\fR (inside the parenthesis block for each \fIspec\fR):
+.RS
+.TP
+.BI KEEP= "name ..."
+Write only the named columns to this target.
+.TP
+.BI DROP= "name ..."
+Exclude the named columns from this target.
+.B KEEP
+and
+.B DROP
+may not both appear for the same target.
+.TP
+.BI RENAME= "(" "old=new" " [, " "old=new" " ...]" ")"
+Rename columns in the output projection for this target.
+The in-memory PDV is not modified.
+.TP
+.BI IF= expr
+Row-level filter for this target.
+A record is written to this target only when
+.I expr
+is true.
+Absent
+.B IF=
+means always write.
+.TP
+.BI FMT= format
+Output format for this target
+.RB ( CSV ", " ODF ", " OOXML ).
+.TP
+.BI HEADER= YES|NO
+Whether to write a header row (default YES).
+.TP
+.BI CHARSET= enc
+Character encoding for this target (e.g.\& UTF\-8).
+.RE
+.PP
+The
+.B AS
+\fIalias\fR clause gives a target a short name usable with
+.BR "WRITE target" .
+Aliases must be unique within a
+.B SAVE
+statement.
+Two targets may not write the same filename.
+.PP
+\fBNOTE (MVP scope):\fR
+In the current release, multi-target
+.B SAVE
+writes the committed table to every registered target at end of
+.BR RUN .
+Per-target
+.B IF=
+filters and per-record routing via
+.B "WRITE target"
+are parsed and stored but not yet fully enforced at write time; these
+capabilities are tracked as follow-on work.
+Single-target
+.B SAVE
+retains full existing semantics.
 .TP
 .B BY \fIvar\fR [\fIvar\fR ...]
 Define BY\-group variables.
@@ -309,7 +466,12 @@ Notable keys:
 .B CHARSET \fIname\fR,
 .B MAXINTAB \fIn\fR,
 and
-.B MAXTEMPMEM \fIn\fR.
+.B MAXTEMPMEM \fIn\fR,
+and
+.B JOIN_WARN_THRESHOLD \fIn\fR
+(per-BY-group Cartesian product threshold above which
+.B /JOIN
+merges emit a warning; default 1,000,000; set to 0 to disable).
 .TP
 .B SYSTEM \fIcmd\fR
 Run an external shell command.
@@ -409,9 +571,28 @@ Examples:
 or
 .BR "BREAK WHEN SALARY > 100000" .
 .TP
-.B WRITE
-Explicitly write the current PDV to the output table.
+.B WRITE [\fItarget\fR[\fB,\fR \fItarget\fR ...]]
+Explicitly write the current PDV to the output.
 Suppresses the automatic end\-of\-record flush for that iteration.
+With no arguments, writes to every registered
+.B SAVE
+target.
+With one or more \fItarget\fR names (aliases or filenames registered via
+.BR SAVE ),
+writes only to those targets.
+Multiple
+.B WRITE
+statements in a single iteration are allowed; writing the same target
+twice produces two output records (matching SAS OUTPUT semantics).
+Naming an unregistered target is a runtime error.
+.PP
+\fBNOTE (MVP scope):\fR
+Target arguments are parsed in the current release; full per-target routing
+(where a
+.B WRITE
+without arguments writes only to matching-IF= targets) is tracked as a
+follow-on.
+The no-argument form retains full current semantics.
 .TP
 .BR KEEP " | " DROP " \fIvar\fR [\fIvar\fR ...]"
 Retain or remove columns from the output table after the next
