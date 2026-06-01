@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.9.1
+Version:        0.9.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Jun 01 2026 John L. Ries <john@theyarnbard.com> - 0.9.2-1
+- Phase B of audit item #5 — migrate direct Runtime field writes to End_Repeat / Clear_Pending_Save helpers (precondition for Phase C privatization).
+
 * Mon Jun 01 2026 John L. Ries <john@theyarnbard.com> - 0.9.1-1
 - USE alias uniqueness, IN= read-only enforcement, build-warning cleanup, missing error tests, architecture doc refresh
 

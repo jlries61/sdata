@@ -62,7 +62,7 @@ manually; `sdata-core` similarly needs to be on `GPR_PROJECT_PATH`.
   spec at `doc/specs/2026-05-19-data-vandal-design.md`.
 - **data-vandal** — a standalone interpreter for controlled data degradation
   (the former `VANDALIZE` command, extracted into its own application in
-  v0.9.1). See [ADR-038](doc/adrs.md) (now superseded) and the data-vandal
+  v0.9.2). See [ADR-038](doc/adrs.md) (now superseded) and the data-vandal
   repository for the application's own README.
 
 ## Installation
@@ -286,7 +286,7 @@ scripts/bump-version.sh <new-version> "<changelog-summary>"
 For example:
 
 ```sh
-scripts/bump-version.sh 0.9.1 "Fix path resolution in FPATH SUBMIT handler."
+scripts/bump-version.sh 0.9.2 "Fix path resolution in FPATH SUBMIT handler."
 ```
 
 The script validates the `N.N.N` version format, detects the current version
@@ -301,7 +301,7 @@ Run `sdata` with no arguments to enter the interactive console:
 
 ```
 $ sdata
-SData Statistical Interpreter version 0.9.1
+SData Statistical Interpreter version 0.9.2
 Interactive Console. Type QUIT to exit.
 sdata> use "mydata.csv"
 sdata> print recno, name$, score
