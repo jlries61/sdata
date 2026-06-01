@@ -95,6 +95,9 @@ begin
                      Nscan_Rows  => Stmt.NSCAN_Val,
                      Is_Mock     => Stmt.Is_Mock);
                end;
+               --  Single-dataset USE: clear any IN= read-only names from a
+               --  prior multi-dataset USE.  No IN= columns are created here.
+               Clear_Readonly_IN_Names;
                --  Cache column names from the file so future bookkeeping can
                --  tell the difference between original and derived columns.
                Input_File_Columns.Clear;
@@ -144,6 +147,38 @@ begin
                   end Free_All_Snapshots;
 
                begin
+                  --  Alias-uniqueness check: mirror the SAVE-side pattern.
+                  --  Walk the dataset list before allocating any snapshots so
+                  --  that a duplicate alias fails fast without leaking heap.
+                  declare
+                     package U is new Ada.Containers.Indefinite_Hashed_Sets
+                       (Element_Type        => String,
+                        Hash                => Ada.Strings.Hash,
+                        Equivalent_Elements => "=");
+                     Seen_USE_Aliases : U.Set;
+                  begin
+                     for Spec_Idx in 1 .. Natural (Stmt.Dataset_List.Length) loop
+                        declare
+                           Spec : constant Dataset_Spec_Access :=
+                                     Stmt.Dataset_List (Spec_Idx);
+                        begin
+                           if Spec.Alias_Len > 0 then
+                              declare
+                                 A : constant String :=
+                                    To_Upper (Spec.Alias (1 .. Spec.Alias_Len));
+                              begin
+                                 if Seen_USE_Aliases.Contains (A) then
+                                    raise SData_Core.Script_Error
+                                      with "duplicate USE alias: "
+                                           & Spec.Alias (1 .. Spec.Alias_Len);
+                                 end if;
+                                 Seen_USE_Aliases.Include (A);
+                              end;
+                           end if;
+                        end;
+                     end loop;
+                  end;
+
                   --  Convert statement-level BY vars once (Match/Interleave/
                   --  Join modes only).
                   if Stmt.Mode = MM_Match
@@ -152,6 +187,10 @@ begin
                   then
                      Convert_Variable_List (Stmt.By_Vars, By_Names);
                   end if;
+
+                  --  Clear the read-only IN= name set at the start of every
+                  --  multi-dataset USE.  Single-dataset USE clears it below.
+                  Clear_Readonly_IN_Names;
 
                   begin
                      --  Process each dataset spec.
@@ -305,49 +344,71 @@ begin
                      --  If the requested IN= column name already exists in
                      --  Combined (collision with a real data column) we raise
                      --  Script_Error rather than silently overwriting data.
-                     for Spec_Idx in 1 .. Natural (Stmt.Dataset_List.Length)
-                     loop
-                        declare
-                           Spec : constant Dataset_Spec_Access :=
-                                     Stmt.Dataset_List (Spec_Idx);
-                        begin
-                           if Spec.Opts.IN_Name_Len > 0 then
-                              declare
-                                 IN_Name : constant String :=
-                                    Spec.Opts.IN_Name
-                                       (1 .. Spec.Opts.IN_Name_Len);
-                              begin
-                                 if Combined.Has_Column (IN_Name) then
-                                    raise SData_Core.Script_Error
-                                      with "IN= name """ & IN_Name
-                                           & """ collides with an existing"
-                                           & " column in the combined table";
-                                 end if;
-                                 Combined.Add_Column
-                                   (IN_Name, SData_Core.Table.Col_Integer);
-                                 for R in 1 ..
-                                    SData.Transient_Table.Row_Count (Combined)
-                                 loop
-                                    declare
-                                       Bit : constant Boolean :=
-                                          Spec_Idx <=
-                                             Natural (Provenance.Length)
-                                          and then
-                                             Provenance (R).Contributors
-                                                (Spec_Idx);
-                                       Val : constant SData_Core.Values.Value
-                                          := (Kind =>
-                                                SData_Core.Values.Val_Integer,
-                                              Int_Val =>
-                                                (if Bit then 1 else 0));
-                                    begin
-                                       Combined.Set_Value (R, IN_Name, Val);
-                                    end;
-                                 end loop;
-                              end;
-                           end if;
-                        end;
-                     end loop;
+                     --  Duplicate IN= names across specs also raise an error.
+                     declare
+                        package IN_Name_Sets is new
+                           Ada.Containers.Indefinite_Hashed_Sets
+                             (Element_Type        => String,
+                              Hash                => Ada.Strings.Hash,
+                              Equivalent_Elements => "=");
+                        Seen_IN_Names : IN_Name_Sets.Set;
+                     begin
+                        for Spec_Idx in 1 .. Natural (Stmt.Dataset_List.Length)
+                        loop
+                           declare
+                              Spec : constant Dataset_Spec_Access :=
+                                        Stmt.Dataset_List (Spec_Idx);
+                           begin
+                              if Spec.Opts.IN_Name_Len > 0 then
+                                 declare
+                                    IN_Name : constant String :=
+                                       Spec.Opts.IN_Name
+                                          (1 .. Spec.Opts.IN_Name_Len);
+                                    IN_Upper : constant String :=
+                                       To_Upper (IN_Name);
+                                 begin
+                                    --  Duplicate IN= name across specs.
+                                    if Seen_IN_Names.Contains (IN_Upper) then
+                                       raise SData_Core.Script_Error
+                                         with "duplicate IN= name: " & IN_Name;
+                                    end if;
+                                    Seen_IN_Names.Include (IN_Upper);
+
+                                    if Combined.Has_Column (IN_Name) then
+                                       raise SData_Core.Script_Error
+                                         with "IN= name """ & IN_Name
+                                              & """ collides with an existing"
+                                              & " column in the combined table";
+                                    end if;
+                                    Combined.Add_Column
+                                      (IN_Name, SData_Core.Table.Col_Integer);
+                                    for R in 1 ..
+                                       SData.Transient_Table.Row_Count (Combined)
+                                    loop
+                                       declare
+                                          Bit : constant Boolean :=
+                                             Spec_Idx <=
+                                                Natural (Provenance.Length)
+                                             and then
+                                                Provenance (R).Contributors
+                                                   (Spec_Idx);
+                                          Val : constant SData_Core.Values.Value
+                                             := (Kind =>
+                                                   SData_Core.Values.Val_Integer,
+                                                 Int_Val =>
+                                                   (if Bit then 1 else 0));
+                                       begin
+                                          Combined.Set_Value (R, IN_Name, Val);
+                                       end;
+                                    end loop;
+                                    --  Register as read-only so LET/SET
+                                    --  assignments are rejected.
+                                    Register_Readonly_IN_Name (IN_Upper);
+                                 end;
+                              end if;
+                           end;
+                        end loop;
+                     end;
 
                      --  Install the combined result as the active global table.
                      SData.Transient_Table.Install_To_Current (Combined);
@@ -611,6 +672,7 @@ begin
          Clear_Active_Program;
          Clear_Target_Buffers;
          Clear_Registered_Saves;
+         Clear_Readonly_IN_Names;
          SData_Core.Commands.Execute_NEW;
       when Stmt_OPTIONS =>
          declare

@@ -154,6 +154,27 @@ package body SData.Interpreter is
      (Index_Type => Positive, Element_Type => Save_Target_Access);
    Registered_Saves : Save_Target_Vectors.Vector;
 
+   --  Names of IN= variables created by the most recent multi-dataset USE.
+   --  These are read-only Integer columns carrying provenance; user code is
+   --  rejected from overwriting them via LET or SET.  Cleared on NEW or on
+   --  any subsequent USE (single or multi-dataset).
+   Readonly_IN_Names : Name_Sets.Set;
+
+   procedure Register_Readonly_IN_Name (Name : String) is
+   begin
+      Readonly_IN_Names.Include (To_Upper (Name));
+   end Register_Readonly_IN_Name;
+
+   procedure Clear_Readonly_IN_Names is
+   begin
+      Readonly_IN_Names.Clear;
+   end Clear_Readonly_IN_Names;
+
+   function Is_Readonly_IN_Name (Name : String) return Boolean is
+   begin
+      return Readonly_IN_Names.Contains (To_Upper (Name));
+   end Is_Readonly_IN_Name;
+
    --  Reset per record; set True by any WRITE that fires during the
    --  iteration; consulted at end-of-record to decide whether to
    --  auto-flush.

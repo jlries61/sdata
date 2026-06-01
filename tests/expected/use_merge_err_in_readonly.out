@@ -1,0 +1,3 @@
+Dataset opened: tests/data/merge_a.csv
+Dataset opened: tests/data/merge_b.csv
+Error: cannot assign to IN= variable "hasA"; IN= variables are read-only
