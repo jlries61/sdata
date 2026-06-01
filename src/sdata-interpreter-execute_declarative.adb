@@ -428,8 +428,7 @@ begin
 
                      --  Cancel any active REPEAT state (mirrors legacy
                      --  Execute_USE behavior).
-                     SData_Core.Config.Runtime.Repeat_Active := False;
-                     SData_Core.Config.Runtime.Repeat_Count  := 0;
+                     SData_Core.Config.Runtime.End_Repeat;
 
                      --  Cache merged column names for bookkeeping.
                      Input_File_Columns.Clear;
@@ -498,7 +497,7 @@ begin
             --  The parser leaves Save_List empty and File_Len = 0 for bare SAVE.
             if Natural (Stmt.Save_List.Length) = 0 then
                Clear_Registered_Saves;
-               SData_Core.Config.Runtime.Save_File_Active := False;
+               SData_Core.Config.Runtime.Clear_Pending_Save;
                return;
             end if;
 
