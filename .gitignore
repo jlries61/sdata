@@ -15,6 +15,9 @@ tests/data/output.csv
 tests/data/output_pipe.csv
 tests/data/test1_output.csv
 tests/data/inf_output.csv
+tests/data/multi_out_p.csv
+tests/data/multi_out_q.csv
+tests/data/multi_out_r.csv
 sdata_opt_*.csv
 
 # Packaging artifacts
