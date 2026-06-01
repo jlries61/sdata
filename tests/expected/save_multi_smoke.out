@@ -1,0 +1,6 @@
+Dataset opened: tests/data/merge_a.csv
+1.00000 10.00000
+2.00000 20.00000
+Dataset saved: tests/data/multi_out_p.csv
+Dataset saved: tests/data/multi_out_q.csv
+RUN complete. 2 records and 2 variables processed.
