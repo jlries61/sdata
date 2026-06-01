@@ -1,3 +1,9 @@
+sdata (0.9.1-1) unstable; urgency=medium
+
+  * USE alias uniqueness, IN= read-only enforcement, build-warning cleanup, missing error tests, architecture doc refresh
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 01 Jun 2026 10:22:50 -0700
+
 sdata (0.9.0-1) unstable; urgency=medium
 
   * Multi-dataset USE merge (4 modes), multi-target SAVE with per-record IF= routing, per-row IN= provenance, OPTIONS JOIN_WARN_THRESHOLD
