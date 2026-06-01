@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.9.2
+Version:        0.9.3
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Jun 01 2026 John L. Ries <john@theyarnbard.com> - 0.9.3-1
+- Migrate sdata_unit_test.adb's direct Runtime field writes to Execute_OPTIONS helper (precondition for sdata-core Runtime privatization).
+
 * Mon Jun 01 2026 John L. Ries <john@theyarnbard.com> - 0.9.2-1
 - Phase B of audit item #5 — migrate direct Runtime field writes to End_Repeat / Clear_Pending_Save helpers (precondition for Phase C privatization).
 

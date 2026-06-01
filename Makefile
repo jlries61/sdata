@@ -1,6 +1,6 @@
 # Makefile for SData
 
-VERSION          := 0.9.2
+VERSION          := 0.9.3
 SDATA_CORE_VERSION  := 0.1.3
 ZIPADA_VERSION      := 61.0.0
 XMLADA_VERSION      := 26.0.0
