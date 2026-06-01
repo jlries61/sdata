@@ -8,7 +8,7 @@
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with SData_Core.Config.Runtime;
+with SData_Core.Commands;
 with SData_Core.Table;           use SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
 with SData_Core.Evaluator;       use SData_Core.Evaluator;
@@ -2010,9 +2010,9 @@ begin
       Inputs.Append (B_Ptr);
       By_Vars.Append (To_Unbounded_String ("ID%"));
 
-      SData_Core.Config.Runtime.Options_Join_Warn_Threshold := 5;
+      SData_Core.Commands.Execute_OPTIONS_Join_Warn_Threshold (5);
       Result := SData.Merge.Combine_Join (Inputs, By_Vars, Warnings, Provenance);
-      SData_Core.Config.Runtime.Options_Join_Warn_Threshold := 1_000_000;
+      SData_Core.Commands.Execute_OPTIONS_Join_Warn_Threshold (1_000_000);
 
       Check ("CJ-04 Threshold trip row count = 9",
              Result.Row_Count, 9);
