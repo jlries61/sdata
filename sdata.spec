@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.8.1
+Version:        0.9.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Jun 01 2026 John L. Ries <john@theyarnbard.com> - 0.9.0-1
+- Multi-dataset USE merge (4 modes), multi-target SAVE with per-record IF= routing, per-row IN= provenance, OPTIONS JOIN_WARN_THRESHOLD
+
 * Tue May 26 2026 John L. Ries <john@theyarnbard.com> - 0.8.1-1
 - Packaging fixes for sdata-core split (RPM, Debian, Slackware); AST Options_Key_Len/Val_Len initialization fix.
 
