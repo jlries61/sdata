@@ -3,7 +3,6 @@
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
 with Ada.Unchecked_Deallocation;
-with SData_Core.Evaluator;
 
 package body SData.AST is
 
@@ -58,7 +57,6 @@ package body SData.AST is
    end Free_Spec_Options;
 
    procedure Free_Expr_List (List : in out SData_Core.Evaluator.Expression_List) is
-      use SData_Core.Evaluator;
       procedure Free_List_Node is new Ada.Unchecked_Deallocation (Expression_List_Node, Expression_List);
       Next : Expression_List;
    begin
@@ -197,7 +195,6 @@ package body SData.AST is
    function Copy_Expression_List (List : SData_Core.Evaluator.Expression_List)
       return SData_Core.Evaluator.Expression_List
    is
-      use SData_Core.Evaluator;
    begin
       if List = null then return null; end if;
       return new Expression_List_Node'(Expr     => Copy_Expression (List.Expr),
@@ -209,7 +206,6 @@ package body SData.AST is
    function Copy_Expression (Expr : SData_Core.Evaluator.Expression_Access)
       return SData_Core.Evaluator.Expression_Access
    is
-      use SData_Core.Evaluator;
       Res : Expression_Access;
    begin
       if Expr = null then return null; end if;

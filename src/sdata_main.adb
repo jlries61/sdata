@@ -21,7 +21,6 @@ with SData.Version;
 with SData.Interpreter; use SData.Interpreter;
 with SData_Core.Commands;
 with SData_Core.Config;         use SData_Core.Config;
-with SData_Core.Config.Runtime;
 with SData_Core.IO;          use SData_Core.IO;
 with SData.System;
 with SData_Core.Signals;

@@ -13,7 +13,6 @@ with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData_Core.Commands;
 with SData_Core.Config;
-with SData_Core.Config.Runtime;
 with SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
 with SData_Core.Variables;
