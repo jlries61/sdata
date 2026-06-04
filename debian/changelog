@@ -1,3 +1,9 @@
+sdata (0.9.4-1) unstable; urgency=medium
+
+  * Add USE /APPEND merge mode for vertical concatenation of datasets
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 03 Jun 2026 18:57:24 -0700
+
 sdata (0.9.3-1) unstable; urgency=medium
 
   * Migrate sdata_unit_test.adb's direct Runtime field writes to Execute_OPTIONS helper (precondition for sdata-core Runtime privatization).
