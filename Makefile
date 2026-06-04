@@ -127,7 +127,7 @@ check: build
 			failures=$$((failures+1)); failed_list="$$failed_list $$f"; \
 		elif [ $$actual_exit -ne $$expected_exit ]; then \
 			echo "FAILED (exit $$actual_exit, expected $$expected_exit)"; \
-			rm -f tests/$$base.tmp; \
+			mv tests/$$base.tmp tests/$$base.failed.tmp; \
 			failures=$$((failures+1)); failed_list="$$failed_list $$f"; \
 		elif [ ! -f "$$exp" ]; then \
 			echo "FAILED (no expected output file)"; \
