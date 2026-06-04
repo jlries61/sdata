@@ -4,6 +4,7 @@
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with SData_Core.Config.Runtime;
 with SData_Core.Values;
+with SData_Core.Table;
 
 package body SData.Merge is
 
@@ -691,5 +692,195 @@ package body SData.Merge is
       end loop;
       return Result;
    end Combine_Join;
+
+   --  ---- Append (vertical concatenation) ----------------------------
+
+   --  A character (Col_String) column is routed to a destination whose name
+   --  ends in "$"; numeric-family columns keep their name. This is a pure
+   --  function of (name, type), so the value-copy pass can recompute it
+   --  instead of threading a routing table. It also makes the numeric/
+   --  character split order-independent: numeric "X" -> "X", character "X"
+   --  -> "X$", whichever input each came from.
+   function Append_Dest_Name
+     (Col_Name : String;
+      Col_Type : SData_Core.Table.Column_Type) return String
+   is
+      use type SData_Core.Table.Column_Type;
+   begin
+      if Col_Type = SData_Core.Table.Col_String
+         and then (Col_Name'Length = 0
+                   or else Col_Name (Col_Name'Last) /= '$')
+      then
+         return Col_Name & "$";
+      else
+         return Col_Name;
+      end if;
+   end Append_Dest_Name;
+
+   --  Reconcile the output type when two inputs contribute to the same
+   --  destination column. Integer + Numeric promotes to Numeric; a mix of
+   --  numeric-family and string (only reachable for columns that bypass the
+   --  "$" naming convention) coerces to string.
+   function Reconcile_Type
+     (A, B : SData_Core.Table.Column_Type)
+      return SData_Core.Table.Column_Type
+   is
+      use type SData_Core.Table.Column_Type;
+   begin
+      if A = B then
+         return A;
+      elsif A = SData_Core.Table.Col_String
+         or else B = SData_Core.Table.Col_String
+      then
+         return SData_Core.Table.Col_String;
+      else
+         --  Both numeric-family, types differ -> Integer + Numeric.
+         return SData_Core.Table.Col_Numeric;
+      end if;
+   end Reconcile_Type;
+
+   function Combine_Append
+     (Inputs     : Table_Vectors.Vector;
+      Warnings   : in out Warning_Vectors.Vector;
+      Provenance : in out Provenance_Vectors.Vector)
+      return SData.Transient_Table.Table
+   is
+      pragma Unreferenced (Warnings);
+      use type SData_Core.Table.Column_Type;
+      use type SData_Core.Values.Value_Kind;
+
+      type Dest_Entry is record
+         Name : Unbounded_String;
+         Typ  : SData_Core.Table.Column_Type;
+      end record;
+      package Dest_Vectors is new Ada.Containers.Vectors
+        (Index_Type => Positive, Element_Type => Dest_Entry);
+
+      Result : SData.Transient_Table.Table;
+      Dests  : Dest_Vectors.Vector;
+
+      function Find_Dest (Up : String) return Natural is
+      begin
+         for I in 1 .. Natural (Dests.Length) loop
+            if To_Upper (To_String (Dests (I).Name)) = Up then
+               return I;
+            end if;
+         end loop;
+         return 0;
+      end Find_Dest;
+   begin
+      --  Pass 1: build the reconciled destination schema.
+      for T_Idx in 1 .. Natural (Inputs.Length) loop
+         declare
+            T : constant Table_Access := Inputs (T_Idx);
+         begin
+            for C in 1 .. SData.Transient_Table.Column_Count (T.all) loop
+               declare
+                  Name : constant String :=
+                     SData.Transient_Table.Column_Name (T.all, C);
+                  CT   : constant SData_Core.Table.Column_Type :=
+                     SData.Transient_Table.Get_Column_Type (T.all, Name);
+                  Dest : constant String := Append_Dest_Name (Name, CT);
+                  Pos  : constant Natural := Find_Dest (To_Upper (Dest));
+               begin
+                  if Pos = 0 then
+                     Dests.Append
+                       ((Name => To_Unbounded_String (Dest), Typ => CT));
+                  else
+                     Dests (Pos).Typ := Reconcile_Type (Dests (Pos).Typ, CT);
+                  end if;
+               end;
+            end loop;
+         end;
+      end loop;
+
+      for D of Dests loop
+         Result.Add_Column (To_String (D.Name), D.Typ);
+      end loop;
+
+      --  Pass 2: stack rows. Each output row comes from exactly one input.
+      for T_Idx in 1 .. Natural (Inputs.Length) loop
+         declare
+            T  : constant Table_Access := Inputs (T_Idx);
+            N  : constant Natural := SData.Transient_Table.Row_Count (T.all);
+            NC : constant Natural := SData.Transient_Table.Column_Count (T.all);
+
+            --  Per-source-column routing, computed once for this input rather
+            --  than per cell: the destination name and whether an integer
+            --  value must be promoted to numeric there are both constant
+            --  across rows.
+            type Route_Entry is record
+               Src     : Unbounded_String;
+               Dest    : Unbounded_String;
+               Promote : Boolean;
+            end record;
+            Routes : array (1 .. NC) of Route_Entry;
+         begin
+            for SC in 1 .. NC loop
+               declare
+                  Name : constant String :=
+                     SData.Transient_Table.Column_Name (T.all, SC);
+                  CT   : constant SData_Core.Table.Column_Type :=
+                     SData.Transient_Table.Get_Column_Type (T.all, Name);
+                  Dest : constant String := Append_Dest_Name (Name, CT);
+               begin
+                  Routes (SC) :=
+                    (Src     => To_Unbounded_String (Name),
+                     Dest    => To_Unbounded_String (Dest),
+                     Promote =>
+                        SData.Transient_Table.Get_Column_Type (Result, Dest)
+                          = SData_Core.Table.Col_Numeric);
+               end;
+            end loop;
+
+            for R in 1 .. N loop
+               Result.Add_Row;
+               declare
+                  R_Out : constant Positive :=
+                     SData.Transient_Table.Row_Count (Result);
+               begin
+                  --  Default every cell to missing.
+                  for OC in 1 .. SData.Transient_Table.Column_Count (Result)
+                  loop
+                     Result.Set_Value
+                       (R_Out,
+                        SData.Transient_Table.Column_Name (Result, OC),
+                        (Kind => SData_Core.Values.Val_Missing));
+                  end loop;
+
+                  --  Route each source column of this input to its dest.
+                  for SC in 1 .. NC loop
+                     declare
+                        Src  : constant String := To_String (Routes (SC).Src);
+                        Dest : constant String := To_String (Routes (SC).Dest);
+                        V    : SData_Core.Values.Value := T.Get_Value (R, Src);
+                     begin
+                        --  Integer -> Numeric where the dest was promoted.
+                        if Routes (SC).Promote
+                           and then V.Kind = SData_Core.Values.Val_Integer
+                        then
+                           V := (Kind    => SData_Core.Values.Val_Numeric,
+                                 Num_Val => Float (V.Int_Val));
+                        end if;
+                        Result.Set_Value (R_Out, Dest, V);
+                     end;
+                  end loop;
+
+                  --  Provenance: exactly one bit set (this input).
+                  declare
+                     Mask : Row_Provenance;
+                  begin
+                     for J in 1 .. Natural (Inputs.Length) loop
+                        Mask.Contributors.Append (J = T_Idx);
+                     end loop;
+                     Provenance.Append (Mask);
+                  end;
+               end;
+            end loop;
+         end;
+      end loop;
+
+      return Result;
+   end Combine_Append;
 
 end SData.Merge;

@@ -332,6 +332,9 @@ begin
                            Combined := SData.Merge.Combine_Join
                                          (Snapshots, By_Names, Warnings,
                                           Provenance);
+                        when MM_Append =>
+                           Combined := SData.Merge.Combine_Append
+                                         (Snapshots, Warnings, Provenance);
                         when MM_Single =>
                            null;  --  not reached; handled by the outer if
                      end case;

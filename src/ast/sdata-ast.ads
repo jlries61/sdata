@@ -98,7 +98,7 @@ package SData.AST is
      (Index_Type => Positive, Element_Type => Save_Spec_Access);
 
    type Merge_Mode is (MM_Single, MM_Positional, MM_Match,
-                       MM_Interleave, MM_Join);
+                       MM_Interleave, MM_Join, MM_Append);
 
    type Statement;
    type Statement_Access is access Statement;

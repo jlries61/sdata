@@ -2106,6 +2106,326 @@ begin
    end;
 
    ---------------------------------------------------------------------------
+   --  ── Combine_Append tests (CA-*) ─────────────────────────────────────────
+   ---------------------------------------------------------------------------
+
+   Put_Line ("--- Combine_Append tests ---");
+
+   --  CA-01: two-input disjoint columns -> 4 rows, correct population.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs     : SData.Merge.Table_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("X", SData_Core.Table.Col_Numeric);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "X",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 1.0));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "X",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 2.0));
+
+      B_Ptr.Add_Column ("Y", SData_Core.Table.Col_Numeric);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "Y",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 100.0));
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (2, "Y",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 200.0));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Append (Inputs, Warnings, Provenance);
+
+      Check ("CA-01 Result row count = 4", Result.Row_Count, 4);
+      Check ("CA-01b Result column count = 2", Result.Column_Count, 2);
+      VV := Result.Get_Value (1, "X");
+      Check_Float ("CA-01c Row 1 X = 1.0", VV.Num_Val, 1.0);
+      VV := Result.Get_Value (1, "Y");
+      Check ("CA-01d Row 1 Y missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (3, "X");
+      Check ("CA-01e Row 3 X missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (3, "Y");
+      Check_Float ("CA-01f Row 3 Y = 100.0", VV.Num_Val, 100.0);
+      VV := Result.Get_Value (4, "Y");
+      Check_Float ("CA-01g Row 4 Y = 200.0", VV.Num_Val, 200.0);
+   end;
+
+   --  CA-02: two-input overlapping numeric column -> stacked, no warning.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs     : SData.Merge.Table_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("V", SData_Core.Table.Col_Numeric);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "V",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 10.0));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "V",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 20.0));
+
+      B_Ptr.Add_Column ("V", SData_Core.Table.Col_Numeric);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "V",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 30.0));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Append (Inputs, Warnings, Provenance);
+
+      Check ("CA-02 Result row count = 3", Result.Row_Count, 3);
+      Check ("CA-02b Single column (no split)", Result.Column_Count, 1);
+      Check ("CA-02c No warnings", Natural (Warnings.Length), 0);
+      VV := Result.Get_Value (3, "V");
+      Check_Float ("CA-02d Row 3 V = 30.0", VV.Num_Val, 30.0);
+   end;
+
+   --  CA-03: three-input disjoint columns -> 6 rows.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      C_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs     : SData.Merge.Table_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+   begin
+      A_Ptr.Add_Column ("P", SData_Core.Table.Col_Numeric);
+      A_Ptr.Add_Row; A_Ptr.Add_Row;
+      B_Ptr.Add_Column ("Q", SData_Core.Table.Col_Numeric);
+      B_Ptr.Add_Row; B_Ptr.Add_Row;
+      C_Ptr.Add_Column ("R", SData_Core.Table.Col_Numeric);
+      C_Ptr.Add_Row; C_Ptr.Add_Row;
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+      Inputs.Append (C_Ptr);
+
+      Result := SData.Merge.Combine_Append (Inputs, Warnings, Provenance);
+
+      Check ("CA-03 Three-way row count = 6", Result.Row_Count, 6);
+      Check ("CA-03b Column count = 3", Result.Column_Count, 3);
+   end;
+
+   --  CA-04: mismatched row counts -> each input's actual count (no padding).
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs     : SData.Merge.Table_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+   begin
+      A_Ptr.Add_Column ("X", SData_Core.Table.Col_Numeric);
+      A_Ptr.Add_Row; A_Ptr.Add_Row; A_Ptr.Add_Row;
+      B_Ptr.Add_Column ("Y", SData_Core.Table.Col_Numeric);
+      B_Ptr.Add_Row;
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Append (Inputs, Warnings, Provenance);
+
+      Check ("CA-04 Row count = 3 + 1 = 4", Result.Row_Count, 4);
+   end;
+
+   --  CA-05: provenance -> each row's mask has exactly one bit set matching
+   --  the contributing input index.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs     : SData.Merge.Table_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      pragma Unreferenced (Result);
+   begin
+      A_Ptr.Add_Column ("X", SData_Core.Table.Col_Numeric);
+      A_Ptr.Add_Row; A_Ptr.Add_Row;
+      B_Ptr.Add_Column ("Y", SData_Core.Table.Col_Numeric);
+      B_Ptr.Add_Row; B_Ptr.Add_Row;
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Append (Inputs, Warnings, Provenance);
+
+      Check ("CA-05 Provenance has 4 rows",
+             Natural (Provenance.Length), 4);
+      Check ("CA-05b Row 1 from input 1",
+             Provenance (1).Contributors (1)
+               and then not Provenance (1).Contributors (2), True);
+      Check ("CA-05c Row 2 from input 1",
+             Provenance (2).Contributors (1)
+               and then not Provenance (2).Contributors (2), True);
+      Check ("CA-05d Row 3 from input 2",
+             Provenance (3).Contributors (2)
+               and then not Provenance (3).Contributors (1), True);
+      Check ("CA-05e Row 4 from input 2",
+             Provenance (4).Contributors (2)
+               and then not Provenance (4).Contributors (1), True);
+   end;
+
+   --  CA-06: integer/numeric promotion under the same name.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs     : SData.Merge.Table_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+      use type SData_Core.Table.Column_Type;
+   begin
+      A_Ptr.Add_Column ("N", SData_Core.Table.Col_Integer);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "N",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 5));
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (2, "N",
+                       (Kind => SData_Core.Values.Val_Integer, Int_Val => 7));
+
+      B_Ptr.Add_Column ("N", SData_Core.Table.Col_Numeric);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "N",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 1.5));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Append (Inputs, Warnings, Provenance);
+
+      Check ("CA-06 Single reconciled column", Result.Column_Count, 1);
+      Check ("CA-06b Column N promoted to Numeric",
+             SData.Transient_Table.Get_Column_Type (Result, "N")
+               = SData_Core.Table.Col_Numeric, True);
+      VV := Result.Get_Value (1, "N");
+      Check ("CA-06c Row 1 is now Numeric kind",
+             VV.Kind = SData_Core.Values.Val_Numeric, True);
+      Check_Float ("CA-06d Row 1 N = 5.0", VV.Num_Val, 5.0);
+      VV := Result.Get_Value (3, "N");
+      Check_Float ("CA-06e Row 3 N = 1.5", VV.Num_Val, 1.5);
+   end;
+
+   --  CA-07: numeric/string split into name and name$ (convention bypass).
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs     : SData.Merge.Table_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("VAL", SData_Core.Table.Col_Numeric);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "VAL",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 10.0));
+
+      --  B's VAL is character but named WITHOUT "$": bypasses the convention.
+      B_Ptr.Add_Column ("VAL", SData_Core.Table.Col_String);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "VAL",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("foo")));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Append (Inputs, Warnings, Provenance);
+
+      Check ("CA-07 Split produced 2 columns", Result.Column_Count, 2);
+      Check ("CA-07b VAL column exists",
+             Result.Has_Column ("VAL"), True);
+      Check ("CA-07c VAL$ column exists",
+             Result.Has_Column ("VAL$"), True);
+      VV := Result.Get_Value (1, "VAL");
+      Check_Float ("CA-07d Row 1 VAL = 10.0", VV.Num_Val, 10.0);
+      VV := Result.Get_Value (1, "VAL$");
+      Check ("CA-07e Row 1 VAL$ missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (2, "VAL");
+      Check ("CA-07f Row 2 VAL missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+      VV := Result.Get_Value (2, "VAL$");
+      Check ("CA-07g Row 2 VAL$ = foo",
+             To_String (VV.Str_Val), "foo");
+   end;
+
+   --  CA-08: split merges into an existing name$ column rather than duplicating.
+   declare
+      A_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      B_Ptr    : constant SData.Merge.Table_Access :=
+                    new SData.Transient_Table.Table;
+      Inputs     : SData.Merge.Table_Vectors.Vector;
+      Warnings   : SData.Merge.Warning_Vectors.Vector;
+      Provenance : SData.Merge.Provenance_Vectors.Vector;
+      Result   : SData.Transient_Table.Table;
+      VV       : SData_Core.Values.Value;
+   begin
+      A_Ptr.Add_Column ("VAL", SData_Core.Table.Col_Numeric);
+      A_Ptr.Add_Column ("VAL$", SData_Core.Table.Col_String);
+      A_Ptr.Add_Row;
+      A_Ptr.Set_Value (1, "VAL",
+                       (Kind => SData_Core.Values.Val_Numeric, Num_Val => 10.0));
+      A_Ptr.Set_Value (1, "VAL$",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("x")));
+
+      --  B's VAL is character, bypassing the convention; it must land in VAL$.
+      B_Ptr.Add_Column ("VAL", SData_Core.Table.Col_String);
+      B_Ptr.Add_Row;
+      B_Ptr.Set_Value (1, "VAL",
+                       (Kind    => SData_Core.Values.Val_String,
+                        Str_Val => To_Unbounded_String ("y")));
+
+      Inputs.Append (A_Ptr);
+      Inputs.Append (B_Ptr);
+
+      Result := SData.Merge.Combine_Append (Inputs, Warnings, Provenance);
+
+      Check ("CA-08 No duplicate VAL$ (2 columns total)",
+             Result.Column_Count, 2);
+      VV := Result.Get_Value (1, "VAL$");
+      Check ("CA-08b Row 1 VAL$ = x", To_String (VV.Str_Val), "x");
+      VV := Result.Get_Value (2, "VAL$");
+      Check ("CA-08c Row 2 VAL$ = y (B's string routed here)",
+             To_String (VV.Str_Val), "y");
+      VV := Result.Get_Value (2, "VAL");
+      Check ("CA-08d Row 2 VAL missing",
+             VV.Kind = SData_Core.Values.Val_Missing, True);
+   end;
+
+   ---------------------------------------------------------------------------
    --  ── Summary ─────────────────────────────────────────────────────────────
    ---------------------------------------------------------------------------
 

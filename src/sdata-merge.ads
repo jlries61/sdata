@@ -78,4 +78,22 @@ package SData.Merge is
       Provenance : in out Provenance_Vectors.Vector)
       return SData.Transient_Table.Table;
 
+   --  Append (vertical concatenation): stack the rows of each input in
+   --  spec order. Output row count = sum of input row counts; row order is
+   --  input order. Columns are the union of input columns, with same-named
+   --  columns type-reconciled across inputs:
+   --    * numeric-family + numeric-family -> Integer+Numeric promotes to
+   --      Numeric; identical types unchanged.
+   --    * a character column (Col_String) is routed to a destination whose
+   --      name carries the "$" suffix (appended if absent), so a numeric
+   --      "X" and a character "X" land in separate columns "X" and "X$".
+   --  Each output row originates from exactly one input, so its provenance
+   --  mask has exactly one bit set. The Warnings parameter is retained for
+   --  signature uniformity with the other combiners but is left unused.
+   function Combine_Append
+     (Inputs     : Table_Vectors.Vector;
+      Warnings   : in out Warning_Vectors.Vector;
+      Provenance : in out Provenance_Vectors.Vector)
+      return SData.Transient_Table.Table;
+
 end SData.Merge;

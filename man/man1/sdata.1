@@ -178,7 +178,7 @@ Statements fall into three categories:
 Execute immediately and configure state for the next data step.
 .RS
 .TP
-.B USE \fIspec\fR[\fB,\fR \fIspec\fR ...] [\fB/BY=\fIvar\fR ...] [\fB/INTERLEAVE\fR|\fB/JOIN\fR]
+.B USE \fIspec\fR[\fB,\fR \fIspec\fR ...] [\fB/BY=\fIvar\fR ...] [\fB/INTERLEAVE\fR|\fB/JOIN\fR|\fB/APPEND\fR]
 Load one or more datasets and install the result as the current table.
 Each \fIspec\fR has the form:
 .RS
@@ -219,6 +219,28 @@ Every combination of rows within each BY group is produced.
 Unmatched BY groups are dropped.
 A warning is emitted if a group\(cqs Cartesian product exceeds
 .BR "OPTIONS JOIN_WARN_THRESHOLD" .
+.TP
+.B /APPEND
+Vertical concatenation.
+All rows of every input are stacked in the order the specs are listed:
+all rows of the first dataset, then all rows of the second, and so on.
+The result columns are the union of the input columns, matched by name;
+a row carries missing values for any column its source dataset lacks.
+Same-named numeric columns are reconciled (integer and floating-point
+promote to floating-point), and a character column always occupies a
+name ending in
+.RB \(dq $ \(dq,
+so a numeric and a character field of the same base name remain separate
+columns.
+.B /APPEND
+requires two or more datasets and may not be combined with
+.BR /BY= ,
+.BR /INTERLEAVE ,
+or
+.BR /JOIN
+(use
+.B /INTERLEAVE
+for BY-sorted stacking).
 .RE
 .PP
 \fBPer-dataset options\fR (inside the parenthesis block for each \fIspec\fR):

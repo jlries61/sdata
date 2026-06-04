@@ -1092,7 +1092,7 @@ package body SData.Parser is
    --  grammar:
    --
    --    USE dataset_spec { , dataset_spec }
-   --        [ /BY=var_list ] [ /INTERLEAVE | /JOIN ]
+   --        [ /BY=var_list ] [ /INTERLEAVE | /JOIN | /APPEND ]
    --        [ /FMT=... /HEADER=... /CHARSET=... /DLM=... /NSCAN=... /SKIP=...
    --          /MAXROWS=... ]    (legacy single-dataset slash-options only)
    --
@@ -1169,6 +1169,7 @@ package body SData.Parser is
       Saw_BY         : Boolean := False;
       Saw_INTERLEAVE : Boolean := False;
       Saw_JOIN       : Boolean := False;
+      Saw_APPEND     : Boolean := False;
       Had_Error      : Boolean := False;
       --  True if the first (and only, for single-dataset) spec had an explicit
       --  "(" ... ")" per-dataset options block.  Used to decide whether legacy
@@ -1295,6 +1296,9 @@ package body SData.Parser is
             elsif Flag_Tok.Kind = Token_JOIN or else Flag_Name = "JOIN" then
                Saw_JOIN := True;
 
+            elsif Flag_Tok.Kind = Token_APPEND or else Flag_Name = "APPEND" then
+               Saw_APPEND := True;
+
             else
                --  Legacy per-dataset slash-options: only allowed when there is
                --  exactly one dataset and it had no paren-option block.
@@ -1325,7 +1329,18 @@ package body SData.Parser is
       --  Validate mode combinations.
       --  -----------------------------------------------------------------------
       if not Had_Error then
-         if Saw_INTERLEAVE and then Saw_JOIN then
+         if Saw_APPEND
+            and then (Saw_BY or else Saw_INTERLEAVE or else Saw_JOIN)
+         then
+            Put_Line_Error
+              ("Error: /APPEND cannot be combined with /BY, /INTERLEAVE,"
+               & " or /JOIN");
+            Had_Error := True;
+         elsif Saw_APPEND and then Natural (Stmt.Dataset_List.Length) < 2 then
+            Put_Line_Error
+              ("Error: /APPEND requires multiple datasets in USE");
+            Had_Error := True;
+         elsif Saw_INTERLEAVE and then Saw_JOIN then
             Put_Line_Error
               ("Error: /INTERLEAVE and /JOIN cannot both be specified in USE");
             Had_Error := True;
@@ -1392,7 +1407,9 @@ package body SData.Parser is
 
       else
          --  Multi-dataset.
-         if Saw_INTERLEAVE then
+         if Saw_APPEND then
+            Stmt.Mode := MM_Append;
+         elsif Saw_INTERLEAVE then
             Stmt.Mode := MM_Interleave;
          elsif Saw_JOIN then
             Stmt.Mode := MM_Join;

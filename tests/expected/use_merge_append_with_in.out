@@ -1,0 +1,7 @@
+Dataset opened: tests/data/merge_a.csv
+Dataset opened: tests/data/merge_b.csv
+1.00000 1 0
+2.00000 1 0
+1.00000 0 1
+2.00000 0 1
+RUN complete. 4 records and 5 variables processed.
