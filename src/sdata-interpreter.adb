@@ -962,7 +962,7 @@ package body SData.Interpreter is
       --  Delegate the end-of-step shared work (filter rebuild against the
       --  newly committed table, plus pending-SAVE flush) to sdata-core so
       --  the same semantics are available to other front ends.
-      SData_Core.Commands.Execute_RUN;
+      SData_Core.Commands.Execute_Commit_Step;
 
       --  Multi-target SAVE flush (Follow-on C): per-record routing.
       --  Each target's buffer was filled during the data step by
