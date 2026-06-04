@@ -11,9 +11,12 @@ SDATA_CORE_REPO     := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../sdata-co
 
 # Bundled sdata-core version, derived from the sibling checkout's alire.toml so
 # it can never drift out of sync.  Only used by the packaging targets, which
-# already require SDATA_CORE_REPO to exist; empty elsewhere is harmless.  Keep
+# already require SDATA_CORE_REPO to exist; the lookup is silenced (2>/dev/null)
+# and resolves to empty in contexts where the sibling is absent — e.g. inside
+# an unpacked source tarball during 'make build' from the SRPM — which is
+# harmless since 'build' never references this variable.  Keep
 # %global sdata_core_version in sdata.spec matching this value.
-SDATA_CORE_VERSION  := $(shell sed -n 's/^version *= *"\([^"]*\)".*/\1/p' $(SDATA_CORE_REPO)/alire.toml | head -1)
+SDATA_CORE_VERSION  := $(shell sed -n 's/^version *= *"\([^"]*\)".*/\1/p' $(SDATA_CORE_REPO)/alire.toml 2>/dev/null | head -1)
 
 GPR_FILE = sdata.gpr
 # Use GPRBUILD from the environment or command line if set; otherwise detect
