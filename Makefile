@@ -323,6 +323,8 @@ slackware: clean
 	 cp sdata-$(VERSION).tar.gz "$$TEMP_DIR/"; \
 	 cp slackware/* "$$TEMP_DIR/"; \
 	 chmod +x "$$TEMP_DIR/sdata.SlackBuild"; \
+	 sed -i 's#sdata-core-[0-9][0-9.]*\.tar\.gz#sdata-core-$(SDATA_CORE_VERSION).tar.gz#' "$$TEMP_DIR/sdata.SlackBuild"; \
+	 sed -i 's#^SDATA_CORE_DIR=.*#SDATA_CORE_DIR="sdata-core-$(SDATA_CORE_VERSION)"#' "$$TEMP_DIR/sdata.SlackBuild"; \
 	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz; do \
 	   cp "$$TARBALL_DIR/$$tb" "$$TEMP_DIR/"; \
 	 done; \

@@ -44,7 +44,7 @@ tar xzf $CWD/zipada-61.0.0.tar.gz
 tar xzf $CWD/xmlada-26.0.0.tar.gz
 tar xzf $CWD/mathpaqs-20260205.0.0.tar.gz
 tar xzf $CWD/ada_sqlite3_0.1.1_2edbcebd.tar.gz
-tar xzf $CWD/sdata-core-*.tar.gz
+tar xzf $CWD/sdata-core-0.1.4.tar.gz
 
 chown -R root:root .
 find -L . \
@@ -59,8 +59,12 @@ ZIPADA_DIR="zipada_61.0.0_54fc9836"
 XMLADA_DIR="xmlada_26.0.0_b140ed4a"
 MATHPAQS_DIR="mathpaqs_20260205.0.0_abed7ef9"
 SQLITE3_DIR="ada_sqlite3_0.1.1_2edbcebd"
-# Derive from the unpacked sdata-core source dir (whatever version was bundled).
-SDATA_CORE_DIR=$(echo sdata-core-*/ | sed 's#/##')
+# The sdata-core version in this and the tar line above is injected by the
+# parent Makefile's 'slackware' target at packaging time; the committed value
+# is just the current default (mirrors %global sdata_core_version in sdata.spec).
+# An exact name is used rather than a glob so a stale sdata-core-*.tar.gz in the
+# build directory can't confuse tar (two matches make it treat one as a member).
+SDATA_CORE_DIR="sdata-core-0.1.4"
 
 mkdir -p obj bin
 
