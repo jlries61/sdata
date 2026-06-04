@@ -2301,7 +2301,6 @@ begin
       Provenance : SData.Merge.Provenance_Vectors.Vector;
       Result   : SData.Transient_Table.Table;
       VV       : SData_Core.Values.Value;
-      use type SData_Core.Table.Column_Type;
    begin
       A_Ptr.Add_Column ("N", SData_Core.Table.Col_Integer);
       A_Ptr.Add_Row;

@@ -10,7 +10,6 @@
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
-with SData;
 with SData_Core.Config;
 with SData_Core.Table;           use SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
