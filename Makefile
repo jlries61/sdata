@@ -264,6 +264,9 @@ srpm: clean
 	@mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 	@mv sdata-$(VERSION).tar.gz rpmbuild/SOURCES/
 	@cp sdata.spec rpmbuild/SPECS/
+	@# Inject the live sdata-core version so the spec's Source5 / build dir
+	@# always match the bundled tarball, regardless of the committed %global.
+	@sed -i 's/^%global sdata_core_version .*/%global sdata_core_version $(SDATA_CORE_VERSION)/' rpmbuild/SPECS/sdata.spec
 	@# Copy vendored Ada library tarballs from their canonical location.
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
 	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz $(SQLITE3_TARBALL).tar.gz; do \

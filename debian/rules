@@ -1,9 +1,10 @@
 #!/usr/bin/make -f
 export DH_VERBOSE = 1
 
-# Bundled sdata-core version (path-pin sibling during development).
-# Keep in sync with SDATA_CORE_VERSION in the parent Makefile.
-SDATA_CORE_VERSION = 0.1.0
+# Bundled sdata-core version, derived from the name of the sdata-core source
+# directory unpacked alongside us in the Debian source tree.  Nothing to keep
+# in sync — whatever version the parent Makefile bundled is used automatically.
+SDATA_CORE_VERSION := $(patsubst sdata-core-%,%,$(notdir $(wildcard $(CURDIR)/sdata-core-*)))
 
 # Point gprbuild at the vendored dependency subdirectories for all phases (build, test, clean).
 # sdata-core's .gpr lives at the root of its unpacked tarball; mathpaqs uses
