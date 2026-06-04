@@ -18,6 +18,18 @@ tests/data/inf_output.csv
 tests/data/multi_out_p.csv
 tests/data/multi_out_q.csv
 tests/data/multi_out_r.csv
+# SAVE-target outputs written by the save_multi_* / save_multi_with_if tests
+tests/data/p.csv
+tests/data/q.csv
+tests/data/out1.csv
+tests/data/out2.csv
+tests/data/out_a.csv
+tests/data/out_b.csv
+tests/data/save_drop.csv
+tests/data/save_keep.csv
+tests/data/save_rename.csv
+tests/data/big.csv
+tests/data/small.csv
 sdata_opt_*.csv
 
 # Packaging artifacts
