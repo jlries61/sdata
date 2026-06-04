@@ -5,7 +5,7 @@ Summary:        A statistical data interpreter for processing datasets.
 
 # Bundled sdata-core version (path-pin sibling during development).
 # Keep in sync with SDATA_CORE_VERSION in the Makefile.
-%global sdata_core_version 0.1.0
+%global sdata_core_version 0.1.4
 
 License:        GPLv3
 URL:            https://github.com/jlries61/sdata

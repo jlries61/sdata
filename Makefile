@@ -1,7 +1,6 @@
 # Makefile for SData
 
 VERSION          := 0.9.4
-SDATA_CORE_VERSION  := 0.1.3
 ZIPADA_VERSION      := 61.0.0
 XMLADA_VERSION      := 26.0.0
 MATHPAQS_VERSION    := 20260205.0.0
@@ -9,6 +8,12 @@ SQLITE3_TARBALL     := ada_sqlite3_0.1.1_2edbcebd
 
 # Path to the sibling sdata-core checkout for packaging targets.
 SDATA_CORE_REPO     := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../sdata-core)
+
+# Bundled sdata-core version, derived from the sibling checkout's alire.toml so
+# it can never drift out of sync.  Only used by the packaging targets, which
+# already require SDATA_CORE_REPO to exist; empty elsewhere is harmless.  Keep
+# %global sdata_core_version in sdata.spec matching this value.
+SDATA_CORE_VERSION  := $(shell sed -n 's/^version *= *"\([^"]*\)".*/\1/p' $(SDATA_CORE_REPO)/alire.toml | head -1)
 
 GPR_FILE = sdata.gpr
 # Use GPRBUILD from the environment or command line if set; otherwise detect
