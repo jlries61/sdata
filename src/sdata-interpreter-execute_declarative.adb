@@ -332,6 +332,9 @@ begin
                            Combined := SData.Merge.Combine_Join
                                          (Snapshots, By_Names, Warnings,
                                           Provenance);
+                        when MM_Append =>
+                           Combined := SData.Merge.Combine_Append
+                                         (Snapshots, Warnings, Provenance);
                         when MM_Single =>
                            null;  --  not reached; handled by the outer if
                      end case;
@@ -610,9 +613,10 @@ begin
                          VC (VC'First + 1 .. VC'Last) & " variables processed.");
             end;
             --  Flush any pending SAVE and rebuild the SELECT filter map on the
-            --  freshly sorted table.  Delegating to Execute_RUN keeps the save
-            --  path in sync with the one used by explicit RUN statements.
-            SData_Core.Commands.Execute_RUN;
+            --  freshly sorted table.  Delegating to Execute_Commit_Step keeps
+            --  the save path in sync with the one used by explicit RUN
+            --  statements (which also commit the step).
+            SData_Core.Commands.Execute_Commit_Step;
          end;
       when Stmt_BY =>
          if SData_Core.Table.Column_Count = 0 and then not SData_Core.Config.Runtime.Repeat_Active then

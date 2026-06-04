@@ -1,7 +1,7 @@
 # APPEND — Fifth Merge Mode (Vertical Concatenation)
 
-**Date:** 2026-05-30
-**Status:** Approved (design phase) — execution deferred
+**Date:** 2026-05-30 (type-handling refinement added 2026-06-03)
+**Status:** Approved (design phase) — implementation in progress
 **Scope:** sdata interpreter only; one additive `Combine_Append` in `SData.Merge`
 
 ## Context
@@ -44,12 +44,38 @@ USE a, b [, c ...] /APPEND
 - **Row order**: input order. All rows of `a` come first, then all rows of
   `b`, then `c`, and so on. Within an input, rows preserve their original
   order.
-- **Column set**: union of input columns, taken in input order (matches
-  `Build_Schema` from the other combiners). Column-name collisions across
-  inputs follow the same last-wins rule with one warning per collision.
-- **Per-row values**: for each output row that came from input `i`, columns
-  that exist in `i` carry that input's value; columns that exist only in
-  other inputs are missing.
+- **Column set**: union of input columns, keyed by exact name
+  (case-insensitive), taken in input order.
+- **Type reconciliation** (refinement, 2026-06-03): unlike the other four
+  modes — which emit each output row from a single input and therefore reuse
+  the shared `Build_Schema` first-wins/last-wins rule — APPEND stacks values
+  from *multiple* inputs into the *same* column, so a same-named column's
+  output type must be reconciled across all contributors:
+  - both numeric-family → promote: `Col_Integer` + `Col_Numeric` →
+    `Col_Numeric`; identical types unchanged.
+  - both `Col_String` → `Col_String`.
+  - one numeric-family **and** one `Col_String` under the same exact name →
+    **split into two columns**: numeric data stays in `name`; string data is
+    routed to `name$` (append `$`; if a `name$` `Col_String` column already
+    exists, merge the string values into it). This guarantees the numeric and
+    character versions of a field never share a column, and the character
+    column always carries the `$` suffix.
+  Because every reader forces a `$` suffix onto any column it infers as
+  character, and forces character type onto any `$`-suffixed name regardless
+  of its data (CSV `csv.adb:302-305`; ODF/OOXML via `Apply_Dollar_Override`),
+  a numeric `X` and a character `X$` already carry distinct names once read —
+  so for file inputs the numeric/character separation happens structurally at
+  read time and the split branch above is only reached for in-memory or
+  computed columns that bypass the convention. It is kept as a defensive
+  guarantee.
+- **Per-row values**: for each output row from input `i`, each output column
+  that input `i` supplies (under its reconciled or split destination name)
+  carries that input's value; output columns input `i` does not supply are
+  missing.
+- **No type-based errors**: APPEND never fails on column type grounds — the
+  split rule absorbs the only otherwise-incompatible case. There is no
+  per-collision warning (a same-named column across inputs is the normal,
+  intended way to stack a field).
 - **Per-dataset options**: `KEEP=`, `DROP=`, `RENAME=()`, and `IN=` work
   identically to the other multi-dataset modes. RENAME applies first, then
   KEEP, then DROP. Both KEEP and DROP on the same dataset is an error.
@@ -120,7 +146,36 @@ project / sort. For `MM_Append`:
 - Everything else (warnings, install, IN= column materialisation,
   snapshot cleanup) works unchanged.
 
+## Schema reconciliation (`Build_Append_Schema`)
+
+APPEND does **not** reuse the shared `Build_Schema` (which is first-wins on
+type and last-wins on source). Instead it uses a dedicated pass that:
+
+1. Walks inputs left→right; for each input column name (case-insensitive),
+   look up the reconciled output column:
+   - not yet present → add it with that input's type, and record a routing
+     entry `(input_idx, src_name) → dest_name`.
+   - present and the two types are both numeric-family → set the output type
+     to the promotion (`Numeric` if either is `Numeric`, else `Integer`);
+     route to the same `dest_name`.
+   - present as numeric-family but this input's column is `Col_String` (or
+     vice-versa) → apply the **split**: ensure a `dest = name & "$"`
+     `Col_String` column exists (create if absent) and route this input's
+     column there, leaving the numeric column under `name`.
+   - both `Col_String` → route to the same `dest_name`.
+2. Yields, per input, a map from its source column names to destination
+   output column names. The value-copy loop below routes through this map
+   rather than assuming `dest_name = src_name`.
+
+Integer values flowing into a promoted `Col_Numeric` column are converted on
+copy (an `Integer` `Value` is read and stored as `Numeric`).
+
 ## Combine_Append algorithm
+
+The pseudocode below shows the no-split happy path for clarity; the real
+implementation routes each source column through the `Build_Append_Schema`
+destination map (so `Col_Out` is the *destination* name, not necessarily the
+source name) and converts integer→numeric on promoted columns.
 
 ```ada
 function Combine_Append
@@ -130,9 +185,9 @@ function Combine_Append
    return SData.Transient_Table.Table
 is
    Result  : SData.Transient_Table.Table;
-   Sources : Source_Vectors.Vector;
+   Routes  : Route_Map;  --  (input_idx, src_name) -> dest_name, from below
 begin
-   Build_Schema (Result, Sources, Inputs, Warnings);
+   Build_Append_Schema (Result, Routes, Inputs);  --  promotion + $-split
    for I in 1 .. Natural (Inputs.Length) loop
       declare
          T : constant Table_Access := Inputs (I);
@@ -145,18 +200,29 @@ begin
                R_Out : constant Positive :=
                   SData.Transient_Table.Row_Count (Result);
             begin
-               for C in 1 .. Natural (Sources.Length) loop
+               --  Every output cell defaults to missing; then route each
+               --  source column of input T to its destination column.
+               for C in 1 .. SData.Transient_Table.Column_Count (Result) loop
+                  Result.Set_Value
+                    (R_Out,
+                     SData.Transient_Table.Column_Name (Result, C),
+                     (Kind => SData_Core.Values.Val_Missing));
+               end loop;
+               for SC in 1 .. SData.Transient_Table.Column_Count (T.all) loop
                   declare
-                     Col_Out : constant String :=
-                        SData.Transient_Table.Column_Name (Result, C);
-                     V : SData_Core.Values.Value;
+                     Src  : constant String :=
+                        SData.Transient_Table.Column_Name (T.all, SC);
+                     Dest : constant String := Routes.Dest (I, Src);
+                     V    : SData_Core.Values.Value := T.Get_Value (R, Src);
                   begin
-                     if SData.Transient_Table.Has_Column (T.all, Col_Out) then
-                        V := T.Get_Value (R, Col_Out);
-                     else
-                        V := (Kind => SData_Core.Values.Val_Missing);
+                     --  Integer -> Numeric on a promoted destination column.
+                     if SData.Transient_Table.Get_Column_Type (Result, Dest)
+                          = SData_Core.Table.Col_Numeric
+                        and then V.Kind = SData_Core.Values.Val_Integer
+                     then
+                        V := Promote_To_Numeric (V);
                      end if;
-                     Result.Set_Value (R_Out, Col_Out, V);
+                     Result.Set_Value (R_Out, Dest, V);
                   end;
                end loop;
             end;
@@ -176,8 +242,10 @@ begin
 end Combine_Append;
 ```
 
-About 35 lines including comments. Closely mirrors `Combine_Interleave`
-minus the cursor/key machinery.
+Closer to ~70 lines with `Build_Append_Schema` and the routing/promotion
+logic. The `Warnings` parameter is retained for signature uniformity with the
+other combiners (the executor dispatch is mode-uniform) but APPEND emits no
+warnings.
 
 ## Error handling
 
@@ -212,6 +280,14 @@ minus the cursor/key machinery.
   /APPEND`. Verify each row has exactly one of fromA/fromB set to 1.
 - `tests/use_merge_append_per_ds_keep.cmd` — per-dataset KEEP=
   exercised on each input.
+- `tests/use_merge_append_dollar_split.cmd` — input A has numeric column
+  `VAL`; input B has character column `VAL$`. Confirm the output keeps both
+  `VAL` (numeric, populated for A's rows, missing for B's) and `VAL$`
+  (character, populated for B's rows, missing for A's). This is the normal
+  read-time separation, verifying APPEND preserves it.
+- `tests/use_merge_append_int_promote.cmd` — input A's `N` is integer-typed,
+  input B's `N` is float-typed; confirm the merged `N` is numeric and A's
+  integer values survive as numerics.
 - `tests/use_merge_err_append_with_by.cmd` — `/APPEND /BY=k` → expected
   parse error.
 - `tests/use_merge_err_append_single.cmd` — single-dataset `/APPEND` →
@@ -229,6 +305,18 @@ minus the cursor/key machinery.
   count (no padding).
 - `CA-05` provenance verification: each row's mask has exactly one bit set
   matching the contributing input index.
+- `CA-06` integer/numeric promotion: input A column `N` is `Col_Integer`,
+  input B column `N` is `Col_Numeric`; output `N` is `Col_Numeric` and A's
+  values read back as numerics equal to the originals.
+- `CA-07` numeric/string split: input A column `VAL` is numeric, input B has
+  a same-base-name `Col_String` column reached under exact name `VAL` (an
+  in-memory table constructed to bypass the `$` convention). Output has both
+  `VAL` (numeric, A's rows populated / B's missing) and `VAL$` (string, B's
+  rows populated / A's missing).
+- `CA-08` split merge-into-existing: input A has numeric `VAL` and string
+  `VAL$`; input B has a `Col_String` column under exact name `VAL`. The split
+  routes B's `VAL` strings into the existing `VAL$` column rather than
+  creating a second one.
 
 Label combiner tests `CA-NN` for consistency with `CP/CM/CI/CJ-NN`.
 
@@ -240,11 +328,27 @@ Label combiner tests `CA-NN` for consistency with `CP/CM/CI/CJ-NN`.
 
 ## Spec self-review
 
-- **Coverage:** semantics, lexer, AST, parser, executor, combiner,
-  error handling, tests all addressed.
+- **Coverage:** semantics, type reconciliation (promotion + `$`-split),
+  lexer, AST, parser, executor, combiner, error handling, tests all
+  addressed.
 - **Internal consistency:** mode-determination table covers all
-  combinations; mutex rules consistent across spec.
-- **Scope:** small — ~50 lines of new Ada, ~7 integration tests, ~5 unit
-  tests, 1 enum literal, 1 token. Single focused PR.
+  combinations; mutex rules consistent across spec; the no-type-error rule in
+  Semantics matches the dropped Script_Error case in Error handling.
+- **Scope:** small–moderate — ~70 lines of new Ada (combiner +
+  `Build_Append_Schema`), ~9 integration tests, ~8 unit tests, 1 enum
+  literal, 1 token. Single focused PR.
 - **Ambiguity:** none expected; APPEND is a well-known operation and the
-  semantics are tightly specified above.
+  semantics — including the numeric/character split keyed on the `$`
+  convention — are tightly specified above.
+
+## Revision history
+
+- **2026-05-30** — Original spec (vertical concatenation, union/last-wins
+  collision). Approved, execution deferred.
+- **2026-06-03** — Type-handling refinement: same-named columns are
+  type-reconciled across inputs (integer→numeric promotion; numeric-vs-string
+  split into `name` / `name$`) via a dedicated `Build_Append_Schema` pass
+  instead of the shared `Build_Schema`; per-collision warning dropped. APPEND
+  still never raises on type grounds (the split absorbs the only otherwise
+  incompatible case). Added unit tests CA-06…CA-08 and two integration tests.
+  Status moved to implementation in progress.
