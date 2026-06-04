@@ -52,6 +52,10 @@ sdata_main
         ├── SData.Parser           token stream → AST          (this crate)
         │     └── SData.Lexer      keyword/token recogniser    (this crate)
         ├── SData.AST              statement AST node types    (this crate)
+        ├── SData.Merge            merge combiner algorithms (positional / match
+        │                             / interleave / join) (this crate)
+        ├── SData.Transient_Table  mutation-free in-memory table value type
+        │                             used by merge + per-target SAVE buffers (this crate)
         ├── SData.Help             HELP topic dispatcher       (this crate)
         ├── SData.Version          version + copyright strings (this crate; ADR-043)
         ├── SData.System           sdata-only SYSTEM wrapper   (this crate)
@@ -91,8 +95,8 @@ interpreter encounters them and shape the data step that follows.
 
 | Command | Effect |
 |---|---|
-| `USE` | Load an input dataset (CSV, ODF, OOXML) |
-| `SAVE` | Designate an output path for the next RUN |
+| `USE` | Load one or more input datasets (CSV, ODF, OOXML); multi-dataset form supports positional / match / interleave / Cartesian-join merge via `/BY=` / `/INTERLEAVE` / `/JOIN` |
+| `SAVE` | Designate one or more output targets for the next RUN; per-target `KEEP=` / `DROP=` / `RENAME=` / `IF=` filter applied at write time |
 | `REPEAT n` | Synthesise *n* blank records instead of reading a file |
 | `SELECT expr` | Install a row filter; rows not matching are invisible to deferred commands |
 | `SELECT /ALL` | Clear the filter |

@@ -1,0 +1,9 @@
+Dataset opened: tests/data/merge_a.csv
+Dataset saved: tests/data/big.csv
+Dataset saved: tests/data/small.csv
+RUN complete. 2 records and 3 variables processed.
+Dataset opened: tests/data/big.csv
+Permanent Variables (Table Columns):
+ID X MARKER 
+Session Variables (SET):
+(none)

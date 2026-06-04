@@ -189,6 +189,24 @@ Commit the result, then create an annotated tag:
 git tag -a v<new-version> -m "Version <new-version>"
 ```
 
+**Bundled sdata-core version (packaging).** The version of the sdata-core
+tarball bundled into the RPM/Debian/Slackware packages is **never hardcoded** —
+it is derived from whatever sdata-core artifact is present in each build
+context, so it cannot drift and needs no manual bump when sdata-core's version
+changes:
+
+- `Makefile` derives `SDATA_CORE_VERSION` from `../sdata-core/alire.toml`, and
+  the `srpm` target injects that value into the spec copy in `rpmbuild/SPECS/`
+  (so `sdata.spec`'s committed `%global sdata_core_version` is only a fallback).
+- `debian/rules` and `slackware/sdata.SlackBuild` run standalone inside an
+  unpacked source tree where `../sdata-core` is unavailable, so they derive the
+  version by globbing the bundled `sdata-core-*` directory shipped alongside
+  them.
+
+Each derivation assumes exactly one `sdata-core-*` artifact per build context;
+the `make clean` at the start of every packaging target guards against a stale
+one lingering. Do not reintroduce a hardcoded sdata-core version in these files.
+
 ## Phase Status
 
 - Phases 1–4: **complete** (core, control flow, distributions/aggregates, spreadsheet I/O)

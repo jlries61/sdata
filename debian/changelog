@@ -1,3 +1,39 @@
+sdata (0.9.4-1) unstable; urgency=medium
+
+  * Add USE /APPEND merge mode for vertical concatenation of datasets
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 03 Jun 2026 18:57:24 -0700
+
+sdata (0.9.3-1) unstable; urgency=medium
+
+  * Migrate sdata_unit_test.adb's direct Runtime field writes to Execute_OPTIONS helper (precondition for sdata-core Runtime privatization).
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 01 Jun 2026 15:38:50 -0700
+
+sdata (0.9.2-1) unstable; urgency=medium
+
+  * Phase B of audit item #5 — migrate direct Runtime field writes to End_Repeat / Clear_Pending_Save helpers (precondition for Phase C privatization).
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 01 Jun 2026 13:48:10 -0700
+
+sdata (0.9.1-1) unstable; urgency=medium
+
+  * USE alias uniqueness, IN= read-only enforcement, build-warning cleanup, missing error tests, architecture doc refresh
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 01 Jun 2026 10:22:50 -0700
+
+sdata (0.9.0-1) unstable; urgency=medium
+
+  * Multi-dataset USE merge (4 modes), multi-target SAVE with per-record IF= routing, per-row IN= provenance, OPTIONS JOIN_WARN_THRESHOLD
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 01 Jun 2026 09:09:21 -0700
+
+sdata (0.8.1-1) unstable; urgency=medium
+
+  * Packaging fixes for sdata-core split (RPM, Debian, Slackware); AST Options_Key_Len/Val_Len initialization fix.
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 26 May 2026 17:37:54 -0700
+
 sdata (0.8.0-1) unstable; urgency=medium
 
   * Extract VANDALIZE into standalone data-vandal application; introduce sdata-core shared library.

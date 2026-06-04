@@ -1,7 +1,6 @@
 # Makefile for SData
 
-VERSION             := 0.8.0
-SDATA_CORE_VERSION  := 0.1.0
+VERSION          := 0.9.4
 ZIPADA_VERSION      := 61.0.0
 XMLADA_VERSION      := 26.0.0
 MATHPAQS_VERSION    := 20260205.0.0
@@ -9,6 +8,15 @@ SQLITE3_TARBALL     := ada_sqlite3_0.1.1_2edbcebd
 
 # Path to the sibling sdata-core checkout for packaging targets.
 SDATA_CORE_REPO     := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../sdata-core)
+
+# Bundled sdata-core version, derived from the sibling checkout's alire.toml so
+# it can never drift out of sync.  Only used by the packaging targets, which
+# already require SDATA_CORE_REPO to exist; the lookup is silenced (2>/dev/null)
+# and resolves to empty in contexts where the sibling is absent — e.g. inside
+# an unpacked source tarball during 'make build' from the SRPM — which is
+# harmless since 'build' never references this variable.  Keep
+# %global sdata_core_version in sdata.spec matching this value.
+SDATA_CORE_VERSION  := $(shell sed -n 's/^version *= *"\([^"]*\)".*/\1/p' $(SDATA_CORE_REPO)/alire.toml 2>/dev/null | head -1)
 
 GPR_FILE = sdata.gpr
 # Use GPRBUILD from the environment or command line if set; otherwise detect
@@ -259,6 +267,9 @@ srpm: clean
 	@mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 	@mv sdata-$(VERSION).tar.gz rpmbuild/SOURCES/
 	@cp sdata.spec rpmbuild/SPECS/
+	@# Inject the live sdata-core version so the spec's Source5 / build dir
+	@# always match the bundled tarball, regardless of the committed %global.
+	@sed -i 's/^%global sdata_core_version .*/%global sdata_core_version $(SDATA_CORE_VERSION)/' rpmbuild/SPECS/sdata.spec
 	@# Copy vendored Ada library tarballs from their canonical location.
 	@TARBALL_DIR="$(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../Data/tarballs)"; \
 	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz $(SQLITE3_TARBALL).tar.gz; do \
@@ -312,6 +323,8 @@ slackware: clean
 	 cp sdata-$(VERSION).tar.gz "$$TEMP_DIR/"; \
 	 cp slackware/* "$$TEMP_DIR/"; \
 	 chmod +x "$$TEMP_DIR/sdata.SlackBuild"; \
+	 sed -i 's#sdata-core-[0-9][0-9.]*\.tar\.gz#sdata-core-$(SDATA_CORE_VERSION).tar.gz#' "$$TEMP_DIR/sdata.SlackBuild"; \
+	 sed -i 's#^SDATA_CORE_DIR=.*#SDATA_CORE_DIR="sdata-core-$(SDATA_CORE_VERSION)"#' "$$TEMP_DIR/sdata.SlackBuild"; \
 	 for tb in zipada-$(ZIPADA_VERSION).tar.gz xmlada-$(XMLADA_VERSION).tar.gz mathpaqs-$(MATHPAQS_VERSION).tar.gz $(SQLITE3_TARBALL).tar.gz; do \
 	   cp "$$TARBALL_DIR/$$tb" "$$TEMP_DIR/"; \
 	 done; \

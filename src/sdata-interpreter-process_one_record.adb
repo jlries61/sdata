@@ -106,14 +106,14 @@ begin
                   when E : Script_Error | SData_Core.Script_Error =>
                      if SData_Core.Config.Continue_On_Error then
                         Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                        SData_Core.Config.Runtime.Last_Error_Code := 1;
-                        SData_Core.Config.Runtime.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
+                        SData_Core.Commands.Execute_Record_Error
+                           (1, SData_Core.Table.Get_Current_Record_Index);
                      else raise; end if;
                   when E : others =>
                      if SData_Core.Config.Continue_On_Error then
                         Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                        SData_Core.Config.Runtime.Last_Error_Code := 1;
-                        SData_Core.Config.Runtime.Last_Error_Line := SData_Core.Table.Get_Current_Record_Index;
+                        SData_Core.Commands.Execute_Record_Error
+                           (1, SData_Core.Table.Get_Current_Record_Index);
                      else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
                end;
             when others => null;
@@ -133,4 +133,35 @@ begin
    if not Ctx.Deleted and then not Global_Has_Write then
       SData_Core.Variables.Flush_PDV_To_Output;
    end if;
+
+   --  Per-record multi-target routing (Follow-on C).
+   --  After the data step body executes, route the current PDV into the
+   --  appropriate per-target buffers.
+   if not Ctx.Deleted and then Natural (Registered_Saves.Length) > 0 then
+      if Write_Fired_This_Iter then
+         --  Drain WRITE-queued targets into their buffers.
+         --  A target may appear multiple times (e.g. WRITE a; WRITE a),
+         --  producing one buffer row per WRITE statement that fired for it.
+         for T_Ref of Pending_Writes_This_Iter loop
+            for B of Target_Buffers loop
+               if B.Target = T_Ref then
+                  Append_Pdv_To_Buffer (B);
+                  exit;
+               end if;
+            end loop;
+         end loop;
+      else
+         --  Auto-flush: no explicit WRITE fired this iteration.
+         --  Append to every target whose IF= filter passes.
+         for B of Target_Buffers loop
+            if Should_Write (B.Target) then
+               Append_Pdv_To_Buffer (B);
+            end if;
+         end loop;
+      end if;
+   end if;
+
+   --  Reset per-record WRITE routing state so each record starts clean.
+   Write_Fired_This_Iter    := False;
+   Pending_Writes_This_Iter.Clear;
 end Process_One_Record;

@@ -150,6 +150,14 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
    Var_Name_Str : constant String := Stmt.Var_Name (1 .. Stmt.Var_Len);
    Result       : Value;
 begin
+   --  Reject assignment to IN= provenance variables (read-only from user code).
+   --  The base variable name is checked so that subscripted forms such as
+   --  LET hasA(1) = 99 are also caught (IN= variables are scalar anyway).
+   if Is_Readonly_IN_Name (Var_Name_Str) then
+      raise SData_Core.Script_Error
+        with "cannot assign to IN= variable """ & Var_Name_Str
+             & """; IN= variables are read-only";
+   end if;
    Result := Evaluate (Stmt.Expr);
    if Var_Name_Str'Length > 0
       and then Var_Name_Str (Var_Name_Str'Last) = '%'

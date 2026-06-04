@@ -11,8 +11,8 @@
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with SData_Core.Commands;
 with SData_Core.Config;
-with SData_Core.Config.Runtime;
 with SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
 with SData_Core.Variables;
@@ -82,7 +82,7 @@ procedure Interpreter_Unit_Test is
       SData_Core.Table.Clear;
       SData_Core.Variables.Clear_Temporary;
       SData_Core.Variables.Initialize_PDV;
-      SData_Core.Config.Runtime.Reset;
+      SData_Core.Commands.Execute_NEW;
    end Reset;
 
    --  Parse and execute Script from a clean state.  Propagates any exception.

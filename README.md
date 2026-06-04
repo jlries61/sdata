@@ -62,16 +62,28 @@ manually; `sdata-core` similarly needs to be on `GPR_PROJECT_PATH`.
   spec at `doc/specs/2026-05-19-data-vandal-design.md`.
 - **data-vandal** — a standalone interpreter for controlled data degradation
   (the former `VANDALIZE` command, extracted into its own application in
-  v0.8.0). See [ADR-038](doc/adrs.md) (now superseded) and the data-vandal
+  v0.9.4). See [ADR-038](doc/adrs.md) (now superseded) and the data-vandal
   repository for the application's own README.
 
-## Building
+## Installation
+
+### From source with Alire (recommended)
 
 ```sh
-make
+git clone https://github.com/jlries61/sdata.git
+git clone https://github.com/jlries61/sdata-core.git   # path-pinned sibling
+cd sdata
+alr build
 ```
 
-This invokes `gprbuild` and produces the `sdata` executable in `bin/`.
+The binary lands at `bin/sdata`.  Run `make install` (with optional
+`PREFIX=` and `DESTDIR=`) to drop it into `/usr/local/bin/` along with
+the man page and `LICENSE`:
+
+```sh
+make install                                  # default PREFIX=/usr/local
+make install PREFIX=/usr DESTDIR=/path/to/stage
+```
 
 To run the test suite:
 
@@ -79,70 +91,92 @@ To run the test suite:
 make check
 ```
 
-To install (default prefix `/usr/local`):
+### From source without Alire
 
-```sh
-make install
-```
+The Makefile falls back to invoking `gprbuild` directly if `alr` is not
+on `PATH`.  Make sure the dependency `.gpr` files (Zip-Ada, XML/Ada,
+MathPaqs, ada_sqlite3, sdata-core) are on `GPR_PROJECT_PATH`.
 
-Or specify a custom prefix:
-
-```sh
-make install PREFIX=/usr DESTDIR=/path/to/staging
-```
-
-## Packaging
-
-### RPM (Fedora, openSUSE, RHEL, etc.)
-
-Build a source RPM:
+### Source RPM (Fedora, openSUSE, RHEL, …)
 
 ```sh
 make srpm
+rpmbuild --rebuild sdata-X.Y.Z-1.src.rpm
 ```
 
-This creates `sdata-0.8.0-1.src.rpm` which can be built with `rpmbuild
---rebuild` or submitted to a build service. The vendored library tarballs must
-be present in `../Data/tarballs/`.
+`make srpm` bundles vendored tarballs of the four Ada library
+dependencies plus a fresh tarball of the sibling `sdata-core` repo, so
+the downstream build environment needs only the system Ada compiler
+(`gcc-ada` on openSUSE/SLES, `gcc-gnat` on Fedora/RHEL/Mageia), `make`,
+and `sqlite-devel` — no Alire required.
 
-### Debian/Ubuntu
-
-Build a Debian source package:
+### Debian source package (Debian, Ubuntu, …)
 
 ```sh
 make dsc
+dpkg-source -x sdata_X.Y.Z-1.dsc
+cd sdata-X.Y.Z
+dpkg-buildpackage -us -uc -b
 ```
 
-This creates the `.dsc`, `.orig.tar.gz`, and `.debian.tar.xz` files. Build the
-binary package with `dpkg-buildpackage` or `pbuilder`.
+`make dsc` produces the standard Debian source-package triple
+(`sdata_X.Y.Z-1.dsc`, `sdata_X.Y.Z.orig.tar.gz`,
+`sdata_X.Y.Z-1.debian.tar.xz`), bundling the same vendored
+tarballs the RPM target uses.  Downstream builds need only `gnat`,
+`gprbuild`, `make`, and `libsqlite3-dev` — no Alire required.
 
-### Slackware
+`make dsc` itself needs `dpkg-source` (from the `dpkg-dev` package)
+on the machine that builds the source package; once the triple is
+produced, the binary build can run on any Debian-derivative with the
+Build-Depends above plus `debhelper-compat (= 13)` installed.
 
-Create a SlackBuild tarball:
+### Slackware package
 
 ```sh
 make slackware
+tar xzf sdata-X.Y.Z-slackbuild.tar.gz
+./sdata.SlackBuild              # as root; emits a .txz in /tmp
+installpkg /tmp/sdata-X.Y.Z-x86_64-1_SBo.txz
 ```
 
-This creates `sdata-0.8.0-slackbuild.tar.gz` containing the SlackBuild script,
-source tarball, and vendored dependencies. Extract and run `./sdata.SlackBuild`
-as root to build the package.
+`make slackware` produces two artefacts in the repo root: the
+self-contained `sdata-X.Y.Z-slackbuild.tar.gz` and the
+upstream-source tarball `sdata-X.Y.Z.tar.gz`.  The slackbuild
+tarball already contains a copy of the source tarball plus the four
+vendored Ada library tarballs, the sdata-core snapshot,
+`sdata.SlackBuild`, `sdata.info`, and `slack-desc` — so extracting it
+gives the SlackBuild script everything it needs.
+
+`sdata.SlackBuild` reads the upstream source tarball at
+`$CWD/sdata-X.Y.Z.tar.gz`, so it must be present in the
+directory you invoke the script from (whether that's where you
+extracted the slackbuild tarball, or the repo root directly after
+`make slackware`).
+
+The SlackBuild script drives `gnatmake` directly rather than
+`gprbuild`, so the downstream build environment needs only the
+system Ada toolchain (`gcc-gnat`) and `sqlite3-devel`.
+
+The `make slackware` step itself only needs the standard build tools
+(`tar`, `gzip`, `git`) on the packager's machine.
 
 ### macOS
 
 #### Building with Alire
 
-If you use Alire on macOS, the Alire-managed GNAT toolchain is a pre-built
-binary targeting a specific macOS SDK version. If your macOS version is older
-than the one the toolchain was compiled for, the C compiler will not find
-Apple's private SDK headers (such as `_stdio.h`) when compiling the bundled
-`sqlite3.c` in the `ada_sqlite3` dependency, producing an error like:
+The Alire-managed GNAT toolchain on macOS is a pre-built binary
+targeting a specific macOS SDK version.  If your macOS version is
+older than the one the toolchain was compiled for, the C compiler
+will not find Apple's private SDK headers (such as `_stdio.h`) when
+compiling the bundled `sqlite3.c` in the `ada_sqlite3` dependency,
+producing an error like:
 
 ```
 fatal error: _stdio.h: No such file or directory
 ```
 
-The fix is to set `C_INCLUDE_PATH` so that GCC can locate the SDK headers:
+The fix is to set `C_INCLUDE_PATH` so that GCC can locate the SDK
+headers:
 
 ```sh
 export SDKROOT=$(xcrun --show-sdk-path)
@@ -150,40 +184,52 @@ export C_INCLUDE_PATH=$SDKROOT/usr/include
 alr build
 ```
 
-Add both lines to your `~/.zshrc` or `~/.zprofile` to make the setting
-permanent. Note that `SDKROOT` alone is not sufficient — unlike Clang, the
-GCC-based GNAT toolchain does not automatically apply it as `-isysroot`.
+Add both lines to your `~/.zshrc` or `~/.zprofile` to make the
+setting permanent.  Note that `SDKROOT` alone is not sufficient —
+unlike Clang, the GCC-based GNAT toolchain does not automatically
+apply it as `-isysroot`.
 
-This issue is not specific to Alire: the same fix is needed whenever the
-pre-built GNAT binary is used with `gprbuild` directly. A GNAT compiled
-natively for your macOS version will have the correct SDK paths embedded and
-should not require this workaround.
+This issue is not specific to Alire: the same fix is needed
+whenever the pre-built GNAT binary is used with `gprbuild` directly.
+A GNAT compiled natively for your macOS version will have the
+correct SDK paths embedded and should not require this workaround.
 
-#### Running the Test Suite
+#### Running the test suite
 
-The test harness uses the GNU coreutils `timeout` command, which is not
-included with macOS. Install it via MacPorts (`sudo port install coreutils`),
-after which it is available as `gtimeout`. The Makefile detects `gtimeout`
-automatically, so no further configuration is needed.
+The harness uses the GNU coreutils `timeout` command, which is not
+included with macOS.  Install it via MacPorts
+(`sudo port install coreutils`) or Homebrew
+(`brew install coreutils`); both ship it as `gtimeout`.  The
+Makefile detects `gtimeout` automatically, so no further
+configuration is needed.
 
-#### Installer Package
-
-Build a macOS installer package:
+#### Installer package
 
 ```sh
 make pkg
+sudo installer -pkg sdata-X.Y.Z.pkg -target /
 ```
 
-This creates `sdata-0.8.0.pkg`. The `sdata` binary must already be built
-(`make` first). Requires the `pkgbuild` tool (included with Xcode).
+`make pkg` produces `sdata-X.Y.Z.pkg` in the repo root: a per-machine
+installer that places `sdata`, the gzipped man page, `README.md`,
+and `LICENSE` under `/usr/local/{bin,share/...}` and registers itself
+with the system installer database.  Requires the `pkgbuild` tool
+(included with the Xcode command-line tools; `xcode-select --install`
+if not already installed) and a built `bin/sdata` (the recipe depends
+on the `build` target, so a fresh `alr build` runs automatically if
+needed).
+
+Install with `installer` as above, or by double-clicking the `.pkg`
+in Finder.  Uninstall is a manual `sudo rm` of the four installed
+files plus their per-app docdir.
 
 ### Windows
 
 #### Building
 
-The recommended toolchain is [Alire](https://alire.ada.dev/) inside an MSYS2
-MinGW64 shell. Install Alire from the MSYS2 package or from the upstream
-release, then:
+The recommended toolchain is [Alire](https://alire.ada.dev/) inside
+an MSYS2 MinGW64 shell.  Install Alire from the MSYS2 package or
+from the upstream release, then:
 
 ```sh
 alr build
@@ -195,36 +241,36 @@ Or, equivalently:
 alr exec -- make
 ```
 
-The build produces `bin\sdata.exe`. Cygwin works too — Alire and a recent GNAT
-toolchain on PATH are the only hard requirements.
+The build produces `bin\sdata.exe`.  Cygwin works too — Alire and a
+recent GNAT toolchain on `PATH` are the only hard requirements.
 
-#### MSI Installer
-
-Build a Windows MSI installer:
+#### MSI installer
 
 ```sh
 alr exec -- make msi
 ```
 
-This creates `sdata-0.8.0-x64.msi`, a per-machine x64 installer that places
-`sdata.exe`, `LICENSE.txt`, `README.md`, and an HTML rendering of the man page
-under `C:\Program Files\sdata\` and appends that directory to the system
-`PATH`. Requirements:
+This creates `sdata-X.Y.Z-x64.msi`, a per-machine x64 installer that
+places `sdata.exe`, `LICENSE.txt`, `README.md`, and an HTML rendering
+of the man page under `C:\Program Files\sdata\` and appends that
+directory to the system `PATH`.  Requirements:
 
 - **WiX Toolset v4 or later** (v7 recommended) via the .NET tool:
   ```sh
   dotnet tool install --global wix
   ```
-  Verify with `wix --version`. WiX requires the .NET 8 (or later) SDK.
+  Verify with `wix --version`.  WiX requires the .NET 8 (or later)
+  SDK.
 
-- **pandoc** — converts the man page to HTML for inclusion in the installer.
-  In MSYS2: `pacman -S mingw-w64-x86_64-pandoc`. Alternately, Pandoc can be
-  installed via [Chocolatey](https://chocolatey.org/) or downloaded directly
-  from the [Pandoc website](https://pandoc.org/installing.html).
+- **pandoc** — converts the man page to HTML for inclusion in the
+  installer.  In MSYS2: `pacman -S mingw-w64-x86_64-pandoc`.
+  Alternately, pandoc can be installed via
+  [Chocolatey](https://chocolatey.org/) or downloaded directly from
+  the [pandoc website](https://pandoc.org/installing.html).
 
-Install the resulting MSI with `msiexec /i sdata-0.8.0-x64.msi`, or by
-double-clicking it. After install, `sdata` is available from any new CMD or
-PowerShell window.
+Install the resulting MSI with `msiexec /i sdata-X.Y.Z-x64.msi`,
+or by double-clicking it.  After install, `sdata` is available
+from any new CMD or PowerShell window.
 
 ## Release Management
 
@@ -240,7 +286,7 @@ scripts/bump-version.sh <new-version> "<changelog-summary>"
 For example:
 
 ```sh
-scripts/bump-version.sh 0.8.1 "Fix path resolution in FPATH SUBMIT handler."
+scripts/bump-version.sh 0.9.4 "Fix path resolution in FPATH SUBMIT handler."
 ```
 
 The script validates the `N.N.N` version format, detects the current version
@@ -255,7 +301,7 @@ Run `sdata` with no arguments to enter the interactive console:
 
 ```
 $ sdata
-SData Statistical Interpreter version 0.8.0
+SData Statistical Interpreter version 0.9.4
 Interactive Console. Type QUIT to exit.
 sdata> use "mydata.csv"
 sdata> print recno, name$, score

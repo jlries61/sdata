@@ -19,8 +19,8 @@ with SData.AST; use SData.AST;
 with SData.Version;
 
 with SData.Interpreter; use SData.Interpreter;
+with SData_Core.Commands;
 with SData_Core.Config;         use SData_Core.Config;
-with SData_Core.Config.Runtime;
 with SData_Core.IO;          use SData_Core.IO;
 with SData.System;
 with SData_Core.Signals;
@@ -453,8 +453,8 @@ begin
    if not Shell_Timeout_Explicit and then Filename_Len > 0 then
       SData_Core.Config.Shell_Timeout_Default := 300;
    end if;
-   SData_Core.Config.Runtime.Options_Shell_Timeout :=
-      SData_Core.Config.Shell_Timeout_Default;
+   SData_Core.Commands.Execute_OPTIONS_Shell_Timeout
+      (SData_Core.Config.Shell_Timeout_Default);
 
    --  Validate -p / --noshell interaction.
    if Length (Pager_Cmd) > 0 and then Disable_Shell then

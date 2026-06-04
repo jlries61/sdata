@@ -1,11 +1,11 @@
 Name:           sdata
-Version:        0.8.0
+Version:        0.9.4
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
 # Bundled sdata-core version (path-pin sibling during development).
 # Keep in sync with SDATA_CORE_VERSION in the Makefile.
-%global sdata_core_version 0.1.0
+%global sdata_core_version 0.1.4
 
 License:        GPLv3
 URL:            https://github.com/jlries61/sdata
@@ -68,6 +68,24 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Jun 03 2026 John L. Ries <john@theyarnbard.com> - 0.9.4-1
+- Add USE /APPEND merge mode for vertical concatenation of datasets
+
+* Mon Jun 01 2026 John L. Ries <john@theyarnbard.com> - 0.9.3-1
+- Migrate sdata_unit_test.adb's direct Runtime field writes to Execute_OPTIONS helper (precondition for sdata-core Runtime privatization).
+
+* Mon Jun 01 2026 John L. Ries <john@theyarnbard.com> - 0.9.2-1
+- Phase B of audit item #5 — migrate direct Runtime field writes to End_Repeat / Clear_Pending_Save helpers (precondition for Phase C privatization).
+
+* Mon Jun 01 2026 John L. Ries <john@theyarnbard.com> - 0.9.1-1
+- USE alias uniqueness, IN= read-only enforcement, build-warning cleanup, missing error tests, architecture doc refresh
+
+* Mon Jun 01 2026 John L. Ries <john@theyarnbard.com> - 0.9.0-1
+- Multi-dataset USE merge (4 modes), multi-target SAVE with per-record IF= routing, per-row IN= provenance, OPTIONS JOIN_WARN_THRESHOLD
+
+* Tue May 26 2026 John L. Ries <john@theyarnbard.com> - 0.8.1-1
+- Packaging fixes for sdata-core split (RPM, Debian, Slackware); AST Options_Key_Len/Val_Len initialization fix.
+
 * Thu May 21 2026 John L. Ries <john@theyarnbard.com> - 0.8.0-1
 - Extract VANDALIZE into standalone data-vandal application; introduce sdata-core shared library.
 

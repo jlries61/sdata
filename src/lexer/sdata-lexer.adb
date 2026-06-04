@@ -289,6 +289,11 @@ package body SData.Lexer is
                elsif Upper = "FPATH" then T.Kind := Token_FPATH;
                elsif Upper = "HEADER" then T.Kind := Token_HEADER;
                elsif Upper = "ALL" or Upper = "/ALL" then T.Kind := Token_ALL;
+               elsif Upper = "AS" then T.Kind := Token_AS;
+               elsif Upper = "IN" then T.Kind := Token_IN;
+               elsif Upper = "INTERLEAVE" then T.Kind := Token_INTERLEAVE;
+               elsif Upper = "JOIN" then T.Kind := Token_JOIN;
+               elsif Upper = "APPEND" then T.Kind := Token_APPEND;
                elsif Upper = "REM" then 
                   T.Kind := Token_REM;
                   -- Skip rest of line for REM command (comment).
