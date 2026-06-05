@@ -22,6 +22,39 @@ package body SData.Transient_Table is
       return 0;
    end Column_Index_Upper;
 
+   --  Map a name's type suffix to a column type: '$' -> string,
+   --  '%' -> integer, otherwise numeric (float).  Mirrors the evaluator's
+   --  Get_Expected_Kind so RENAME honours the suffix-determines-type rule.
+   function Type_From_Name
+     (Name : String) return SData_Core.Table.Column_Type
+   is
+      use SData_Core.Table;
+   begin
+      if Name'Length = 0 then
+         return Col_Numeric;
+      elsif Name (Name'Last) = '$' then
+         return Col_String;
+      elsif Name (Name'Last) = '%' then
+         return Col_Integer;
+      else
+         return Col_Numeric;
+      end if;
+   end Type_From_Name;
+
+   --  Value_Kind corresponding to a column type.
+   function Kind_Of
+     (T : SData_Core.Table.Column_Type) return SData_Core.Values.Value_Kind
+   is
+      use SData_Core.Table;
+      use SData_Core.Values;
+   begin
+      case T is
+         when Col_Numeric => return Val_Numeric;
+         when Col_Integer => return Val_Integer;
+         when Col_String  => return Val_String;
+      end case;
+   end Kind_Of;
+
    ---------------------------------------------------------------------------
    --  Schema
    ---------------------------------------------------------------------------
@@ -280,6 +313,41 @@ package body SData.Transient_Table is
          end;
       end loop;
 
+      --  Validate: a suffix change must stay within the numeric family
+      --  (float <-> integer).  Crossing the numeric/character boundary is
+      --  rejected here, before any mutation, so nothing is applied on error
+      --  (all-or-nothing).  Runs after the duplicate/collision checks so
+      --  those messages fire first.
+      for I in 1 .. Natural (T.Cols.Length) loop
+         declare
+            Col_Up  : constant String :=
+              To_Upper (To_String (T.Cols (I).Name));
+            Cur_Typ : constant SData_Core.Table.Column_Type := T.Cols (I).Typ;
+            use type SData_Core.Table.Column_Type;
+         begin
+            for P of Pairs loop
+               if To_Upper (To_String (P.Old_Name)) = Col_Up then
+                  declare
+                     New_Typ : constant SData_Core.Table.Column_Type :=
+                       Type_From_Name (To_String (P.New_Name));
+                  begin
+                     if (Cur_Typ = SData_Core.Table.Col_String)
+                          /= (New_Typ = SData_Core.Table.Col_String)
+                     then
+                        raise Rename_Error with
+                          "Apply_Rename: cannot retype column "
+                          & To_String (P.Old_Name)
+                          & " across the numeric/character boundary ("
+                          & To_String (P.Old_Name) & " -> "
+                          & To_String (P.New_Name) & ")";
+                     end if;
+                  end;
+                  exit;
+               end if;
+            end loop;
+         end;
+      end loop;
+
       --  Apply: simultaneous rename evaluated against original names.
       for I in 1 .. Natural (T.Cols.Length) loop
          declare
@@ -290,7 +358,26 @@ package body SData.Transient_Table is
                if To_Upper (To_String (P.Old_Name)) = Col_Up then
                   declare
                      Entry_Val : Col_Entry := T.Cols (I);
+                     New_Typ   : constant SData_Core.Table.Column_Type :=
+                       Type_From_Name (To_String (P.New_Name));
+                     use type SData_Core.Table.Column_Type;
                   begin
+                     if New_Typ /= Entry_Val.Typ then
+                        --  Convert every value in this column to the new kind.
+                        declare
+                           CV       : Value_Vectors.Vector := T.Data (I);
+                           New_Kind : constant SData_Core.Values.Value_Kind :=
+                             Kind_Of (New_Typ);
+                        begin
+                           for R in 1 .. Natural (CV.Length) loop
+                              CV.Replace_Element
+                                (R, SData_Core.Values.Convert_Value
+                                      (CV.Element (R), New_Kind));
+                           end loop;
+                           T.Data.Replace_Element (I, CV);
+                        end;
+                        Entry_Val.Typ := New_Typ;
+                     end if;
                      Entry_Val.Name := P.New_Name;
                      T.Cols.Replace_Element (I, Entry_Val);
                   end;

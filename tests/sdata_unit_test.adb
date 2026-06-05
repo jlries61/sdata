@@ -809,6 +809,51 @@ begin
       Check ("TT-26 Rename_Error target collides with existing", Raised, True);
    end;
 
+   --  TT-28: Apply_Rename float->integer rename converts type and truncates
+   declare
+      TT    : SData.Transient_Table.Table;
+      Pairs : SData.Transient_Table.Rename_Map_Vectors.Vector;
+   begin
+      TT.Add_Column ("X", SData_Core.Table.Col_Numeric);
+      TT.Add_Row;
+      TT.Set_Value (1, "X", (Kind => Val_Numeric, Num_Val => 10.7));
+      Pairs.Append ((Old_Name => To_Unbounded_String ("X"),
+                     New_Name => To_Unbounded_String ("Y%")));
+      SData.Transient_Table.Apply_Rename (TT, Pairs);
+      Check ("TT-28 renamed column Y% present", TT.Has_Column ("Y%"), True);
+      Check ("TT-28b column type now Integer",
+             TT.Get_Column_Type ("Y%") = SData_Core.Table.Col_Integer, True);
+      declare
+         V : constant Value := TT.Get_Value (1, "Y%");
+      begin
+         Check ("TT-28c value truncated to 10",
+                V.Kind = Val_Integer and then V.Int_Val = 10, True);
+      end;
+   end;
+
+   --  TT-29: Apply_Rename rejects numeric->character boundary, all-or-nothing
+   declare
+      TT     : SData.Transient_Table.Table;
+      Pairs  : SData.Transient_Table.Rename_Map_Vectors.Vector;
+      Raised : Boolean := False;
+   begin
+      TT.Add_Column ("X", SData_Core.Table.Col_Numeric);
+      TT.Add_Column ("K", SData_Core.Table.Col_Numeric);
+      --  A valid pair (K->KK) plus an invalid boundary pair (X->Y$).
+      Pairs.Append ((Old_Name => To_Unbounded_String ("K"),
+                     New_Name => To_Unbounded_String ("KK")));
+      Pairs.Append ((Old_Name => To_Unbounded_String ("X"),
+                     New_Name => To_Unbounded_String ("Y$")));
+      begin
+         SData.Transient_Table.Apply_Rename (TT, Pairs);
+      exception
+         when SData.Transient_Table.Rename_Error => Raised := True;
+      end;
+      Check ("TT-29 boundary rename raises Rename_Error", Raised, True);
+      Check ("TT-29b all-or-nothing: K not renamed", TT.Has_Column ("K"), True);
+      Check ("TT-29c all-or-nothing: KK absent", TT.Has_Column ("KK"), False);
+   end;
+
    --  TT-27: Sort_By orders rows ascending by key column
    declare
       TT   : SData.Transient_Table.Table;
