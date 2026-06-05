@@ -2425,6 +2425,38 @@ begin
    end;
 
    ---------------------------------------------------------------------------
+   --  Convert_Value (numeric-family conversion helper)
+   ---------------------------------------------------------------------------
+   declare
+      Iv     : constant Value := (Kind => Val_Integer, Int_Val => 3);
+      Fv     : constant Value := (Kind => Val_Numeric, Num_Val => 3.7);
+      Fn     : constant Value := (Kind => Val_Numeric, Num_Val => -3.7);
+      Sv     : constant Value := (Kind    => Val_String,
+                                  Str_Val => To_Unbounded_String ("hi"));
+      Mv     : constant Value := (Kind => Val_Missing);
+      Sink   : Value;
+      Raised : Boolean := False;
+   begin
+      Check ("CV-01 numeric->integer truncates toward zero",
+             Convert_Value (Fv, Val_Integer).Int_Val, 3);
+      Check ("CV-02 negative numeric->integer truncates toward zero",
+             Convert_Value (Fn, Val_Integer).Int_Val, -3);
+      Check ("CV-03 integer->numeric promotes",
+             Convert_Value (Iv, Val_Numeric).Num_Val = 3.0, True);
+      Check ("CV-04 missing passes through",
+             Convert_Value (Mv, Val_Integer).Kind = Val_Missing, True);
+      Check ("CV-05 same-kind is a no-op",
+             Convert_Value (Iv, Val_Integer).Int_Val, 3);
+      begin
+         Sink := Convert_Value (Sv, Val_Integer);
+      exception
+         when Conversion_Error => Raised := True;
+      end;
+      Check ("CV-06 string->integer raises Conversion_Error", Raised, True);
+      if Sink.Kind = Val_Missing then null; end if;  --  reference Sink
+   end;
+
+   ---------------------------------------------------------------------------
    --  ── Summary ─────────────────────────────────────────────────────────────
    ---------------------------------------------------------------------------
 
