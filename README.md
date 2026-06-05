@@ -25,6 +25,23 @@ SData is written in Ada 2012 and requires:
 - **GPRbuild** — the GNAT project build tool
 - **GNU Make**
 
+### Runtime Requirements
+
+Enforcing a timeout on `SYSTEM`/`SHELL` commands requires a `timeout(1)`
+utility on `PATH` — GNU coreutils `timeout`, or its `gtimeout` alias on
+platforms where the bare name is taken by a different tool (SData prefers
+`gtimeout` and is silent and identical across platforms when it is present).
+A timeout is in effect whenever `OPTIONS SHELLTIMEOUT` is greater than zero;
+**batch scripts apply a default of 300 seconds**, so in practice any script
+that runs external commands needs this utility. If a timeout is requested but
+no such utility is found, SData reports a clear error rather than running the
+command unbounded.
+
+The dependency does **not** apply when `OPTIONS SHELLTIMEOUT 0` is set
+(unlimited — the interactive default) or to the bare interactive `SYSTEM`
+shell. macOS ships no `timeout`; install GNU coreutils via MacPorts
+(`sudo port install coreutils`) or Homebrew (`brew install coreutils`).
+
 ### Ada Library Dependencies
 
 SData depends on a sibling Alire library crate, `sdata-core`, that holds the
