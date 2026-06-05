@@ -101,6 +101,40 @@ Only the transient-table path is changed:
 Both funnel through `SData.Transient_Table.Apply_Rename`, which operates on a
 fully in-memory transient table — no disk-spill interaction.
 
+### Discovered gap: single-dataset USE / single-target SAVE ignored paren options
+
+During implementation, integration testing revealed that per-dataset/per-target
+paren options (`rename=`/`keep=`/`drop=`) were applied **only** in the
+multi-dataset `USE` and multi-target `SAVE` code paths. A *single*-dataset
+`USE "f" (...)` (the `MM_Single` branch in
+`sdata-interpreter-execute_declarative.adb`) and a *single*-target `SAVE "f" (...)`
+(the legacy pending-save path: `Execute_SAVE` registers a pending whole-table
+write that `Flush_Pending_Save` performs in sdata-core) **silently ignored**
+those options entirely. This is pre-existing behavior, independent of the retype
+change — but it means the headline case `USE foo(rename=(x=x%))` (a single
+dataset) never reached `Apply_Rename`.
+
+This spec is therefore extended to make the single paths honour their paren
+options (rename, keep, and drop — for consistency), reusing the same
+`Apply_Rename`/`Apply_Keep`/`Apply_Drop` + `Install_To_Current` machinery:
+
+- **Single USE (`MM_Single`):** after `Execute_USE`, if the dataset spec
+  (`Stmt.Dataset_List.First_Element.Opts`) carries options, snapshot the global
+  table, apply rename → keep → drop (with the same KEEP/DROP-exclusivity check),
+  and `Install_To_Current`. This runs **before** the `Input_File_Columns` cache
+  is populated so the cache reflects the post-projection schema.
+- **Single SAVE:** when the single target carries options
+  (`Stmt.Save_List.First_Element.Opts`), route it through the existing
+  multi-target **registration** path instead of `Legacy_Execute_SAVE`. Per-record
+  auto-flush (no explicit `WRITE`) populates the target buffer, and the
+  multi-target flush projects rename → keep → drop (already including the retype)
+  and writes. An optionless single SAVE stays on the legacy path unchanged, so
+  existing single-SAVE behavior is untouched.
+
+Because the multi-target SAVE flush and the USE snapshot path both call
+`Apply_Rename`, the retype logic (and boundary rejection) applies uniformly
+across single and multi forms with no additional code.
+
 The standalone `RENAME` **statement** (`Rename_Column` on the global
 `SData_Core.Table`) is **deliberately left name-only** and is out of scope here:
 the global table spills row-segments to SQLite typed by `Col.Typ`, so retyping a
