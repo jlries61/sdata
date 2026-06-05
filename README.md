@@ -6,6 +6,8 @@ columns, supporting floating point, integer, and character data types. Features
 include:
 
 - CSV, ODF, and OOXML spreadsheet I/O
+- Column types from the header-name suffix on load: `name$` → string,
+  `name%` → integer, otherwise floating-point (non-numeric data → string)
 - Comprehensive statistical distribution functions (normal, t, F, chi-square,
   etc.)
 - Aggregate functions (mean, median, standard deviation, etc.)
