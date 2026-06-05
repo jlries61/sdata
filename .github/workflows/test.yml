@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout sdata
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: sdata
 
@@ -25,7 +25,7 @@ jobs:
       # index, this step can be removed and the path pin replaced with a
       # plain version dependency.
       - name: Checkout sdata-core
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: jlries61/sdata-core
           ref: main
