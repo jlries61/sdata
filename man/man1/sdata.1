@@ -889,6 +889,31 @@ File format is auto\-detected from the file extension when not specified
 explicitly.
 Script files conventionally use the extension
 .BR .CMD .
+.SS Column types
+On load, each column's data type is taken from the trailing character of
+its header name:
+.TP
+.IR name $
+A string (character) column.
+.TP
+.IR name %
+An integer column.
+Non\-integer numeric values are truncated toward zero (with a warning);
+values that are not valid integers \(em non\-numeric, or outside the
+representable integer range \(em are stored as missing (with a warning).
+.TP
+.I name
+(no suffix) A floating\-point numeric column.
+If its values are non\-numeric, the column is loaded as a string column
+instead and a
+.B $
+is appended to its name.
+.PP
+This is the same
+.B $
+(string) and
+.B %
+(integer) suffix convention used for variable names.
 .SS Formula cells in spreadsheets
 .B sdata
 does not contain a spreadsheet formula evaluator.
