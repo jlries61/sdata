@@ -23,7 +23,7 @@ mathpaqs = "^20260205.0.0"
 ada_sqlite3 = "^0.1.1"
 
 [[depends-on]]
-sdata_core = "^0.1.1"
+sdata_core = "^0.1.5"
 
 [[pins]]
 sdata_core = { path = "../sdata-core" }

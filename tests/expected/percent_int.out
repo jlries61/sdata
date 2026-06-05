@@ -1,0 +1,8 @@
+Warning: "tests/data/percent_int.csv", data row 3, column "N%": non-integer value "2.5" in integer column -- truncated
+Warning: "tests/data/percent_int.csv", data row 4, column "N%": non-numeric value "foo" in integer column -- stored as missing
+Dataset opened: tests/data/percent_int.csv
+5
+-7
+2
+.
+RUN complete. 4 records and 2 variables processed.
