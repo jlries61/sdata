@@ -1,3 +1,9 @@
+sdata (0.9.6-1) unstable; urgency=medium
+
+  * USE/SAVE RENAME= applies suffix-determines-type: float<->integer convert (truncating toward zero), numeric<->character rejected; single-dataset USE and single-target SAVE now honor rename/keep/drop options
+
+ -- John L. Ries <john@theyarnbard.com>  Sat, 06 Jun 2026 19:06:38 -0700
+
 sdata (0.9.5-1) unstable; urgency=medium
 
   * Load %-suffixed header columns as integer (sdata-core 0.1.5).
