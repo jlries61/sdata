@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-06-05" "sdata 0.9.5" "User Commands"
+.TH SDATA 1 "2026-06-06" "sdata 0.9.6" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -265,6 +265,12 @@ is applied before
 .B KEEP
 and
 .BR DROP .
+If the new name's type suffix differs from the column's current type, the column
+is retyped: a change within the numeric family converts the values (float to
+integer truncates toward zero).
+A rename crossing the numeric/character boundary (a "$" suffix added to or
+removed from a numeric column, or removed from a character column) is rejected
+and the entire RENAME is aborted with no change applied.
 .TP
 .BI IN= varname
 Create a temporary integer variable set to 1 for records that originate from
@@ -340,6 +346,11 @@ may not both appear for the same target.
 .BI RENAME= "(" "old=new" " [, " "old=new" " ...]" ")"
 Rename columns in the output projection for this target.
 The in-memory PDV is not modified.
+If the new name's type suffix differs from the column's current type, the column
+is retyped in the output: a change within the numeric family converts the values
+(float to integer truncates toward zero).
+A rename crossing the numeric/character boundary is rejected and the entire
+RENAME is aborted with no change applied.
 .TP
 .BI IF= expr
 Row-level filter for this target.

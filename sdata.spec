@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.9.5
+Version:        0.9.6
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Sat Jun 06 2026 John L. Ries <john@theyarnbard.com> - 0.9.6-1
+- USE/SAVE RENAME= applies suffix-determines-type: float<->integer convert (truncating toward zero), numeric<->character rejected; single-dataset USE and single-target SAVE now honor rename/keep/drop options
+
 * Fri Jun 05 2026 John L. Ries <john@theyarnbard.com> - 0.9.5-1
 - Load %-suffixed header columns as integer (sdata-core 0.1.5).
 

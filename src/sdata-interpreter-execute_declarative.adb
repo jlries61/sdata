@@ -95,6 +95,71 @@ begin
                      Nscan_Rows  => Stmt.NSCAN_Val,
                      Is_Mock     => Stmt.Is_Mock);
                end;
+
+               --  Apply per-dataset RENAME / KEEP / DROP for single-dataset
+               --  USE.  The MM_Single path historically ignored these paren
+               --  options; apply them here (via a snapshot of the freshly
+               --  loaded table) so single-dataset USE matches the
+               --  multi-dataset behavior.  Done BEFORE caching
+               --  Input_File_Columns so the cache reflects the post-projection
+               --  schema.
+               if not Stmt.Dataset_List.Is_Empty then
+                  declare
+                     Spec : constant Dataset_Spec_Access :=
+                              Stmt.Dataset_List.First_Element;
+                  begin
+                     if Spec.Opts.Keep_Vars /= null
+                        and then Spec.Opts.Drop_Vars /= null
+                     then
+                        raise SData_Core.Script_Error
+                          with "KEEP and DROP cannot both be specified"
+                               & " on the same USE dataset spec";
+                     end if;
+                     if Spec.Opts.Rename_Pairs /= null
+                        or else Spec.Opts.Keep_Vars /= null
+                        or else Spec.Opts.Drop_Vars /= null
+                     then
+                        declare
+                           Snap : SData.Transient_Table.Table :=
+                                    SData.Transient_Table
+                                       .Snapshot_From_Current;
+                        begin
+                           if Spec.Opts.Rename_Pairs /= null then
+                              declare
+                                 Pairs : SData.Transient_Table
+                                            .Rename_Map_Vectors.Vector;
+                              begin
+                                 Convert_Rename_List
+                                   (Spec.Opts.Rename_Pairs, Pairs);
+                                 Snap.Apply_Rename (Pairs);
+                              end;
+                           end if;
+                           if Spec.Opts.Keep_Vars /= null then
+                              declare
+                                 Names : SData.Transient_Table
+                                            .Name_Vectors.Vector;
+                              begin
+                                 Convert_Variable_List
+                                   (Spec.Opts.Keep_Vars, Names);
+                                 Snap.Apply_Keep (Names);
+                              end;
+                           end if;
+                           if Spec.Opts.Drop_Vars /= null then
+                              declare
+                                 Names : SData.Transient_Table
+                                            .Name_Vectors.Vector;
+                              begin
+                                 Convert_Variable_List
+                                   (Spec.Opts.Drop_Vars, Names);
+                                 Snap.Apply_Drop (Names);
+                              end;
+                           end if;
+                           SData.Transient_Table.Install_To_Current (Snap);
+                        end;
+                     end if;
+                  end;
+               end if;
+
                --  Single-dataset USE: clear any IN= read-only names from a
                --  prior multi-dataset USE.  No IN= columns are created here.
                Clear_Readonly_IN_Names;
@@ -507,8 +572,17 @@ begin
             --  Single-target legacy path: the parser always puts the file into
             --  Save_List (Length = 1) and also copies it into the legacy Stmt
             --  fields.  Delegate to the legacy handler so that single-target
-            --  SAVE continues to work exactly as before.
-            if Natural (Stmt.Save_List.Length) = 1 then
+            --  SAVE continues to work exactly as before -- UNLESS the target
+            --  carries per-target paren options (RENAME/KEEP/DROP), which the
+            --  legacy pending-save path ignores.  In that case fall through to
+            --  the registration path below so the multi-target flush applies
+            --  the options (per-record auto-flush populates the buffer when no
+            --  WRITE fires).
+            if Natural (Stmt.Save_List.Length) = 1
+               and then Stmt.Save_List.First_Element.Opts.Rename_Pairs = null
+               and then Stmt.Save_List.First_Element.Opts.Keep_Vars = null
+               and then Stmt.Save_List.First_Element.Opts.Drop_Vars = null
+            then
                Legacy_Execute_SAVE;
                return;
             end if;
