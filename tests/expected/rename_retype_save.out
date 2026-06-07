@@ -1,0 +1,24 @@
+Dataset opened: tests/data/rename_retype.csv
+Dataset saved: tests/data/rename_retype_out.csv
+RUN complete. 3 records and 1 variables processed.
+Dataset opened: tests/data/rename_retype_out.csv
+Permanent Variables (Table Columns):
+Y% 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
+Y% 
+Session Variables (SET):
+(none)
+10
+Permanent Variables (Table Columns):
+Y% 
+Session Variables (SET):
+(none)
+-3
+Permanent Variables (Table Columns):
+Y% 
+Session Variables (SET):
+(none)
+20
+RUN complete. 3 records and 1 variables processed.

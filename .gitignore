@@ -28,6 +28,7 @@ tests/data/out_b.csv
 tests/data/save_drop.csv
 tests/data/save_keep.csv
 tests/data/save_rename.csv
+tests/data/rename_retype_out.csv
 tests/data/big.csv
 tests/data/small.csv
 sdata_opt_*.csv
