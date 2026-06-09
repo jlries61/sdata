@@ -696,14 +696,42 @@ begin
          if SData_Core.Table.Column_Count = 0 and then not SData_Core.Config.Runtime.Repeat_Active then
             raise Script_Error with "BY statement requires an active dataset (use USE or REPEAT first).";
          end if;
-         SData_Core.Table.Clear_By_Vars;
+         --  BY is declarative: it sorts the input table and establishes the BY
+         --  variables.  Inside a data step the parser leaves the BY statement
+         --  in the per-record body, so it is dispatched once per record; the
+         --  guard below makes the 2nd..Nth dispatch a cheap no-op instead of
+         --  re-sorting the whole table every record (which was O(n^2 log n)).
+         --  The input table is immutable during the step and the sort is
+         --  stable, so if the requested BY variables already match the
+         --  established ones the table is already sorted by them.
          declare
             Curr_Var : Variable_List := Stmt.Sort_Vars;
             Count    : Natural := 0;
             Tmp      : Variable_List := Curr_Var;
+
+            function Already_Established return Boolean is
+               C : Variable_List := Stmt.Sort_Vars;
+            begin
+               if Count = 0 or else Count /= SData_Core.Table.By_Var_Count then
+                  return False;
+               end if;
+               for I in 1 .. Count loop
+                  if To_Upper (C.Var.Start_Name (1 .. C.Var.Start_Len))
+                       /= SData_Core.Table.By_Var_Name (I)
+                  then
+                     return False;
+                  end if;
+                  C := C.Next;
+               end loop;
+               return True;
+            end Already_Established;
          begin
             while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
-            if Count > 0 then
+            if Count = 0 then
+               --  Bare BY cancels grouping.
+               SData_Core.Table.Clear_By_Vars;
+            elsif not Already_Established then
+               SData_Core.Table.Clear_By_Vars;
                declare
                   Crit : Sort_Criteria_Array (1 .. Count);
                   Idx  : Positive := 1;

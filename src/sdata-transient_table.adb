@@ -112,14 +112,11 @@ package body SData.Transient_Table is
    procedure Add_Row (T : in out Table) is
    begin
       T.N_Rows := T.N_Rows + 1;
-      --  Append a missing value to each column's data vector.
+      --  Append a missing value to each column's data vector, in place.
+      --  Mutating through Reference avoids copying the whole column vector
+      --  on every row (which made a full N-row build O(N^2)).
       for I in 1 .. Natural (T.Data.Length) loop
-         declare
-            CV : Value_Vectors.Vector := T.Data (I);
-         begin
-            CV.Append ((Kind => SData_Core.Values.Val_Missing));
-            T.Data.Replace_Element (I, CV);
-         end;
+         T.Data.Reference (I).Append ((Kind => SData_Core.Values.Val_Missing));
       end loop;
    end Add_Row;
 
@@ -159,12 +156,9 @@ package body SData.Transient_Table is
          raise Constraint_Error
            with "Transient_Table.Set_Value: unknown column " & Col;
       end if;
-      declare
-         CV : Value_Vectors.Vector := T.Data (Idx);
-      begin
-         CV.Replace_Element (Row, Val);
-         T.Data.Replace_Element (Idx, CV);
-      end;
+      --  Mutate the cell in place through Reference; copying the whole
+      --  column vector per Set_Value made a full build O(N^2).
+      T.Data.Reference (Idx).Replace_Element (Row, Val);
    end Set_Value;
 
    ---------------------------------------------------------------------------
