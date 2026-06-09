@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 | **Version:** 0.9.6 | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -110,37 +110,62 @@ oversized declarative-dispatch procedure and still-absent enforced SAST.
 
 ---
 
-## 3. Efficiency & Performance — **76/100**
+## 3. Efficiency & Performance — **83/100**
 
-### 3.1 Hot Path & Storage — strong
+> **Post-audit correction (v0.9.7, 2026-06-09).** This audit (v0.9.6) scored the
+> data-step hot path as "O(1), no per-row hashing — a highlight." That was wrong:
+> a real-world script later exposed **three latent O(n²) defects** in the data
+> step, two of them in the supposedly-clean hot path. All three are now fixed
+> (sdata PR #21 / commit `396048a`, sdata-core PR #29 / commit `99a7534`,
+> v0.9.7 / sdata-core 0.1.7). The score is revised **up** because the hot path is
+> now genuinely linear; the prose below is corrected to match.
 
-The data-step inner loop uses a pre-resolved `Column_Cursor_Cache` for O(1)
-column access (`sdata_core-table.adb`), no per-row hashing. In-memory column
-store spills to SQLite at `Max_Table_Cells` via batched transactions
-(`Spill_Table_To_Disk`), with a segment cache on read and
-`journal_mode=OFF`/`synchronous=OFF` for throughput. This remains a highlight.
+### 3.1 Hot Path & Storage
 
-### 3.2 New cost: snapshot/install for option application
+The in-memory column store spills to SQLite at `Max_Table_Cells` via batched
+transactions (`Spill_Table_To_Disk`), with a segment cache on read and
+`journal_mode=OFF`/`synchronous=OFF` for throughput — a genuine highlight.
 
-The v0.9.6 single-dataset `USE (rename=/keep=/drop=)` path and the multi-target
-SAVE projection apply options by **snapshotting the whole table to a transient
-copy, projecting, and installing it back** (`Snapshot_From_Current` /
-`Install_To_Current`, `sdata-transient_table.adb`). That is O(rows×cols) copy-in
-plus O(rows×cols) copy-out per such statement — correct and consistent with the
-multi-dataset path, but not free. For large single-`USE`-with-options it doubles
-memory traffic where an in-place projection would not. This is an honest debit of
-the feature shipped this cycle.
+Column access via `Column_Cursor_Cache` is O(1). **However, the per-record output
+flush was not.** `SData_Core.Variables.Flush_PDV_To_Output` called
+`Get_Column_Type`, which did `Column_Maps.Element (Cursor).Typ` — returning the
+whole `Column` *by value*, deep-copying its entire `Value_Vectors` data (every
+row) just to read one enum. Called per-column-per-record, this made **every**
+`RUN` O(rows²): a plain `use; run` over 32k rows took ~402s. **[RESOLVED v0.9.7,
+commit `99a7534`]** — read `Typ` through `Constant_Reference` (O(1)); the same
+case now runs ~1.3s.
 
-### 3.3 Other
+### 3.2 Transient-table build — was O(rows²)
 
-- `Transient_Table.Set_Value` copies the whole column vector per write
-  (`sdata-transient_table.adb`), which compounds inside merge/buffer loops
-  (`sdata-merge.adb`, ~886 lines). Acceptable for typical sizes; a scalability
-  watch item.
+`Transient_Table.Add_Row` / `Set_Value` copied the whole column vector on every
+call (copy-modify-copy-back), so any transient build — `/append` and merge
+(`sdata-merge.adb`), `Snapshot_From_Current` / `Install_To_Current`, and the
+single-`USE`/`SAVE` option projection — was O(rows²). A 49k-row `/append` took
+~791s. **[RESOLVED v0.9.7, commit `396048a`]** — mutate in place via `Reference`;
+the merge now runs ~9s. This also makes the single-`USE`-with-options
+snapshot/install O(rows) rather than O(rows²), retiring the prior cycle's "honest
+debit" for that feature.
+
+### 3.3 BY re-sort per record — was O(rows²·log rows)
+
+A `BY` statement inside a data-step body is dispatched once per record, and each
+dispatch re-sorted the entire table. **[RESOLVED v0.9.7, commit `396048a`]** — an
+idempotent guard skips the re-sort when the requested BY keys already match the
+established ones (the input table is immutable during the step and the sort is
+stable); bare `BY` still cancels grouping.
+
+### 3.4 Remaining
+
+- `Transient_Table.Get_Value`/`Set_Value` still do a per-cell linear column-index
+  scan + `To_Upper` (O(cols) per cell); minor at typical widths, a candidate for a
+  cached position map.
 - Parser heap-allocates AST nodes; no arena. Fine below ~1,000 statements.
+- No per-statement profiling or memory-usage reporting infrastructure.
 
-**Δ from v0.6.14 (78):** −2. Storage/hot-path unchanged and excellent; the new
-snapshot/install projection cost is the driver.
+**Δ from v0.6.14 (78):** +5. The three O(n²) defects that were latent at audit
+time are fixed; the hot path, transient build, and BY step are now linear, with
+the strong spill design intact. The audit's failure to catch these on inspection
+is itself a finding (see Hard Truth).
 
 ---
 
@@ -307,17 +332,20 @@ plain-text design doc.
 
 ## Overall Scores
 
-| Category | v0.6.14 | v0.9.6 | Δ |
+Scores are as of v0.9.6 except **Efficiency**, revised to **83** after the three
+O(n²) defects it had missed were fixed in v0.9.7 (see §3).
+
+| Category | v0.6.14 | current | Δ |
 |---|---|---|---|
 | Architectural Integrity | 78 | **76** | −2 |
 | Code Quality & Craftsmanship | 82 | **80** | −2 |
-| Efficiency & Performance | 78 | **76** | −2 |
+| Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
 | Maintainability & Evolvability | 84 | **80** | −4 |
 | Error Handling & Resilience | 73 | **73** | 0 |
 | Security Posture | 77 | **74** | −3 |
 | Operational Readiness | 66 | **72** | +6 |
 | Documentation | 87 | **83** | −4 |
-| **TOTAL** | **625/800 (78.1%)** | **614/800 (76.8%)** | **−11** |
+| **TOTAL** | **625/800 (78.1%)** | **621/800 (77.6%)** | **−4** |
 
 ---
 
@@ -333,7 +361,8 @@ plain-text design doc.
 | 6 | Extract `Execute_Declarative` merge-mode arms into named subprograms | §2 | Medium | §2 +1 |
 | 7 | `gnatcheck`/SAST in CI; fuzz driver for merge + RENAME syntax | §2, §6 | Medium | §6 +1 |
 | 8 | Commit a plain-text `design.txt`; add `--progress` and a SUBMIT depth limit | §8, §7, §5 | Low | §8 +1 |
-| 9 | Consider in-place projection for single-`USE` options to avoid the full-table snapshot/install | §3 | High | §3 +1 |
+| ~~9~~ | ~~In-place projection for single-`USE` options~~ — **RESOLVED v0.9.7**: transient `Add_Row`/`Set_Value` made in-place, so snapshot/install is now O(rows) | §3 | — | done |
+| 10 | Add a **performance regression test** on a non-trivial dataset (e.g. a timed `use; run` + `/append` + `by` on ~50k rows) so an O(n²) reintroduction is caught in CI, not in production | §3 | Low | guards §3 |
 
 ---
 
@@ -347,12 +376,17 @@ price of coordination friction nobody has paid down, the statistics module is
 still 775 lines of numerical approximation with **zero** unit tests guarding it,
 and the threat model is a document describing a program that no longer exists —
 stamped "Current" while two releases of new attack surface (merge, transient
-tables, RENAME type coercion) went unanalysed. Worse, the very feature shipped this
-cycle leans on a full-table snapshot-and-reinstall to apply a column rename — a
-correct, tested, and quietly O(rows×cols) choice that nobody would notice until a
-big dataset makes them. None of these are emergencies. All of them are the kind of
-debt that is invisible right up until SData 1.0 puts a stability promise on top of
-it. Fix the threat model and the statistics tests before that promise, not after.
+tables, RENAME type coercion) went unanalysed. And this audit's own §3 illustrates
+the trap: it read the data-step hot path, pronounced it "O(1) — a highlight," and
+**missed three latent O(n²) defects** that made a routine 49k-row script take
+thirteen minutes. They were caught not by inspection but by a profiler on a real
+workload — proof that "looks linear" is not the same as "is linear," and that
+this codebase needs a standing performance test on a non-trivial dataset, not just
+correctness tests. (All three are now fixed in v0.9.7; §3 is revised up
+accordingly.) None of the remaining items are emergencies. All of them are the
+kind of debt that is invisible right up until SData 1.0 puts a stability promise on
+top of it. Fix the threat model, the statistics tests, and add a perf regression
+test before that promise, not after.
 
 ---
 
@@ -364,7 +398,10 @@ it. Fix the threat model and the statistics tests before that promise, not after
 | Capacity-constant duplication | `src/sdata.ads:13–18` vs `sdata_core.ads` | identical constants, no cross-ref |
 | DRY truncation centralization | `sdata_core-values.adb:23–48`; `sdata_core-table.adb:267,272` | Coerce_Value delegates to Convert_Value |
 | Oversized declarative dispatch | `src/sdata-interpreter-execute_declarative.adb` | 828 lines, nested merge-mode arms |
-| Snapshot/install projection cost | `src/sdata-transient_table.adb` (Snapshot/Install) | O(rows×cols) in + out per options statement |
+| O(n²) #1 `Get_Column_Type` whole-column copy **[RESOLVED v0.9.7, `99a7534`]** | `sdata_core-table.adb` (`Element(Cursor).Typ`) | per-record flush copied every row to read one enum; `use;run` 32k: 402s→1.3s (callgrind) |
+| O(n²) #2 transient copy-per-cell **[RESOLVED v0.9.7, `396048a`]** | `src/sdata-transient_table.adb` (`Add_Row`/`Set_Value`) | whole-column copy per call; `/append` 49k: 791s→9s |
+| O(n²) #3 BY re-sort per record **[RESOLVED v0.9.7, `396048a`]** | `src/sdata-interpreter-execute_declarative.adb` (Stmt_BY) | sorted whole table every record; pass-2 2k: 19s→0.17s |
+| Perf headline | full adult train/test script | >13 min → ~11s after the three fixes; output identical |
 | Statistics untested | `sdata_core-statistics.adb` (775 lines); `tests/` | no `statistics_unit_test` |
 | Test counts | `make check`; `ls tests/*.cmd` | 196 integration; 733 unit (71/355/170/89/48) |
 | `when others` inventory | grep both `src/` trees | 44 total (20 sdata, 24 core); ~10 silent-null, justified |
