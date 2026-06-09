@@ -1,0 +1,10 @@
+Dataset saved: tests/data/perf_regression_a.csv
+RUN complete. 20000 records and 2 variables processed.
+Dataset opened: tests/data/perf_regression_a.csv
+Dataset opened: tests/data/perf_regression_a.csv
+Dataset saved: tests/data/perf_regression_b.csv
+RUN complete. 40000 records and 2 variables processed.
+Dataset opened: tests/data/perf_regression_b.csv
+RUN complete. 40000 records and 2 variables processed.
+A rows= 20000.00000
+RUN complete. 1 records and 0 variables processed.
