@@ -362,7 +362,7 @@ O(n²) defects it had missed were fixed in v0.9.7 (see §3).
 | 7 | `gnatcheck`/SAST in CI; fuzz driver for merge + RENAME syntax | §2, §6 | Medium | §6 +1 |
 | 8 | Commit a plain-text `design.txt`; add `--progress` and a SUBMIT depth limit | §8, §7, §5 | Low | §8 +1 |
 | ~~9~~ | ~~In-place projection for single-`USE` options~~ — **RESOLVED v0.9.7**: transient `Add_Row`/`Set_Value` made in-place, so snapshot/install is now O(rows) | §3 | — | done |
-| 10 | Add a **performance regression test** on a non-trivial dataset (e.g. a timed `use; run` + `/append` + `by` on ~50k rows) so an O(n²) reintroduction is caught in CI, not in production | §3 | Low | guards §3 |
+| ~~10~~ | ~~Add a performance regression test~~ — **RESOLVED**: `tests/perf_regression.cmd` exercises all three paths on 20k/40k rows; relies on the harness 10s per-test timeout so an O(n²) reintroduction fails the suite | §3 | — | done |
 
 ---
 
@@ -382,11 +382,13 @@ the trap: it read the data-step hot path, pronounced it "O(1) — a highlight," 
 thirteen minutes. They were caught not by inspection but by a profiler on a real
 workload — proof that "looks linear" is not the same as "is linear," and that
 this codebase needs a standing performance test on a non-trivial dataset, not just
-correctness tests. (All three are now fixed in v0.9.7; §3 is revised up
+correctness tests. (All three are now fixed in v0.9.7, and a
+standing perf-regression test — `tests/perf_regression.cmd`, which fails the
+suite if any path goes quadratic again — now guards them; §3 is revised up
 accordingly.) None of the remaining items are emergencies. All of them are the
 kind of debt that is invisible right up until SData 1.0 puts a stability promise on
-top of it. Fix the threat model, the statistics tests, and add a perf regression
-test before that promise, not after.
+top of it. Fix the threat model and the statistics tests before that promise, not
+after.
 
 ---
 
