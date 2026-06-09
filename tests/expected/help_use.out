@@ -10,6 +10,24 @@ Options:
   /FMT=format  Specifies the file format (CSV, ODF, OOXML).
                Default is auto-detected from file extension.
   /NSCAN=n     Number of rows to scan for type detection (default: 20).
+Per-dataset options (in parentheses after a filename):
+  (KEEP=name ...)          Keep only the named columns.
+  (DROP=name ...)          Drop the named columns.
+  (RENAME=(old=new ...))   Rename columns (applied before KEEP/DROP);
+                           all pairs apply against the original names.
+                           If the new name's type suffix differs, the
+                           column is retyped: float<->integer converts
+                           values (float to integer truncates toward
+                           zero); a numeric<->character change ($ added
+                           or removed) is rejected and the whole RENAME
+                           is aborted.
+Merge (two or more comma-separated datasets):
+  USE a, b                 Positional merge (combine rows by position).
+  USE a, b /BY=var ...     Match merge (full outer; auto-sorted by BY).
+  ... /INTERLEAVE          Interleave all rows in BY-sorted order.
+  ... /JOIN                Cartesian inner join within each BY group.
+  USE a, b /APPEND         Stack rows vertically (union of columns).
+  IN=name marks a 0/1 provenance column, e.g. USE a(IN=ina), b(IN=inb).
 Formula cells (ODF/OOXML):
   sdata has no built-in formula evaluator.
   If LibreOffice (soffice) is on PATH, it is invoked to recalculate
