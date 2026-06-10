@@ -57,3 +57,5 @@ debian/sdata/
 debian/sdata.substvars
 debian/debhelper-build-stamp
 
+# Generated SUBMIT depth-limit chain (submit_depth_test)
+tests/data/submit_depth_gen/

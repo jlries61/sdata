@@ -16,6 +16,11 @@ begin
             if Submit_Chain.Contains (Final) then
                raise Script_Error with "Recursive SUBMIT detected: " & Final;
             end if;
+            if Natural (Submit_Chain.Length) >= Max_Submit_Depth then
+               raise Script_Error with
+                 "SUBMIT nesting too deep (depth limit"
+                 & Max_Submit_Depth'Image & " exceeded): " & Final;
+            end if;
             Submit_Chain.Insert (Final);
             declare
                type String_Access is access String;

@@ -140,6 +140,12 @@ package body SData.Interpreter is
    --  Set of script files currently in the SUBMIT execution chain (for cycle detection).
    Submit_Chain : Name_Sets.Set;
 
+   --  Maximum SUBMIT nesting depth.  Cycle detection (Submit_Chain) catches a
+   --  file re-entering itself; this bounds a chain of *distinct* files so deep
+   --  nesting cannot exhaust the stack.  Submit_Chain.Length is the current
+   --  depth, since one entry is inserted per active SUBMIT level.
+   Max_Submit_Depth : constant := 64;
+
    --  Multi-target SAVE registration. When non-empty, supersedes the
    --  single-target Save_File_* fields in SData_Core.Config.Runtime
    --  for the duration of the next RUN. Cleared by RUN flush, by an

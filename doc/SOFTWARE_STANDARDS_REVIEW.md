@@ -227,7 +227,7 @@ checkout.
 
 ---
 
-## 5. Error Handling & Resilience — **74/100** (2026-06-10)
+## 5. Error Handling & Resilience — **75/100** (2026-06-10)
 
 ### 5.1 Strategy
 
@@ -264,13 +264,19 @@ audit flagged in the interpreter body remain the weakest pattern but are bounded
   future path ever raises one it surfaces as a clean `Error: …` with a failure exit
   status instead of an "Internal error" via `when others`. No sdata-core change; no
   version bump.
-- **No SUBMIT nesting-depth limit** (loop detection exists; depth does not).
+- ~~**No SUBMIT nesting-depth limit**~~ — **RESOLVED 2026-06-10 (remediation #8).**
+  `Execute_IO` now bounds the active SUBMIT chain to `Max_Submit_Depth` (64) before
+  inserting, raising a clean `Script_Error` ("SUBMIT nesting too deep …") so a chain of
+  distinct files cannot exhaust the stack. (Cycle detection already handled same-file
+  re-entry.) Covered by `tests/submit_depth_test.cmd` (a 65-deep generated chain;
+  RED→GREEN verified).
 - **No per-expression timeout** (a non-terminating `WHILE` runs forever).
 
-**Δ from v0.6.14 (73):** +1 → **74** (2026-06-10). The coercion-exception surfacing
-gap is closed as documented defense-in-depth (remediation #4), and the
-unreachability is now verified rather than assumed; SQLite/CSV/signal handling remain
-strong. The SUBMIT-depth and expression-timeout gaps are the remaining debits.
+**Δ from v0.6.14 (73):** +2 → **75** (2026-06-10). The coercion-exception surfacing
+gap is closed as documented defense-in-depth (remediation #4, with unreachability now
+verified rather than assumed) and the SUBMIT nesting-depth limit is added (remediation
+#8); SQLite/CSV/signal handling remain strong. The lone remaining debit is the absent
+per-expression timeout.
 
 ---
 
@@ -387,8 +393,8 @@ debit is the statistics module's missing implementation-choice prose.
 Scores are as of v0.9.6 except seven revised post-audit. From 2026-06-09:
 **Efficiency** (→83, three O(n²) fixes in v0.9.7, §3), **Documentation** (→85,
 threat-model + test-count syncs, §8), and **Maintainability** (→82, statistics
-unit tests added, §4). From 2026-06-10: **Error Handling** (→74,
-coercion-exception defense-in-depth guard + verified unreachability, §5),
+unit tests added, §4). From 2026-06-10: **Error Handling** (→75,
+coercion-exception defense-in-depth guard + SUBMIT depth limit, §5),
 **Architectural Integrity** (→77, capacity-constant de-duplication, §1),
 **Code Quality** (→81, declarative-dispatch decomposition, §2), **Security**
 (→77, threat-model refresh + merge/RENAME fuzz driver, §6), and **Documentation**
@@ -403,11 +409,11 @@ remain the principal debits.
 | Code Quality & Craftsmanship | 82 | **81** (2026-06-10) | −1 |
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
 | Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
-| Error Handling & Resilience | 73 | **74** (2026-06-10) | +1 |
+| Error Handling & Resilience | 73 | **75** (2026-06-10) | +2 |
 | Security Posture | 77 | **77** (2026-06-10) | 0 |
 | Operational Readiness | 66 | **72** | +6 |
 | Documentation | 87 | **86** (2026-06-10) | −1 |
-| **TOTAL** | **625/800 (78.1%)** | **632/800 (79.0%)** | **+7** |
+| **TOTAL** | **625/800 (78.1%)** | **633/800 (79.1%)** | **+8** |
 
 ---
 
@@ -422,7 +428,7 @@ remain the principal debits.
 | ~~5~~ | ~~De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`)~~ — **RESOLVED 2026-06-10**: `sdata.ads` now `with`s `SData_Core` and re-exports the six constants from it; one literal per limit, cannot diverge. sdata-only, no version bump | §1 | — | done |
 | ~~6~~ | ~~Extract `Execute_Declarative` merge-mode arms into named subprograms~~ — **RESOLVED 2026-06-10**: USE arm's single/multi paths extracted into `Execute_USE_Single` / `Execute_USE_Multi` (byte-identical move, verified by diff; 197/197 green); arm reduced to a 7-line dispatch | §2 | — | done |
 | ~~7~~ | **PARTIAL 2026-06-10** — fuzz driver for merge + RENAME **done** (`tests/merge_fuzz_driver.adb` + seeds, wired into `make fuzz-corpus`; closes the §6 fuzz debit, +1). `gnatcheck`/SAST-in-CI **deferred (toolchain-blocked)**: FSF GNAT 15.2 ships no gnatcheck; ASIS gnatcheck is version-incompatible; libadalang build too heavy for CI (§2.4, §6.2) | §2, §6 | Medium | §6 +1 |
-| 8 | ~~Commit a plain-text `design.txt`~~ → **committed `doc/design.md` (Markdown, RESOLVED 2026-06-10, §8 +1)**; add `--progress` and a SUBMIT depth limit | §8, §7, §5 | Low | §8 +1 |
+| 8 | **2026-06-10:** ~~commit `design.txt`~~ → committed `doc/design.md` (§8 +1, done); ~~SUBMIT depth limit~~ → `Max_Submit_Depth`=64 guard (§5 +1, done); `--progress` still pending | §8, §7, §5 | Low | §8 +1 |
 | ~~9~~ | ~~In-place projection for single-`USE` options~~ — **RESOLVED v0.9.7**: transient `Add_Row`/`Set_Value` made in-place, so snapshot/install is now O(rows) | §3 | — | done |
 | ~~10~~ | ~~Add a performance regression test~~ — **RESOLVED**: `tests/perf_regression.cmd` exercises all three paths on 20k/40k rows; relies on the harness 10s per-test timeout so an O(n²) reintroduction fails the suite | §3 | — | done |
 

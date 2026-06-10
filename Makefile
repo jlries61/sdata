@@ -115,6 +115,14 @@ check: build
 	 fi
 	@echo ""
 	@echo "Running tests..."
+	@#  Generate the SUBMIT depth-limit chain (gitignored; see submit_depth_test.cmd).
+	@mkdir -p tests/data/submit_depth_gen; \
+	 i=1; while [ $$i -le 64 ]; do \
+	   n=$$(printf "%03d" $$i); m=$$(printf "%03d" $$((i+1))); \
+	   printf 'SUBMIT "tests/data/submit_depth_gen/c%s.cmd"\n' "$$m" > "tests/data/submit_depth_gen/c$$n.cmd"; \
+	   i=$$((i+1)); \
+	 done; \
+	 printf -- '-- depth-chain terminal (reached only without the guard)\n' > tests/data/submit_depth_gen/c065.cmd
 	@failures=0; failed_list=""; total=0; \
 	for f in tests/*.cmd; do \
 		total=$$((total+1)); \
