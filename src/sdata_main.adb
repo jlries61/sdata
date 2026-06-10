@@ -91,6 +91,7 @@ procedure SData_Main is
       Put_Line ("  --nosubmit               Disable SUBMIT command");
       Put_Line ("  -k, --continue-on-error  Continue executing after a statement error");
       Put_Line ("  --ignore-math-errors     Math domain errors return MISSING instead of halting");
+      Put_Line ("  --progress               Report record-count progress on stderr for long USE/RUN/SORT runs");
       Put_Line ("  -u, --infmt              Input dataset and format");
       Put_Line ("  -s, --outfmt             Output dataset and format");
       Put_Line ("  -o <file>                Console output file");
@@ -394,6 +395,8 @@ begin
             Disable_Submit := True;
          elsif Arg = "--ignore-math-errors" then
             Ignore_Math_Errors := True;
+         elsif Arg = "--progress" then
+            Progress := True;
          elsif Arg = "--debug" then
             Debug_Level := 3;
          elsif Arg'Length > 8

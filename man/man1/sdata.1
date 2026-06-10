@@ -82,6 +82,12 @@ returns the record number where the error occurred.
 Instead of halting on a floating\-point domain error (e.g. LOG of a negative
 number), emit a warning and return the missing value.
 .TP
+.B \-\-progress
+Report record\-count progress on standard error for long\-running operations
+(\fBUSE\fR file loads, the per\-record \fBRUN\fR data step, and \fBSORT\fR).
+A counter is printed every 10,000 records and updated in place; progress is
+written only to standard error, never to the data stream.
+.TP
 .BI \-o " file"
 Redirect console output to
 .IR file

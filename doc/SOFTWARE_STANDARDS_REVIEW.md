@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§8 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§7/§8 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -326,7 +326,7 @@ the residual point is the toolchain-blocked SAST-in-CI.
 
 ---
 
-## 7. Operational Readiness — **72/100**
+## 7. Operational Readiness — **73/100** (2026-06-10)
 
 ### 7.1 Improvements
 
@@ -342,16 +342,23 @@ the residual point is the toolchain-blocked SAST-in-CI.
 
 ### 7.2 Gaps
 
-- **No progress reporting** (`--progress`/record-count) for long USE/SORT/aggregate
-  runs — silence until completion.
+- ~~**No progress reporting**~~ — **RESOLVED 2026-06-10 (remediation #8).** A
+  `--progress` flag (`SData_Core.Config.Progress`) emits throttled record-count
+  progress to **stderr only** (never the data stream) for the long-running phases:
+  USE file loads (per-row in all three readers — CSV/ODF/OOXML), the per-record RUN
+  data step (which subsumes aggregate-function evaluation), and SORT. The shared
+  `SData_Core.IO.Show_Progress` helper prints every 10,000 records with a final total
+  per phase. Verified end-to-end on a 25k-row dataset.
 - **No unified ecosystem CI:** data-vandal is not exercised in sdata's pipeline
   (manual `cd ~/Develop/data-vandal && make check` per CLAUDE.md). The sdata-core
   consumer-test pin also lags the current sdata release.
 - Stale in-repo test counts (see §8) cause onboarding confusion.
 
-**Δ from v0.6.14 (66):** +6. Derived-version packaging, expanded CI, and richer
-debug/test infrastructure are concrete operational gains — the one dimension that
-improved.
+**Δ from v0.6.14 (66):** +7 → **73** (2026-06-10). Derived-version packaging,
+expanded CI, richer debug/test infrastructure, and now `--progress` reporting for
+long USE/RUN/SORT runs (remediation #8) are concrete operational gains. The residual
+gap is the lack of a unified ecosystem CI (data-vandal not exercised in sdata's
+pipeline; consumer-test pin lags).
 
 ---
 
@@ -397,9 +404,10 @@ unit tests added, §4). From 2026-06-10: **Error Handling** (→75,
 coercion-exception defense-in-depth guard + SUBMIT depth limit, §5),
 **Architectural Integrity** (→77, capacity-constant de-duplication, §1),
 **Code Quality** (→81, declarative-dispatch decomposition, §2), **Security**
-(→77, threat-model refresh + merge/RENAME fuzz driver, §6), and **Documentation**
-(→86, design doc converted to committed Markdown, §8). The total now exceeds
-the v0.6.14 mark, with a different composition:
+(→77, threat-model refresh + merge/RENAME fuzz driver, §6), **Documentation**
+(→86, design doc converted to committed Markdown, §8), and **Operational
+Readiness** (→73, `--progress` reporting, §7). The total now exceeds the v0.6.14
+mark, with a different composition:
 Efficiency and Operational Readiness up most; the split-coordination dimensions
 remain the principal debits.
 
@@ -411,9 +419,9 @@ remain the principal debits.
 | Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
 | Error Handling & Resilience | 73 | **75** (2026-06-10) | +2 |
 | Security Posture | 77 | **77** (2026-06-10) | 0 |
-| Operational Readiness | 66 | **72** | +6 |
+| Operational Readiness | 66 | **73** (2026-06-10) | +7 |
 | Documentation | 87 | **86** (2026-06-10) | −1 |
-| **TOTAL** | **625/800 (78.1%)** | **633/800 (79.1%)** | **+8** |
+| **TOTAL** | **625/800 (78.1%)** | **634/800 (79.3%)** | **+9** |
 
 ---
 
@@ -428,7 +436,7 @@ remain the principal debits.
 | ~~5~~ | ~~De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`)~~ — **RESOLVED 2026-06-10**: `sdata.ads` now `with`s `SData_Core` and re-exports the six constants from it; one literal per limit, cannot diverge. sdata-only, no version bump | §1 | — | done |
 | ~~6~~ | ~~Extract `Execute_Declarative` merge-mode arms into named subprograms~~ — **RESOLVED 2026-06-10**: USE arm's single/multi paths extracted into `Execute_USE_Single` / `Execute_USE_Multi` (byte-identical move, verified by diff; 197/197 green); arm reduced to a 7-line dispatch | §2 | — | done |
 | ~~7~~ | **PARTIAL 2026-06-10** — fuzz driver for merge + RENAME **done** (`tests/merge_fuzz_driver.adb` + seeds, wired into `make fuzz-corpus`; closes the §6 fuzz debit, +1). `gnatcheck`/SAST-in-CI **deferred (toolchain-blocked)**: FSF GNAT 15.2 ships no gnatcheck; ASIS gnatcheck is version-incompatible; libadalang build too heavy for CI (§2.4, §6.2) | §2, §6 | Medium | §6 +1 |
-| 8 | **2026-06-10:** ~~commit `design.txt`~~ → committed `doc/design.md` (§8 +1, done); ~~SUBMIT depth limit~~ → `Max_Submit_Depth`=64 guard (§5 +1, done); `--progress` still pending | §8, §7, §5 | Low | §8 +1 |
+| ~~8~~ | **RESOLVED 2026-06-10** — committed `doc/design.md` (Markdown, §8 +1); `Max_Submit_Depth`=64 SUBMIT guard (§5 +1); `--progress` record-count reporting for USE/RUN/SORT (§7 +1). All three parts done | §8, §7, §5 | — | done |
 | ~~9~~ | ~~In-place projection for single-`USE` options~~ — **RESOLVED v0.9.7**: transient `Add_Row`/`Set_Value` made in-place, so snapshot/install is now O(rows) | §3 | — | done |
 | ~~10~~ | ~~Add a performance regression test~~ — **RESOLVED**: `tests/perf_regression.cmd` exercises all three paths on 20k/40k rows; relies on the harness 10s per-test timeout so an O(n²) reintroduction fails the suite | §3 | — | done |
 
