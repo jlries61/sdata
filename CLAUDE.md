@@ -39,9 +39,9 @@ of v0.9.7; `make check` output is the source of truth):
 3. `bin/evaluator_unit_test` — expression evaluator (170)
 4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write (89)
 5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT (48)
-6. 199 `.cmd` integration tests in `tests/` (~733 unit checks total)
+6. 201 `.cmd` integration tests in `tests/` (~733 unit checks total)
 
-All 199 integration tests must pass before committing. Never use `--no-verify`.
+All 201 integration tests must pass before committing. Never use `--no-verify`.
 
 If a sdata-core change is involved, run `cd ~/Develop/sdata-core && alr build`
 first, then `cd ~/Develop/sdata && make check` to catch regressions in both layers.
@@ -74,7 +74,7 @@ implement USE, SAVE, FPATH, OUTPUT, SELECT, KEEP, DROP, ARRAY, DIM, RUN, and
 their related helpers (`Execute_OUTPUT_Table`, `Execute_Rebuild_Filter`). sdata's
 interpreter delegates to these rather than duplicating the logic. data-vandal
 calls the same procedures. When changing one of these commands' semantics, edit
-sdata-core and confirm both `make check` (sdata, 199 integration tests) and
+sdata-core and confirm both `make check` (sdata, 201 integration tests) and
 `cd ~/Develop/data-vandal && make check` (data-vandal, 44 tests) still pass.
 
 ## Source Layout
@@ -211,7 +211,7 @@ one lingering. Do not reintroduce a hardcoded sdata-core version in these files.
 
 - Phases 1–4: **complete** (core, control flow, distributions/aggregates, spreadsheet I/O)
 - Phase 5 (Polish): **complete** — disk spillover, interactive improvements, pager, HELP, LIST, ERR/ERL, error messages, performance, documentation
-- Phase 6 (Testing): **ongoing** — 199 integration tests, ~733 unit checks across 5 modules
+- Phase 6 (Testing): **ongoing** — 201 integration tests, ~733 unit checks across 5 modules
 - v0.8.0 milestone (2026-05-21): VANDALIZE extracted into `data-vandal`; sdata-core shared library created (ADRs 039–043)
 
 Full plan: `doc/feasibility_assessment.md`
