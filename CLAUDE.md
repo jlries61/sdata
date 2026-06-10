@@ -65,6 +65,14 @@ of v0.9.7; `make check` output is the source of truth):
 
 All 201 integration tests must pass before committing. Never use `--no-verify`.
 
+**Documentation-only commits** — changes confined to `doc/`, `man/`, and `*.md`
+(README, CONTRIBUTING, CLAUDE.md) and similar non-build prose — do **not** require a
+local `make check` (or the cross-crate gate above); the suite is known-passing from
+the last code change, and CI reruns on push as a backstop. This exemption does **not**
+apply if the commit also touches `src/`, `tests/` (incl. `tests/expected/`), `*.gpr`,
+`Makefile`, `alire.toml`, or packaging files — those still require the full local check
+(and the cross-crate check if the change is in sdata-core).
+
 If a sdata-core change is involved, run `cd ~/Develop/sdata-core && alr build`
 first, then `cd ~/Develop/sdata && make check` to catch regressions in both layers.
 
