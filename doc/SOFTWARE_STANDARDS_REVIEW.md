@@ -247,7 +247,7 @@ the new exceptions add a minor surfacing gap offset by thorough RENAME validatio
 
 ---
 
-## 6. Security Posture — **74/100**
+## 6. Security Posture — **76/100**
 
 ### 6.1 Trust Model & Controls — intact
 
@@ -259,18 +259,23 @@ hardcoded secrets.
 
 ### 6.2 Gaps
 
-- **Threat model is stale.** `doc/threat_model.md` is stamped **v0.6.13 /
-  2026-05-14 / "Current"** and predates the three-crate split, the merge/transient
-  machinery, multi-target SAVE projections, and RENAME type conversion. New input
-  surfaces (merge BY-group warning volume, RENAME-derived column names reaching the
-  spill layer) are unanalysed. This is the single biggest security debit.
+- **Threat model — REFRESHED 2026-06-09 (remediation #1, done).**
+  `doc/threat_model.md` was stamped v0.6.13 / 2026-05-14 / "Current" and predated
+  the three-crate split, merge/transient machinery, multi-target SAVE, and RENAME
+  type conversion. It is now updated to v0.9.7: new attack-surface rows
+  (merge/transient, per-dataset/target options), T1 extended to RENAME-derived
+  names (covered by `Sql_Id`), a new **D4** (merge `/JOIN` amplification +
+  unbounded transient memory, since transient tables don't spill), corrected file
+  references, and refreshed gaps/deployment guidance.
 - **Fuzz corpus did not grow with the code.** Drivers still cover CSV/parser/ODS/
   XLSX; the ~886-line merge path and RENAME syntax have no fuzz driver. The CI job
-  is seed-corpus regression, not coverage-guided fuzzing.
+  is seed-corpus regression, not coverage-guided fuzzing. (Now also logged as a
+  gap in the threat model.) **This is the remaining §6 debit.**
 - No SAST in CI (gnatcheck Ubuntu-only; CodePeer unused).
 
-**Δ from v0.6.14 (77):** −3. Controls unchanged, but the threat model not keeping
-pace with two releases of new attack surface is a real posture regression.
+**Δ from v0.6.14 (77):** −1. The threat-model staleness that drove the prior −3 is
+resolved; the still-missing merge/RENAME fuzz coverage keeps it just below the
+v0.6.14 mark.
 
 ---
 
@@ -319,21 +324,23 @@ improved.
 
 - **Stale test counts.** `CLAUDE.md` claims **140** integration tests in three
   places (`:38`, `:40`, `:73`); actual is **196**. `CONTRIBUTING.md` likewise lags.
-- **Threat model stamp stale** (§6) — also a documentation-currency failure.
+- ~~**Threat model stamp stale** (§6)~~ — **resolved 2026-06-09** (refreshed to v0.9.7).
 - **`doc/design.odt` remains binary-only.** A `design.txt` exists locally but is
   **untracked** (not committed), so the authoritative spec is still ODF-only in git.
 - Statistics module has citations but no prose on implementation-choice rationale.
 
-**Δ from v0.6.14 (87):** −4. Excellent breadth and a current man page, undercut by
-stale test-count claims, the stale threat-model stamp, and the still-uncommitted
-plain-text design doc.
+**Δ from v0.6.14 (87):** −4. Excellent breadth and a current man page; the stale
+threat-model stamp is now fixed, but stale test-count claims and the
+still-uncommitted plain-text design doc keep the score down. (Score held at 83:
+the test-count and design-doc gaps still dominate.)
 
 ---
 
 ## Overall Scores
 
-Scores are as of v0.9.6 except **Efficiency**, revised to **83** after the three
-O(n²) defects it had missed were fixed in v0.9.7 (see §3).
+Scores are as of v0.9.6 except **Efficiency** (revised to 83 after the three O(n²)
+fixes in v0.9.7, see §3) and **Security** (revised to 76 after the threat-model
+refresh of 2026-06-09, see §6).
 
 | Category | v0.6.14 | current | Δ |
 |---|---|---|---|
@@ -342,10 +349,10 @@ O(n²) defects it had missed were fixed in v0.9.7 (see §3).
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
 | Maintainability & Evolvability | 84 | **80** | −4 |
 | Error Handling & Resilience | 73 | **73** | 0 |
-| Security Posture | 77 | **74** | −3 |
+| Security Posture | 77 | **76** (2026-06-09) | −1 |
 | Operational Readiness | 66 | **72** | +6 |
 | Documentation | 87 | **83** | −4 |
-| **TOTAL** | **625/800 (78.1%)** | **621/800 (77.6%)** | **−4** |
+| **TOTAL** | **625/800 (78.1%)** | **623/800 (77.9%)** | **−2** |
 
 ---
 
@@ -353,7 +360,7 @@ O(n²) defects it had missed were fixed in v0.9.7 (see §3).
 
 | Priority | Item | Section | Effort | Gain |
 |---|---|---|---|---|
-| 1 | Refresh `doc/threat_model.md` to v0.9.6 — cover merge/transient surface, RENAME-derived names, shared sdata-core surface | §6, §8 | Medium | §6 +2 |
+| ~~1~~ | ~~Refresh `doc/threat_model.md`~~ — **RESOLVED 2026-06-09**: updated to v0.9.7 with merge/transient + per-target-option attack surface, T1 extended to RENAME names, new D4 (merge/transient memory), corrected file refs | §6, §8 | — | done |
 | 2 | Sync stale test counts (`CLAUDE.md` 140→196, `CONTRIBUTING.md`); ideally derive from harness output | §8 | Low | §8 +2 |
 | 3 | Add `statistics_unit_test` for `sdata_core-statistics.adb` (boundaries, monotonicity, IDF∘CDF) | §4 | Medium | §4 +2 |
 | 4 | Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error` at the sdata-core boundary | §5 | Low | §5 +1 |
