@@ -1,0 +1,3 @@
+USE "f.csv"
+SAVE "out.csv" (RENAME=(X=Y%))
+SAVE "a.csv" (KEEP=X), "b.csv" (DROP=Y)

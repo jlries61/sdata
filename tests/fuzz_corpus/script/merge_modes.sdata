@@ -1,0 +1,5 @@
+USE "a.csv", "b.csv" /BY=ID /MATCH
+USE "a.csv", "b.csv" /BY=ID /JOIN
+USE "a.csv", "b.csv" /BY=ID /INTERLEAVE
+USE "a.csv", "b.csv" /APPEND
+USE "a.csv", "b.csv" /POSITIONAL

@@ -1,0 +1,5 @@
+USE "f.csv" (RENAME=(X=Y%))
+USE "a.csv" (RENAME=(ID=Z, X=Z)), "b.csv" /BY=ID
+USE "a.csv" (KEEP=X), "b.csv" (DROP=Y) /APPEND
+USE "a.csv" AS L, "b.csv" AS R /BY=ID /MATCH
+USE "a.csv" (IN=hasA), "b.csv" (IN=hasB) /BY=ID

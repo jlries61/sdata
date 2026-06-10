@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -110,9 +110,11 @@ deferral (`sdata_core-table.adb:96`, a bounded SQLite-handle leak gated on an
   diff against the pre-refactor file), so behaviour is provably unchanged (build clean
   + 197/197 integration). The SAVE/OPTIONS arms already used named helpers
   (`Legacy_Execute_SAVE`, `Dlm_Display`).
-- **No enforced static analysis.** `gnatcheck.rules` exists (two rules) but is not
-  run in CI (Ubuntu `asis-programs` only). CodePeer unused. Pragma-`Annotate`
-  exemptions for the bounded evaluator recursion are justified.
+- **No enforced static analysis (toolchain-blocked).** `gnatcheck.rules` exists (two
+  rules) but is not run in CI: FSF GNAT 15.2 (the Alire toolchain) ships no
+  `gnatcheck`, and Ubuntu's ASIS `gnatcheck` is version-incompatible with it (see §6.2
+  for the full rationale). CodePeer unused. Pragma-`Annotate` exemptions for the
+  bounded evaluator recursion are justified.
 
 **Δ from v0.6.14 (82):** −1 → **81** (2026-06-10). The DRY win and clean naming now
 include the decomposed declarative dispatch (remediation #6); the residual debit is the
@@ -272,7 +274,7 @@ strong. The SUBMIT-depth and expression-timeout gaps are the remaining debits.
 
 ---
 
-## 6. Security Posture — **76/100**
+## 6. Security Posture — **77/100** (2026-06-10)
 
 ### 6.1 Trust Model & Controls — intact
 
@@ -292,15 +294,29 @@ hardcoded secrets.
   names (covered by `Sql_Id`), a new **D4** (merge `/JOIN` amplification +
   unbounded transient memory, since transient tables don't spill), corrected file
   references, and refreshed gaps/deployment guidance.
-- **Fuzz corpus did not grow with the code.** Drivers still cover CSV/parser/ODS/
-  XLSX; the ~886-line merge path and RENAME syntax have no fuzz driver. The CI job
-  is seed-corpus regression, not coverage-guided fuzzing. (Now also logged as a
-  gap in the threat model.) **This is the remaining §6 debit.**
-- No SAST in CI (gnatcheck Ubuntu-only; CodePeer unused).
+- ~~**Fuzz corpus did not grow with the code.**~~ — **RESOLVED 2026-06-10
+  (remediation #7, fuzz half).** `tests/merge_fuzz_driver.adb` exercises the merge
+  path end-to-end: it derives 2–4 transient tables (typed columns, byte-derived rows)
+  with a RENAME map from stdin bytes, then runs `Apply_Rename` / `Sort_By` and every
+  `SData.Merge.Combine_*` combiner (Positional / Match / Interleave / Join / Append),
+  catching expected `Rename_Error` / `Script_Error` and letting real crashes propagate.
+  Seven seeds under `tests/fuzz_corpus/merge/` plus four merge/RENAME **syntax** seeds
+  under `…/script/` (RENAME command, per-dataset `(RENAME=/KEEP/DROP)`, all merge
+  modes, multi-target SAVE) extend the parser driver's coverage. Wired into
+  `make fuzz-corpus` (which CI runs). Validated: 0 crashes across the seeds + 2000
+  random inputs.
+- **No SAST in CI — still open (toolchain-blocked).** `gnatcheck.rules` (two rules)
+  is not run in CI. The Alire toolchain is **FSF GNAT 15.2**, which does *not* bundle
+  `gnatcheck`; Ubuntu's `asis-programs` `gnatcheck` is ASIS-based and version-locked to
+  Ubuntu's system GNAT, so it cannot process GNAT-15.2-built sources; the
+  libadalang-based `gnatcheck` (Alire `libadalang_tools`) would mean building
+  libadalang from source in CI — too heavy/fragile to justify for two rules. Revisit
+  when an Alire `gnatcheck` binary crate is available; meanwhile `make gnatcheck` runs
+  on a dev machine with a matching toolchain. CodePeer unused.
 
-**Δ from v0.6.14 (77):** −1. The threat-model staleness that drove the prior −3 is
-resolved; the still-missing merge/RENAME fuzz coverage keeps it just below the
-v0.6.14 mark.
+**Δ from v0.6.14 (77):** 0 → **77** (2026-06-10). The threat-model staleness and the
+merge/RENAME fuzz gap — the two debits that drove the prior −1 — are both resolved;
+the residual point is the toolchain-blocked SAST-in-CI.
 
 ---
 
@@ -366,15 +382,15 @@ smaller and keep it just shy of the v0.6.14 mark.
 
 ## Overall Scores
 
-Scores are as of v0.9.6 except seven revised post-audit:
-**Efficiency** (→83, three O(n²) fixes in v0.9.7, §3), **Security** (→76,
-threat-model refresh, §6), **Documentation** (→85, threat-model + test-count
-syncs, §8), and **Maintainability** (→82, statistics unit tests added, §4) — all
-2026-06-09 — plus **Error Handling** (→74, coercion-exception defense-in-depth
-guard + verified unreachability, §5), **Architectural Integrity** (→77,
-capacity-constant de-duplication, §1), and **Code Quality** (→81, declarative-
-dispatch decomposition, §2) — all 2026-06-10. The total now exceeds the v0.6.14
-mark, with a different composition:
+Scores are as of v0.9.6 except seven revised post-audit. From 2026-06-09:
+**Efficiency** (→83, three O(n²) fixes in v0.9.7, §3), **Documentation** (→85,
+threat-model + test-count syncs, §8), and **Maintainability** (→82, statistics
+unit tests added, §4). From 2026-06-10: **Error Handling** (→74,
+coercion-exception defense-in-depth guard + verified unreachability, §5),
+**Architectural Integrity** (→77, capacity-constant de-duplication, §1),
+**Code Quality** (→81, declarative-dispatch decomposition, §2), and **Security**
+(→77, threat-model refresh + merge/RENAME fuzz driver, §6). The total now exceeds
+the v0.6.14 mark, with a different composition:
 Efficiency and Operational Readiness up most; the split-coordination dimensions
 remain the principal debits.
 
@@ -385,10 +401,10 @@ remain the principal debits.
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
 | Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
 | Error Handling & Resilience | 73 | **74** (2026-06-10) | +1 |
-| Security Posture | 77 | **76** (2026-06-09) | −1 |
+| Security Posture | 77 | **77** (2026-06-10) | 0 |
 | Operational Readiness | 66 | **72** | +6 |
 | Documentation | 87 | **85** (2026-06-09) | −2 |
-| **TOTAL** | **625/800 (78.1%)** | **630/800 (78.8%)** | **+5** |
+| **TOTAL** | **625/800 (78.1%)** | **631/800 (78.9%)** | **+6** |
 
 ---
 
@@ -402,7 +418,7 @@ remain the principal debits.
 | ~~4~~ | ~~Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error`~~ — **RESOLVED 2026-06-10**: verified unreachable by construction (assignment/rename pre-validate; merge coerces-to-missing; flush writes validated values), so closed as **defense-in-depth** — sdata's two top-level handlers now catch both alongside `Script_Error`. No sdata-core change | §5 | — | done |
 | ~~5~~ | ~~De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`)~~ — **RESOLVED 2026-06-10**: `sdata.ads` now `with`s `SData_Core` and re-exports the six constants from it; one literal per limit, cannot diverge. sdata-only, no version bump | §1 | — | done |
 | ~~6~~ | ~~Extract `Execute_Declarative` merge-mode arms into named subprograms~~ — **RESOLVED 2026-06-10**: USE arm's single/multi paths extracted into `Execute_USE_Single` / `Execute_USE_Multi` (byte-identical move, verified by diff; 197/197 green); arm reduced to a 7-line dispatch | §2 | — | done |
-| 7 | `gnatcheck`/SAST in CI; fuzz driver for merge + RENAME syntax | §2, §6 | Medium | §6 +1 |
+| ~~7~~ | **PARTIAL 2026-06-10** — fuzz driver for merge + RENAME **done** (`tests/merge_fuzz_driver.adb` + seeds, wired into `make fuzz-corpus`; closes the §6 fuzz debit, +1). `gnatcheck`/SAST-in-CI **deferred (toolchain-blocked)**: FSF GNAT 15.2 ships no gnatcheck; ASIS gnatcheck is version-incompatible; libadalang build too heavy for CI (§2.4, §6.2) | §2, §6 | Medium | §6 +1 |
 | 8 | Commit a plain-text `design.txt`; add `--progress` and a SUBMIT depth limit | §8, §7, §5 | Low | §8 +1 |
 | ~~9~~ | ~~In-place projection for single-`USE` options~~ — **RESOLVED v0.9.7**: transient `Add_Row`/`Set_Value` made in-place, so snapshot/install is now O(rows) | §3 | — | done |
 | ~~10~~ | ~~Add a performance regression test~~ — **RESOLVED**: `tests/perf_regression.cmd` exercises all three paths on 20k/40k rows; relies on the harness 10s per-test timeout so an O(n²) reintroduction fails the suite | §3 | — | done |
@@ -432,8 +448,10 @@ suite if any path goes quadratic again — now guards them; §3 is revised up
 accordingly.) None of the remaining items are emergencies, and the highest-risk
 ones — the stale threat model and the untested statistics module — are now
 cleared. What remains is the kind of debt that stays invisible right up until
-SData 1.0 puts a stability promise on top of it: the merge/RENAME fuzz gap (#7)
-and the two-crate change friction. Close those before the promise, not after.
+SData 1.0 puts a stability promise on top of it. The merge/RENAME fuzz gap (#7)
+is now closed (`tests/merge_fuzz_driver.adb`); what is left is the
+toolchain-blocked SAST-in-CI and the two-crate change friction. Close those
+before the promise, not after.
 
 ---
 
