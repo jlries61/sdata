@@ -26,10 +26,11 @@ with SData.System;
 with SData_Core.Signals;
 --  Withed so the top-level handlers can name the two coercion exceptions and
 --  surface them as clean script errors rather than via `when others`.  These
---  paths are unreachable by construction today (assignment & rename
---  pre-validate; merge coerces incompatible values to missing; the PDV flush
---  writes only validated values) -- the guard is defense-in-depth against any
---  future path that might raise them.  See doc/SOFTWARE_STANDARDS_REVIEW.md §5.3.
+--  paths are rare but NOT unreachable: e.g. a derived output column that is
+--  missing on its first record then character later reaches Type_Mismatch_Error
+--  through the PDV/output flush (sdata-core issue #24).  This guard turns such a
+--  case into a clean script error; the underlying mismatch is separately fixed
+--  in sdata-core (output-column type upgrade).  See SOFTWARE_STANDARDS_REVIEW §5.3.
 with SData_Core.Table;
 with SData_Core.Values;
 pragma Unreferenced (SData_Core.Signals);
