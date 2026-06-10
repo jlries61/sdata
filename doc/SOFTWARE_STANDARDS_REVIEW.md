@@ -169,7 +169,7 @@ is itself a finding (see Hard Truth).
 
 ---
 
-## 4. Maintainability & Evolvability — **80/100**
+## 4. Maintainability & Evolvability — **82/100**
 
 ### 4.1 Test Coverage
 
@@ -186,10 +186,12 @@ is itself a finding (see Hard Truth).
 CI runs all unit suites + 196 integration tests + a fuzz-corpus regression on push
 and PR. data-vandal carries its own 44 integration tests (run manually / its own CI).
 
-**Gap (carried from v0.6.14):** `sdata_core-statistics.adb` (775 lines, ~54
-distribution/IDF/RNG functions) still has **no dedicated unit tests** — exercised
-only indirectly via integration scripts. Boundary conditions, monotonicity, and
-IDF∘CDF round-trips are unverified at the unit level.
+**Gap — RESOLVED 2026-06-09 (remediation #3, sdata-core PR #31).**
+`sdata_core-statistics.adb` (775 lines, ~54 distribution/IDF/RNG functions) had
+no dedicated unit tests. Now covered by `tests/statistics_tests.adb`, an
+88-assertion property-based in-crate driver: canonical reference values, CDF
+boundaries + monotonicity, IDF∘CDF round-trips (incl. Weibull's reversed
+`Scale`/`Shape` order), symmetry, PDF non-negativity, and seeded-RNG support.
 
 ### 4.2 Change Resilience
 
@@ -206,8 +208,10 @@ this manageable, but the friction is real and worth acknowledging in process doc
 document the split rationale/boundary/consequences in depth; ADR-044 covers the
 RENAME suffix-type rule. `scripts/bump-version.sh` updates 9 files atomically.
 
-**Δ from v0.6.14 (84):** −4. Strong docs and growing tests, but the untested
-statistics module and the two-crate change burden are genuine evolvability costs.
+**Δ from v0.6.14 (84):** −2 → **82** (2026-06-09). The untested-statistics gap is
+now closed (remediation #3); the remaining debit is the two-crate change burden
+for shared commands — real but well-managed by the path pin and CI sibling
+checkout.
 
 ---
 
@@ -341,24 +345,25 @@ smaller and keep it just shy of the v0.6.14 mark.
 
 ## Overall Scores
 
-Scores are as of v0.9.6 except three revised post-audit: **Efficiency** (→83
-after the three O(n²) fixes in v0.9.7, §3), **Security** (→76 after the
-threat-model refresh, §6), and **Documentation** (→85 after the threat-model and
-test-count syncs, §8) — all 2026-06-09. The total returns to the v0.6.14 mark,
-but the *composition* differs: Efficiency and Operational Readiness up, the split-
-and-currency dimensions down.
+Scores are as of v0.9.6 except four revised post-audit (all 2026-06-09):
+**Efficiency** (→83, three O(n²) fixes in v0.9.7, §3), **Security** (→76,
+threat-model refresh, §6), **Documentation** (→85, threat-model + test-count
+syncs, §8), and **Maintainability** (→82, statistics unit tests added, §4). The
+total now slightly exceeds the v0.6.14 mark, with a different composition:
+Efficiency and Operational Readiness up most; the split-coordination dimensions
+remain the principal debits.
 
 | Category | v0.6.14 | current | Δ |
 |---|---|---|---|
 | Architectural Integrity | 78 | **76** | −2 |
 | Code Quality & Craftsmanship | 82 | **80** | −2 |
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
-| Maintainability & Evolvability | 84 | **80** | −4 |
+| Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
 | Error Handling & Resilience | 73 | **73** | 0 |
 | Security Posture | 77 | **76** (2026-06-09) | −1 |
 | Operational Readiness | 66 | **72** | +6 |
 | Documentation | 87 | **85** (2026-06-09) | −2 |
-| **TOTAL** | **625/800 (78.1%)** | **625/800 (78.1%)** | **0** |
+| **TOTAL** | **625/800 (78.1%)** | **627/800 (78.4%)** | **+2** |
 
 ---
 
@@ -368,7 +373,7 @@ and-currency dimensions down.
 |---|---|---|---|---|
 | ~~1~~ | ~~Refresh `doc/threat_model.md`~~ — **RESOLVED 2026-06-09**: updated to v0.9.7 with merge/transient + per-target-option attack surface, T1 extended to RENAME names, new D4 (merge/transient memory), corrected file refs | §6, §8 | — | done |
 | ~~2~~ | ~~Sync stale test counts~~ — **RESOLVED 2026-06-09**: `CLAUDE.md` + `CONTRIBUTING.md` now state 197 integration / ~733 unit / 44 data-vandal, with `make check` named as the source of truth | §8 | — | done |
-| 3 | Add `statistics_unit_test` for `sdata_core-statistics.adb` (boundaries, monotonicity, IDF∘CDF) | §4 | Medium | §4 +2 |
+| ~~3~~ | ~~Add `statistics_unit_test`~~ — **RESOLVED 2026-06-09** (sdata-core PR #31): `tests/statistics_tests.adb`, 88 property-based assertions across all 14 distributions | §4 | — | done |
 | 4 | Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error` at the sdata-core boundary | §5 | Low | §5 +1 |
 | 5 | De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`) | §1 | Low | §1 +1 |
 | 6 | Extract `Execute_Declarative` merge-mode arms into named subprograms | §2 | Medium | §2 +1 |
@@ -385,11 +390,12 @@ The code is not what slipped — the *discipline around it* is. SData v0.9.6 is 
 well-built interpreter with an enviable test count, a clean acyclic crate split,
 and a man page that actually matches the binary. Yet the headline number went
 **down**, and that is the honest signal: the three-crate split bought reuse at the
-price of coordination friction nobody has paid down, the statistics module is
-still 775 lines of numerical approximation with **zero** unit tests guarding it,
-and the threat model is a document describing a program that no longer exists —
-stamped "Current" while two releases of new attack surface (merge, transient
-tables, RENAME type coercion) went unanalysed. And this audit's own §3 illustrates
+price of coordination friction nobody has paid down, the statistics module was
+775 lines of numerical approximation with **zero** unit tests guarding it, and the
+threat model was a document describing a program that no longer existed — stamped
+"Current" while two releases of new attack surface (merge, transient tables,
+RENAME type coercion) went unanalysed. (Both of those are since fixed —
+remediation #1 and #3 — see below.) And this audit's own §3 illustrates
 the trap: it read the data-step hot path, pronounced it "O(1) — a highlight," and
 **missed three latent O(n²) defects** that made a routine 49k-row script take
 thirteen minutes. They were caught not by inspection but by a profiler on a real
@@ -398,10 +404,11 @@ this codebase needs a standing performance test on a non-trivial dataset, not ju
 correctness tests. (All three are now fixed in v0.9.7, and a
 standing perf-regression test — `tests/perf_regression.cmd`, which fails the
 suite if any path goes quadratic again — now guards them; §3 is revised up
-accordingly.) None of the remaining items are emergencies. All of them are the
-kind of debt that is invisible right up until SData 1.0 puts a stability promise on
-top of it. Fix the threat model and the statistics tests before that promise, not
-after.
+accordingly.) None of the remaining items are emergencies, and the highest-risk
+ones — the stale threat model and the untested statistics module — are now
+cleared. What remains is the kind of debt that stays invisible right up until
+SData 1.0 puts a stability promise on top of it: the merge/RENAME fuzz gap (#7)
+and the two-crate change friction. Close those before the promise, not after.
 
 ---
 
@@ -417,7 +424,7 @@ after.
 | O(n²) #2 transient copy-per-cell **[RESOLVED v0.9.7, `396048a`]** | `src/sdata-transient_table.adb` (`Add_Row`/`Set_Value`) | whole-column copy per call; `/append` 49k: 791s→9s |
 | O(n²) #3 BY re-sort per record **[RESOLVED v0.9.7, `396048a`]** | `src/sdata-interpreter-execute_declarative.adb` (Stmt_BY) | sorted whole table every record; pass-2 2k: 19s→0.17s |
 | Perf headline | full adult train/test script | >13 min → ~11s after the three fixes; output identical |
-| Statistics untested | `sdata_core-statistics.adb` (775 lines); `tests/` | no `statistics_unit_test` |
+| Statistics tested **[RESOLVED 2026-06-09, sdata-core PR #31]** | `sdata-core/tests/statistics_tests.adb` | 88 property-based assertions; all 14 distributions |
 | Test counts | `make check`; `ls tests/*.cmd` | 196 integration; 733 unit (71/355/170/89/48) |
 | `when others` inventory | grep both `src/` trees | 44 total (20 sdata, 24 core); ~10 silent-null, justified |
 | Uncaught new exceptions | `sdata_core-values.adb:33,40,43`; `sdata_core-table.adb:269,274,276` | no handler; reach top-level only |
