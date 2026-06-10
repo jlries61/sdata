@@ -275,7 +275,7 @@ audit flagged in the interpreter body remain the weakest pattern but are bounded
 **Δ from v0.6.14 (73):** +2 → **75** (2026-06-10). The coercion-exception surfacing
 gap is closed as documented defense-in-depth (remediation #4, with unreachability now
 verified rather than assumed) and the SUBMIT nesting-depth limit is added (remediation
-#8); SQLite/CSV/signal handling remain strong. The lone remaining debit is the absent
+\#8); SQLite/CSV/signal handling remain strong. The lone remaining debit is the absent
 per-expression timeout.
 
 ---
@@ -457,7 +457,7 @@ lesson stands as written: this audit once pronounced the hot path "O(1) — a hi
 standing perf-regression test now guards the data step. The remediations that followed —
 threat-model refresh, statistics tests, the O(n²) fixes, and the 2026-06-10 batch (#4–#8) —
 were re-checked this pass *adversarially against the auditor's own commits*, and they held: the
-#6 merge-arm extraction is a verified byte-identical move, the #4 coercion guard is honest
+\#6 merge-arm extraction is a verified byte-identical move, the #4 coercion guard is honest
 defense-in-depth over a path proven (not assumed) unreachable, and the `--progress` per-row
 hooks cost exactly one boolean when disabled. The score — **634/800** — moved for real reasons.
 
