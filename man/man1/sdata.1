@@ -498,7 +498,12 @@ and
 .B JOIN_WARN_THRESHOLD \fIn\fR
 (per-BY-group Cartesian product threshold above which
 .B /JOIN
-merges emit a warning; default 1,000,000; set to 0 to disable).
+merges emit a warning; default 1,000,000; set to 0 to disable),
+and
+.B PROGRESS YES|NO
+(runtime equivalent of
+.BR \-\-progress ;
+emit record-count progress on standard error for long USE/RUN/SORT runs).
 .TP
 .B SYSTEM \fIcmd\fR
 Run an external shell command.

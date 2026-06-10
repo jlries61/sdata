@@ -540,12 +540,14 @@ package body SData.Help is
       Put_Line ("  OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)");
       Put_Line ("                               0.0/0.0 always raises an error. Cleared by NEW.");
       Put_Line ("  OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.");
+      Put_Line ("  OPTIONS PROGRESS YES|NO    : Emit record-count progress on stderr for long USE/RUN/SORT runs (default: NO)");
       Put_Line ("");
       Put_Line ("CLI flags (set at startup, not runtime):");
       Put_Line ("  --shell-timeout=N    : SYSTEM/SHELL timeout in seconds (0 = unlimited; default 300 in batch)");
       Put_Line ("  --noshell            : Disable SYSTEM/SHELL; also disables -p");
       Put_Line ("  --nosubmit           : Disable SUBMIT");
       Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
+      Put_Line ("  --progress           : Same as OPTIONS PROGRESS YES, enabled from startup");
       Put_Line ("  --clen <n>           : Set max character variable length");
       Put_Line ("  -m <n>               : Set max in-memory table cells (rows*cols; 0 = unlimited)");
       Put_Line ("  -t <n>               : Set max temporary variables");

@@ -322,12 +322,14 @@ With no arguments, OPTIONS lists all current option values.
   OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)
                                0.0/0.0 always raises an error. Cleared by NEW.
   OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.
+  OPTIONS PROGRESS YES|NO    : Emit record-count progress on stderr for long USE/RUN/SORT runs (default: NO)
 
 CLI flags (set at startup, not runtime):
   --shell-timeout=N    : SYSTEM/SHELL timeout in seconds (0 = unlimited; default 300 in batch)
   --noshell            : Disable SYSTEM/SHELL; also disables -p
   --nosubmit           : Disable SUBMIT
   --ignore-math-errors : Domain errors return MISSING
+  --progress           : Same as OPTIONS PROGRESS YES, enabled from startup
   --clen <n>           : Set max character variable length
   -m <n>               : Set max in-memory table cells (rows*cols; 0 = unlimited)
   -t <n>               : Set max temporary variables

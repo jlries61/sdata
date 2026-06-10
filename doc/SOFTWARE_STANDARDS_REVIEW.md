@@ -348,7 +348,8 @@ the residual point is the toolchain-blocked SAST-in-CI.
   USE file loads (per-row in all three readers — CSV/ODF/OOXML), the per-record RUN
   data step (which subsumes aggregate-function evaluation), and SORT. The shared
   `SData_Core.IO.Show_Progress` helper prints every 10,000 records with a final total
-  per phase. Verified end-to-end on a 25k-row dataset.
+  per phase. A runtime `OPTIONS PROGRESS YES|NO` toggle mirrors the flag (listed by
+  bare `OPTIONS`). Verified end-to-end on a 25k-row dataset.
 - **No unified ecosystem CI:** data-vandal is not exercised in sdata's pipeline
   (manual `cd ~/Develop/data-vandal && make check` per CLAUDE.md). The sdata-core
   consumer-test pin also lags the current sdata release.
