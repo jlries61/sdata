@@ -157,6 +157,23 @@ sdata_core-signals.{ads,adb}      -- SIGINT/SIGTERM cleanup
 sdata_core-system.{ads,adb}       -- shell execution + privilege detection
 ```
 
+## Keeping the user-facing surface in sync (HELP, man page, design doc)
+
+When you change language-visible **syntax** — add or modify a command, function,
+`OPTIONS` key, CLI flag, or statement form — update **all three** user-facing
+references in the *same* change. They drift otherwise, and the built-in **HELP** has
+historically been the one most often missed:
+
+1. **Built-in HELP** — `src/sdata-help.adb` (the `HELP <topic>` and `HELP /ALL`
+   output). This is the primary gap to watch. Updating it changes the `HELP /ALL`
+   snapshot, so regenerate `tests/expected/help_all.out` — and any `options_display`
+   / `*_options` expected output that lists the affected key.
+2. **Man page** — `man/man1/sdata.1`.
+3. **Design doc** — `doc/design.md` (the authoritative language spec).
+
+A syntax change that updates only the parser/interpreter, or only one of the three
+references, is incomplete.
+
 ## Reference Documents
 
 **Design document** — `doc/design.md`
