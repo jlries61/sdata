@@ -194,13 +194,9 @@ bin/sdata --debug tests/aggregates.cmd
 | `doc/threat_model.md` | STRIDE threat model: trust model, attack surface, mitigations, known gaps |
 | `CLAUDE.md` | AI agent context, also useful for humans: build commands, key architecture notes, source layout |
 
-The authoritative language specification is `doc/design.odt` (LibreOffice).
-Convert it to plain text for terminal reading:
-
-```sh
-soffice --headless --convert-to txt doc/design.odt
-# writes design.txt
-```
+The authoritative language specification is `doc/design.md` (Markdown, converted
+from the original ODF via pandoc). Read it directly; the command and function
+references are HTML tables that GitHub renders faithfully.
 
 ---
 

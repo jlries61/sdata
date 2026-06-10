@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§8 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -349,7 +349,7 @@ improved.
 
 ---
 
-## 8. Documentation — **85/100**
+## 8. Documentation — **86/100** (2026-06-10)
 
 ### 8.1 Current & strong
 
@@ -368,15 +368,17 @@ improved.
   data-vandal tests, with `make check` named as the source of truth. (One stale
   pair remains in the *sdata-core* `CLAUDE.md` — separate repo, PR pending.)
 - ~~**Threat model stamp stale** (§6)~~ — **resolved 2026-06-09** (refreshed to v0.9.7).
-- **`doc/design.odt` remains binary-only.** A `design.txt` exists locally but is
-  **untracked** (not committed), so the authoritative spec is still ODF-only in git.
+- ~~**`doc/design.odt` remains binary-only.**~~ — **RESOLVED 2026-06-10
+  (remediation #8, design half).** The design doc is converted to committed Markdown
+  (`doc/design.md`, via pandoc) and is now the authoritative spec; the binary
+  `design.odt` is removed. The spec is now diffable and grep-able in git (the command
+  / function references are HTML tables, faithful to the original and GitHub-rendered).
 - Statistics module has citations but no prose on implementation-choice rationale.
 
-**Δ from v0.6.14 (87):** −2 → **85** (2026-06-09). The two documentation-currency
-failures (stale threat-model stamp, stale test counts) are both now fixed; the
-remaining debits — `design.odt` committed binary-only (the `design.txt` is
-untracked) and the statistics module's missing implementation-choice prose — are
-smaller and keep it just shy of the v0.6.14 mark.
+**Δ from v0.6.14 (87):** −1 → **86** (2026-06-10). The two documentation-currency
+failures (stale threat-model stamp, stale test counts) are fixed, and the design doc
+is now committed Markdown rather than binary ODF (remediation #8); the lone residual
+debit is the statistics module's missing implementation-choice prose.
 
 ---
 
@@ -388,8 +390,9 @@ threat-model + test-count syncs, §8), and **Maintainability** (→82, statistic
 unit tests added, §4). From 2026-06-10: **Error Handling** (→74,
 coercion-exception defense-in-depth guard + verified unreachability, §5),
 **Architectural Integrity** (→77, capacity-constant de-duplication, §1),
-**Code Quality** (→81, declarative-dispatch decomposition, §2), and **Security**
-(→77, threat-model refresh + merge/RENAME fuzz driver, §6). The total now exceeds
+**Code Quality** (→81, declarative-dispatch decomposition, §2), **Security**
+(→77, threat-model refresh + merge/RENAME fuzz driver, §6), and **Documentation**
+(→86, design doc converted to committed Markdown, §8). The total now exceeds
 the v0.6.14 mark, with a different composition:
 Efficiency and Operational Readiness up most; the split-coordination dimensions
 remain the principal debits.
@@ -403,8 +406,8 @@ remain the principal debits.
 | Error Handling & Resilience | 73 | **74** (2026-06-10) | +1 |
 | Security Posture | 77 | **77** (2026-06-10) | 0 |
 | Operational Readiness | 66 | **72** | +6 |
-| Documentation | 87 | **85** (2026-06-09) | −2 |
-| **TOTAL** | **625/800 (78.1%)** | **631/800 (78.9%)** | **+6** |
+| Documentation | 87 | **86** (2026-06-10) | −1 |
+| **TOTAL** | **625/800 (78.1%)** | **632/800 (79.0%)** | **+7** |
 
 ---
 
@@ -419,7 +422,7 @@ remain the principal debits.
 | ~~5~~ | ~~De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`)~~ — **RESOLVED 2026-06-10**: `sdata.ads` now `with`s `SData_Core` and re-exports the six constants from it; one literal per limit, cannot diverge. sdata-only, no version bump | §1 | — | done |
 | ~~6~~ | ~~Extract `Execute_Declarative` merge-mode arms into named subprograms~~ — **RESOLVED 2026-06-10**: USE arm's single/multi paths extracted into `Execute_USE_Single` / `Execute_USE_Multi` (byte-identical move, verified by diff; 197/197 green); arm reduced to a 7-line dispatch | §2 | — | done |
 | ~~7~~ | **PARTIAL 2026-06-10** — fuzz driver for merge + RENAME **done** (`tests/merge_fuzz_driver.adb` + seeds, wired into `make fuzz-corpus`; closes the §6 fuzz debit, +1). `gnatcheck`/SAST-in-CI **deferred (toolchain-blocked)**: FSF GNAT 15.2 ships no gnatcheck; ASIS gnatcheck is version-incompatible; libadalang build too heavy for CI (§2.4, §6.2) | §2, §6 | Medium | §6 +1 |
-| 8 | Commit a plain-text `design.txt`; add `--progress` and a SUBMIT depth limit | §8, §7, §5 | Low | §8 +1 |
+| 8 | ~~Commit a plain-text `design.txt`~~ → **committed `doc/design.md` (Markdown, RESOLVED 2026-06-10, §8 +1)**; add `--progress` and a SUBMIT depth limit | §8, §7, §5 | Low | §8 +1 |
 | ~~9~~ | ~~In-place projection for single-`USE` options~~ — **RESOLVED v0.9.7**: transient `Add_Row`/`Set_Value` made in-place, so snapshot/install is now O(rows) | §3 | — | done |
 | ~~10~~ | ~~Add a performance regression test~~ — **RESOLVED**: `tests/perf_regression.cmd` exercises all three paths on 20k/40k rows; relies on the harness 10s per-test timeout so an O(n²) reintroduction fails the suite | §3 | — | done |
 
@@ -473,7 +476,7 @@ before the promise, not after.
 | Uncaught new exceptions | `sdata_core-values.adb:33,40,43`; `sdata_core-table.adb:269,274,276` | no handler; reach top-level only |
 | Threat model stale | `doc/threat_model.md:3` | v0.6.13 / 2026-05-14 / "Current" |
 | Stale doc test counts | `CLAUDE.md:38,40,73` | claims 140; actual 196 |
-| design doc binary-only | `git ls-files doc/design.txt` | untracked; only `design.odt` committed |
+| design doc binary-only **[RESOLVED 2026-06-10, remediation #8]** | `doc/design.md` (pandoc-converted) | ODF removed; Markdown spec now authoritative + committed |
 | Man page current | `man/man1/sdata.1:1` | v0.9.6 / 2026-06-06; 1,098 lines |
 | Packaging version derived | `Makefile`, `debian/rules`, `slackware/sdata.SlackBuild` | sdata-core version globbed/injected, not hardcoded |
 | ADR / spec / plan counts | `doc/adrs.md`, `doc/specs/`, `doc/plans/` | 44 / 22 / 28 |
