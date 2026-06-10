@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§7/§8 revised 2026-06-10) | **Re-audited:** 2026-06-10 (full adversarial re-pass; snapshot sdata `cbfd8f8` + sdata-core `2ecaa4d` / 0.1.8; standalone report at `.ssd/audits/2026-06-10-sdata-reaudit/`) | **Version:** 0.9.6 → reflects sdata `cbfd8f8` | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§7/§8 revised 2026-06-10; §5 revised 2026-06-11 — Error Handling 75→76, sdata-core #24 root-cause fix) | **Re-audited:** 2026-06-10 (full adversarial re-pass; snapshot sdata `cbfd8f8` + sdata-core `2ecaa4d` / 0.1.8; standalone report at `.ssd/audits/2026-06-10-sdata-reaudit/`) | **Version:** 0.9.6 → reflects sdata `cbfd8f8` | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -227,7 +227,7 @@ checkout.
 
 ---
 
-## 5. Error Handling & Resilience — **75/100** (2026-06-10)
+## 5. Error Handling & Resilience — **76/100** (2026-06-11)
 
 ### 5.1 Strategy
 
@@ -270,11 +270,17 @@ audit flagged in the interpreter body remain the weakest pattern but are bounded
   RED→GREEN verified).
 - **No per-expression timeout** (a non-terminating `WHILE` runs forever).
 
-**Δ from v0.6.14 (73):** +2 → **75** (2026-06-10). The coercion-exception surfacing
-gap is closed as documented defense-in-depth (remediation #4, with unreachability now
-verified rather than assumed) and the SUBMIT nesting-depth limit is added (remediation
-\#8); SQLite/CSV/signal handling remain strong. The lone remaining debit is the absent
-per-expression timeout.
+**Δ from v0.6.14 (73):** +2 → **75** (2026-06-10): the coercion-exception surfacing
+gap is closed (remediation #4) and the SUBMIT nesting-depth limit is added (remediation
+\#8); SQLite/CSV/signal handling remain strong.
+
+**+1 → 76** (2026-06-11): the reachable coercion path the #4 guard surfaced (a derived
+output column missing-then-character) is now *root-cause fixed* in sdata-core 0.1.9 —
+the output column upgrades its type on the first non-missing value instead of raising
+`Type_Mismatch_Error` (sdata-core issue #24, pinned by `tests/derived_col_type_upgrade.cmd`).
+The guard stays as honest defense-in-depth; the underlying mismatch no longer occurs.
+The lone remaining debit is the absent per-expression timeout (a non-terminating `WHILE`
+runs forever).
 
 ---
 
@@ -410,7 +416,8 @@ Scores are as of v0.9.6 except seven revised post-audit. From 2026-06-09:
 **Efficiency** (→83, three O(n²) fixes in v0.9.7, §3), **Documentation** (→85,
 threat-model + test-count syncs, §8), and **Maintainability** (→82, statistics
 unit tests added, §4). From 2026-06-10: **Error Handling** (→75,
-coercion-exception defense-in-depth guard + SUBMIT depth limit, §5),
+coercion-exception defense-in-depth guard + SUBMIT depth limit, §5; →76 on
+2026-06-11 with the sdata-core 0.1.9 root-cause fix for the surfaced #24 path),
 **Architectural Integrity** (→77, capacity-constant de-duplication, §1),
 **Code Quality** (→81, declarative-dispatch decomposition, §2), **Security**
 (→77, threat-model refresh + merge/RENAME fuzz driver, §6), **Documentation**
@@ -426,11 +433,11 @@ remain the principal debits.
 | Code Quality & Craftsmanship | 82 | **81** (2026-06-10) | −1 |
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
 | Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
-| Error Handling & Resilience | 73 | **75** (2026-06-10) | +2 |
+| Error Handling & Resilience | 73 | **76** (2026-06-11) | +3 |
 | Security Posture | 77 | **77** (2026-06-10) | 0 |
 | Operational Readiness | 66 | **73** (2026-06-10) | +7 |
 | Documentation | 87 | **86** (2026-06-10) | −1 |
-| **TOTAL** | **625/800 (78.1%)** | **634/800 (79.3%)** | **+9** |
+| **TOTAL** | **625/800 (78.1%)** | **635/800 (79.4%)** | **+10** |
 
 ---
 
@@ -463,7 +470,9 @@ were re-checked this pass *adversarially against the auditor's own commits*, and
 hooks cost exactly one boolean when disabled. The one thing I got wrong on the first pass:
 I called the #4 coercion guard "defense-in-depth over an unreachable path" — it is actually
 guarding a *real* reachable path (sdata-core issue #24, since fixed), which is a better
-justification, not a worse one. The score — **634/800** — moved for real reasons.
+justification, not a worse one — and that reachable path is now root-cause fixed in
+sdata-core 0.1.9 (Error Handling +1 → 76, 2026-06-11). The score — **635/800** — moved
+for real reasons.
 
 The uncomfortable part is what the number *hides* — though less than an earlier draft of this
 section claimed. SData-the-codebase is in good shape, and contrary to my first telling, each crate
