@@ -308,7 +308,7 @@ improved.
 
 ---
 
-## 8. Documentation — **83/100**
+## 8. Documentation — **85/100**
 
 ### 8.1 Current & strong
 
@@ -322,25 +322,31 @@ improved.
 
 ### 8.2 Gaps
 
-- **Stale test counts.** `CLAUDE.md` claims **140** integration tests in three
-  places (`:38`, `:40`, `:73`); actual is **196**. `CONTRIBUTING.md` likewise lags.
+- ~~**Stale test counts.**~~ — **RESOLVED 2026-06-09** (remediation #2): `CLAUDE.md`
+  and `CONTRIBUTING.md` now state 197 integration tests / ~733 unit checks / 44
+  data-vandal tests, with `make check` named as the source of truth. (One stale
+  pair remains in the *sdata-core* `CLAUDE.md` — separate repo, PR pending.)
 - ~~**Threat model stamp stale** (§6)~~ — **resolved 2026-06-09** (refreshed to v0.9.7).
 - **`doc/design.odt` remains binary-only.** A `design.txt` exists locally but is
   **untracked** (not committed), so the authoritative spec is still ODF-only in git.
 - Statistics module has citations but no prose on implementation-choice rationale.
 
-**Δ from v0.6.14 (87):** −4. Excellent breadth and a current man page; the stale
-threat-model stamp is now fixed, but stale test-count claims and the
-still-uncommitted plain-text design doc keep the score down. (Score held at 83:
-the test-count and design-doc gaps still dominate.)
+**Δ from v0.6.14 (87):** −2 → **85** (2026-06-09). The two documentation-currency
+failures (stale threat-model stamp, stale test counts) are both now fixed; the
+remaining debits — `design.odt` committed binary-only (the `design.txt` is
+untracked) and the statistics module's missing implementation-choice prose — are
+smaller and keep it just shy of the v0.6.14 mark.
 
 ---
 
 ## Overall Scores
 
-Scores are as of v0.9.6 except **Efficiency** (revised to 83 after the three O(n²)
-fixes in v0.9.7, see §3) and **Security** (revised to 76 after the threat-model
-refresh of 2026-06-09, see §6).
+Scores are as of v0.9.6 except three revised post-audit: **Efficiency** (→83
+after the three O(n²) fixes in v0.9.7, §3), **Security** (→76 after the
+threat-model refresh, §6), and **Documentation** (→85 after the threat-model and
+test-count syncs, §8) — all 2026-06-09. The total returns to the v0.6.14 mark,
+but the *composition* differs: Efficiency and Operational Readiness up, the split-
+and-currency dimensions down.
 
 | Category | v0.6.14 | current | Δ |
 |---|---|---|---|
@@ -351,8 +357,8 @@ refresh of 2026-06-09, see §6).
 | Error Handling & Resilience | 73 | **73** | 0 |
 | Security Posture | 77 | **76** (2026-06-09) | −1 |
 | Operational Readiness | 66 | **72** | +6 |
-| Documentation | 87 | **83** | −4 |
-| **TOTAL** | **625/800 (78.1%)** | **623/800 (77.9%)** | **−2** |
+| Documentation | 87 | **85** (2026-06-09) | −2 |
+| **TOTAL** | **625/800 (78.1%)** | **625/800 (78.1%)** | **0** |
 
 ---
 
@@ -361,7 +367,7 @@ refresh of 2026-06-09, see §6).
 | Priority | Item | Section | Effort | Gain |
 |---|---|---|---|---|
 | ~~1~~ | ~~Refresh `doc/threat_model.md`~~ — **RESOLVED 2026-06-09**: updated to v0.9.7 with merge/transient + per-target-option attack surface, T1 extended to RENAME names, new D4 (merge/transient memory), corrected file refs | §6, §8 | — | done |
-| 2 | Sync stale test counts (`CLAUDE.md` 140→196, `CONTRIBUTING.md`); ideally derive from harness output | §8 | Low | §8 +2 |
+| ~~2~~ | ~~Sync stale test counts~~ — **RESOLVED 2026-06-09**: `CLAUDE.md` + `CONTRIBUTING.md` now state 197 integration / ~733 unit / 44 data-vandal, with `make check` named as the source of truth | §8 | — | done |
 | 3 | Add `statistics_unit_test` for `sdata_core-statistics.adb` (boundaries, monotonicity, IDF∘CDF) | §4 | Medium | §4 +2 |
 | 4 | Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error` at the sdata-core boundary | §5 | Low | §5 +1 |
 | 5 | De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`) | §1 | Low | §1 +1 |
