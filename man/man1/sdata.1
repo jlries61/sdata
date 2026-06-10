@@ -82,6 +82,12 @@ returns the record number where the error occurred.
 Instead of halting on a floating\-point domain error (e.g. LOG of a negative
 number), emit a warning and return the missing value.
 .TP
+.B \-\-progress
+Report record\-count progress on standard error for long\-running operations
+(\fBUSE\fR file loads, the per\-record \fBRUN\fR data step, and \fBSORT\fR).
+A counter is printed every 10,000 records and updated in place; progress is
+written only to standard error, never to the data stream.
+.TP
 .BI \-o " file"
 Redirect console output to
 .IR file
@@ -492,7 +498,12 @@ and
 .B JOIN_WARN_THRESHOLD \fIn\fR
 (per-BY-group Cartesian product threshold above which
 .B /JOIN
-merges emit a warning; default 1,000,000; set to 0 to disable).
+merges emit a warning; default 1,000,000; set to 0 to disable),
+and
+.B PROGRESS YES|NO
+(runtime equivalent of
+.BR \-\-progress ;
+emit record-count progress on standard error for long USE/RUN/SORT runs).
 .TP
 .B SYSTEM \fIcmd\fR
 Run an external shell command.

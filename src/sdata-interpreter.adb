@@ -1141,7 +1141,9 @@ package body SData.Interpreter is
             if Act = Action_Run then
                Step_Mode := False;
             end if;
+            SData_Core.IO.Show_Progress ("RUN", Logical_I);
          end loop;
+         SData_Core.IO.Show_Progress ("RUN", Logical_Count, Final => True);
       end;
       Commit_Step;
    end Run_One_Step;
