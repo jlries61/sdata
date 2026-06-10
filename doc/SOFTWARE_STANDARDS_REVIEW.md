@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09; §5 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §1 + §5 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -13,7 +13,7 @@ materially changed a dimension, the delta and its driver are called out.*
 
 ---
 
-## 1. Architectural Integrity — **76/100**
+## 1. Architectural Integrity — **77/100** (2026-06-10)
 
 ### 1.1 The Three-Crate Split (ADRs 039–043)
 
@@ -31,10 +31,13 @@ costs that a single-crate design did not have:
 - **Façade indirection.** Every shared command now routes through a
   `SData_Core.Commands.Execute_*` procedure (e.g. `execute_declarative.adb:86` →
   `Execute_USE` → `File_IO`). Correct, but a layer the v0.6.14 code lacked.
-- **Capacity-constant duplication.** `src/sdata.ads:13–18` and
-  `~/Develop/sdata-core/src/sdata_core.ads` define the *same* `Max_Name_Len`,
-  `Max_Path_Len`, etc. with no cross-reference — a DRY violation that can silently
-  diverge.
+- ~~**Capacity-constant duplication.**~~ — **RESOLVED 2026-06-10 (remediation #5).**
+  `src/sdata.ads` no longer redefines the six capacity constants as literals; it
+  `with`s `SData_Core` and re-exports them (`Max_Name_Len : constant :=
+  SData_Core.Max_Name_Len;` …). There is now exactly one literal per limit (in
+  `sdata_core.ads`), so the two cannot diverge; every existing `SData.*`/bare
+  reference keeps working and the values remain static named numbers (sdata-only
+  change, no version bump).
 - **SELECT round-trip.** Because the evaluator lives in sdata-core but the parser
   does not, `SELECT expr` is re-serialised to text and re-parsed via
   `Evaluator.Parse_Expression`. Negligible at typical script sizes, but a real
@@ -65,9 +68,10 @@ at parse time and run once per record. No tier leakage.
 - Cross-crate change coordination (see §4.2) is the dominant integrity tax.
 - `execute_declarative.adb` at 828 lines is approaching the point where its merge-mode arms should become named subprograms (see §2).
 
-**Δ from v0.6.14 (78):** −2. The split is sound engineering, but façade
-indirection, duplicated capacity constants, and the SELECT round-trip are net
-integrity costs not offset within this dimension.
+**Δ from v0.6.14 (78):** −1 → **77** (2026-06-10). The split is sound engineering;
+the capacity-constant duplication is now resolved (remediation #5), leaving façade
+indirection and the SELECT round-trip as the residual split-introduced integrity
+costs not offset within this dimension.
 
 ---
 
@@ -356,19 +360,20 @@ smaller and keep it just shy of the v0.6.14 mark.
 
 ## Overall Scores
 
-Scores are as of v0.9.6 except five revised post-audit:
+Scores are as of v0.9.6 except six revised post-audit:
 **Efficiency** (→83, three O(n²) fixes in v0.9.7, §3), **Security** (→76,
 threat-model refresh, §6), **Documentation** (→85, threat-model + test-count
 syncs, §8), and **Maintainability** (→82, statistics unit tests added, §4) — all
 2026-06-09 — plus **Error Handling** (→74, coercion-exception defense-in-depth
-guard + verified unreachability, §5, 2026-06-10). The total now exceeds the
+guard + verified unreachability, §5) and **Architectural Integrity** (→77,
+capacity-constant de-duplication, §1) — both 2026-06-10. The total now exceeds the
 v0.6.14 mark, with a different composition:
 Efficiency and Operational Readiness up most; the split-coordination dimensions
 remain the principal debits.
 
 | Category | v0.6.14 | current | Δ |
 |---|---|---|---|
-| Architectural Integrity | 78 | **76** | −2 |
+| Architectural Integrity | 78 | **77** (2026-06-10) | −1 |
 | Code Quality & Craftsmanship | 82 | **80** | −2 |
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
 | Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
@@ -376,7 +381,7 @@ remain the principal debits.
 | Security Posture | 77 | **76** (2026-06-09) | −1 |
 | Operational Readiness | 66 | **72** | +6 |
 | Documentation | 87 | **85** (2026-06-09) | −2 |
-| **TOTAL** | **625/800 (78.1%)** | **628/800 (78.5%)** | **+3** |
+| **TOTAL** | **625/800 (78.1%)** | **629/800 (78.6%)** | **+4** |
 
 ---
 
@@ -388,7 +393,7 @@ remain the principal debits.
 | ~~2~~ | ~~Sync stale test counts~~ — **RESOLVED 2026-06-09**: `CLAUDE.md` + `CONTRIBUTING.md` now state 197 integration / ~733 unit / 44 data-vandal, with `make check` named as the source of truth | §8 | — | done |
 | ~~3~~ | ~~Add `statistics_unit_test`~~ — **RESOLVED 2026-06-09** (sdata-core PR #31): `tests/statistics_tests.adb`, 88 property-based assertions across all 14 distributions | §4 | — | done |
 | ~~4~~ | ~~Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error`~~ — **RESOLVED 2026-06-10**: verified unreachable by construction (assignment/rename pre-validate; merge coerces-to-missing; flush writes validated values), so closed as **defense-in-depth** — sdata's two top-level handlers now catch both alongside `Script_Error`. No sdata-core change | §5 | — | done |
-| 5 | De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`) | §1 | Low | §1 +1 |
+| ~~5~~ | ~~De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`)~~ — **RESOLVED 2026-06-10**: `sdata.ads` now `with`s `SData_Core` and re-exports the six constants from it; one literal per limit, cannot diverge. sdata-only, no version bump | §1 | — | done |
 | 6 | Extract `Execute_Declarative` merge-mode arms into named subprograms | §2 | Medium | §2 +1 |
 | 7 | `gnatcheck`/SAST in CI; fuzz driver for merge + RENAME syntax | §2, §6 | Medium | §6 +1 |
 | 8 | Commit a plain-text `design.txt`; add `--progress` and a SUBMIT depth limit | §8, §7, §5 | Low | §8 +1 |
@@ -430,7 +435,7 @@ and the two-crate change friction. Close those before the promise, not after.
 | Finding | File:Line / Source | Evidence |
 |---|---|---|
 | Three-crate split, acyclic boundary | ADRs 039–043; `sdata.ads`, `sdata_core.ads` | sdata→sdata-core only |
-| Capacity-constant duplication | `src/sdata.ads:13–18` vs `sdata_core.ads` | identical constants, no cross-ref |
+| Capacity-constant duplication **[RESOLVED 2026-06-10, remediation #5]** | `src/sdata.ads` re-exports from `sdata_core.ads` | `Max_* : constant := SData_Core.Max_*`; one literal per limit |
 | DRY truncation centralization | `sdata_core-values.adb:23–48`; `sdata_core-table.adb:267,272` | Coerce_Value delegates to Convert_Value |
 | Oversized declarative dispatch | `src/sdata-interpreter-execute_declarative.adb` | 828 lines, nested merge-mode arms |
 | O(n²) #1 `Get_Column_Type` whole-column copy **[RESOLVED v0.9.7, `99a7534`]** | `sdata_core-table.adb` (`Element(Cursor).Typ`) | per-record flush copied every row to read one enum; `use;run` 32k: 402s→1.3s (callgrind) |
