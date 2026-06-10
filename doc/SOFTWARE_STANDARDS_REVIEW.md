@@ -250,20 +250,18 @@ audit flagged in the interpreter body remain the weakest pattern but are bounded
 ### 5.3 Gaps
 
 - ~~**`Conversion_Error` / `Type_Mismatch_Error` are uncaught.**~~ — **RESOLVED
-  2026-06-10 (remediation #4).** Re-examination upgraded the original "effectively
-  unreachable" suspicion to a **verified-unreachable** conclusion: every script path
-  that could raise either exception is already guarded — assignment
-  (`Coerce_For_Scalar`) and rename (`Apply_Rename`) pre-validate the
-  numeric/character boundary; merge **coerces** type-incompatible values to missing
-  rather than raising (confirmed across match/interleave/join/append/positional); and
-  the PDV flush only ever writes already-validated values. `Convert_Value`'s
-  string-crossing branch has no reachable caller (its two callers are numeric↔integer
-  only). Because the gap is theoretical, the fix is **defense-in-depth**, not a bug
-  fix: sdata's two top-level handlers (`sdata_main.adb`) now catch
-  `Type_Mismatch_Error` / `Conversion_Error` alongside `Script_Error`, so *if* a
-  future path ever raises one it surfaces as a clean `Error: …` with a failure exit
-  status instead of an "Internal error" via `when others`. No sdata-core change; no
-  version bump.
+  2026-06-10 (remediation #4); framing corrected 2026-06-11.** sdata's two top-level
+  handlers (`sdata_main.adb`, batch + REPL) now catch `Type_Mismatch_Error` /
+  `Conversion_Error` alongside `Script_Error`, so either surfaces as a clean `Error: …`
+  with a failure exit instead of an "Internal error" via `when others`. **Correction:**
+  the original write-up called these paths "verified unreachable / defense-in-depth
+  only" — that was wrong. They are *rare* but **reachable**: a purely derived output
+  column that is missing on its first record then character later reaches
+  `Type_Mismatch_Error` through the PDV/output flush (sdata-core issue #24). That path
+  was a live example, now **separately fixed** (output-column type upgrade, sdata-core
+  0.1.9); the #4 guard is what surfaced it cleanly in the meantime, so it is justified
+  by a real case, not just future paths. The common assignment/rename/merge paths do
+  pre-validate or coerce-to-missing, which is why such cases are rare.
 - ~~**No SUBMIT nesting-depth limit**~~ — **RESOLVED 2026-06-10 (remediation #8).**
   `Execute_IO` now bounds the active SUBMIT chain to `Max_Submit_Depth` (64) before
   inserting, raising a clean `Script_Error` ("SUBMIT nesting too deep …") so a chain of
@@ -443,7 +441,7 @@ remain the principal debits.
 | ~~1~~ | ~~Refresh `doc/threat_model.md`~~ — **RESOLVED 2026-06-09**: updated to v0.9.7 with merge/transient + per-target-option attack surface, T1 extended to RENAME names, new D4 (merge/transient memory), corrected file refs | §6, §8 | — | done |
 | ~~2~~ | ~~Sync stale test counts~~ — **RESOLVED 2026-06-09**: `CLAUDE.md` + `CONTRIBUTING.md` now state 197 integration / ~733 unit / 44 data-vandal, with `make check` named as the source of truth | §8 | — | done |
 | ~~3~~ | ~~Add `statistics_unit_test`~~ — **RESOLVED 2026-06-09** (sdata-core PR #31): `tests/statistics_tests.adb`, 88 property-based assertions across all 14 distributions | §4 | — | done |
-| ~~4~~ | ~~Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error`~~ — **RESOLVED 2026-06-10**: verified unreachable by construction (assignment/rename pre-validate; merge coerces-to-missing; flush writes validated values), so closed as **defense-in-depth** — sdata's two top-level handlers now catch both alongside `Script_Error`. No sdata-core change | §5 | — | done |
+| ~~4~~ | ~~Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error`~~ — **RESOLVED 2026-06-10**: sdata's two top-level handlers now catch both alongside `Script_Error`. (Framing corrected 2026-06-11: these paths are rare but **reachable** — e.g. sdata-core issue #24, a derived missing-first-then-character output column, now separately fixed; the guard caught a real case, not just hypothetical future ones.) | §5 | — | done |
 | ~~5~~ | ~~De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`)~~ — **RESOLVED 2026-06-10**: `sdata.ads` now `with`s `SData_Core` and re-exports the six constants from it; one literal per limit, cannot diverge. sdata-only, no version bump | §1 | — | done |
 | ~~6~~ | ~~Extract `Execute_Declarative` merge-mode arms into named subprograms~~ — **RESOLVED 2026-06-10**: USE arm's single/multi paths extracted into `Execute_USE_Single` / `Execute_USE_Multi` (byte-identical move, verified by diff; 197/197 green); arm reduced to a 7-line dispatch | §2 | — | done |
 | ~~7~~ | **PARTIAL 2026-06-10** — fuzz driver for merge + RENAME **done** (`tests/merge_fuzz_driver.adb` + seeds, wired into `make fuzz-corpus`; closes the §6 fuzz debit, +1). `gnatcheck`/SAST-in-CI **deferred (toolchain-blocked)**: FSF GNAT 15.2 ships no gnatcheck; ASIS gnatcheck is version-incompatible; libadalang build too heavy for CI (§2.4, §6.2) | §2, §6 | Medium | §6 +1 |
@@ -461,9 +459,11 @@ lesson stands as written: this audit once pronounced the hot path "O(1) — a hi
 standing perf-regression test now guards the data step. The remediations that followed —
 threat-model refresh, statistics tests, the O(n²) fixes, and the 2026-06-10 batch (#4–#8) —
 were re-checked this pass *adversarially against the auditor's own commits*, and they held: the
-\#6 merge-arm extraction is a verified byte-identical move, the #4 coercion guard is honest
-defense-in-depth over a path proven (not assumed) unreachable, and the `--progress` per-row
-hooks cost exactly one boolean when disabled. The score — **634/800** — moved for real reasons.
+\#6 merge-arm extraction is a verified byte-identical move, and the `--progress` per-row
+hooks cost exactly one boolean when disabled. The one thing I got wrong on the first pass:
+I called the #4 coercion guard "defense-in-depth over an unreachable path" — it is actually
+guarding a *real* reachable path (sdata-core issue #24, since fixed), which is a better
+justification, not a worse one. The score — **634/800** — moved for real reasons.
 
 The uncomfortable part is what the number *hides* — though less than an earlier draft of this
 section claimed. SData-the-codebase is in good shape, and contrary to my first telling, each crate
