@@ -350,16 +350,22 @@ the residual point is the toolchain-blocked SAST-in-CI.
   `SData_Core.IO.Show_Progress` helper prints every 10,000 records with a final total
   per phase. A runtime `OPTIONS PROGRESS YES|NO` toggle mirrors the flag (listed by
   bare `OPTIONS`). Verified end-to-end on a 25k-row dataset.
-- **No unified ecosystem CI:** data-vandal is not exercised in sdata's pipeline
-  (manual `cd ~/Develop/data-vandal && make check` per CLAUDE.md). The sdata-core
-  consumer-test pin also lags the current sdata release.
+- **No unified ecosystem CI — but data-vandal's absence is by design.** data-vandal
+  is an **intentionally unpublished** private sibling (employer constraint), so it
+  *cannot* be exercised in any public pipeline; this is a deliberate constraint, not a
+  defect, and the cross-crate guarantee is held by a documented local-discipline gate
+  (`make check` in sdata + data-vandal before any sdata-core push — see CLAUDE.md
+  "Cross-crate coordination"). The genuinely fixable residual is narrower: the
+  sdata-core **consumer-test pin lags** (`ref: v0.9.3` vs current 0.9.7), so even the
+  one automated cross-crate gate validates a stale consumer.
 - Stale in-repo test counts (see §8) cause onboarding confusion.
 
 **Δ from v0.6.14 (66):** +7 → **73** (2026-06-10). Derived-version packaging,
 expanded CI, richer debug/test infrastructure, and now `--progress` reporting for
 long USE/RUN/SORT runs (remediation #8) are concrete operational gains. The residual
-gap is the lack of a unified ecosystem CI (data-vandal not exercised in sdata's
-pipeline; consumer-test pin lags).
+gap is the stale sdata-core consumer-test pin; data-vandal's absence from CI is a
+deliberate privacy constraint (unpublished sibling) backstopped by a documented
+local-discipline gate, not an operational defect.
 
 ---
 
@@ -456,16 +462,22 @@ defense-in-depth over a path proven (not assumed) unreachable, and the `--progre
 hooks cost exactly one boolean when disabled. The score — **634/800** — moved for real reasons.
 
 The uncomfortable part is what the number *hides*. SData-the-codebase is in good shape; SData-the-
-**ecosystem** is held together by a CI seam that does not close. sdata-core's consumer-test pins a
-sdata from **four releases ago** (`v0.9.3` vs 0.9.7), so the very gate meant to catch a breaking
-change to the shared library checks it against a museum piece — and data-vandal, the *other*
-consumer, sits in no automated gate at all. This cycle proved the cost twice: remediation #4's
-cleaner design had to be **abandoned** because removing two exported exceptions broke that pinned
-consumer-test, and `--progress` was a two-crate dance precisely because the boundary is real but
-unwatched. The highest-leverage work left is not another +1 on a dimension — it is making the three
-crates actually test each other, on every change. The toolchain-blocked SAST-in-CI (#7) and the
-absent WHILE/expression timeout (§5) are the other standing debts. Close the CI loop first, then let
-SData 1.0 put a stability promise on top of a seam someone is finally watching.
+**ecosystem** rests on a boundary that no *public* gate can fully close — and partly by design.
+data-vandal is an unpublished private sibling (employer constraint), so it will never sit in CI;
+that is a deliberate trade, and the honest mitigation — now written into CLAUDE.md — is a
+**local-discipline gate**: build sdata-core and run `make check` in *both* sdata and data-vandal
+before any sdata-core push. The criticism that survives that constraint is narrower and entirely
+fixable: the one automated cross-crate gate that *does* exist, sdata-core's consumer-test, pins a
+sdata from **four releases ago** (`v0.9.3` vs 0.9.7), so it validates a museum piece; and the
+sdata-core version constraint must be kept current in *both* consumers' `alire.toml`. This cycle
+proved the boundary is load-bearing twice over: remediation #4's cleaner design had to be
+**abandoned** because removing two exported exceptions broke that pinned consumer-test, and
+`--progress` was a two-crate dance because the boundary is real. The highest-leverage work left is
+not another +1 on a dimension — it is bumping that consumer-test pin, keeping the version
+references in lockstep, and *actually running* the local two-consumer gate every time. The
+toolchain-blocked SAST-in-CI (#7) and the absent WHILE/expression timeout (§5) are the other
+standing debts. Tighten the seam — automated where it can be, disciplined where it can't — then
+let SData 1.0 put a stability promise on top of it.
 
 ---
 

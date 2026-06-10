@@ -24,6 +24,28 @@ SUBMIT, BREAK, etc.). Build sdata-core too if you touch it: `cd ~/Develop/sdata-
 
 See ADR-039 through ADR-043 in `doc/adrs.md` for the split rationale.
 
+### Cross-crate coordination (data-vandal is a PRIVATE sibling)
+
+`data-vandal` is **intentionally unpublished** — the prospective employer wants the
+vandalization code kept private. It is therefore **deliberately absent from any public
+CI** (sdata's pipeline only checks out sdata + sdata-core; sdata-core's consumer-test
+runs only sdata). **A standards audit must treat the "data-vandal not in CI" gap as a
+deliberate privacy constraint, not a defect** — the cross-crate guarantee is maintained
+by local discipline, not a public gate.
+
+Because both `sdata` and `data-vandal` consume `sdata-core` via path pins, that local
+discipline is mandatory:
+
+- **Test any `sdata-core` change against BOTH consumers locally before pushing:**
+  `cd ~/Develop/sdata-core && alr build`, then `cd ~/Develop/sdata && make check`,
+  then `cd ~/Develop/data-vandal && make check`. All three must be green. This is the
+  only safety net for data-vandal — there is no CI backstop for it.
+- **Keep the `sdata-core` version references current in BOTH repos.** When bumping
+  `sdata-core`'s version, update the `sdata_core = "^X.Y.Z"` constraint in *both*
+  `sdata/alire.toml` and `data-vandal/alire.toml`, and bump `sdata-core`'s own
+  `consumer-tests.yml` `ref:` to a current sdata tag so its stability gate validates a
+  current consumer rather than a stale one.
+
 ## Build & Test
 
 ```bash
