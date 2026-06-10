@@ -97,18 +97,28 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
       Expected      : constant Value_Kind := Get_Expected_Kind (Var_Name);
       Existing_Kind : constant Value_Kind := Get_Type (Var_Name);
       Result        : Value := Raw;
+
+      --  Report a scalar-assignment type mismatch as a Script_Error tagged
+      --  with the target variable name.  (sdata-core's Coerce_Value now raises
+      --  Script_Error at the table boundary directly; this is the matching
+      --  variable-level message for PDV/scalar assignment.)
+      procedure Raise_Mismatch (Detail : String);
+      pragma No_Return (Raise_Mismatch);
+      procedure Raise_Mismatch (Detail : String) is
+      begin
+         raise Script_Error with
+           "Type mismatch for variable " & Var_Name & ": " & Detail;
+      end Raise_Mismatch;
    begin
       if Existing_Kind /= Val_Missing then
          if Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
-            raise SData_Core.Table.Type_Mismatch_Error with
-              "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+            Raise_Mismatch
+              ("Cannot assign " & Result.Kind'Image & " to " & Expected'Image);
          end if;
          if Existing_Kind = Val_String and Result.Kind /= Val_String then
-            raise SData_Core.Table.Type_Mismatch_Error with
-              "Cannot assign numeric to string variable " & Var_Name;
+            Raise_Mismatch ("Cannot assign numeric to string variable " & Var_Name);
          elsif Existing_Kind /= Val_String and Result.Kind = Val_String then
-            raise SData_Core.Table.Type_Mismatch_Error with
-              "Cannot assign string to numeric variable " & Var_Name;
+            Raise_Mismatch ("Cannot assign string to numeric variable " & Var_Name);
          end if;
       end if;
       if Result.Kind = Val_Numeric and then Is_Inf (Result.Num_Val)
@@ -130,8 +140,8 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
          elsif Expected /= Result.Kind
             and not (Expected = Val_Numeric and Result.Kind = Val_Integer)
          then
-            raise SData_Core.Table.Type_Mismatch_Error with
-              "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;
+            Raise_Mismatch
+              ("Cannot assign " & Result.Kind'Image & " to " & Expected'Image);
          end if;
       end if;
       if Result.Kind = Val_String
@@ -184,9 +194,6 @@ begin
                    & Var_Name_Str & " = " & Debug_Value (Result), 3);
    end if;
 exception
-   when E : SData_Core.Table.Type_Mismatch_Error =>
-      raise Script_Error with "Type mismatch for variable " & Var_Name_Str
-        & ": " & Ada.Exceptions.Exception_Message (E);
    when Script_Error => raise;
    when SData_Core.Script_Error => raise;
    when E : others =>

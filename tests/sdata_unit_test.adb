@@ -147,31 +147,34 @@ begin
 
    declare
       Raised : Boolean := False;
-      pragma Unreferenced (Raised);
    begin
-      Set_Value (1, "X",
-                 (Kind => Val_String, Str_Val => To_Unbounded_String ("bad")));
-   exception
-      when SData_Core.Table.Type_Mismatch_Error => Raised := True;
+      begin
+         Set_Value (1, "X",
+                    (Kind => Val_String, Str_Val => To_Unbounded_String ("bad")));
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("T-19 type mismatch numeric←string raises Script_Error",
+             Raised, True);
+      V := Get_Value (1, "X");
+      Check ("T-19b numeric value unchanged after rejected write",
+             V.Kind = Val_Numeric, True);
    end;
-   Check ("T-19 type mismatch numeric←string raises", True, True);
-   --  Note: T-19 always passes structurally; the real guard is T-12/T-13
-   --  remaining correct (i.e. the bad Set_Value was rejected).
-   V := Get_Value (1, "X");
-   Check ("T-19b numeric value unchanged after rejected write",
-          V.Kind = Val_Numeric, True);
 
    declare
       Raised : Boolean := False;
-      pragma Unreferenced (Raised);
    begin
-      Set_Value (1, "NAME$", (Kind => Val_Numeric, Num_Val => 1.0));
-   exception
-      when SData_Core.Table.Type_Mismatch_Error => Raised := True;
+      begin
+         Set_Value (1, "NAME$", (Kind => Val_Numeric, Num_Val => 1.0));
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("T-20 type mismatch string←numeric raises Script_Error",
+             Raised, True);
+      V := Get_Value (1, "NAME$");
+      Check ("T-20b string value unchanged after rejected write",
+             To_String (V.Str_Val), "Alice");
    end;
-   V := Get_Value (1, "NAME$");
-   Check ("T-20 string value unchanged after rejected write",
-          To_String (V.Str_Val), "Alice");
 
    ---------------------------------------------------------------------------
    --  ── SData_Core.Table: Rename_Column ──────────────────────────────────────────
@@ -2495,9 +2498,9 @@ begin
       begin
          Sink := Convert_Value (Sv, Val_Integer);
       exception
-         when Conversion_Error => Raised := True;
+         when SData_Core.Script_Error => Raised := True;
       end;
-      Check ("CV-06 string->integer raises Conversion_Error", Raised, True);
+      Check ("CV-06 string->integer raises Script_Error", Raised, True);
       if Sink.Kind = Val_Missing then null; end if;  --  reference Sink
    end;
 
