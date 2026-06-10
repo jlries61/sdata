@@ -350,14 +350,18 @@ the residual point is the toolchain-blocked SAST-in-CI.
   `SData_Core.IO.Show_Progress` helper prints every 10,000 records with a final total
   per phase. A runtime `OPTIONS PROGRESS YES|NO` toggle mirrors the flag (listed by
   bare `OPTIONS`). Verified end-to-end on a 25k-row dataset.
-- **No unified ecosystem CI — but data-vandal's absence is by design.** data-vandal
-  is an **intentionally unpublished** private sibling (employer constraint), so it
-  *cannot* be exercised in any public pipeline; this is a deliberate constraint, not a
-  defect, and the cross-crate guarantee is held by a documented local-discipline gate
-  (`make check` in sdata + data-vandal before any sdata-core push — see CLAUDE.md
-  "Cross-crate coordination"). The genuinely fixable residual is narrower: the
-  sdata-core **consumer-test pin lags** (`ref: v0.9.3` vs current 0.9.7), so even the
-  one automated cross-crate gate validates a stale consumer.
+- **No *unified* ecosystem CI — but each crate is in fact gated.** (Corrected from an
+  earlier draft of this audit that wrongly said data-vandal "sits in no automated gate
+  at all.") Reading the actual workflows: sdata's `test.yml` *and* data-vandal's
+  `test.yml` each clone `sdata-core@main` on their own push/PR and run `make check`, so
+  a change in **either consumer** is auto-validated against current sdata-core;
+  sdata-core's `consumer-tests.yml` validates an sdata-core change against sdata (pinned
+  tag) and `build.yml` smoke-builds the lib. data-vandal is **intentionally** not run in
+  sdata-core's CI (private repo — deliberate, not a defect). The genuine residuals are
+  two: (a) an sdata-core change is **not** validated against data-vandal until
+  data-vandal next pushes — a one-directional *timing* gap that the mandatory local
+  two-consumer gate closes (CLAUDE.md "Cross-crate coordination"); and (b) the sdata-core
+  **consumer-test pin lags** (`ref: v0.9.3` vs current 0.9.7), so it validates a stale sdata.
 - Stale in-repo test counts (see §8) cause onboarding confusion.
 
 **Δ from v0.6.14 (66):** +7 → **73** (2026-06-10). Derived-version packaging,
@@ -461,15 +465,18 @@ were re-checked this pass *adversarially against the auditor's own commits*, and
 defense-in-depth over a path proven (not assumed) unreachable, and the `--progress` per-row
 hooks cost exactly one boolean when disabled. The score — **634/800** — moved for real reasons.
 
-The uncomfortable part is what the number *hides*. SData-the-codebase is in good shape; SData-the-
-**ecosystem** rests on a boundary that no *public* gate can fully close — and partly by design.
-data-vandal is an unpublished private sibling (employer constraint), so it will never sit in CI;
-that is a deliberate trade, and the honest mitigation — now written into CLAUDE.md — is a
-**local-discipline gate**: build sdata-core and run `make check` in *both* sdata and data-vandal
-before any sdata-core push. The criticism that survives that constraint is narrower and entirely
-fixable: the one automated cross-crate gate that *does* exist, sdata-core's consumer-test, pins a
-sdata from **four releases ago** (`v0.9.3` vs 0.9.7), so it validates a museum piece; and the
-sdata-core version constraint must be kept current in *both* consumers' `alire.toml`. This cycle
+The uncomfortable part is what the number *hides* — though less than an earlier draft of this
+section claimed. SData-the-codebase is in good shape, and contrary to my first telling, each crate
+**is** gated: sdata and data-vandal both rebuild against `sdata-core@main` in their own CI, and
+sdata-core's consumer-test rebuilds sdata against every sdata-core change. The real weak spot is
+narrow and deliberate: no automated gate covers the **sdata-core → data-vandal** direction *at
+sdata-core-push time* — data-vandal is a private repo sdata-core's CI can't check out, so a break
+there surfaces only on data-vandal's next push. The honest mitigation, now written into CLAUDE.md,
+is the **local two-consumer gate**: build sdata-core and run `make check` in *both* sdata and
+data-vandal before any sdata-core push. The other fixable residual is that sdata-core's
+consumer-test pins a sdata from **four releases ago** (`v0.9.3` vs 0.9.7), so it validates a museum
+piece — keep that pin and the `sdata_core` constraint in *both* consumers' `alire.toml` current.
+This cycle
 proved the boundary is load-bearing twice over: remediation #4's cleaner design had to be
 **abandoned** because removing two exported exceptions broke that pinned consumer-test, and
 `--progress` was a two-crate dance because the boundary is real. The highest-leverage work left is
