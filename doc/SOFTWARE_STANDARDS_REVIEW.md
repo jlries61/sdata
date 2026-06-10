@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§7/§8 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§7/§8 revised 2026-06-10) | **Re-audited:** 2026-06-10 (full adversarial re-pass; snapshot sdata `cbfd8f8` + sdata-core `2ecaa4d` / 0.1.8; standalone report at `.ssd/audits/2026-06-10-sdata-reaudit/`) | **Version:** 0.9.6 → reflects sdata `cbfd8f8` | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -445,31 +445,27 @@ remain the principal debits.
 
 ## The Hard Truth
 
-The code is not what slipped — the *discipline around it* is. SData v0.9.6 is a
-well-built interpreter with an enviable test count, a clean acyclic crate split,
-and a man page that actually matches the binary. Yet the headline number went
-**down**, and that is the honest signal: the three-crate split bought reuse at the
-price of coordination friction nobody has paid down, the statistics module was
-775 lines of numerical approximation with **zero** unit tests guarding it, and the
-threat model was a document describing a program that no longer existed — stamped
-"Current" while two releases of new attack surface (merge, transient tables,
-RENAME type coercion) went unanalysed. (Both of those are since fixed —
-remediation #1 and #3 — see below.) And this audit's own §3 illustrates
-the trap: it read the data-step hot path, pronounced it "O(1) — a highlight," and
-**missed three latent O(n²) defects** that made a routine 49k-row script take
-thirteen minutes. They were caught not by inspection but by a profiler on a real
-workload — proof that "looks linear" is not the same as "is linear," and that
-this codebase needs a standing performance test on a non-trivial dataset, not just
-correctness tests. (All three are now fixed in v0.9.7, and a
-standing perf-regression test — `tests/perf_regression.cmd`, which fails the
-suite if any path goes quadratic again — now guards them; §3 is revised up
-accordingly.) None of the remaining items are emergencies, and the highest-risk
-ones — the stale threat model and the untested statistics module — are now
-cleared. What remains is the kind of debt that stays invisible right up until
-SData 1.0 puts a stability promise on top of it. The merge/RENAME fuzz gap (#7)
-is now closed (`tests/merge_fuzz_driver.adb`); what is left is the
-toolchain-blocked SAST-in-CI and the two-crate change friction. Close those
-before the promise, not after.
+*(Re-audit 2026-06-10, snapshot sdata `cbfd8f8` + sdata-core `2ecaa4d`.)* The prior cycle's
+lesson stands as written: this audit once pronounced the hot path "O(1) — a highlight" and
+**missed three latent O(n²) defects** a profiler caught on a real workload, which is why a
+standing perf-regression test now guards the data step. The remediations that followed —
+threat-model refresh, statistics tests, the O(n²) fixes, and the 2026-06-10 batch (#4–#8) —
+were re-checked this pass *adversarially against the auditor's own commits*, and they held: the
+#6 merge-arm extraction is a verified byte-identical move, the #4 coercion guard is honest
+defense-in-depth over a path proven (not assumed) unreachable, and the `--progress` per-row
+hooks cost exactly one boolean when disabled. The score — **634/800** — moved for real reasons.
+
+The uncomfortable part is what the number *hides*. SData-the-codebase is in good shape; SData-the-
+**ecosystem** is held together by a CI seam that does not close. sdata-core's consumer-test pins a
+sdata from **four releases ago** (`v0.9.3` vs 0.9.7), so the very gate meant to catch a breaking
+change to the shared library checks it against a museum piece — and data-vandal, the *other*
+consumer, sits in no automated gate at all. This cycle proved the cost twice: remediation #4's
+cleaner design had to be **abandoned** because removing two exported exceptions broke that pinned
+consumer-test, and `--progress` was a two-crate dance precisely because the boundary is real but
+unwatched. The highest-leverage work left is not another +1 on a dimension — it is making the three
+crates actually test each other, on every change. The toolchain-blocked SAST-in-CI (#7) and the
+absent WHILE/expression timeout (§5) are the other standing debts. Close the CI loop first, then let
+SData 1.0 put a stability promise on top of a seam someone is finally watching.
 
 ---
 

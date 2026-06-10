@@ -99,7 +99,7 @@ src/
 tests/
   csv_unit_test.adb           -- SData_Core.CSV unit tests
   sdata_unit_test.adb         -- SData_Core.Variables / PDV unit tests
-  *.cmd                       -- integration test scripts (140)
+  *.cmd                       -- integration test scripts (201)
 doc/
   SOFTWARE_STANDARDS_REVIEW.md  -- living standards audit (annotated)
   adrs.md                     -- 43 ADRs (ADR-001 through ADR-043; some gaps)
