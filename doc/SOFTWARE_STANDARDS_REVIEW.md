@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §5 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -215,7 +215,7 @@ checkout.
 
 ---
 
-## 5. Error Handling & Resilience — **73/100**
+## 5. Error Handling & Resilience — **74/100** (2026-06-10)
 
 ### 5.1 Strategy
 
@@ -237,17 +237,28 @@ audit flagged in the interpreter body remain the weakest pattern but are bounded
 
 ### 5.3 Gaps
 
-- **`Conversion_Error` / `Type_Mismatch_Error` are uncaught.** In current paths
-  they are effectively unreachable — `Apply_Rename`'s pre-validation rejects the
-  numeric↔character crossing before `Convert_Value` runs, and `Coerce_Value` only
-  invokes `Convert_Value` for numeric↔integer — so they would only ever surface via
-  the top-level `when others`. Defensive, but they should be wrapped into
-  `Script_Error` at the sdata-core boundary for clean messaging.
+- ~~**`Conversion_Error` / `Type_Mismatch_Error` are uncaught.**~~ — **RESOLVED
+  2026-06-10 (remediation #4).** Re-examination upgraded the original "effectively
+  unreachable" suspicion to a **verified-unreachable** conclusion: every script path
+  that could raise either exception is already guarded — assignment
+  (`Coerce_For_Scalar`) and rename (`Apply_Rename`) pre-validate the
+  numeric/character boundary; merge **coerces** type-incompatible values to missing
+  rather than raising (confirmed across match/interleave/join/append/positional); and
+  the PDV flush only ever writes already-validated values. `Convert_Value`'s
+  string-crossing branch has no reachable caller (its two callers are numeric↔integer
+  only). Because the gap is theoretical, the fix is **defense-in-depth**, not a bug
+  fix: sdata's two top-level handlers (`sdata_main.adb`) now catch
+  `Type_Mismatch_Error` / `Conversion_Error` alongside `Script_Error`, so *if* a
+  future path ever raises one it surfaces as a clean `Error: …` with a failure exit
+  status instead of an "Internal error" via `when others`. No sdata-core change; no
+  version bump.
 - **No SUBMIT nesting-depth limit** (loop detection exists; depth does not).
 - **No per-expression timeout** (a non-terminating `WHILE` runs forever).
 
-**Δ from v0.6.14 (73):** 0. Net flat — SQLite/CSV/signal handling remain strong;
-the new exceptions add a minor surfacing gap offset by thorough RENAME validation.
+**Δ from v0.6.14 (73):** +1 → **74** (2026-06-10). The coercion-exception surfacing
+gap is closed as documented defense-in-depth (remediation #4), and the
+unreachability is now verified rather than assumed; SQLite/CSV/signal handling remain
+strong. The SUBMIT-depth and expression-timeout gaps are the remaining debits.
 
 ---
 
@@ -345,11 +356,13 @@ smaller and keep it just shy of the v0.6.14 mark.
 
 ## Overall Scores
 
-Scores are as of v0.9.6 except four revised post-audit (all 2026-06-09):
+Scores are as of v0.9.6 except five revised post-audit:
 **Efficiency** (→83, three O(n²) fixes in v0.9.7, §3), **Security** (→76,
 threat-model refresh, §6), **Documentation** (→85, threat-model + test-count
-syncs, §8), and **Maintainability** (→82, statistics unit tests added, §4). The
-total now slightly exceeds the v0.6.14 mark, with a different composition:
+syncs, §8), and **Maintainability** (→82, statistics unit tests added, §4) — all
+2026-06-09 — plus **Error Handling** (→74, coercion-exception defense-in-depth
+guard + verified unreachability, §5, 2026-06-10). The total now exceeds the
+v0.6.14 mark, with a different composition:
 Efficiency and Operational Readiness up most; the split-coordination dimensions
 remain the principal debits.
 
@@ -359,11 +372,11 @@ remain the principal debits.
 | Code Quality & Craftsmanship | 82 | **80** | −2 |
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
 | Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
-| Error Handling & Resilience | 73 | **73** | 0 |
+| Error Handling & Resilience | 73 | **74** (2026-06-10) | +1 |
 | Security Posture | 77 | **76** (2026-06-09) | −1 |
 | Operational Readiness | 66 | **72** | +6 |
 | Documentation | 87 | **85** (2026-06-09) | −2 |
-| **TOTAL** | **625/800 (78.1%)** | **627/800 (78.4%)** | **+2** |
+| **TOTAL** | **625/800 (78.1%)** | **628/800 (78.5%)** | **+3** |
 
 ---
 
@@ -374,7 +387,7 @@ remain the principal debits.
 | ~~1~~ | ~~Refresh `doc/threat_model.md`~~ — **RESOLVED 2026-06-09**: updated to v0.9.7 with merge/transient + per-target-option attack surface, T1 extended to RENAME names, new D4 (merge/transient memory), corrected file refs | §6, §8 | — | done |
 | ~~2~~ | ~~Sync stale test counts~~ — **RESOLVED 2026-06-09**: `CLAUDE.md` + `CONTRIBUTING.md` now state 197 integration / ~733 unit / 44 data-vandal, with `make check` named as the source of truth | §8 | — | done |
 | ~~3~~ | ~~Add `statistics_unit_test`~~ — **RESOLVED 2026-06-09** (sdata-core PR #31): `tests/statistics_tests.adb`, 88 property-based assertions across all 14 distributions | §4 | — | done |
-| 4 | Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error` at the sdata-core boundary | §5 | Low | §5 +1 |
+| ~~4~~ | ~~Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error`~~ — **RESOLVED 2026-06-10**: verified unreachable by construction (assignment/rename pre-validate; merge coerces-to-missing; flush writes validated values), so closed as **defense-in-depth** — sdata's two top-level handlers now catch both alongside `Script_Error`. No sdata-core change | §5 | — | done |
 | 5 | De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`) | §1 | Low | §1 +1 |
 | 6 | Extract `Execute_Declarative` merge-mode arms into named subprograms | §2 | Medium | §2 +1 |
 | 7 | `gnatcheck`/SAST in CI; fuzz driver for merge + RENAME syntax | §2, §6 | Medium | §6 +1 |

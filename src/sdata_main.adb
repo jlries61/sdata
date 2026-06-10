@@ -24,6 +24,14 @@ with SData_Core.Config;         use SData_Core.Config;
 with SData_Core.IO;          use SData_Core.IO;
 with SData.System;
 with SData_Core.Signals;
+--  Withed so the top-level handlers can name the two coercion exceptions and
+--  surface them as clean script errors rather than via `when others`.  These
+--  paths are unreachable by construction today (assignment & rename
+--  pre-validate; merge coerces incompatible values to missing; the PDV flush
+--  writes only validated values) -- the guard is defense-in-depth against any
+--  future path that might raise them.  See doc/SOFTWARE_STANDARDS_REVIEW.md §5.3.
+with SData_Core.Table;
+with SData_Core.Values;
 pragma Unreferenced (SData_Core.Signals);
 
 procedure SData_Main is
@@ -166,7 +174,9 @@ procedure SData_Main is
                SData_Core.IO.Flush_Pager_Buffer;
                Ada.Text_IO.New_Line;
                exit REPL;
-            when E : SData.Script_Error | SData_Core.Script_Error =>
+            when E : SData.Script_Error | SData_Core.Script_Error
+                   | SData_Core.Table.Type_Mismatch_Error
+                   | SData_Core.Values.Conversion_Error =>
                Put_Line_Error ("Error: " & Exception_Message (E));
                Buffer := Null_Unbounded_String;
                SData_Core.IO.Flush_Pager_Buffer;
@@ -537,7 +547,9 @@ exception
       Put_Line_Error ("Error: incomplete block at end of script"
                       & " (missing END SELECT, END IF, NEXT, or WEND?)");
       Set_Exit_Status (Failure);
-   when E : SData.Script_Error | SData_Core.Script_Error =>
+   when E : SData.Script_Error | SData_Core.Script_Error
+          | SData_Core.Table.Type_Mismatch_Error
+          | SData_Core.Values.Conversion_Error =>
       Put_Line_Error ("Error: " & Exception_Message (E));
       Set_Exit_Status (Failure);
    when E : others =>
