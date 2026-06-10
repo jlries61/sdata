@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09; §1 + §5 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5 revised 2026-06-10) | **Version:** 0.9.6 (§3 reflects 0.9.7 fixes) | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -58,7 +58,7 @@ at parse time and run once per record. No tier leakage.
 | `src/sdata-interpreter.adb` | 1,205 | dispatch + data step |
 | `sdata-core/.../sdata_core-table.adb` | 1,174 | column store + SQLite spill |
 | `sdata-core/.../sdata_core-evaluator.adb` | 1,059 | expression eval (bounded recursion, exempted) |
-| `src/sdata-interpreter-execute_declarative.adb` | 828 | grew from 299: now single+multi USE, multi-target SAVE, options |
+| `src/sdata-interpreter-execute_declarative.adb` | 864 | USE arm decomposed into `Execute_USE_Single`/`Execute_USE_Multi` (remediation #6); multi-target SAVE, options |
 
 `sdata_core-commands.adb` (711 lines) is a new, coherent home for the shared
 `Execute_*` procedures. No file inverts its dependencies; nothing is orphaned.
@@ -75,7 +75,7 @@ costs not offset within this dimension.
 
 ---
 
-## 2. Code Quality & Craftsmanship — **80/100**
+## 2. Code Quality & Craftsmanship — **81/100** (2026-06-10)
 
 ### 2.1 Language Use
 
@@ -101,16 +101,22 @@ deferral (`sdata_core-table.adb:96`, a bounded SQLite-handle leak gated on an
 
 ### 2.4 Concerns
 
-- **`execute_declarative.adb` Execute_Declarative** is an 828-line procedure with
-  nested per-merge-mode case arms (MM_Single / Positional / Match / Interleave /
-  Join / Append) plus SAVE/OPTIONS. It is the one place cognitive load is high;
-  its arms should be extracted into named subprograms.
+- ~~**`execute_declarative.adb` Execute_Declarative** is an 828-line procedure with
+  nested per-merge-mode case arms…~~ — **RESOLVED 2026-06-10 (remediation #6).** The
+  USE arm's two merge-mode paths are extracted into named nested subprograms
+  `Execute_USE_Single` (~120 lines) and `Execute_USE_Multi` (~340 lines); the arm is
+  now a 7-line dispatch (`if Stmt.Mode = MM_Single then Execute_USE_Single; else
+  Execute_USE_Multi; …`). The bodies were moved **byte-identically** (verified by
+  diff against the pre-refactor file), so behaviour is provably unchanged (build clean
+  + 197/197 integration). The SAVE/OPTIONS arms already used named helpers
+  (`Legacy_Execute_SAVE`, `Dlm_Display`).
 - **No enforced static analysis.** `gnatcheck.rules` exists (two rules) but is not
   run in CI (Ubuntu `asis-programs` only). CodePeer unused. Pragma-`Annotate`
   exemptions for the bounded evaluator recursion are justified.
 
-**Δ from v0.6.14 (82):** −2. The DRY win and clean naming are offset by the
-oversized declarative-dispatch procedure and still-absent enforced SAST.
+**Δ from v0.6.14 (82):** −1 → **81** (2026-06-10). The DRY win and clean naming now
+include the decomposed declarative dispatch (remediation #6); the residual debit is the
+still-absent enforced SAST (remediation #7).
 
 ---
 
@@ -360,28 +366,29 @@ smaller and keep it just shy of the v0.6.14 mark.
 
 ## Overall Scores
 
-Scores are as of v0.9.6 except six revised post-audit:
+Scores are as of v0.9.6 except seven revised post-audit:
 **Efficiency** (→83, three O(n²) fixes in v0.9.7, §3), **Security** (→76,
 threat-model refresh, §6), **Documentation** (→85, threat-model + test-count
 syncs, §8), and **Maintainability** (→82, statistics unit tests added, §4) — all
 2026-06-09 — plus **Error Handling** (→74, coercion-exception defense-in-depth
-guard + verified unreachability, §5) and **Architectural Integrity** (→77,
-capacity-constant de-duplication, §1) — both 2026-06-10. The total now exceeds the
-v0.6.14 mark, with a different composition:
+guard + verified unreachability, §5), **Architectural Integrity** (→77,
+capacity-constant de-duplication, §1), and **Code Quality** (→81, declarative-
+dispatch decomposition, §2) — all 2026-06-10. The total now exceeds the v0.6.14
+mark, with a different composition:
 Efficiency and Operational Readiness up most; the split-coordination dimensions
 remain the principal debits.
 
 | Category | v0.6.14 | current | Δ |
 |---|---|---|---|
 | Architectural Integrity | 78 | **77** (2026-06-10) | −1 |
-| Code Quality & Craftsmanship | 82 | **80** | −2 |
+| Code Quality & Craftsmanship | 82 | **81** (2026-06-10) | −1 |
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
 | Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
 | Error Handling & Resilience | 73 | **74** (2026-06-10) | +1 |
 | Security Posture | 77 | **76** (2026-06-09) | −1 |
 | Operational Readiness | 66 | **72** | +6 |
 | Documentation | 87 | **85** (2026-06-09) | −2 |
-| **TOTAL** | **625/800 (78.1%)** | **629/800 (78.6%)** | **+4** |
+| **TOTAL** | **625/800 (78.1%)** | **630/800 (78.8%)** | **+5** |
 
 ---
 
@@ -394,7 +401,7 @@ remain the principal debits.
 | ~~3~~ | ~~Add `statistics_unit_test`~~ — **RESOLVED 2026-06-09** (sdata-core PR #31): `tests/statistics_tests.adb`, 88 property-based assertions across all 14 distributions | §4 | — | done |
 | ~~4~~ | ~~Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error`~~ — **RESOLVED 2026-06-10**: verified unreachable by construction (assignment/rename pre-validate; merge coerces-to-missing; flush writes validated values), so closed as **defense-in-depth** — sdata's two top-level handlers now catch both alongside `Script_Error`. No sdata-core change | §5 | — | done |
 | ~~5~~ | ~~De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`)~~ — **RESOLVED 2026-06-10**: `sdata.ads` now `with`s `SData_Core` and re-exports the six constants from it; one literal per limit, cannot diverge. sdata-only, no version bump | §1 | — | done |
-| 6 | Extract `Execute_Declarative` merge-mode arms into named subprograms | §2 | Medium | §2 +1 |
+| ~~6~~ | ~~Extract `Execute_Declarative` merge-mode arms into named subprograms~~ — **RESOLVED 2026-06-10**: USE arm's single/multi paths extracted into `Execute_USE_Single` / `Execute_USE_Multi` (byte-identical move, verified by diff; 197/197 green); arm reduced to a 7-line dispatch | §2 | — | done |
 | 7 | `gnatcheck`/SAST in CI; fuzz driver for merge + RENAME syntax | §2, §6 | Medium | §6 +1 |
 | 8 | Commit a plain-text `design.txt`; add `--progress` and a SUBMIT depth limit | §8, §7, §5 | Low | §8 +1 |
 | ~~9~~ | ~~In-place projection for single-`USE` options~~ — **RESOLVED v0.9.7**: transient `Add_Row`/`Set_Value` made in-place, so snapshot/install is now O(rows) | §3 | — | done |
@@ -437,7 +444,7 @@ and the two-crate change friction. Close those before the promise, not after.
 | Three-crate split, acyclic boundary | ADRs 039–043; `sdata.ads`, `sdata_core.ads` | sdata→sdata-core only |
 | Capacity-constant duplication **[RESOLVED 2026-06-10, remediation #5]** | `src/sdata.ads` re-exports from `sdata_core.ads` | `Max_* : constant := SData_Core.Max_*`; one literal per limit |
 | DRY truncation centralization | `sdata_core-values.adb:23–48`; `sdata_core-table.adb:267,272` | Coerce_Value delegates to Convert_Value |
-| Oversized declarative dispatch | `src/sdata-interpreter-execute_declarative.adb` | 828 lines, nested merge-mode arms |
+| Oversized declarative dispatch **[RESOLVED 2026-06-10, remediation #6]** | `src/sdata-interpreter-execute_declarative.adb` | USE arm extracted to `Execute_USE_Single`/`Execute_USE_Multi` (byte-identical move; 197/197 green) |
 | O(n²) #1 `Get_Column_Type` whole-column copy **[RESOLVED v0.9.7, `99a7534`]** | `sdata_core-table.adb` (`Element(Cursor).Typ`) | per-record flush copied every row to read one enum; `use;run` 32k: 402s→1.3s (callgrind) |
 | O(n²) #2 transient copy-per-cell **[RESOLVED v0.9.7, `396048a`]** | `src/sdata-transient_table.adb` (`Add_Row`/`Set_Value`) | whole-column copy per call; `/append` 49k: 791s→9s |
 | O(n²) #3 BY re-sort per record **[RESOLVED v0.9.7, `396048a`]** | `src/sdata-interpreter-execute_declarative.adb` (Stmt_BY) | sorted whole table every record; pass-2 2k: 19s→0.17s |

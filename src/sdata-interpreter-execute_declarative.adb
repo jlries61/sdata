@@ -56,8 +56,8 @@ begin
                end loop;
             end Convert_Rename_List;
 
-         begin
-            if Stmt.Mode = MM_Single then
+            procedure Execute_USE_Single is
+            begin
                --  -------------------------------------------------------
                --  Legacy single-dataset path — no behavioral change.
                --  -------------------------------------------------------
@@ -180,13 +180,14 @@ begin
                                  (Natural'Image (SData_Core.Table.Column_Count),
                                   Ada.Strings.Both)
                             & " variables)", 1);
-            else
+            end Execute_USE_Single;
+
                --  -------------------------------------------------------
                --  Multi-dataset path: snapshot each input, apply per-
                --  dataset RENAME/KEEP/DROP, sort by BY vars if needed,
                --  then combine and install.
                --  -------------------------------------------------------
-               declare
+            procedure Execute_USE_Multi is
                   procedure Free_Snap is new Ada.Unchecked_Deallocation
                     (SData.Transient_Table.Table,
                      SData.Merge.Table_Access);
@@ -211,7 +212,7 @@ begin
                      Snapshots.Clear;
                   end Free_All_Snapshots;
 
-               begin
+            begin
                   --  Alias-uniqueness check: mirror the SAVE-side pattern.
                   --  Walk the dataset list before allocating any snapshots so
                   --  that a duplicate alias fails fast without leaking heap.
@@ -526,7 +527,13 @@ begin
                         Free_All_Snapshots;
                         raise;
                   end;
-               end;
+            end Execute_USE_Multi;
+
+         begin
+            if Stmt.Mode = MM_Single then
+               Execute_USE_Single;
+            else
+               Execute_USE_Multi;
             end if;
          end;
       when Stmt_SAVE =>
