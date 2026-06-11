@@ -65,20 +65,21 @@ begin
                   File_Name : constant String :=
                      (if Stmt.Is_Mock then "MOCK"
                       else Stmt.File_Path (1 .. Stmt.File_Len));
-                  Eff_DLM   : constant String :=
-                     (if Stmt.DLM_Len > 0
-                      then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                      else SData_Core.Config.Runtime.Options_CSVDLM
-                              (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
-                  Eff_Header  : constant Boolean :=
-                     (if Stmt.Header_Specified
-                      then Stmt.Header_Val
-                      else SData_Core.Config.Runtime.Options_Header);
-                  Eff_Charset : constant String :=
-                     (if Stmt.Output_CHARSET_Len > 0
-                      then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
-                      else SData_Core.Config.Runtime.Options_CHARSET
-                              (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len));
+                  --  Resolve delimiter / header / charset against OPTIONS
+                  --  state in core (single authority — see ADR / Evans
+                  --  E1).  Format still resolves consumer-side (it falls
+                  --  back to Input_Format, not an OPTIONS field).
+                  Eff : constant SData_Core.Commands.Use_Defaults :=
+                     SData_Core.Commands.Resolve_Use_Defaults
+                       (Delimiter           =>
+                           Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len)),
+                        Delimiter_Specified => Stmt.DLM_Len > 0,
+                        Read_Header         => Stmt.Header_Val,
+                        Header_Specified    => Stmt.Header_Specified,
+                        Charset             =>
+                           Stmt.Output_CHARSET_Val
+                             (1 .. Stmt.Output_CHARSET_Len),
+                        Charset_Specified   => Stmt.Output_CHARSET_Len > 0);
                   Eff_Fmt : constant SData_Core.Config.Format_Type :=
                      (if Stmt.Format_Specified then Stmt.Fmt_Override
                       else SData_Core.Config.Input_Format);
@@ -87,9 +88,9 @@ begin
                     (File_Name   => File_Name,
                      Fmt         => Eff_Fmt,
                      Sheet_Name  => Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
-                     Delimiter   => Eff_DLM,
-                     Read_Header => Eff_Header,
-                     Charset     => Eff_Charset,
+                     Delimiter   => Eff.Delimiter (1 .. Eff.Delimiter_Len),
+                     Read_Header => Eff.Read_Header,
+                     Charset     => Eff.Charset (1 .. Eff.Charset_Len),
                      Skip_Rows   => Stmt.Skip_Val,
                      Max_Rows    => Stmt.Maxrows_Val,
                      Nscan_Rows  => Stmt.NSCAN_Val,
@@ -266,25 +267,24 @@ begin
                                          Stmt.Dataset_List (Spec_Idx);
                            Snap_Ptr : constant SData.Merge.Table_Access :=
                                          new SData.Transient_Table.Table;
-                           Eff_DLM  : constant String :=
-                              (if Spec.Opts.DLM_Len > 0
-                               then Dlm_To_Str
+                           --  Resolve delimiter / header / charset against
+                           --  OPTIONS state in core (single authority — see
+                           --  ADR / Evans E1).  Format stays consumer-side.
+                           Eff : constant SData_Core.Commands.Use_Defaults :=
+                              SData_Core.Commands.Resolve_Use_Defaults
+                                (Delimiter           =>
+                                    Dlm_To_Str
                                       (Spec.Opts.DLM_Val
-                                          (1 .. Spec.Opts.DLM_Len))
-                               else SData_Core.Config.Runtime.Options_CSVDLM
-                                       (1 .. SData_Core.Config.Runtime
-                                                .Options_CSVDLM_Len));
-                           Eff_Header : constant Boolean :=
-                              (if Spec.Opts.Header_Specified
-                               then Spec.Opts.Header_Val
-                               else SData_Core.Config.Runtime.Options_Header);
-                           Eff_Charset : constant String :=
-                              (if Spec.Opts.Charset_Len > 0
-                               then Spec.Opts.Charset_Val
-                                       (1 .. Spec.Opts.Charset_Len)
-                               else SData_Core.Config.Runtime.Options_CHARSET
-                                       (1 .. SData_Core.Config.Runtime
-                                                .Options_CHARSET_Len));
+                                         (1 .. Spec.Opts.DLM_Len)),
+                                 Delimiter_Specified => Spec.Opts.DLM_Len > 0,
+                                 Read_Header         => Spec.Opts.Header_Val,
+                                 Header_Specified    =>
+                                    Spec.Opts.Header_Specified,
+                                 Charset             =>
+                                    Spec.Opts.Charset_Val
+                                      (1 .. Spec.Opts.Charset_Len),
+                                 Charset_Specified   =>
+                                    Spec.Opts.Charset_Len > 0);
                            Eff_Fmt : constant SData_Core.Config.Format_Type :=
                               (if Spec.Opts.Format_Specified
                                then Spec.Opts.Fmt_Override
@@ -302,9 +302,11 @@ begin
                               Fmt         => Eff_Fmt,
                               Sheet_Name  => Spec.Opts.Sheet_Name
                                                (1 .. Spec.Opts.Sheet_Name_Len),
-                              Delimiter   => Eff_DLM,
-                              Read_Header => Eff_Header,
-                              Charset     => Eff_Charset,
+                              Delimiter   =>
+                                 Eff.Delimiter (1 .. Eff.Delimiter_Len),
+                              Read_Header => Eff.Read_Header,
+                              Charset     =>
+                                 Eff.Charset (1 .. Eff.Charset_Len),
                               Skip_Rows   => Spec.Opts.Skip_Val,
                               Max_Rows    => Spec.Opts.Maxrows_Val,
                               Nscan_Rows  => Spec.Opts.NSCAN_Val,
