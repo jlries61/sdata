@@ -14,13 +14,22 @@ GNATMETRIC=${GNATMETRIC:-gnatmetric}
 cd "$(dirname "$0")/.."                      # repo root
 
 rm -f metrix.xml
+gm_err=$(mktemp)
+gm_status=0
 "$GNATMETRIC" --generate-xml-output --no-text-output --complexity-cyclomatic \
-  --xml-file-name=metrix.xml src/*.ads src/*.adb >/dev/null 2>&1 || true
+  --xml-file-name=metrix.xml src/*.ads src/*.adb >/dev/null 2>"$gm_err" || gm_status=$?
 
 if [ ! -f metrix.xml ]; then
-  echo "check-complexity: gnatmetric produced no metrix.xml" >&2
+  # Fail closed, and surface WHY (gnatmetric's stderr is otherwise lost).
+  echo "check-complexity: gnatmetric produced no metrix.xml (exit $gm_status). Failing closed." >&2
+  echo "  gnatmetric : $GNATMETRIC" >&2
+  echo "  cwd        : $(pwd)" >&2
+  echo "  shared libs:" >&2; ldd "$GNATMETRIC" 2>&1 | sed 's/^/    /' >&2
+  echo "  gnatmetric stderr (tail):" >&2; tail -20 "$gm_err" | sed 's/^/    /' >&2
+  rm -f "$gm_err"
   exit 2
 fi
+rm -f "$gm_err"
 
 # A single subprogram's McCabe complexity is always a whole number, so per-unit
 # values render as bare integers (e.g. >81<). gnatmetric's file/global AVERAGE
