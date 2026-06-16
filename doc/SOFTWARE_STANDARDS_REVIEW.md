@@ -483,8 +483,9 @@ hooks cost exactly one boolean when disabled. The one thing I got wrong on the f
 I called the #4 coercion guard "defense-in-depth over an unreachable path" — it is actually
 guarding a *real* reachable path (sdata-core issue #24, since fixed), which is a better
 justification, not a worse one — and that reachable path is now root-cause fixed in
-sdata-core 0.1.9 (Error Handling +1 → 76, 2026-06-11). The score — **635/800** — moved
-for real reasons.
+sdata-core 0.1.9 (Error Handling +1 → 76, 2026-06-11), and SAST-in-CI was closed by the
+gnatmetric complexity gate (Code Quality +1, Security +1, 2026-06-16). The score —
+**637/800** — moved for real reasons.
 
 The uncomfortable part is what the number *hides* — though less than an earlier draft of this
 section claimed. SData-the-codebase is in good shape, and contrary to my first telling, each crate
