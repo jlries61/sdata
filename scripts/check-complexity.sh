@@ -22,6 +22,12 @@ if [ ! -f metrix.xml ]; then
   exit 2
 fi
 
+# A single subprogram's McCabe complexity is always a whole number, so per-unit
+# values render as bare integers (e.g. >81<). gnatmetric's file/global AVERAGE
+# rollups render with decimals (e.g. >23.00<) inside a <global> block. Matching
+# integer-only values therefore selects exactly the per-unit metrics and excludes
+# the averages. If that ever stops holding (format drift), parsing yields max=0
+# and the guard below fails CLOSED rather than passing silently.
 result=$(awk '
   /<unit name="/ { if (match($0, /name="[^"]+"/)) cur = substr($0, RSTART+6, RLENGTH-7) }
   /<metric name="cyclomatic_complexity">/ {
@@ -36,6 +42,17 @@ rm -f metrix.xml
 
 max=${result%% *}
 worst=${result#* }
+
+case "$max" in
+  ''|*[!0-9]*)
+    echo "check-complexity: malfunction — non-numeric max '$max' (gnatmetric XML format changed?). Failing closed." >&2
+    exit 2 ;;
+esac
+
+if [ "$max" -le 0 ] || [ -z "$worst" ]; then
+  echo "check-complexity: malfunction — no per-unit complexity parsed (max=$max). Failing closed." >&2
+  exit 2
+fi
 
 if [ "$max" -gt "$MAX_CYCLOMATIC" ]; then
   echo "check-complexity: FAIL — '$worst' has cyclomatic complexity $max (ceiling $MAX_CYCLOMATIC)" >&2
