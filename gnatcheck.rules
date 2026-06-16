@@ -1,5 +1,9 @@
 --  GNATcheck rules for SData
---  Enforced in CI via "make gnatcheck" (alr exec -- make gnatcheck).
+--  Manual/optional: run with "make gnatcheck" where a gnatcheck binary is
+--  available. gnatcheck is not in the Alire toolchain (FSF GNAT 15.2) and is
+--  unpackaged on several target distros, so it is NOT run in CI. CI instead
+--  enforces static analysis via the gnatmetric cyclomatic-complexity gate
+--  ("make complexity-check"; see scripts/check-complexity.sh).
 --
 --  To exempt an intentional exception, bracket the construct with:
 --    pragma Annotate (GNATcheck, Exempt_On, "Rule_Name", "justification");
