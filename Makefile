@@ -70,7 +70,7 @@ INSTALL_DIR  = $(DESTDIR)$(BINDIR)
 MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 DOC_DIR      = $(DESTDIR)$(DOCDIR)
 
-.PHONY: all build clean run check fuzz-corpus gnatcheck install srpm pkg msi \
+.PHONY: all build clean run check fuzz-corpus gnatcheck complexity-check install srpm pkg msi \
         sdata-core-tarball
 
 all: build
@@ -173,6 +173,9 @@ check: build
 
 gnatcheck: build
 	gnatcheck -P $(GPR_FILE) --rules-file=gnatcheck.rules -j0
+
+complexity-check:
+	@GNATMETRIC=$$(scripts/provision-gnatmetric.sh) scripts/check-complexity.sh
 
 fuzz-corpus: build
 	@echo "Running corpus regression (csv_fuzz_driver)..."
