@@ -62,3 +62,13 @@ jobs:
       - name: Fuzz corpus regression
         working-directory: sdata
         run: alr exec -- make fuzz-corpus
+
+      - name: Cache gnatmetric (libadalang_tools)
+        uses: actions/cache@v4
+        with:
+          path: sdata/tools
+          key: gnatmetric-${{ runner.os }}-libadalang_tools-26.0.0
+
+      - name: Complexity gate (gnatmetric)
+        working-directory: sdata
+        run: make complexity-check

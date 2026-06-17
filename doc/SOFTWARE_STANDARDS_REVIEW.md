@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§7/§8 revised 2026-06-10; §5 revised 2026-06-11 — Error Handling 75→76, sdata-core #24 root-cause fix) | **Re-audited:** 2026-06-10 (full adversarial re-pass; snapshot sdata `cbfd8f8` + sdata-core `2ecaa4d` / 0.1.8; standalone report at `.ssd/audits/2026-06-10-sdata-reaudit/`) | **Version:** 0.9.6 → reflects sdata `cbfd8f8` | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§7/§8 revised 2026-06-10; §5 revised 2026-06-11 — Error Handling 75→76, sdata-core #24 root-cause fix; §2/§6 revised 2026-06-16 — SAST-in-CI closed via gnatmetric complexity gate, Code Quality 81→82, Security 77→78) | **Re-audited:** 2026-06-10 (full adversarial re-pass; snapshot sdata `cbfd8f8` + sdata-core `2ecaa4d` / 0.1.8; standalone report at `.ssd/audits/2026-06-10-sdata-reaudit/`) | **Version:** 0.9.6 → reflects sdata `cbfd8f8` | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -75,7 +75,7 @@ costs not offset within this dimension.
 
 ---
 
-## 2. Code Quality & Craftsmanship — **81/100** (2026-06-10)
+## 2. Code Quality & Craftsmanship — **82/100** (2026-06-16)
 
 ### 2.1 Language Use
 
@@ -110,15 +110,22 @@ deferral (`sdata_core-table.adb:96`, a bounded SQLite-handle leak gated on an
   diff against the pre-refactor file), so behaviour is provably unchanged (build clean
   + 197/197 integration). The SAVE/OPTIONS arms already used named helpers
   (`Legacy_Execute_SAVE`, `Dlm_Display`).
-- **No enforced static analysis (toolchain-blocked).** `gnatcheck.rules` exists (two
-  rules) but is not run in CI: FSF GNAT 15.2 (the Alire toolchain) ships no
-  `gnatcheck`, and Ubuntu's ASIS `gnatcheck` is version-incompatible with it (see §6.2
-  for the full rationale). CodePeer unused. Pragma-`Annotate` exemptions for the
-  bounded evaluator recursion are justified.
+- ~~**No enforced static analysis (toolchain-blocked).**~~ — **RESOLVED 2026-06-16
+  (remediation #7, SAST half).** CI now enforces a `gnatmetric` cyclomatic-complexity
+  gate (`make complexity-check`, blocking): `scripts/check-complexity.sh` fails the
+  build if any `src/` subprogram exceeds complexity 85 (current max 81, `SData_Main`),
+  excluding the recursive-descent parser and tokenizer (`src/parser`, `src/lexer`),
+  whose high McCabe complexity is inherent and exempted.
+  gnatmetric is built from the Alire `libadalang_tools` crate into a version-pinned
+  cached sandbox, sidestepping the FSF-GNAT-15.2-ships-no-`gnatcheck` / ASIS-version-
+  incompatibility blocker (§6.2). `gnatcheck.rules` (two rules) is retained as a
+  manual/optional tool. CodePeer unused. Pragma-`Annotate` exemptions for the bounded
+  evaluator recursion are justified.
 
-**Δ from v0.6.14 (82):** −1 → **81** (2026-06-10). The DRY win and clean naming now
-include the decomposed declarative dispatch (remediation #6); the residual debit is the
-still-absent enforced SAST (remediation #7).
+**Δ from v0.6.14 (82):** 0 → **82** (2026-06-16). The DRY win and clean naming include
+the decomposed declarative dispatch (remediation #6); the prior residual debit — absent
+enforced SAST — is cleared by the CI `gnatmetric` complexity gate (remediation #7, SAST
+half), restoring the v0.6.14 mark.
 
 ---
 
@@ -284,7 +291,7 @@ runs forever).
 
 ---
 
-## 6. Security Posture — **77/100** (2026-06-10)
+## 6. Security Posture — **78/100** (2026-06-16)
 
 ### 6.1 Trust Model & Controls — intact
 
@@ -315,18 +322,25 @@ hardcoded secrets.
   modes, multi-target SAVE) extend the parser driver's coverage. Wired into
   `make fuzz-corpus` (which CI runs). Validated: 0 crashes across the seeds + 2000
   random inputs.
-- **No SAST in CI — still open (toolchain-blocked).** `gnatcheck.rules` (two rules)
-  is not run in CI. The Alire toolchain is **FSF GNAT 15.2**, which does *not* bundle
-  `gnatcheck`; Ubuntu's `asis-programs` `gnatcheck` is ASIS-based and version-locked to
-  Ubuntu's system GNAT, so it cannot process GNAT-15.2-built sources; the
-  libadalang-based `gnatcheck` (Alire `libadalang_tools`) would mean building
-  libadalang from source in CI — too heavy/fragile to justify for two rules. Revisit
-  when an Alire `gnatcheck` binary crate is available; meanwhile `make gnatcheck` runs
-  on a dev machine with a matching toolchain. CodePeer unused.
+- ~~**No SAST in CI — still open (toolchain-blocked).**~~ — **RESOLVED 2026-06-16
+  (remediation #7, SAST half).** CI now runs a blocking `gnatmetric` cyclomatic-
+  complexity gate (`make complexity-check`) that fails the build if any `src/`
+  subprogram exceeds complexity 85 (current max 81, `SData_Main`), excluding the
+  recursive-descent parser and tokenizer (`src/parser`, `src/lexer`) whose high
+  McCabe complexity is inherent and exempted. The Alire toolchain
+  (**FSF GNAT 15.2**) ships no `gnatcheck`, and Ubuntu's ASIS `asis-programs`
+  `gnatcheck` is version-locked to Ubuntu's system GNAT (cannot process GNAT-15.2
+  sources) — so rather than chase a `gnatcheck` binary, the gate uses `gnatmetric` from
+  the Alire `libadalang_tools` crate. The libadalang build cost — the reason this was
+  deferred when the only payoff was *two gnatcheck rules* — is now accepted for an
+  enforced complexity ceiling and amortised by a version-pinned CI cache.
+  `gnatcheck.rules` is retained as a manual/optional tool (`make gnatcheck` on a dev
+  machine with a matching toolchain). CodePeer unused.
 
-**Δ from v0.6.14 (77):** 0 → **77** (2026-06-10). The threat-model staleness and the
-merge/RENAME fuzz gap — the two debits that drove the prior −1 — are both resolved;
-the residual point is the toolchain-blocked SAST-in-CI.
+**Δ from v0.6.14 (77):** +1 → **78** (2026-06-16). The threat-model staleness and the
+merge/RENAME fuzz gap (the two debits behind the prior −1) were resolved 2026-06-10, and
+the last residual — toolchain-blocked SAST-in-CI — is now closed by the CI `gnatmetric`
+complexity gate (remediation #7, SAST half).
 
 ---
 
@@ -412,7 +426,7 @@ debit is the statistics module's missing implementation-choice prose.
 
 ## Overall Scores
 
-Scores are as of v0.9.6 except seven revised post-audit. From 2026-06-09:
+Scores are as of v0.9.6 except those revised post-audit. From 2026-06-09:
 **Efficiency** (→83, three O(n²) fixes in v0.9.7, §3), **Documentation** (→85,
 threat-model + test-count syncs, §8), and **Maintainability** (→82, statistics
 unit tests added, §4). From 2026-06-10: **Error Handling** (→75,
@@ -422,22 +436,24 @@ coercion-exception defense-in-depth guard + SUBMIT depth limit, §5; →76 on
 **Code Quality** (→81, declarative-dispatch decomposition, §2), **Security**
 (→77, threat-model refresh + merge/RENAME fuzz driver, §6), **Documentation**
 (→86, design doc converted to committed Markdown, §8), and **Operational
-Readiness** (→73, `--progress` reporting, §7). The total now exceeds the v0.6.14
-mark, with a different composition:
+Readiness** (→73, `--progress` reporting, §7). From 2026-06-16: **Code Quality**
+(→82) and **Security** (→78), the CI `gnatmetric` cyclomatic-complexity gate closing
+the toolchain-blocked SAST-in-CI (remediation #7, §2/§6). The total now exceeds the
+v0.6.14 mark, with a different composition:
 Efficiency and Operational Readiness up most; the split-coordination dimensions
 remain the principal debits.
 
 | Category | v0.6.14 | current | Δ |
 |---|---|---|---|
 | Architectural Integrity | 78 | **77** (2026-06-10) | −1 |
-| Code Quality & Craftsmanship | 82 | **81** (2026-06-10) | −1 |
+| Code Quality & Craftsmanship | 82 | **82** (2026-06-16) | 0 |
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
 | Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
 | Error Handling & Resilience | 73 | **76** (2026-06-11) | +3 |
-| Security Posture | 77 | **77** (2026-06-10) | 0 |
+| Security Posture | 77 | **78** (2026-06-16) | +1 |
 | Operational Readiness | 66 | **73** (2026-06-10) | +7 |
 | Documentation | 87 | **86** (2026-06-10) | −1 |
-| **TOTAL** | **625/800 (78.1%)** | **635/800 (79.4%)** | **+10** |
+| **TOTAL** | **625/800 (78.1%)** | **637/800 (79.6%)** | **+12** |
 
 ---
 
@@ -451,7 +467,7 @@ remain the principal debits.
 | ~~4~~ | ~~Wrap `Conversion_Error` / `Type_Mismatch_Error` into `Script_Error`~~ — **RESOLVED 2026-06-10**: sdata's two top-level handlers now catch both alongside `Script_Error`. (Framing corrected 2026-06-11: these paths are rare but **reachable** — e.g. sdata-core issue #24, a derived missing-first-then-character output column, now separately fixed; the guard caught a real case, not just hypothetical future ones.) | §5 | — | done |
 | ~~5~~ | ~~De-duplicate capacity constants (`sdata.ads` vs `sdata_core.ads`)~~ — **RESOLVED 2026-06-10**: `sdata.ads` now `with`s `SData_Core` and re-exports the six constants from it; one literal per limit, cannot diverge. sdata-only, no version bump | §1 | — | done |
 | ~~6~~ | ~~Extract `Execute_Declarative` merge-mode arms into named subprograms~~ — **RESOLVED 2026-06-10**: USE arm's single/multi paths extracted into `Execute_USE_Single` / `Execute_USE_Multi` (byte-identical move, verified by diff; 197/197 green); arm reduced to a 7-line dispatch | §2 | — | done |
-| ~~7~~ | **PARTIAL 2026-06-10** — fuzz driver for merge + RENAME **done** (`tests/merge_fuzz_driver.adb` + seeds, wired into `make fuzz-corpus`; closes the §6 fuzz debit, +1). `gnatcheck`/SAST-in-CI **deferred (toolchain-blocked)**: FSF GNAT 15.2 ships no gnatcheck; ASIS gnatcheck is version-incompatible; libadalang build too heavy for CI (§2.4, §6.2) | §2, §6 | Medium | §6 +1 |
+| ~~7~~ | **RESOLVED 2026-06-16** — fuzz driver for merge + RENAME done 2026-06-10 (`tests/merge_fuzz_driver.adb` + seeds, wired into `make fuzz-corpus`; §6 fuzz debit, +1). SAST-in-CI now done: a blocking `gnatmetric` cyclomatic-complexity gate (`make complexity-check`; ceiling 85, current max 81 `SData_Main`) built from Alire `libadalang_tools` into a version-pinned cached sandbox — sidesteps the no-`gnatcheck`-binary blocker (FSF GNAT 15.2 / ASIS version lock). `gnatcheck.rules` kept as a manual tool (§2 +1, §6 +1) | §2, §6 | Medium | §2 +1, §6 +1 |
 | ~~8~~ | **RESOLVED 2026-06-10** — committed `doc/design.md` (Markdown, §8 +1); `Max_Submit_Depth`=64 SUBMIT guard (§5 +1); `--progress` record-count reporting for USE/RUN/SORT (§7 +1). All three parts done | §8, §7, §5 | — | done |
 | ~~9~~ | ~~In-place projection for single-`USE` options~~ — **RESOLVED v0.9.7**: transient `Add_Row`/`Set_Value` made in-place, so snapshot/install is now O(rows) | §3 | — | done |
 | ~~10~~ | ~~Add a performance regression test~~ — **RESOLVED**: `tests/perf_regression.cmd` exercises all three paths on 20k/40k rows; relies on the harness 10s per-test timeout so an O(n²) reintroduction fails the suite | §3 | — | done |
@@ -471,8 +487,9 @@ hooks cost exactly one boolean when disabled. The one thing I got wrong on the f
 I called the #4 coercion guard "defense-in-depth over an unreachable path" — it is actually
 guarding a *real* reachable path (sdata-core issue #24, since fixed), which is a better
 justification, not a worse one — and that reachable path is now root-cause fixed in
-sdata-core 0.1.9 (Error Handling +1 → 76, 2026-06-11). The score — **635/800** — moved
-for real reasons.
+sdata-core 0.1.9 (Error Handling +1 → 76, 2026-06-11), and SAST-in-CI was closed by the
+gnatmetric complexity gate (Code Quality +1, Security +1, 2026-06-16). The score —
+**637/800** — moved for real reasons.
 
 The uncomfortable part is what the number *hides* — though less than an earlier draft of this
 section claimed. SData-the-codebase is in good shape, and contrary to my first telling, each crate
@@ -491,8 +508,8 @@ proved the boundary is load-bearing twice over: remediation #4's cleaner design 
 `--progress` was a two-crate dance because the boundary is real. The highest-leverage work left is
 not another +1 on a dimension — it is bumping that consumer-test pin, keeping the version
 references in lockstep, and *actually running* the local two-consumer gate every time. The
-toolchain-blocked SAST-in-CI (#7) and the absent WHILE/expression timeout (§5) are the other
-standing debts. Tighten the seam — automated where it can be, disciplined where it can't — then
+absent WHILE/expression timeout (§5) is the other standing debt (the toolchain-blocked
+SAST-in-CI, #7, is now closed by the CI `gnatmetric` complexity gate). Tighten the seam — automated where it can be, disciplined where it can't — then
 let SData 1.0 put a stability promise on top of it.
 
 ---
