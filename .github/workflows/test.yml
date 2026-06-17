@@ -63,8 +63,9 @@ jobs:
         working-directory: sdata
         run: alr exec -- make fuzz-corpus
 
-      - name: Cache gnatmetric (libadalang_tools)
-        uses: actions/cache@v4
+      - name: Restore gnatmetric (libadalang_tools) cache
+        id: gnatmetric-cache
+        uses: actions/cache/restore@v4
         with:
           path: sdata/tools
           key: gnatmetric-${{ runner.os }}-libadalang_tools-26.0.0
@@ -72,3 +73,13 @@ jobs:
       - name: Complexity gate (gnatmetric)
         working-directory: sdata
         run: make complexity-check
+
+      # Save the built gnatmetric even if a later step (or the gate itself)
+      # fails — actions/cache only saves on success, which would otherwise
+      # force a ~27-min libadalang rebuild on the next run after any red job.
+      - name: Save gnatmetric (libadalang_tools) cache
+        if: always() && steps.gnatmetric-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: sdata/tools
+          key: gnatmetric-${{ runner.os }}-libadalang_tools-26.0.0
