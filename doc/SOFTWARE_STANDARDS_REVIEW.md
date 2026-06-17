@@ -113,7 +113,9 @@ deferral (`sdata_core-table.adb:96`, a bounded SQLite-handle leak gated on an
 - ~~**No enforced static analysis (toolchain-blocked).**~~ — **RESOLVED 2026-06-16
   (remediation #7, SAST half).** CI now enforces a `gnatmetric` cyclomatic-complexity
   gate (`make complexity-check`, blocking): `scripts/check-complexity.sh` fails the
-  build if any `src/` subprogram exceeds complexity 85 (current max 81, `SData_Main`).
+  build if any `src/` subprogram exceeds complexity 85 (current max 81, `SData_Main`),
+  excluding the recursive-descent parser and tokenizer (`src/parser`, `src/lexer`),
+  whose high McCabe complexity is inherent and exempted.
   gnatmetric is built from the Alire `libadalang_tools` crate into a version-pinned
   cached sandbox, sidestepping the FSF-GNAT-15.2-ships-no-`gnatcheck` / ASIS-version-
   incompatibility blocker (§6.2). `gnatcheck.rules` (two rules) is retained as a
@@ -323,7 +325,9 @@ hardcoded secrets.
 - ~~**No SAST in CI — still open (toolchain-blocked).**~~ — **RESOLVED 2026-06-16
   (remediation #7, SAST half).** CI now runs a blocking `gnatmetric` cyclomatic-
   complexity gate (`make complexity-check`) that fails the build if any `src/`
-  subprogram exceeds complexity 85 (current max 81, `SData_Main`). The Alire toolchain
+  subprogram exceeds complexity 85 (current max 81, `SData_Main`), excluding the
+  recursive-descent parser and tokenizer (`src/parser`, `src/lexer`) whose high
+  McCabe complexity is inherent and exempted. The Alire toolchain
   (**FSF GNAT 15.2**) ships no `gnatcheck`, and Ubuntu's ASIS `asis-programs`
   `gnatcheck` is version-locked to Ubuntu's system GNAT (cannot process GNAT-15.2
   sources) — so rather than chase a `gnatcheck` binary, the gate uses `gnatmetric` from

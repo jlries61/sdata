@@ -1,8 +1,9 @@
 #!/bin/sh
-# Cyclomatic-complexity gate for sdata src/.
-# Fails (exit 1) if any unit's McCabe cyclomatic complexity exceeds
-# MAX_CYCLOMATIC. Threshold derived from the measured maximum on 2026-06-16:
-# the worst unit was SData_Main at 81; ceiling set to 85 (next multiple of 5
+# Cyclomatic-complexity gate for sdata src/ (excluding the recursive-descent
+# parser and the tokenizer — see the exemption note at the file list below).
+# Fails (exit 1) if any covered unit's McCabe cyclomatic complexity exceeds
+# MAX_CYCLOMATIC. Threshold derived from the measured maximum: the worst
+# covered unit is SData_Main at 81; ceiling set to 85 (next multiple of 5
 # above the measured max, and >= max+3 headroom). Raise it only deliberately,
 # with justification — growth past the ceiling signals a subprogram that
 # should be decomposed. See doc/specs/2026-06-15-gnatmetric-ci-gate-design.md.
@@ -13,11 +14,21 @@ GNATMETRIC=${GNATMETRIC:-gnatmetric}
 
 cd "$(dirname "$0")/.."                      # repo root
 
+# Analyse the whole src/ tree EXCEPT the recursive-descent parser and the
+# tokenizer (src/parser, src/lexer). Their McCabe cyclomatic complexity is
+# inherently high (large token/grammar dispatch case statements — e.g.
+# Parse_Statement ~170, Get_Next_Token_Internal ~156) and intentional, exempted
+# the same way gnatcheck.rules exempts the bounded evaluator recursion. All
+# other src/ subprograms (incl. src/ast) are gated at MAX_CYCLOMATIC.
+files=$(find src -type f \( -name '*.ads' -o -name '*.adb' \) \
+        ! -path 'src/parser/*' ! -path 'src/lexer/*')
+
 rm -f metrix.xml
 gm_err=$(mktemp)
 gm_status=0
+# $files is an intentionally unquoted list of simple (space-free) source paths.
 "$GNATMETRIC" --generate-xml-output --no-text-output --complexity-cyclomatic \
-  --xml-file-name=metrix.xml src/*.ads src/*.adb >/dev/null 2>"$gm_err" || gm_status=$?
+  --xml-file-name=metrix.xml $files >/dev/null 2>"$gm_err" || gm_status=$?
 
 if [ ! -f metrix.xml ]; then
   # Fail closed, and surface WHY (gnatmetric's stderr is otherwise lost).
