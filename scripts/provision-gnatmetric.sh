@@ -28,17 +28,19 @@ if [ -n "${existing:-}" ] && [ -x "$existing" ]; then
 fi
 
 # 3. Fetch (outside any crate) and build it (heavy).
+# alr writes progress to stdout; redirect it to stderr so this script's stdout
+# carries ONLY the final gnatmetric path (the caller does GNATMETRIC=$(...)).
 mkdir -p "$TOOLS_DIR"
 abs_tools=$(cd "$TOOLS_DIR" && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
-( cd "$tmp" && alr -n -f get "libadalang_tools=$LAL_TOOLS_VERSION" )
+( cd "$tmp" && alr -n -f get "libadalang_tools=$LAL_TOOLS_VERSION" ) >&2
 fetched=$(ls -d "$tmp"/libadalang_tools_*/ 2>/dev/null | head -n1)
 [ -n "${fetched:-}" ] || { echo "provision-gnatmetric: alr get produced no crate dir" >&2; exit 1; }
 crate_dir="$abs_tools/$(basename "${fetched%/}")"
 rm -rf "$crate_dir"
 mv "${fetched%/}" "$crate_dir"
-( cd "$crate_dir" && alr -n build )
+( cd "$crate_dir" && alr -n build ) >&2
 
 bin="$crate_dir/bin/gnatmetric"
 if [ ! -x "$bin" ]; then
