@@ -4,6 +4,29 @@
 **Status:** Approved (design phase) — execution deferred
 **Scope:** sdata interpreter only; no sdata-core changes
 
+> **Scope addendum (2026-06-17): data-vandal also wants this capability.**
+> The design body below is written for sdata and stands as-is. Extending it to
+> data-vandal does **not** move work into sdata-core: per ADR-040, the lexer,
+> AST, and parser are deliberately *not* in sdata-core — each consumer owns its
+> complete grammar. data-vandal has its own parallel stack
+> (`data-vandal/src/lexer/`, `…/parser/`, `…/ast/`), so the lexer-token +
+> parser-site changes here must be **implemented a second time** against
+> data-vandal's lexer/parser. The *design* is shared; the *code* is duplicated,
+> and sdata-core work is essentially zero.
+>
+> One exception worth revisiting at implementation time: the **USE-time
+> reserved-keyword warning** (see that section) was deliberately kept sdata-only
+> "since data-vandal doesn't need it." That rationale no longer holds. Since the
+> warning logic just walks a `Table` (which *is* in sdata-core) against a keyword
+> set, consider promoting a generic `Warn_Reserved_Columns (Table, Keyword_Set)`
+> helper into sdata-core, with each consumer passing its own (grammar-specific)
+> reserved-keyword list. That is the one small genuinely-shareable sliver.
+>
+> The implementation session should reconcile this scope during the design step
+> (e.g. `/ssd feature`): treat it as "design once, implement twice (sdata +
+> data-vandal), plus one optional sdata-core warning helper," not as a
+> sdata-core-centric change.
+
 ## Context
 
 sdata reserves keyword tokens at the lexer level (`USE`, `BY`, `KEEP`, `DROP`,
