@@ -1939,7 +1939,7 @@ The language is entirely case insensitive:
 
 Command and function names are reserved keywords in the sdata language. A column or variable whose name collides with a reserved keyword (e.g. a CSV file containing a column literally named `AS` or `USE`) can still be referenced using the backtick quoted-identifier form (see Section 3.2). When a dataset is loaded via *USE* and a column name matches a reserved keyword, sdata emits an advisory warning of the form:
 
-> `warning: column "AS" matches a reserved keyword; reference it as `AS` or rename it`
+> ``warning: column "AS" matches a reserved keyword; reference it as `AS` or rename it``
 
 This warning can be suppressed with *OPTIONS WARNRESERVED NO*. Best practice remains to avoid reserved keyword names in column names when possible.
 
