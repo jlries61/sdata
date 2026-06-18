@@ -835,6 +835,7 @@ begin
                Put_Line ("OPTIONS DEBUG " & Ada.Strings.Fixed.Trim (SData_Core.Config.Debug_Level'Image, Ada.Strings.Both));
                Put_Line ("OPTIONS JOIN_WARN_THRESHOLD " & Ada.Strings.Fixed.Trim (SData_Core.Config.Runtime.Options_Join_Warn_Threshold'Image, Ada.Strings.Both));
                Put_Line ("OPTIONS PROGRESS " & Bool_Display (SData_Core.Config.Progress));
+               Put_Line ("OPTIONS WARNRESERVED " & Bool_Display (SData_Core.Config.Runtime.Options_Warn_Reserved));
             elsif Key = "MAXINTAB" then
                SData_Core.Config.Max_Table_Cells := Natural'Value (Val);
             elsif Key = "MAXTEMPMEM" then
@@ -863,6 +864,8 @@ begin
                   (Natural'Value (Val));
             elsif Key = "PROGRESS" then
                SData_Core.Config.Progress := (Val_Upper = "YES");
+            elsif Key = "WARNRESERVED" then
+               SData_Core.Commands.Execute_OPTIONS_WarnReserved (Val_Upper = "YES");
             else
                Put_Line_Error ("Warning: Unknown OPTIONS key: " & Key);
             end if;
