@@ -1,0 +1,16 @@
+Dataset opened: tests/data/reserved_cols.csv
+warning: column "AS" matches a reserved keyword; reference it as `AS` or rename it
+warning: column "USE" matches a reserved keyword; reference it as `USE` or rename it
+Dataset saved: tests/data/qid_if_big.csv
+Dataset saved: tests/data/qid_if_small.csv
+RUN complete. 2 records and 3 variables processed.
+Dataset opened: tests/data/qid_if_big.csv
+warning: column "AS" matches a reserved keyword; reference it as `AS` or rename it
+warning: column "USE" matches a reserved keyword; reference it as `USE` or rename it
+2.00000 20.00000
+RUN complete. 1 records and 3 variables processed.
+Dataset opened: tests/data/qid_if_small.csv
+warning: column "AS" matches a reserved keyword; reference it as `AS` or rename it
+warning: column "USE" matches a reserved keyword; reference it as `USE` or rename it
+1.00000 10.00000
+RUN complete. 1 records and 3 variables processed.

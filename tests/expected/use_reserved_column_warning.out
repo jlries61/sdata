@@ -1,0 +1,3 @@
+Dataset opened: tests/data/reserved_cols.csv
+warning: column "AS" matches a reserved keyword; reference it as `AS` or rename it
+warning: column "USE" matches a reserved keyword; reference it as `USE` or rename it

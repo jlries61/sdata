@@ -54,7 +54,7 @@ package body SData.Help is
       New_Line;
       Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
       Put_Line ("Use HELP EXECUTION for an explanation of the three execution tiers.");
-      Put_Line ("Use HELP CONCEPTS for an introduction to the PDV, LET/SET, and BY groups.");
+      Put_Line ("Use HELP CONCEPTS for an introduction to the PDV, LET/SET, BY groups, and quoted identifiers.");
    end Help_Index;
 
    -- ==========================================================================
@@ -541,6 +541,7 @@ package body SData.Help is
       Put_Line ("                               0.0/0.0 always raises an error. Cleared by NEW.");
       Put_Line ("  OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.");
       Put_Line ("  OPTIONS PROGRESS YES|NO    : Emit record-count progress on stderr for long USE/RUN/SORT runs (default: NO)");
+      Put_Line ("  OPTIONS WARNRESERVED YES|NO: Warn when a loaded column matches a reserved keyword (default: YES)");
       Put_Line ("");
       Put_Line ("CLI flags (set at startup, not runtime):");
       Put_Line ("  --shell-timeout=N    : SYSTEM/SHELL timeout in seconds (0 = unlimited; default 300 in batch)");
@@ -642,6 +643,19 @@ package body SData.Help is
       Put_Line ("  RUN");
       New_Line;
       Put_Line ("See also: HELP LET  HELP SET  HELP BY  HELP HOLD  HELP EXECUTION");
+      New_Line;
+      Put_Line ("--- Quoted Identifiers ---");
+      Put_Line ("A column or variable whose name collides with a reserved keyword, or");
+      Put_Line ("contains spaces or dots, can be referenced by enclosing it in backticks:");
+      Put_Line ("  `AS`             -- column named AS (a reserved keyword)");
+      Put_Line ("  `col with spaces`  -- column with embedded spaces");
+      Put_Line ("The backtick form is accepted wherever a bare identifier is accepted");
+      Put_Line ("(LET/SET, PRINT, KEEP/DROP, RENAME, BY, ARRAY/DIM, SORT, etc.).");
+      Put_Line ("Empty backticks (``) and unterminated backticks are lexical errors.");
+      Put_Line ("NAMES output and error messages show the bare name without backticks;");
+      Put_Line ("the backtick form is an input notation only.");
+      Put_Line ("Use OPTIONS WARNRESERVED NO to suppress the advisory warning that");
+      Put_Line ("USE emits when a loaded column matches a reserved keyword.");
    end Help_CONCEPTS;
 
    -- ==========================================================================

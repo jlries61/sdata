@@ -323,6 +323,7 @@ With no arguments, OPTIONS lists all current option values.
                                0.0/0.0 always raises an error. Cleared by NEW.
   OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.
   OPTIONS PROGRESS YES|NO    : Emit record-count progress on stderr for long USE/RUN/SORT runs (default: NO)
+  OPTIONS WARNRESERVED YES|NO: Warn when a loaded column matches a reserved keyword (default: YES)
 
 CLI flags (set at startup, not runtime):
   --shell-timeout=N    : SYSTEM/SHELL timeout in seconds (0 = unlimited; default 300 in batch)
@@ -418,6 +419,19 @@ Example -- subtotal SALARY by DEPT:
   RUN
 
 See also: HELP LET  HELP SET  HELP BY  HELP HOLD  HELP EXECUTION
+
+--- Quoted Identifiers ---
+A column or variable whose name collides with a reserved keyword, or
+contains spaces or dots, can be referenced by enclosing it in backticks:
+  `AS`             -- column named AS (a reserved keyword)
+  `col with spaces`  -- column with embedded spaces
+The backtick form is accepted wherever a bare identifier is accepted
+(LET/SET, PRINT, KEEP/DROP, RENAME, BY, ARRAY/DIM, SORT, etc.).
+Empty backticks (``) and unterminated backticks are lexical errors.
+NAMES output and error messages show the bare name without backticks;
+the backtick form is an input notation only.
+Use OPTIONS WARNRESERVED NO to suppress the advisory warning that
+USE emits when a loaded column matches a reserved keyword.
 
 Debug mode: --debug[=N] flag  (N = 1, 2, or 3; default 3)
 Enables trace output to stderr and interactive step mode.

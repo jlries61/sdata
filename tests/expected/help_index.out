@@ -39,4 +39,4 @@ Available Functions:
 
 Use HELP <name> for details.  Use HELP /ALL for the full reference.
 Use HELP EXECUTION for an explanation of the three execution tiers.
-Use HELP CONCEPTS for an introduction to the PDV, LET/SET, and BY groups.
+Use HELP CONCEPTS for an introduction to the PDV, LET/SET, BY groups, and quoted identifiers.

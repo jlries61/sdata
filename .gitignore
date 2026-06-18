@@ -19,6 +19,7 @@ tests/data/multi_out_p.csv
 tests/data/multi_out_q.csv
 tests/data/multi_out_r.csv
 # SAVE-target outputs written by the save_multi_* / save_multi_with_if tests
+# and the quoted_id_* tests
 tests/data/p.csv
 tests/data/q.csv
 tests/data/out1.csv
@@ -33,6 +34,9 @@ tests/data/perf_regression_a.csv
 tests/data/perf_regression_b.csv
 tests/data/big.csv
 tests/data/small.csv
+tests/data/qid_if_big.csv
+tests/data/qid_if_small.csv
+tests/data/qid_alias.csv
 sdata_opt_*.csv
 
 # Packaging artifacts

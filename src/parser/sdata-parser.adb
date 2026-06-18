@@ -34,6 +34,20 @@ with SData_Core.Variables; use SData_Core.Variables;
 
 package body SData.Parser is
 
+   --  A quoted identifier (`name`) is accepted anywhere a bare identifier is.
+   function Is_Identifier_Token (T : Token) return Boolean is
+     (T.Kind = Token_Identifier
+        or else T.Kind = Token_Quoted_Identifier);
+
+   --  Use Identifier_Text wherever an identifier token's name is read, so the
+   --  intent ("this is an identifier, bare or quoted") is explicit. Quoted-id
+   --  tokens already store backtick-stripped text, so this is equivalent to a
+   --  raw Text slice — the helper is for clarity/consistency.
+   --
+   --  Raw identifier text (verbatim; callers upper-case on lookup as before).
+   function Identifier_Text (T : Token) return String is
+     (T.Text (1 .. T.Length));
+
    ------------------
    -- Initialize --
    ------------------
@@ -54,7 +68,7 @@ package body SData.Parser is
       Raw : constant String := T.Text (1 .. T.Length);
    begin
       case T.Kind is
-         when Token_Identifier | Token_Numeric_Literal =>
+         when Token_Identifier | Token_Quoted_Identifier | Token_Numeric_Literal =>
             return Raw;
          when Token_String_Literal =>
             --  Re-quote: scan for embedded '"' and double them.
@@ -408,22 +422,22 @@ package body SData.Parser is
                      Node.Str_Value := To_Unbounded_String (Actual_Tok.Text (1 .. Actual_Tok.Length));
                      return Node;
 
-                  when Token_Identifier | Token_NEXT | Token_IF =>
+                  when Token_Identifier | Token_Quoted_Identifier | Token_NEXT | Token_IF =>
                      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren or else
                         Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
                         declare
                            LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                            Closing : constant Token_Kind := (if LP.Kind = Token_Left_Paren then Token_Right_Paren else Token_Right_Brace);
                         begin
-                           if Has_Array (To_Upper (Actual_Tok.Text (1 .. Actual_Tok.Length))) then
+                           if Has_Array (To_Upper (Identifier_Text (Actual_Tok))) then
                               Node := new Expression (Expr_Array_Access);
                               Node.Arr_Len := Actual_Tok.Length;
-                              Node.Arr_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                              Node.Arr_Name (1 .. Actual_Tok.Length) := Identifier_Text (Actual_Tok);
                               Node.Arr_Idx := Parse_Expression_List (Ctx, Closing);
                            else
                               Node := new Expression (Expr_Function_Call);
                               Node.Func_Len := Actual_Tok.Length;
-                              Node.Func_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                              Node.Func_Name (1 .. Actual_Tok.Length) := Identifier_Text (Actual_Tok);
                               Node.Arguments := Parse_Expression_List (Ctx, Closing);
                            end if;
 
@@ -434,7 +448,7 @@ package body SData.Parser is
                                  Put_Line_Error ("Error: Expected closing '" &
                                     (if Closing = Token_Right_Paren then ")" else "]") &
                                     "' after arguments of """ &
-                                    Actual_Tok.Text (1 .. Actual_Tok.Length) & """");
+                                    Identifier_Text (Actual_Tok) & """");
                               end if;
                            end;
                         end;
@@ -442,7 +456,7 @@ package body SData.Parser is
                      else
                         Node := new Expression (Expr_Variable);
                         Node.Var_Len := Actual_Tok.Length;
-                        Node.Var_Name (1 .. Actual_Tok.Length) := Actual_Tok.Text (1 .. Actual_Tok.Length);
+                        Node.Var_Name (1 .. Actual_Tok.Length) := Identifier_Text (Actual_Tok);
                         return Node;
                      end if;
 
@@ -569,15 +583,15 @@ package body SData.Parser is
    begin
       loop
          Tok := Peek_Next_Token (Ctx.Lex_Ctx);
-         exit when Tok.Kind /= Token_Identifier;
-         
+         exit when not Is_Identifier_Token (Tok);
+
          Tok := Get_Next_Token (Ctx.Lex_Ctx);
          declare
             Node : constant Variable_List := new Variable_List_Node;
          begin
-            Node.Var.Start_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
+            Node.Var.Start_Name (1 .. Tok.Length) := Identifier_Text (Tok);
             Node.Var.Start_Len := Tok.Length;
-            
+
             declare
                P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
             begin
@@ -586,12 +600,12 @@ package body SData.Parser is
                      Sep     : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      End_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                   begin
-                     if End_Tok.Kind /= Token_Identifier then
+                     if not Is_Identifier_Token (End_Tok) then
                         Put_Line_Error ("Error: Expected identifier after '" & Sep.Kind'Image & "' in range");
                      else
                         Node.Var.Is_Range       := True;
                         Node.Var.Is_Colon_Range := (Sep.Kind = Token_Colon);
-                        Node.Var.End_Name (1 .. End_Tok.Length) := End_Tok.Text (1 .. End_Tok.Length);
+                        Node.Var.End_Name (1 .. End_Tok.Length) := Identifier_Text (End_Tok);
                         Node.Var.End_Len := End_Tok.Length;
                      end if;
                   end;
@@ -623,25 +637,25 @@ package body SData.Parser is
    begin
       loop
          Tok := Get_Next_Token (Ctx.Lex_Ctx);
-         exit when Tok.Kind /= Token_Identifier;
+         exit when not Is_Identifier_Token (Tok);
 
          declare
             Pair : constant Rename_List := new Rename_Pair_Node;
          begin
             Pair.Old_Len := Tok.Length;
-            Pair.Old_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
-            
+            Pair.Old_Name (1 .. Tok.Length) := Identifier_Text (Tok);
+
             if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
                Put_Line_Error ("Error: Expected '=' in RENAME list");
             end if;
-            
+
             Tok := Get_Next_Token (Ctx.Lex_Ctx);
-            if Tok.Kind /= Token_Identifier then
+            if not Is_Identifier_Token (Tok) then
                Put_Line_Error ("Error: Expected identifier after '=' in RENAME list");
             end if;
             
             Pair.New_Len := Tok.Length;
-            Pair.New_Name (1 .. Tok.Length) := Tok.Text (1 .. Tok.Length);
+            Pair.New_Name (1 .. Tok.Length) := Identifier_Text (Tok);
             
             if First = null then First := Pair; else Last.Next := Pair; end if;
             Last := Pair;
@@ -743,11 +757,11 @@ package body SData.Parser is
                declare
                   Id : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                begin
-                  if Id.Kind /= Token_Identifier then
+                  if not Is_Identifier_Token (Id) then
                      Put_Line_Error ("Error: Expected identifier after IN= in spec option");
                   end if;
                   Opts.IN_Name_Len := Id.Length;
-                  Opts.IN_Name (1 .. Id.Length) := Id.Text (1 .. Id.Length);
+                  Opts.IN_Name (1 .. Id.Length) := Identifier_Text (Id);
                end;
 
             when Token_IF =>
@@ -781,7 +795,7 @@ package body SData.Parser is
                   end if;
                end;
 
-            when Token_Identifier =>
+            when Token_Identifier | Token_Quoted_Identifier =>
                --  Generic keyword=value options: FMT, HEADER, CHARSET, DLM,
                --  NSCAN, SKIP, MAXROWS, SHEET.
                declare
@@ -836,7 +850,7 @@ package body SData.Parser is
                                  Mid_Tok.Text (1 .. M_Len);
                               Len := Len + 1 + M_Len;
                               P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                              if P2.Kind = Token_Identifier then
+                              if Is_Identifier_Token (P2) then
                                  declare
                                     S_Upper : constant String :=
                                        To_Upper (P2.Text (1 .. P2.Length));
@@ -1003,7 +1017,7 @@ package body SData.Parser is
                            Mid_Tok.Text (1 .. M_Len);
                         Len := Len + 1 + M_Len;
                         P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                        if P2.Kind = Token_Identifier then
+                        if Is_Identifier_Token (P2) then
                            declare
                               S_Upper : constant String :=
                                  To_Upper (P2.Text (1 .. P2.Length));
@@ -1210,14 +1224,14 @@ package body SData.Parser is
                      Alias_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      pragma Unreferenced (Discard);
                   begin
-                     if Alias_Tok.Kind /= Token_Identifier then
+                     if not Is_Identifier_Token (Alias_Tok) then
                         Put_Line_Error
                           ("Error: Expected identifier after AS in USE");
                         Had_Error := True;
                      else
                         Spec.Alias_Len := Alias_Tok.Length;
                         Spec.Alias (1 .. Alias_Tok.Length) :=
-                           Alias_Tok.Text (1 .. Alias_Tok.Length);
+                           Identifier_Text (Alias_Tok);
                      end if;
                   end;
                end if;
@@ -1532,14 +1546,14 @@ package body SData.Parser is
                      Alias_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      pragma Unreferenced (Discard);
                   begin
-                     if Alias_Tok.Kind /= Token_Identifier then
+                     if not Is_Identifier_Token (Alias_Tok) then
                         Put_Line_Error
                           ("Error: Expected identifier after AS in SAVE");
                         Had_Error := True;
                      else
                         Spec.Alias_Len := Alias_Tok.Length;
                         Spec.Alias (1 .. Alias_Tok.Length) :=
-                           Alias_Tok.Text (1 .. Alias_Tok.Length);
+                           Identifier_Text (Alias_Tok);
                      end if;
                   end;
                end if;
@@ -1727,13 +1741,13 @@ package body SData.Parser is
 
                if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
                   Put_Line_Error ("Error: Expected '=' after variable name """ &
-                     Var_Tok.Text (1 .. Var_Tok.Length) & """ in " &
+                     Identifier_Text (Var_Tok) & """ in " &
                      (if Tok.Kind = Token_LET then "LET" else "SET") & " statement");
                end if;
 
                Stmt := new Statement ((if Tok.Kind = Token_LET then Stmt_LET else Stmt_SET));
                Stmt.Var_Len      := Var_Tok.Length;
-               Stmt.Var_Name (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);
+               Stmt.Var_Name (1 .. Var_Tok.Length) := Identifier_Text (Var_Tok);
                Stmt.Is_Array     := Is_Arr;
                Stmt.Arr_Idx      := A_Idx;
                Stmt.Arr_Idx_List := A_Idx_List;
@@ -1945,7 +1959,7 @@ package body SData.Parser is
                                                 Mid_Tok.Text (1 .. M_Len);
                                              Len := Len + 1 + M_Len;
                                              P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                             if P2.Kind = Token_Identifier then
+                                             if Is_Identifier_Token (P2) then
                                                 declare
                                                    S_Upper : constant String :=
                                                       To_Upper (P2.Text (1 .. P2.Length));
@@ -2003,7 +2017,7 @@ package body SData.Parser is
                            Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
                            Stmt.Arr_Name_Len := Name_Tok.Length;
-                           Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
+                           Stmt.Arr_Name (1 .. Name_Tok.Length) := Identifier_Text (Name_Tok);
                            Stmt.Arr_Vars := Parse_Variable_List (Ctx);
                         end;
                      end if;
@@ -2014,7 +2028,7 @@ package body SData.Parser is
                      Name_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                   begin
                      Stmt.Arr_Name_Len := Name_Tok.Length;
-                     Stmt.Arr_Name (1 .. Name_Tok.Length) := Name_Tok.Text (1 .. Name_Tok.Length);
+                     Stmt.Arr_Name (1 .. Name_Tok.Length) := Identifier_Text (Name_Tok);
                      declare
                         Tok_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      begin
@@ -2279,7 +2293,7 @@ package body SData.Parser is
             declare
                Peeked : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
             begin
-               if Peeked.Kind = Token_Identifier then
+               if Is_Identifier_Token (Peeked) then
                   Stmt.Write_Targets := Parse_Variable_List (Ctx);
                end if;
             end;
@@ -2293,8 +2307,8 @@ package body SData.Parser is
                Tok_Next : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
             begin
                Stmt := new Statement (Stmt_OUTPUT);
-               if Tok_Next.Kind = Token_String_Literal or else 
-                  Tok_Next.Kind = Token_Identifier or else
+               if Tok_Next.Kind = Token_String_Literal or else
+                  Is_Identifier_Token (Tok_Next) or else
                   (Tok_Next.Kind >= Token_USE and then Tok_Next.Kind <= Token_STEP) then
                   declare
                      File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
@@ -2355,7 +2369,7 @@ package body SData.Parser is
                                                 Mid_Tok.Text (1 .. M_Len);
                                              Len := Len + 1 + M_Len;
                                              P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                             if P2.Kind = Token_Identifier then
+                                             if Is_Identifier_Token (P2) then
                                                 declare
                                                    S_Upper : constant String :=
                                                       To_Upper (P2.Text (1 .. P2.Length));
@@ -2456,7 +2470,7 @@ package body SData.Parser is
                Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- '='
             begin
                Stmt.For_Var_Len := Var_Tok.Length;
-               Stmt.For_Var (1 .. Var_Tok.Length) := Var_Tok.Text (1 .. Var_Tok.Length);
+               Stmt.For_Var (1 .. Var_Tok.Length) := Identifier_Text (Var_Tok);
                Stmt.For_Start := Parse_Expression (Ctx);
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_TO then
                   declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
@@ -2469,7 +2483,7 @@ package body SData.Parser is
                Stmt.For_Body := Parse_Block (Ctx, Token_NEXT);
                
                --  Skip the optional variable name after NEXT.
-               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Identifier then
+               if Is_Identifier_Token (Peek_Next_Token (Ctx.Lex_Ctx)) then
                   declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                end if;
             end;
@@ -2523,6 +2537,13 @@ package body SData.Parser is
             --  the token text as the REM token itself, so skipping it and parsing
             --  the next statement is all that is needed here.
             return Parse_Statement (Ctx);
+
+         when Token_Bad =>
+            --  The lexer has already emitted a diagnostic (e.g. "unterminated
+            --  quoted identifier").  Terminate this statement silently so that
+            --  the parser does not print a second, misleading "Unrecognized
+            --  command" error for the same lex-level problem.
+            return null;
 
          when others =>
             Put_Line_Error ("Error: Unrecognized command """ & Tok.Text (1 .. Tok.Length) &

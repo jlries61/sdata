@@ -4,6 +4,7 @@
 
 with Ada.Characters.Handling;  use Ada.Characters.Handling;
 with Ada.Strings.Unbounded;    use Ada.Strings.Unbounded;
+with SData_Core.IO;            use SData_Core.IO;
 
 package body SData.Lexer is
 
@@ -238,6 +239,9 @@ package body SData.Lexer is
                Advance (Ctx);
             end loop;
 
+            --  NOTE: keep SData.Reserved_Keywords
+            --  (src/sdata-reserved_keywords.adb) in sync — it mirrors this
+            --  bare-keyword list for the USE-time reserved-column warning.
             --  Perform keyword lookup (Case-Insensitive).
             declare
                Upper : constant String := To_Upper (T.Text (1 .. T.Length));
@@ -356,6 +360,36 @@ package body SData.Lexer is
             end loop;
             if not Is_End_Of_Source (Ctx) then
                Advance (Ctx); -- skip closing quote
+            end if;
+
+         --  Backtick-quoted identifier: `name`. Lets users reference column
+         --  names that collide with reserved keywords or contain spaces/dots.
+         --  Content is verbatim (no escapes); newline or EOF before the
+         --  closing backtick, or empty content, is a lex error.
+         elsif C = '`' then
+            Advance (Ctx); -- skip opening backtick
+            while not Is_End_Of_Source (Ctx)
+              and then Current_Char (Ctx) /= '`'
+              and then Current_Char (Ctx) /= ASCII.LF
+            loop
+               T.Length := T.Length + 1;
+               T.Text (T.Length) := Current_Char (Ctx);
+               Advance (Ctx);
+            end loop;
+            if Is_End_Of_Source (Ctx) or else Current_Char (Ctx) = ASCII.LF then
+               Put_Line_Error
+                 ("Error: unterminated quoted identifier at line"
+                  & T.Line'Image);
+               T.Kind   := Token_Bad;
+               T.Length := 0;
+            elsif T.Length = 0 then
+               Put_Line_Error
+                 ("Error: empty quoted identifier at line" & T.Line'Image);
+               Advance (Ctx); -- skip closing backtick
+               T.Kind := Token_Bad;
+            else
+               Advance (Ctx); -- skip closing backtick
+               T.Kind := Token_Quoted_Identifier;
             end if;
 
          --  Identify punctuation and operators.
