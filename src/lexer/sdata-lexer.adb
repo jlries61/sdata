@@ -239,6 +239,9 @@ package body SData.Lexer is
                Advance (Ctx);
             end loop;
 
+            --  NOTE: keep SData.Reserved_Keywords
+            --  (src/sdata-reserved_keywords.adb) in sync — it mirrors this
+            --  bare-keyword list for the USE-time reserved-column warning.
             --  Perform keyword lookup (Case-Insensitive).
             declare
                Upper : constant String := To_Upper (T.Text (1 .. T.Length));

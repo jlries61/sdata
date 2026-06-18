@@ -10,9 +10,9 @@ package body SData.Reserved_Keywords is
    begin
       --  Mirror SData.Lexer's keyword chain (bare forms, lines 246-314 of
       --  src/lexer/sdata-lexer.adb). Alphabetical for review.
-      --  Slash-prefixed alternates ("/USE", "/MOCK", etc.) are excluded:
-      --  a CSV column name cannot start with '/', so they are not a collision
-      --  risk.
+      --  Slash-only forms ("/USE", "/MOCK", etc.) are excluded: a CSV column
+      --  name cannot start with '/', so they pose no collision risk. Their bare
+      --  equivalents (USE, MOCK, SAVE, SUBMIT, SYSTEM, OUTPUT, ALL) ARE included.
       S.Insert ("ALL");
       S.Insert ("AND");
       S.Insert ("APPEND");
