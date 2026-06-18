@@ -2524,6 +2524,13 @@ package body SData.Parser is
             --  the next statement is all that is needed here.
             return Parse_Statement (Ctx);
 
+         when Token_Bad =>
+            --  The lexer has already emitted a diagnostic (e.g. "unterminated
+            --  quoted identifier").  Terminate this statement silently so that
+            --  the parser does not print a second, misleading "Unrecognized
+            --  command" error for the same lex-level problem.
+            return null;
+
          when others =>
             Put_Line_Error ("Error: Unrecognized command """ & Tok.Text (1 .. Tok.Length) &
                """ at line " & Tok.Line'Image & " — type HELP for a list of commands");
