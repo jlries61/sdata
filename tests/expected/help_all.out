@@ -427,7 +427,9 @@ contains spaces or dots, can be referenced by enclosing it in backticks:
   `col with spaces`  -- column with embedded spaces
 The backtick form is accepted wherever a bare identifier is accepted
 (LET/SET, PRINT, KEEP/DROP, RENAME, BY, ARRAY/DIM, SORT, etc.).
-Empty backticks (``) and unterminated backticks are syntax errors.
+Empty backticks (``) and unterminated backticks are lexical errors.
+NAMES output and error messages show the bare name without backticks;
+the backtick form is an input notation only.
 Use OPTIONS WARNRESERVED NO to suppress the advisory warning that
 USE emits when a loaded column matches a reserved keyword.
 

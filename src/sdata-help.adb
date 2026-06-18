@@ -54,7 +54,7 @@ package body SData.Help is
       New_Line;
       Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
       Put_Line ("Use HELP EXECUTION for an explanation of the three execution tiers.");
-      Put_Line ("Use HELP CONCEPTS for an introduction to the PDV, LET/SET, and BY groups.");
+      Put_Line ("Use HELP CONCEPTS for an introduction to the PDV, LET/SET, BY groups, and quoted identifiers.");
    end Help_Index;
 
    -- ==========================================================================
@@ -651,7 +651,9 @@ package body SData.Help is
       Put_Line ("  `col with spaces`  -- column with embedded spaces");
       Put_Line ("The backtick form is accepted wherever a bare identifier is accepted");
       Put_Line ("(LET/SET, PRINT, KEEP/DROP, RENAME, BY, ARRAY/DIM, SORT, etc.).");
-      Put_Line ("Empty backticks (``) and unterminated backticks are syntax errors.");
+      Put_Line ("Empty backticks (``) and unterminated backticks are lexical errors.");
+      Put_Line ("NAMES output and error messages show the bare name without backticks;");
+      Put_Line ("the backtick form is an input notation only.");
       Put_Line ("Use OPTIONS WARNRESERVED NO to suppress the advisory warning that");
       Put_Line ("USE emits when a loaded column matches a reserved keyword.");
    end Help_CONCEPTS;

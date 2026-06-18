@@ -150,6 +150,7 @@ Quoted Identifiers (Backtick Form):
 - The identifier between backticks is taken verbatim and upper-cased on lookup, exactly like a bare identifier.
 - Examples: `` `AS` `` (column named AS), `` `col with spaces` `` (column with embedded spaces).
 - Empty backticks (` `` `) and unterminated or newline-containing backtick sequences are lexical errors.
+- *NAMES* output and error messages show the bare name without backticks; the backtick form is an input notation only.
 - When *USE* loads a dataset with column names matching reserved keywords, an advisory warning is emitted showing the backtick form to use. This warning is controlled by *OPTIONS WARNRESERVED* (default: YES).
 
 ### 3.3 Arrays

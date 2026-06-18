@@ -183,9 +183,7 @@ Statements fall into three categories:
 .SS Identifiers and quoted identifiers
 Variable and column names consist of uppercase letters, digits, underscores,
 and an optional type suffix
-.RB ( $ \ for character,
-.B %
-for integer).
+.RB "(" "$" " for character," "%" " for integer)".
 The language is case\-insensitive.
 .PP
 A column whose name collides with a reserved keyword (such as
@@ -218,7 +216,10 @@ and per\-dataset
 options.
 Empty backticks
 .RB ( `` )
-and unterminated or multi\-line backtick strings are syntax errors.
+and unterminated or multi\-line backtick strings are lexical errors.
+.B NAMES
+output and error messages show the bare name without backticks;
+the backtick form is an input notation only.
 .PP
 When
 .B USE
