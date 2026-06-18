@@ -143,6 +143,15 @@ Examples:
 - *FINGER_LEN(1)* - Member of a numeric array.
 - *ALIAS\$(2)* - Member of a character array.
 
+Quoted Identifiers (Backtick Form):
+
+- A column or variable whose name collides with a reserved keyword, or contains spaces or dots, can be referenced by enclosing it in backticks (`` ` ``).
+- The backtick form is accepted wherever a bare identifier is accepted (expressions, *LET*/*SET*, *PRINT*, *KEEP*/*DROP*, *RENAME*, *BY*, *ARRAY*/*DIM*, *SORT*, per-dataset *KEEP=*/*DROP=*/*RENAME=*/*IN=*).
+- The identifier between backticks is taken verbatim and upper-cased on lookup, exactly like a bare identifier.
+- Examples: `` `AS` `` (column named AS), `` `col with spaces` `` (column with embedded spaces).
+- Empty backticks (` `` `) and unterminated or newline-containing backtick sequences are lexical errors.
+- When *USE* loads a dataset with column names matching reserved keywords, an advisory warning is emitted showing the backtick form to use. This warning is controlled by *OPTIONS WARNRESERVED* (default: YES).
+
 ### 3.3 Arrays
 
 Three types of arrays are supported:
@@ -802,6 +811,12 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td></td>
 <td>Immediate Execution</td>
 <td>As specified in the BW BASIC documentation. In addition, any declarative statements in effect, except for <em>OUTPUT</em>, are canceled.</td>
+</tr>
+<tr>
+<td><em>OPTIONS</em></td>
+<td><em>OPTIONS</em> [<em>key value</em>]</td>
+<td>Immediate Execution</td>
+<td>Set or display runtime options. With no arguments, lists all current option values. Notable keys: <em>MAXINTAB n</em> (max in-memory table cells; 0 = unlimited), <em>MAXTEMPMEM n</em> (max temporary variables; 0 = unlimited), <em>CSVDLM delim</em> (CSV field delimiter), <em>HEADER YES|NO</em> (CSV header row; default YES), <em>SAVEOVERWRT YES|NO</em> (overwrite on SAVE; default YES), <em>TXTFMT AUTO|LF|CRLF|CR</em> (CSV line ending; default AUTO), <em>CHARSET name</em> (character set label), <em>IEEE_DIVIDE YES|NO</em> (float /0 → ±Inf; default NO), <em>SHELLTIMEOUT n</em> (SYSTEM/SHELL timeout in seconds; 0 = unlimited; reset by NEW), <em>PROGRESS YES|NO</em> (emit record-count progress on stderr for long USE/RUN/SORT runs; default NO), <em>JOIN_WARN_THRESHOLD n</em> (Cartesian product warning threshold for /JOIN merges; default 1,000,000; 0 = disable), <em>WARNRESERVED YES|NO</em> (warn when a loaded column name matches a reserved keyword; default YES), <em>DEBUG n</em> (verbosity level for --debug mode; 0 = off).</td>
 </tr>
 <tr>
 <td><em>OUTPUT</em></td>
@@ -1922,7 +1937,11 @@ The language is entirely case insensitive:
 
 ### 8.3 Reserved Names and Keywords
 
-No explicit list of reserved words is provided, but best practice is to avoid using command names and function names as variable names to prevent confusion.
+Command and function names are reserved keywords in the sdata language. A column or variable whose name collides with a reserved keyword (e.g. a CSV file containing a column literally named `AS` or `USE`) can still be referenced using the backtick quoted-identifier form (see Section 3.2). When a dataset is loaded via *USE* and a column name matches a reserved keyword, sdata emits an advisory warning of the form:
+
+> `warning: column "AS" matches a reserved keyword; reference it as `AS` or rename it`
+
+This warning can be suppressed with *OPTIONS WARNRESERVED NO*. Best practice remains to avoid reserved keyword names in column names when possible.
 
 ### 8.4 Error Messages
 
