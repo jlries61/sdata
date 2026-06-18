@@ -27,6 +27,7 @@ with Ada.Unchecked_Deallocation;
 with Ada.Text_IO.Unbounded_IO;
 with SData.Transient_Table;
 with SData.Merge;
+with SData.Reserved_Keywords;
 with SData_Core.File_IO;
 
 --  SData.Interpreter — statement executor and data step engine.

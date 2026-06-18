@@ -170,6 +170,9 @@ begin
                for I in 1 .. Column_Count loop
                   Input_File_Columns.Include (Column_Name (I));
                end loop;
+               --  Warn for any column whose name collides with a reserved keyword.
+               SData_Core.Commands.Warn_Reserved_Columns
+                 (SData.Reserved_Keywords.Set);
                Debug_Trace ("USE: opened "
                             & Stmt.File_Path (1 .. Stmt.File_Len)
                             & " ("
@@ -506,6 +509,10 @@ begin
                      for I in 1 .. Column_Count loop
                         Input_File_Columns.Include (Column_Name (I));
                      end loop;
+                     --  Warn for any column whose name collides with a
+                     --  reserved keyword.
+                     SData_Core.Commands.Warn_Reserved_Columns
+                       (SData.Reserved_Keywords.Set);
 
                      Debug_Trace ("USE (multi): merged "
                                   & Ada.Strings.Fixed.Trim
