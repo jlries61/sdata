@@ -1,0 +1,9 @@
+Dataset opened: tests/data/reserved_cols.csv
+Dataset saved: tests/data/qid_if_big.csv
+Dataset saved: tests/data/qid_if_small.csv
+RUN complete. 2 records and 3 variables processed.
+Dataset opened: tests/data/qid_if_big.csv
+Permanent Variables (Table Columns):
+ID AS USE 
+Session Variables (SET):
+(none)
