@@ -1,0 +1,9 @@
+Dataset opened: tests/data/reserved_cols.csv
+Dataset opened: tests/data/reserved_cols.csv
+warning: column "AS" matches a reserved keyword; reference it as `AS` or rename it
+warning: column "USE" matches a reserved keyword; reference it as `USE` or rename it
+1.00000 10.00000 100.00000
+2.00000 20.00000 200.00000
+1.00000 10.00000 100.00000
+2.00000 20.00000 200.00000
+RUN complete. 4 records and 3 variables processed.
