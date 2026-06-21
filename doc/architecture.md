@@ -324,7 +324,7 @@ decisions.
 
 Significant design choices — language selection, execution model, table storage strategy,
 CLI conventions, test approach, the sdata-core / data-vandal split, and per-session
-architectural calls — are recorded in `doc/adrs.md` (ADR-001 through ADR-043, with a few
+architectural calls — are recorded in `doc/adrs.md` (ADR-001 through ADR-045, with a few
 unused numbers in the sequence). Each entry captures the context, the decision, the
 alternatives considered, and the rationale. Consult it before proposing a structural
 change that might relitigate a settled question.
