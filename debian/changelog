@@ -1,3 +1,9 @@
+sdata (0.9.8-1) unstable; urgency=medium
+
+  * Backtick-quoted identifiers; USE-time reserved-keyword warning; OPTIONS WARNRESERVED command
+
+ -- John L. Ries <john@theyarnbard.com>  Sat, 20 Jun 2026 22:43:45 -0700
+
 sdata (0.9.7-1) unstable; urgency=medium
 
   * Performance: fix three O(n^2) hotspots in the data step (Get_Column_Type whole-column copy, transient-table copy-per-cell, BY re-sort per record) -- large data-step scripts ~70x faster

@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.9.7
+Version:        0.9.8
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Sat Jun 20 2026 John L. Ries <john@theyarnbard.com> - 0.9.8-1
+- Backtick-quoted identifiers; USE-time reserved-keyword warning; OPTIONS WARNRESERVED command
+
 * Tue Jun 09 2026 John L. Ries <john@theyarnbard.com> - 0.9.7-1
 - Performance: fix three O(n^2) hotspots in the data step (Get_Column_Type whole-column copy, transient-table copy-per-cell, BY re-sort per record) -- large data-step scripts ~70x faster
 
