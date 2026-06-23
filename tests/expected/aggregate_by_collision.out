@@ -1,0 +1,2 @@
+Dataset opened: tests/data/agg_runs.csv
+Error: AGGREGATE: outvar 'G' collides with active BY variable

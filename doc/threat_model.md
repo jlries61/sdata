@@ -1,6 +1,12 @@
 # SData Threat Model
 
-**Version:** 0.6.13 | **Date:** 2026-05-14 | **Status:** Current
+**Version:** 0.9.7 | **Date:** 2026-06-09 | **Status:** Current
+
+*Refreshed for the three-crate split (v0.8.0, ADRs 039–043) and the input
+surface added since v0.6.13: multi-dataset `USE` / merge modes, transient
+tables, per-dataset/per-target `KEEP`/`DROP`/`RENAME` options, multi-target
+`SAVE`, and `RENAME` type conversion (ADR-044). Internal file references are
+updated to their post-split locations.*
 
 ---
 
@@ -13,12 +19,21 @@ multi-user state. It reads scripts and data files, manipulates an in-memory
 table (with optional SQLite spill to a temp file), and writes results to the
 filesystem or stdout.
 
+Since v0.8.0 the data layer, expression evaluator, and file I/O live in a shared
+Alire library, **`sdata-core`**, consumed by both this interpreter and the
+sister `data-vandal` application (ADR-039). The split does not change the trust
+boundary — every consumer is still a single-process CLI under the invoking
+account — but internal file references below use the `sdata_core-*` names where
+the code now lives. data-vandal carries its own threat considerations; this
+document covers the `sdata` interpreter.
+
 **Out of scope for this document:**
 - The host operating system and its own access controls
 - The security of the tools invoked by SYSTEM/SHELL (those tools carry their
   own threat models)
 - Supply-chain security of Ada library dependencies (Zip-Ada, XML-Ada,
   MathPaqs, ada_sqlite3)
+- The `data-vandal` application (separate consumer of `sdata-core`)
 
 ---
 
@@ -71,13 +86,15 @@ When running as root (POSIX) or SYSTEM (Windows), `--noshell` and
 | Input | Trust level | Entry point | Notes |
 |---|---|---|---|
 | `.cmd` / `.sdata` script | Operator-controlled | Parser → Interpreter | Full language access |
-| CSV file (USE / WRITE) | Data — untrusted field values | `SData.CSV`, `SData.File_IO.CSV` | Column names enter SQLite DDL |
-| ODF file (USE / WRITE) | Data — untrusted XML/Zip | `SData.File_IO.ODF` | XML-Ada DOM parser |
-| OOXML file (USE / WRITE) | Data — untrusted XML/Zip | `SData.File_IO.OOXML` | XML-Ada DOM + Zip-Ada |
-| SYSTEM / SHELL argument | Script-controlled string | `sdata-system.adb` | Passed to `/bin/sh -c` |
+| CSV file (USE / WRITE) | Data — untrusted field values | `SData_Core.CSV`, `SData_Core.File_IO.CSV` | Column names enter SQLite DDL |
+| ODF file (USE / WRITE) | Data — untrusted XML/Zip | `SData_Core.File_IO.ODF` | XML-Ada DOM parser |
+| OOXML file (USE / WRITE) | Data — untrusted XML/Zip | `SData_Core.File_IO.OOXML` | XML-Ada DOM + Zip-Ada |
+| Multi-dataset USE / merge | Script-controlled combination | `SData.Merge`, `SData.Transient_Table` | `/BY`, `/APPEND`, `/JOIN`, `/INTERLEAVE`; in-memory transient tables (do **not** spill) |
+| Per-dataset / per-target options | Script-controlled names | `SData.Transient_Table` (`Apply_Rename`/`Keep`/`Drop`) | `KEEP=`/`DROP=`/`RENAME=`/`IN=` on USE and SAVE; RENAME-derived names reach the table |
+| SYSTEM / SHELL argument | Script-controlled string | `sdata_core-system.adb` | Passed to `/bin/sh -c` |
 | SUBMIT path | Script-controlled string | Interpreter SUBMIT handler | Resolved via FPATH |
-| `-m` / `OPTIONS MAXINTAB` | Operator CLI / script | `sdata-table.adb` | Controls spill threshold |
-| SQLite temp file path | Process-local | `sdata-table.adb` | `/tmp/sdata_XXXXXX.db` |
+| `-m` / `OPTIONS MAXINTAB` | Operator CLI / script | `sdata_core-table.adb` | Controls spill threshold (global table only) |
+| SQLite temp file path | Process-local | `sdata_core-table.adb` | `/tmp/sdata_XXXXXX.db` |
 
 ---
 
@@ -96,15 +113,25 @@ claims on behalf of users.
 
 **Threat:** A CSV file with column names containing SQL metacharacters
 (`"`, `'`, `]`, `--`, `;`) could corrupt or inject into the SQLite DDL/DML
-statements used to persist the spilled table.
+statements used to persist the spilled table. Since v0.9.x, such names can also
+be *produced* by a script — a `RENAME=(old=new)` option (ADR-044) can set a
+column name to an arbitrary string, which is installed into the global table and
+reaches the same DDL path on spill.
 
-**Mitigation:** The `Sql_Id` helper in `sdata-table.adb` double-brackets all
+**Mitigation:** The `Sql_Id` helper in `sdata_core-table.adb` double-brackets all
 `]` characters (`]` → `]]`) at every DDL/DML construction site. This is the
-standard SQLite identifier-quoting convention using `[name]` delimiters.
-**Commit 456d1e0.**
+standard SQLite identifier-quoting convention using `[name]` delimiters. It is
+applied uniformly to every column name regardless of origin (CSV header, RENAME
+target, or array auto-detection), so RENAME-derived names inherit the same
+protection. Transient tables (the merge/option-projection intermediates) never
+touch SQLite — they are pure in-memory structures — so they add no injection
+surface. **Commit 456d1e0.**
 
-**Residual risk:** None for SQL injection. Column names that survive
-quoting are stored verbatim; they are not further evaluated.
+**Residual risk:** None for SQL injection. Column names that survive quoting are
+stored verbatim; they are not further evaluated. (A future quoted-identifier
+feature — design deferred — would add a third source of arbitrary column names
+referenced from scripts; it must route through `Sql_Id` on the same path. Noted
+here so the feature is evaluated against this threat before it ships.)
 
 ---
 
@@ -228,6 +255,34 @@ language-level escape mechanism (**ADR-029**).
 
 ---
 
+#### D4 — Merge amplification and unbounded transient memory *(Partially mitigated)*
+
+**Threat:** Two surfaces added with the merge feature can amplify memory or
+output beyond the input size:
+
+1. **`/JOIN` Cartesian product.** A match-join produces, for each BY key, the
+   cross product of the contributing rows. A BY group with *n* rows in one input
+   and *m* in another yields *n×m* output rows, so modest inputs can produce a
+   very large result (`SData.Merge` `Combine_Join`, `sdata-merge.adb:557`).
+2. **In-memory transient tables.** Multi-dataset `USE`, merge, and option
+   projection build `SData.Transient_Table` intermediates that are **pure
+   in-memory and never spill to SQLite**. The `-m` / `OPTIONS MAXINTAB`
+   threshold bounds only the *global* table; a large merge can hold several
+   full-size transient copies simultaneously, above that bound.
+
+**Mitigation:** `/JOIN` emits a warning when a group's product exceeds
+`OPTIONS JOIN_WARN_THRESHOLD` (`sdata-merge.adb:561,621`) — a heads-up, not a
+hard cap. Transient peak memory is otherwise governed only by the OS account's
+limits (`ulimit`, cgroup).
+
+**Residual risk:** Accepted for the single-user CLI context, consistent with D1.
+`/JOIN` output and transient peak memory are not hard-capped; operators running
+untrusted scripts should cap process memory at the OS level and/or set a low
+`JOIN_WARN_THRESHOLD`. A future enhancement could spill transient tables or add a
+hard join cap.
+
+---
+
 ### 5.6 Elevation of Privilege
 
 #### E1 — SYSTEM / SHELL executing arbitrary OS commands *(Accepted by design)*
@@ -265,13 +320,14 @@ should use `--nosubmit`.
 
 | ID | Threat | Likelihood | Impact | Status |
 |---|---|---|---|---|
-| T1 | SQL injection via CSV column names | Low | Medium | **Mitigated** (456d1e0) |
+| T1 | SQL injection via CSV / RENAME column names | Low | Medium | **Mitigated** (456d1e0; `Sql_Id` applies to all name origins) |
 | T2 | Malformed Zip in ODF / OOXML | Low | Low–Medium | **Mitigated**; corpus regression via `ods_fuzz_driver` / `xlsx_fuzz_driver` |
 | T3 | Recursive SUBMIT + WRITE disk exhaustion | Very low | Low | **Accepted** (`--nosubmit` opt-in) |
 | I1 | SQLite temp file on disk after crash | Low | Low | **Mitigated** (signal handlers + Finalize) |
 | D1 | Resource exhaustion via crafted file | Low | Medium | **Partially mitigated** (`-m` spill threshold) |
 | D2 | SYSTEM / SHELL blocking | Low | Low | **Mitigated** (ADR-037 timeout) |
 | D3 | Infinite loop in script | Very low | Low | **Accepted** (OS-level mitigation) |
+| D4 | Merge amplification (`/JOIN`) and unbounded transient memory | Low | Medium | **Partially mitigated** (`JOIN_WARN_THRESHOLD` warning; OS memory limits) |
 | E1 | SYSTEM / SHELL arbitrary command execution | Medium (untrusted scripts) | High | **Accepted by design** (`--noshell` opt-in) |
 | E2 | SUBMIT path traversal | Low | Medium | **Accepted by design** (`--nosubmit` opt-in) |
 
@@ -282,8 +338,10 @@ should use `--nosubmit`.
 | Gap | Notes |
 |---|---|
 | ~~ODF / OOXML fuzz coverage~~ | **Closed 2026-05-14:** `bin/ods_fuzz_driver` and `bin/xlsx_fuzz_driver` feed arbitrary files through `Parse_ODF` / `Parse_OOXML` using AFL++ `@@` file-path convention. Seed corpus: 4 ODS + 5 XLSX files in `tests/fuzz_corpus/ods/` and `tests/fuzz_corpus/xlsx/`; `make fuzz-corpus` runs corpus regression for all four drivers. |
-| ~~No per-file size cap during CSV read~~ | **Resolved 2026-05-14 (ce037be):** `Add_Row` in `sdata-table.adb` already spills in-memory segments to SQLite (batched inserts) whenever `Max_Table_Cells` is reached, then continues. `Fetch_From_Disk` reads segments back on demand. For the streaming UTF-8/ASCII path the full file is always read; no truncation occurs. |
+| ~~No per-file size cap during CSV read~~ | **Resolved 2026-05-14 (ce037be):** `Add_Row` in `sdata_core-table.adb` already spills in-memory segments to SQLite (batched inserts) whenever `Max_Table_Cells` is reached, then continues. `Fetch_From_Disk` reads segments back on demand. For the streaming UTF-8/ASCII path the full file is always read; no truncation occurs. |
 | No script execution timeout | A WHILE loop that iterates for hours is not constrained. This is by design but documented here for completeness. |
+| ~~No fuzz coverage of the merge / RENAME surface~~ | **Closed 2026-06-10** (standards-review remediation #7, fuzz half): `bin/merge_fuzz_driver` derives 2–4 transient tables (typed columns, byte-derived rows) with a RENAME map from stdin and exercises `Transient_Table.Apply_Rename` / `Sort_By` and every `SData.Merge.Combine_*` combiner (Positional / Match / Interleave / Join / Append). Seed corpus: 7 files in `tests/fuzz_corpus/merge/`, plus merge/RENAME syntax seeds under `tests/fuzz_corpus/script/`; wired into `make fuzz-corpus` (CI). |
+| No transient-table spill | Transient merge/projection intermediates are in-memory only and not bounded by `-m` (see D4). |
 | No formal SAST | `gnatcheck.rules` with two rules (`Recursive_Subprograms`, `Too_Many_Parameters:8`) and `make gnatcheck` target exist; intentional exceptions carry in-source `pragma Annotate` exemptions. `gnatcheck` is NOT run in CI — available in Ubuntu's `asis-programs` package (not in `gnat`); not found on Debian or openSUSE. `make gnatcheck` available for manual use on Ubuntu hosts. CodePeer (commercial) has not been run. AFL++ corpus regression runs in CI; full coverage-guided fuzzing is not continuous. |
 
 ---
@@ -303,3 +361,8 @@ For operators running SData in pipeline or multi-tenant environments:
 4. **Pin input file sizes** at the pipeline level (e.g. OS file-size quotas
    or a `wc -l` pre-check) if resource exhaustion from crafted CSV is a
    concern. SData's `-m` threshold bounds memory but not initial parse time.
+5. **Cap process memory and constrain joins** for untrusted scripts that may
+   merge datasets. `-m` bounds only the global table, not the in-memory
+   transient intermediates used by merges and option projection (D4). Set an OS
+   memory limit (`ulimit -v`, a cgroup) and a low `OPTIONS JOIN_WARN_THRESHOLD`
+   to surface runaway `/JOIN` Cartesian products early.

@@ -24,6 +24,15 @@ with SData_Core.Config;         use SData_Core.Config;
 with SData_Core.IO;          use SData_Core.IO;
 with SData.System;
 with SData_Core.Signals;
+--  Withed so the top-level handlers can name the two coercion exceptions and
+--  surface them as clean script errors rather than via `when others`.  These
+--  paths are rare but NOT unreachable: e.g. a derived output column that is
+--  missing on its first record then character later reaches Type_Mismatch_Error
+--  through the PDV/output flush (sdata-core issue #24).  This guard turns such a
+--  case into a clean script error; the underlying mismatch is separately fixed
+--  in sdata-core (output-column type upgrade).  See SOFTWARE_STANDARDS_REVIEW §5.3.
+with SData_Core.Table;
+with SData_Core.Values;
 pragma Unreferenced (SData_Core.Signals);
 
 procedure SData_Main is
@@ -83,6 +92,7 @@ procedure SData_Main is
       Put_Line ("  --nosubmit               Disable SUBMIT command");
       Put_Line ("  -k, --continue-on-error  Continue executing after a statement error");
       Put_Line ("  --ignore-math-errors     Math domain errors return MISSING instead of halting");
+      Put_Line ("  --progress               Report record-count progress on stderr for long USE/RUN/SORT runs");
       Put_Line ("  -u, --infmt              Input dataset and format");
       Put_Line ("  -s, --outfmt             Output dataset and format");
       Put_Line ("  -o <file>                Console output file");
@@ -166,7 +176,9 @@ procedure SData_Main is
                SData_Core.IO.Flush_Pager_Buffer;
                Ada.Text_IO.New_Line;
                exit REPL;
-            when E : SData.Script_Error | SData_Core.Script_Error =>
+            when E : SData.Script_Error | SData_Core.Script_Error
+                   | SData_Core.Table.Type_Mismatch_Error
+                   | SData_Core.Values.Conversion_Error =>
                Put_Line_Error ("Error: " & Exception_Message (E));
                Buffer := Null_Unbounded_String;
                SData_Core.IO.Flush_Pager_Buffer;
@@ -384,6 +396,8 @@ begin
             Disable_Submit := True;
          elsif Arg = "--ignore-math-errors" then
             Ignore_Math_Errors := True;
+         elsif Arg = "--progress" then
+            Progress := True;
          elsif Arg = "--debug" then
             Debug_Level := 3;
          elsif Arg'Length > 8
@@ -537,7 +551,9 @@ exception
       Put_Line_Error ("Error: incomplete block at end of script"
                       & " (missing END SELECT, END IF, NEXT, or WEND?)");
       Set_Exit_Status (Failure);
-   when E : SData.Script_Error | SData_Core.Script_Error =>
+   when E : SData.Script_Error | SData_Core.Script_Error
+          | SData_Core.Table.Type_Mismatch_Error
+          | SData_Core.Values.Conversion_Error =>
       Put_Line_Error ("Error: " & Exception_Message (E));
       Set_Exit_Status (Failure);
    when E : others =>

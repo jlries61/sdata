@@ -17,6 +17,7 @@ with SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
 with SData_Core.Variables;
 with SData.AST;             use SData.AST;
+with SData.Lexer;           use SData.Lexer;
 with SData.Parser;
 with SData.Interpreter;
 
@@ -506,6 +507,55 @@ begin
    --  IC-41: Assignment to an undefined array raises Script_Error.
    Check ("IC-41: assignment to undefined array raises error",
           Raises ("LET UNDEF41(1) = 1" & L & "RUN"), True);
+
+   -----------------------------------------------------------------------
+   --  K.  Lexer: Backtick-Quoted Identifiers (Task 3)
+   -----------------------------------------------------------------------
+   Put_Line ("");
+   Put_Line ("--- K: Lexer backtick-quoted identifiers ---");
+
+   --  Helper: lex a single-token source and return the token.
+   declare
+      function Lex1 (Source : String) return Token is
+         Ctx : Lexer_Context;
+      begin
+         Initialize (Ctx, Source);
+         return Get_Next_Token (Ctx);
+      end Lex1;
+
+      T : Token;
+   begin
+      --  LC-01: `AS` produces Token_Quoted_Identifier with text "AS".
+      T := Lex1 ("`AS`");
+      Check ("LC-01: `AS` kind = Token_Quoted_Identifier",
+             T.Kind = Token_Quoted_Identifier, True);
+      Check ("LC-01: `AS` text = ""AS""",
+             T.Text (1 .. T.Length), "AS");
+
+      --  LC-02: `as` preserves lowercase (case preserved at token level).
+      T := Lex1 ("`as`");
+      Check ("LC-02: `as` text = ""as""",
+             T.Text (1 .. T.Length), "as");
+      Check ("LC-02: `as` kind = Token_Quoted_Identifier",
+             T.Kind = Token_Quoted_Identifier, True);
+
+      --  LC-03: `a.b c` passes dots and spaces through verbatim.
+      T := Lex1 ("`a.b c`");
+      Check ("LC-03: `a.b c` text = ""a.b c""",
+             T.Text (1 .. T.Length), "a.b c");
+      Check ("LC-03: `a.b c` kind = Token_Quoted_Identifier",
+             T.Kind = Token_Quoted_Identifier, True);
+
+      --  LC-04: `` (empty backticks) produces Token_Bad.
+      T := Lex1 ("``");
+      Check ("LC-04: empty backticks kind = Token_Bad",
+             T.Kind = Token_Bad, True);
+
+      --  LC-05: `AS (no closing backtick) produces Token_Bad.
+      T := Lex1 ("`AS");
+      Check ("LC-05: unterminated backtick kind = Token_Bad",
+             T.Kind = Token_Bad, True);
+   end;
 
    -----------------------------------------------------------------------
    --  Summary

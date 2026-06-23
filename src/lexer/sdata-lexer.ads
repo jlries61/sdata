@@ -12,10 +12,12 @@ package SData.Lexer is
 
    --  Categories of tokens recognized by the lexer.
    type Token_Kind is (
-      Token_EOF,             -- End of file
-      Token_Identifier,      -- Variables and function names
-      Token_String_Literal,  -- "Quoted strings"
-      Token_Numeric_Literal, -- 123.45
+      Token_EOF,               -- End of file
+      Token_Identifier,        -- Variables and function names
+      Token_Quoted_Identifier, -- `backtick-quoted` identifier (reserved words / spaces)
+      Token_String_Literal,    -- "Quoted strings"
+      Token_Numeric_Literal,   -- 123.45
+      Token_Bad,               -- Lex error sentinel (e.g. unterminated quoted identifier)
 
       -- Keywords (Commands / Commands that are reserved words)
       Token_USE, Token_MOCK, Token_SAVE, Token_KEEP, Token_DROP, Token_HOLD, Token_UNHOLD, Token_NEW,
@@ -26,6 +28,7 @@ package SData.Lexer is
       Token_BY, Token_SORT, Token_RENAME, Token_DELETE, Token_RSEED, Token_NOT, Token_AND, Token_OR, Token_XOR,
       Token_OPTIONS, Token_DIGITS, Token_FPATH, Token_HEADER, Token_ALL,
       Token_REM, Token_HELP, Token_END, Token_RUN, Token_QUIT, Token_NAMES, Token_LIST, Token_DISPLAY,
+      Token_AGGREGATE,
       Token_TO, Token_STEP, Token_BREAK, Token_INTO,
       Token_AS, Token_IN, Token_INTERLEAVE, Token_JOIN, Token_APPEND,
 

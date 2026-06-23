@@ -11,6 +11,24 @@ Options:
   /FMT=format  Specifies the file format (CSV, ODF, OOXML).
                Default is auto-detected from file extension.
   /NSCAN=n     Number of rows to scan for type detection (default: 20).
+Per-dataset options (in parentheses after a filename):
+  (KEEP=name ...)          Keep only the named columns.
+  (DROP=name ...)          Drop the named columns.
+  (RENAME=(old=new ...))   Rename columns (applied before KEEP/DROP);
+                           all pairs apply against the original names.
+                           If the new name's type suffix differs, the
+                           column is retyped: float<->integer converts
+                           values (float to integer truncates toward
+                           zero); a numeric<->character change ($ added
+                           or removed) is rejected and the whole RENAME
+                           is aborted.
+Merge (two or more comma-separated datasets):
+  USE a, b                 Positional merge (combine rows by position).
+  USE a, b /BY=var ...     Match merge (full outer; auto-sorted by BY).
+  ... /INTERLEAVE          Interleave all rows in BY-sorted order.
+  ... /JOIN                Cartesian inner join within each BY group.
+  USE a, b /APPEND         Stack rows vertically (union of columns).
+  IN=name marks a 0/1 provenance column, e.g. USE a(IN=ina), b(IN=inb).
 Formula cells (ODF/OOXML):
   sdata has no built-in formula evaluator.
   If LibreOffice (soffice) is on PATH, it is invoked to recalculate
@@ -29,6 +47,18 @@ Options:
   /FMT=format  Specifies the output format (CSV, ODF, OOXML).
                Default is auto-detected from file extension.
   /HEADER=val  Whether to write a header row (YES or NO). Default: YES.
+Multiple targets (comma-separated) with per-target options:
+  SAVE "a" (KEEP=ID), "b" (DROP=ID), "c" (RENAME=(X=Y))
+  (KEEP=name ...)          Keep only the named columns in this target.
+  (DROP=name ...)          Drop the named columns from this target.
+  (RENAME=(old=new ...))   Rename columns in the output (before KEEP/
+                           DROP).  A suffix change retypes the column:
+                           float<->integer converts values (float to
+                           integer truncates toward zero); a
+                           numeric<->character change is rejected.
+  (IF=expr)                Write a record to this target only when expr
+                           is true (use with WRITE for per-record routing).
+  These options also apply to a single-target SAVE.
 Execution: Declarative -- the file is written at the end of the next RUN.
 
 Command: WRITE
@@ -94,6 +124,17 @@ Execution: Declarative -- grouping is active for all subsequent RUNs.
 Command: SORT variable(s)
 Reorders the Data Table based on the specified variables.
 Execution: Immediate -- re-orders the table at once.
+
+Command: AGGREGATE outvar=fn(invar) [outvar=fn(invar) ...]
+Collapses the Data Table to one row per active BY group, computing
+aggregate functions over the chosen input columns. With no active BY,
+the whole (SELECT-filtered) table is one group.
+Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN.
+  N() with no argument yields the group row count.
+Input may be a scalar column, a whole array (applied element-wise), or
+an array element such as x(1). The active SELECT filter is respected; a
+pending SAVE is written; the active SELECT and BY are then cleared.
+Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
 Command: NEW
 Clears the Data Table, all variables, and the queued program.
@@ -292,12 +333,15 @@ With no arguments, OPTIONS lists all current option values.
   OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)
                                0.0/0.0 always raises an error. Cleared by NEW.
   OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.
+  OPTIONS PROGRESS YES|NO    : Emit record-count progress on stderr for long USE/RUN/SORT runs (default: NO)
+  OPTIONS WARNRESERVED YES|NO: Warn when a loaded column matches a reserved keyword (default: YES)
 
 CLI flags (set at startup, not runtime):
   --shell-timeout=N    : SYSTEM/SHELL timeout in seconds (0 = unlimited; default 300 in batch)
   --noshell            : Disable SYSTEM/SHELL; also disables -p
   --nosubmit           : Disable SUBMIT
   --ignore-math-errors : Domain errors return MISSING
+  --progress           : Same as OPTIONS PROGRESS YES, enabled from startup
   --clen <n>           : Set max character variable length
   -m <n>               : Set max in-memory table cells (rows*cols; 0 = unlimited)
   -t <n>               : Set max temporary variables
@@ -386,6 +430,19 @@ Example -- subtotal SALARY by DEPT:
   RUN
 
 See also: HELP LET  HELP SET  HELP BY  HELP HOLD  HELP EXECUTION
+
+--- Quoted Identifiers ---
+A column or variable whose name collides with a reserved keyword, or
+contains spaces or dots, can be referenced by enclosing it in backticks:
+  `AS`             -- column named AS (a reserved keyword)
+  `col with spaces`  -- column with embedded spaces
+The backtick form is accepted wherever a bare identifier is accepted
+(LET/SET, PRINT, KEEP/DROP, RENAME, BY, ARRAY/DIM, SORT, etc.).
+Empty backticks (``) and unterminated backticks are lexical errors.
+NAMES output and error messages show the bare name without backticks;
+the backtick form is an input notation only.
+Use OPTIONS WARNRESERVED NO to suppress the advisory warning that
+USE emits when a loaded column matches a reserved keyword.
 
 Debug mode: --debug[=N] flag  (N = 1, 2, or 3; default 3)
 Enables trace output to stderr and interactive step mode.

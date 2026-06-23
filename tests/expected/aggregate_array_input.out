@@ -1,0 +1,4 @@
+Dataset opened: tests/data/subscripted.csv
+AGGREGATE complete. 1 records and 6 variables processed.
+REC# MX(1) MX(2) MX(3) SX(1) SX(2) SX(3) 
+1 2.50000 3.50000 4.50000 5.00000 7.00000 9.00000 

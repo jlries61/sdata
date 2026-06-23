@@ -57,6 +57,8 @@ sdata_main
         ├── SData.Transient_Table  mutation-free in-memory table value type
         │                             used by merge + per-target SAVE buffers (this crate)
         ├── SData.Help             HELP topic dispatcher       (this crate)
+        ├── SData.Reserved_Keywords  upcased reserved-keyword set, mirroring the
+        │                             lexer chain; feeds the USE-time warning (this crate)
         ├── SData.Version          version + copyright strings (this crate; ADR-043)
         ├── SData.System           sdata-only SYSTEM wrapper   (this crate)
         └── SData_Core.Commands    shared command execution    (sdata-core)
@@ -80,6 +82,52 @@ Ada enumeration types are closed, so `Token_Kind`, `Statement_Kind`, and
 contains no lexer, AST, or parser — each consumer owns its complete grammar
 and hands string-form expressions to `SData_Core.Evaluator.Parse_Expression`
 for SELECT-filter compilation. See [ADR-040](adrs.md) for the full rationale.
+
+---
+
+## Quoted Identifiers and the Reserved-Keyword Warning
+
+A column or variable whose name collides with a reserved keyword (or contains
+spaces/dots) is referenced with the backtick form `` `name` `` — the language
+spec is in `doc/design.md` §3.2. The implementation is a textbook example of the
+ADR-040 "design once, implement twice, share only the data-level sliver" pattern,
+and it spans all three crates:
+
+- **Lexer (per consumer).** Each grammar adds a `Token_Quoted_Identifier` kind —
+  the lexer consumes a leading backtick, scans to the closing backtick, and
+  returns the inner text (verbatim, upper-cased on lookup like any identifier).
+  A malformed sequence (unterminated, embedded newline, or empty `` `` ``) emits
+  one `Put_Line_Error` and yields `Token_Bad`, which the parser maps to a quiet
+  `return null` (single diagnostic, no double error).
+
+- **Parser (per consumer).** All identifier-accepting sites route through a
+  helper pair — `Is_Identifier_Token` (accepts bare *or* quoted) and
+  `Identifier_Text` (reads `T.Text (1 .. T.Length)`) — so quoting works
+  uniformly wherever a bare identifier is accepted. No AST or semantic change:
+  a quoted identifier resolves to exactly the same name as its bare form.
+
+- **Reserved-keyword set (per consumer).** Each crate owns its own upcased set
+  mirroring its lexer keyword chain — `SData.Reserved_Keywords` and
+  `Data_Vandal.Reserved_Keywords`. The lists are grammar-specific and stay in
+  their crates; only the *warning mechanism* is shared.
+
+- **USE-time warning (shared, in sdata-core).** After a successful `USE`, each
+  consumer calls `SData_Core.Commands.Warn_Reserved_Columns (Keywords)` — passing
+  its own set — which walks the package-global `SData_Core.Table` and emits one
+  advisory per column whose name matches a keyword. Gating lives **inside** the
+  helper, keyed on the shared runtime toggle
+  `SData_Core.Config.Runtime.Options_Warn_Reserved` (default `True`), so the
+  suppression semantics are identical in both consumers. `OPTIONS WARNRESERVED
+  YES|NO` flips the toggle via the shared
+  `SData_Core.Commands.Execute_OPTIONS_WarnReserved`. This additive sdata-core
+  surface is pin-safe for `consumer-tests.yml` and first ships in sdata-core
+  **0.1.16**; both consumers therefore constrain `sdata_core ^0.1.16`.
+
+data-vandal had no `OPTIONS` command before this feature; a minimal one
+(`Token_OPTIONS` → `Stmt_OPTIONS` → `Parse_OPTIONS` → interpreter dispatch,
+with a no-arg display and a non-fatal warning on unknown keys) was added to host
+`WARNRESERVED`. The full design record, including the resolved deferred
+questions, is in `doc/specs/2026-05-30-quoted-identifiers-design.md`.
 
 ---
 
@@ -118,6 +166,7 @@ Commands that trigger an action at once, outside any data step. They are not que
 | `RUN` | Execute the pending deferred statement list (see Data Step below) |
 | `NEW` | Reset interpreter state; discard deferred list and pending configuration |
 | `SORT BY var … [/DESC]` | Sort the current table in place |
+| `AGGREGATE out=fn(in) …` | Collapse the table to one row per active BY group via `SData_Core.Commands.Execute_AGGREGATE` (build-and-swap; flushes pending SAVE; clears SELECT and BY) |
 | `NAMES` | Print column names of the current dataset |
 | `SYSTEM cmd` | Pass a shell command to the OS |
 | `HELP [topic]` | Print help text |
@@ -276,7 +325,7 @@ decisions.
 
 Significant design choices — language selection, execution model, table storage strategy,
 CLI conventions, test approach, the sdata-core / data-vandal split, and per-session
-architectural calls — are recorded in `doc/adrs.md` (ADR-001 through ADR-043, with a few
+architectural calls — are recorded in `doc/adrs.md` (ADR-001 through ADR-045, with a few
 unused numbers in the sequence). Each entry captures the context, the decision, the
 alternatives considered, and the rationale. Consult it before proposing a structural
 change that might relitigate a settled question.

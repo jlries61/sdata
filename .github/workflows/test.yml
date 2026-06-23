@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout sdata
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: sdata
 
@@ -25,7 +25,7 @@ jobs:
       # index, this step can be removed and the path pin replaced with a
       # plain version dependency.
       - name: Checkout sdata-core
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: jlries61/sdata-core
           ref: main
@@ -62,3 +62,24 @@ jobs:
       - name: Fuzz corpus regression
         working-directory: sdata
         run: alr exec -- make fuzz-corpus
+
+      - name: Restore gnatmetric (libadalang_tools) cache
+        id: gnatmetric-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: sdata/tools
+          key: gnatmetric-${{ runner.os }}-libadalang_tools-26.0.0
+
+      - name: Complexity gate (gnatmetric)
+        working-directory: sdata
+        run: make complexity-check
+
+      # Save the built gnatmetric even if a later step (or the gate itself)
+      # fails — actions/cache only saves on success, which would otherwise
+      # force a ~27-min libadalang rebuild on the next run after any red job.
+      - name: Save gnatmetric (libadalang_tools) cache
+        if: always() && steps.gnatmetric-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: sdata/tools
+          key: gnatmetric-${{ runner.os }}-libadalang_tools-26.0.0

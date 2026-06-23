@@ -1,0 +1,6 @@
+Dataset opened: tests/data/agg_multi.csv
+AGGREGATE complete. 3 records and 4 variables processed.
+REC# REGION$ DEPT$ TOTAL NREC 
+1 East Sales 300.00000 2 
+2 East Tech 300.00000 1 
+3 West Sales 400.00000 1 

@@ -1,0 +1,5 @@
+Dataset opened: tests/data/subscripted.csv
+AGGREGATE: resizing existing variable 'Y' (scalar -> array 1..3)
+AGGREGATE complete. 1 records and 3 variables processed.
+REC# Y(1) Y(2) Y(3) 
+1 2.50000 3.50000 4.50000 

@@ -6,12 +6,14 @@ columns, supporting floating point, integer, and character data types. Features
 include:
 
 - CSV, ODF, and OOXML spreadsheet I/O
+- Column types from the header-name suffix on load: `name$` → string,
+  `name%` → integer, otherwise floating-point (non-numeric data → string)
 - Comprehensive statistical distribution functions (normal, t, F, chi-square,
   etc.)
 - Aggregate functions (mean, median, standard deviation, etc.)
 - Permanent and temporary variables, arrays (permanent, temporary, and virtual)
 - Control flow (IF/THEN/ELSE, FOR/NEXT, WHILE, REPEAT/UNTIL, SELECT/CASE)
-- BY-group processing
+- BY-group processing, including the `AGGREGATE` command (collapse to one summary row per group)
 - SYSTEM/SHELL integration (can be disabled)
 
 ## Build Requirements
@@ -24,6 +26,23 @@ SData is written in Ada 2012 and requires:
   - `gnat` on Debian/Ubuntu
 - **GPRbuild** — the GNAT project build tool
 - **GNU Make**
+
+### Runtime Requirements
+
+Enforcing a timeout on `SYSTEM`/`SHELL` commands requires a `timeout(1)`
+utility on `PATH` — GNU coreutils `timeout`, or its `gtimeout` alias on
+platforms where the bare name is taken by a different tool (SData prefers
+`gtimeout` and is silent and identical across platforms when it is present).
+A timeout is in effect whenever `OPTIONS SHELLTIMEOUT` is greater than zero;
+**batch scripts apply a default of 300 seconds**, so in practice any script
+that runs external commands needs this utility. If a timeout is requested but
+no such utility is found, SData reports a clear error rather than running the
+command unbounded.
+
+The dependency does **not** apply when `OPTIONS SHELLTIMEOUT 0` is set
+(unlimited — the interactive default) or to the bare interactive `SYSTEM`
+shell. macOS ships no `timeout`; install GNU coreutils via MacPorts
+(`sudo port install coreutils`) or Homebrew (`brew install coreutils`).
 
 ### Ada Library Dependencies
 
@@ -62,7 +81,7 @@ manually; `sdata-core` similarly needs to be on `GPR_PROJECT_PATH`.
   spec at `doc/specs/2026-05-19-data-vandal-design.md`.
 - **data-vandal** — a standalone interpreter for controlled data degradation
   (the former `VANDALIZE` command, extracted into its own application in
-  v0.9.4). See [ADR-038](doc/adrs.md) (now superseded) and the data-vandal
+  v0.10.0). See [ADR-038](doc/adrs.md) (now superseded) and the data-vandal
   repository for the application's own README.
 
 ## Installation
@@ -286,7 +305,7 @@ scripts/bump-version.sh <new-version> "<changelog-summary>"
 For example:
 
 ```sh
-scripts/bump-version.sh 0.9.4 "Fix path resolution in FPATH SUBMIT handler."
+scripts/bump-version.sh 0.10.0 "Fix path resolution in FPATH SUBMIT handler."
 ```
 
 The script validates the `N.N.N` version format, detects the current version
@@ -301,7 +320,7 @@ Run `sdata` with no arguments to enter the interactive console:
 
 ```
 $ sdata
-SData Statistical Interpreter version 0.9.4
+SData Statistical Interpreter version 0.10.0
 Interactive Console. Type QUIT to exit.
 sdata> use "mydata.csv"
 sdata> print recno, name$, score

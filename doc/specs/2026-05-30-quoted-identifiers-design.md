@@ -1,8 +1,90 @@
 # Quoted Identifiers for Reserved-Keyword Column Names
 
+**Date:** 2026-05-30 (scope reconciled 2026-06-17; implemented & shipped 2026-06-20)
+**Status:** **Implemented & shipped 2026-06-20** across all three crates (sdata v0.9.8, sdata-core 0.1.16, data-vandal 0.6.5). Scope was reconciled in the `/ssd feature` design session 2026-06-17 (see "Implementation reconciliation" below); the final as-built record is in **"Implementation notes (as-built)"** at the end of this document.
+**Scope:** sdata + data-vandal interpreters; one additive sdata-core helper + toggle
+
+> **Implementation reconciliation (2026-06-17).** The `/ssd feature` design
+> session locked the deferred scope decisions and the cross-crate plan. Where
+> this section and the original design body below disagree, **this section
+> wins** — the body is retained for its still-accurate per-component detail.
+>
+> **Decisions locked:**
+>
+> 1. **Both crates this cycle** (sdata *and* data-vandal get quoted identifiers
+>    and the reserved-keyword warning). The lexer/AST/parser changes are
+>    implemented twice (ADR-040: each consumer owns its grammar).
+> 2. **Warning helper promoted to sdata-core** as the genuinely-shareable
+>    sliver: `Warn_Reserved_Columns (T : Table; Keywords : <upcased set>)`.
+>    Additive to sdata-core's public surface, therefore pin-safe for
+>    `consumer-tests.yml`. Each consumer passes its own (grammar-specific)
+>    reserved-keyword list.
+> 3. **Warning gating lives *inside* `Warn_Reserved_Columns`** (single
+>    authority), keyed on a new shared runtime toggle
+>    `Config.Runtime.Options_Warn_Reserved : Boolean := True`, with a getter and
+>    an `Internal.Set_…` setter, surfaced by a shared
+>    `Execute_OPTIONS_WarnReserved (Value : Boolean)`.
+> 4. **`OPTIONS WARNRESERVED YES|NO` (default YES)** is the suppression control.
+>    sdata wires it into its existing OPTIONS dispatch + no-arg display.
+>    data-vandal **has no OPTIONS command today**
+>    (`data_vandal-interpreter.adb`: *"even though data-vandal has no OPTIONS
+>    command today"*), so a **new OPTIONS command subsystem is built in
+>    data-vandal** and exposes **`WARNRESERVED` only** this cycle (not the full
+>    CSVDLM/HEADER/CHARSET key set — those may be added later).
+>
+> **Field-name correction:** the helper sketches below reference `T.Text_Len`;
+> the actual lexer `Token` record field is `Length` (`src/lexer/sdata-lexer.ads`).
+> The token type is `SData.Lexer.Token`. Implementations use the real names.
+>
+> **Build sequence — three independently-shippable phases (SSD iterations):**
+>
+> - **P1 (sdata + sdata-core):** quoted-id lexer+parser in sdata; sdata-core
+>   `Warn_Reserved_Columns` helper, `Options_Warn_Reserved` toggle, and
+>   `Execute_OPTIONS_WarnReserved`; sdata USE-time warning at both call sites
+>   (single-dataset after `Execute_USE`, multi-dataset after
+>   `Install_To_Current`); `OPTIONS WARNRESERVED` key + display in sdata; sdata
+>   docs (HELP + `help_all.out` snapshot + man page + `design.md`) and tests.
+>   Ships the entire sdata story.
+> - **P2 (data-vandal):** quoted-id lexer+parser in data-vandal; data-vandal
+>   USE-time warning (reuses the shipped sdata-core helper; always-on since
+>   data-vandal cannot yet change the toggle); data-vandal tests.
+> - **P3 (data-vandal):** new OPTIONS command subsystem in data-vandal
+>   (`Token_OPTIONS`, AST node, parser, interpreter dispatch, no-arg display)
+>   wiring `WARNRESERVED`; data-vandal docs (man page + `help.adb`).
+>
+> Each phase must leave all three crates green per the CLAUDE.md cross-crate
+> gate (`sdata-core` build, sdata `make check`, data-vandal `make check`).
+
+---
+
+**Original design body (2026-05-30) — retained for component detail:**
+
 **Date:** 2026-05-30
 **Status:** Approved (design phase) — execution deferred
 **Scope:** sdata interpreter only; no sdata-core changes
+
+> **Scope addendum (2026-06-17): data-vandal also wants this capability.**
+> The design body below is written for sdata and stands as-is. Extending it to
+> data-vandal does **not** move work into sdata-core: per ADR-040, the lexer,
+> AST, and parser are deliberately *not* in sdata-core — each consumer owns its
+> complete grammar. data-vandal has its own parallel stack
+> (`data-vandal/src/lexer/`, `…/parser/`, `…/ast/`), so the lexer-token +
+> parser-site changes here must be **implemented a second time** against
+> data-vandal's lexer/parser. The *design* is shared; the *code* is duplicated,
+> and sdata-core work is essentially zero.
+>
+> One exception worth revisiting at implementation time: the **USE-time
+> reserved-keyword warning** (see that section) was deliberately kept sdata-only
+> "since data-vandal doesn't need it." That rationale no longer holds. Since the
+> warning logic just walks a `Table` (which *is* in sdata-core) against a keyword
+> set, consider promoting a generic `Warn_Reserved_Columns (Table, Keyword_Set)`
+> helper into sdata-core, with each consumer passing its own (grammar-specific)
+> reserved-keyword list. That is the one small genuinely-shareable sliver.
+>
+> The implementation session should reconcile this scope during the design step
+> (e.g. `/ssd feature`): treat it as "design once, implement twice (sdata +
+> data-vandal), plus one optional sdata-core warning helper," not as a
+> sdata-core-centric change.
 
 ## Context
 
@@ -222,3 +304,96 @@ the quoted form in the relevant statement:
 - **Ambiguity**: the "what counts as a quoted identifier vs string
   literal" distinction is clear because the lexer is the arbiter —
   backticks are unambiguously quoted-identifier territory.
+
+---
+
+## Implementation notes (as-built, 2026-06-20)
+
+The feature shipped exactly as reconciled (three phases, four PRs, all merged).
+This section records where the as-built code differs from the original body's
+sketches and resolves the two deferred open questions.
+
+### Shipped artifacts
+
+| Phase | PR(s) | Crate / version | Tests |
+|---|---|---|---|
+| P1 | sdata-core #59 → **v0.1.16**; sdata #30 | quoted-id lexer/parser + USE warning + `OPTIONS WARNRESERVED` + docs | sdata 218 |
+| P2 | data-vandal #20 | quoted-id lexer/parser + USE warning | data-vandal 84 |
+| P3 | data-vandal #21 | new `OPTIONS` command exposing `WARNRESERVED` + docs | data-vandal 88 |
+| follow-up | sdata #147ff39, data-vandal #22 | `sdata_core` floor `^0.1.10` → `^0.1.16`; consumer version bumps | — |
+
+**Final versions:** sdata **v0.9.8** (tag `v0.9.8`, main `d01472d`), sdata-core
+**0.1.16**, data-vandal **0.6.5** (main `e362aef`). Both consumers constrain
+`sdata_core ^0.1.16`.
+
+### Deferred open questions — resolved
+
+1. **OPTIONS suppression (the spec's deferred question): YES, implemented.**
+   `OPTIONS WARNRESERVED YES|NO`, default **YES**. The original body said the
+   warning helper should be sdata-only and the warning "always warn"; the
+   reconciliation overrode both. The gating lives **inside** sdata-core's
+   `Warn_Reserved_Columns`, keyed on `Config.Runtime.Options_Warn_Reserved`
+   (getter + `Internal` setter), surfaced by the shared
+   `Execute_OPTIONS_WarnReserved (Value : Boolean)`. Both consumers call the
+   same gated helper, so the toggle behaves identically in each.
+2. **Reserved-keyword list scope: per-consumer, not shared.** Each consumer owns
+   its own upcased set (ADR-040): `SData.Reserved_Keywords` (**64** keywords,
+   mirroring the sdata lexer chain) and `Data_Vandal.Reserved_Keywords`
+   (**27** keywords — 26 + `OPTIONS`, added in P3). Only the *warning mechanism*
+   is shared in sdata-core; the *list* is grammar-specific and stays in each
+   crate.
+
+### As-built corrections to the body's sketches
+
+- **`Warn_Reserved_Columns` takes no `Table` argument.** The body (and the
+  reconciliation) sketched `Warn_Reserved_Columns (T : Table; Keywords : …)`.
+  In sdata-core the table is a package-global singleton, so the real signature
+  is `Warn_Reserved_Columns (Keywords : Reserved_Keyword_Sets.Set)` — it reads
+  `SData_Core.Table.Column_Count` / `Column_Name (I)` directly. The keyword-set
+  type is the public `Reserved_Keyword_Sets` (an
+  `Indefinite_Ordered_Sets (String)`) exported by `SData_Core.Commands`.
+- **Token field is `Length`, not `Text_Len`.** As already flagged in the
+  reconciliation; the lexer `Token` record uses `Length`. `Identifier_Text`
+  reads `T.Text (1 .. T.Length)`.
+- **Error token:** the lexer emits `Token_Bad` on a malformed quoted identifier
+  (unterminated, embedded newline, or empty `` `` ``); the parser turns
+  `Token_Bad` into a quiet `return null` so the lexer's `Put_Line_Error` is the
+  single diagnostic (no double error).
+- **Parser sites routed:** all identifier-accepting sites go through the
+  `Is_Identifier_Token` / `Identifier_Text` helper pair — **15** call sites in
+  sdata's parser, **12** in data-vandal's. (Within the spec's "15–25" estimate;
+  data-vandal's grammar is smaller.)
+- **data-vandal OPTIONS command (P3):** built from scratch — `Token_OPTIONS`
+  (lexer), `Stmt_OPTIONS` (AST, with `Options_Key` / `Options_Val`),
+  `Parse_OPTIONS` (bare / key-only / key+value), and interpreter dispatch. The
+  bare and key-only forms display `OPTIONS WARNRESERVED <YES|NO>`; an unknown
+  key emits a **non-fatal** `Warning:` and is ignored. `WARNRESERVED` is the
+  only key this cycle (CSVDLM/HEADER/CHARSET deferred).
+
+### Tests added (final names)
+
+sdata integration: `quoted_id_print`, `quoted_id_let_lhs`, `quoted_id_rename`,
+`quoted_id_keep`, `quoted_id_drop`, `quoted_id_by`, `quoted_id_per_dataset_keep`,
+`quoted_id_per_dataset_rename`, `quoted_id_save_if`,
+`quoted_id_write_target_alias`, `use_reserved_column_warning`, and the added
+`use_reserved_column_warning_multi` (multi-dataset USE warning). data-vandal:
+the mirrored quoted-id positions, `use_reserved_column_warning`, plus the P3
+OPTIONS tests (`options_display`, `options_key_only`, `options_unknown_key`,
+`options_warnreserved`).
+
+### Known residuals (non-blocking)
+
+- data-vandal **ARRAY** and **FPATH/OUTPUT** quoted-id positions are covered by
+  the uniform helper pattern but not separately integration-tested (verified by
+  inspection).
+- A **pre-existing** data-vandal quirk — SELECT not applied to SAVE — is
+  documented in `quoted_id_select.cmd`; it is out of scope for this feature.
+
+### Process lesson recorded
+
+The two follow-up PRs (floor `^0.1.10` → `^0.1.16`) were needed because the
+consumers called sdata-core 0.1.16 API while still constraining `^0.1.10`. The
+`{ path = "../sdata-core" }` pin overrides the version constraint for local
+builds, so `make check` cannot catch floor drift — the floor must be bumped by
+hand whenever new sdata-core API is consumed (per the CLAUDE.md cross-crate
+rule).

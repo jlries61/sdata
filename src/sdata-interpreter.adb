@@ -27,6 +27,7 @@ with Ada.Unchecked_Deallocation;
 with Ada.Text_IO.Unbounded_IO;
 with SData.Transient_Table;
 with SData.Merge;
+with SData.Reserved_Keywords;
 with SData_Core.File_IO;
 
 --  SData.Interpreter — statement executor and data step engine.
@@ -34,8 +35,8 @@ with SData_Core.File_IO;
 --  Execution model (three tiers):
 --    Declarative       Commands such as USE, BY, SELECT, REPEAT, SAVE, FPATH
 --                      execute immediately and configure interpreter state.
---    Immediate         RUN, SORT, NEW, NAMES, SYSTEM, HELP execute immediately
---                      but are not purely declarative.
+--    Immediate         RUN, SORT, AGGREGATE, NEW, NAMES, SYSTEM, HELP execute
+--                      immediately but are not purely declarative.
 --    Deferred          LET, SET, PRINT, IF, FOR, WHILE, WRITE, DELETE are
 --                      queued in the statement list between two RUN markers and
 --                      executed once per record inside Run_One_Step.
@@ -80,6 +81,17 @@ package body SData.Interpreter is
    package Program_Vectors is new Ada.Containers.Vectors (Positive, Program_Entry);
    Active_Program_Vec : Program_Vectors.Vector;
 
+   --  Count of deferred statements queued since the most recent RUN (or NEW).
+   --  These are "pending / un-run": their per-record effect has not yet been
+   --  committed to the table.  AGGREGATE refuses to run while any are pending
+   --  (error #10) because it would otherwise silently aggregate the table
+   --  without their effect; a RUN (which executes and resets the count) or NEW
+   --  resolves the condition.  Maintained by BOTH execution paths — the REPL
+   --  (Add_To_Active_Program / Run_Active_Program) and the batch linked-list
+   --  walker in Execute — so #10 fires consistently in interactive and script
+   --  modes.
+   Pending_Deferred : Natural := 0;
+
    function Is_Immediate (Kind : Statement_Kind) return Boolean is
    begin
       return Kind in
@@ -88,7 +100,7 @@ package body SData.Interpreter is
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
-         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS;
+         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -139,6 +151,12 @@ package body SData.Interpreter is
 
    --  Set of script files currently in the SUBMIT execution chain (for cycle detection).
    Submit_Chain : Name_Sets.Set;
+
+   --  Maximum SUBMIT nesting depth.  Cycle detection (Submit_Chain) catches a
+   --  file re-entering itself; this bounds a chain of *distinct* files so deep
+   --  nesting cannot exhaust the stack.  Submit_Chain.Length is the current
+   --  depth, since one entry is inserted per active SUBMIT level.
+   Max_Submit_Depth : constant := 64;
 
    --  Multi-target SAVE registration. When non-empty, supersedes the
    --  single-target Save_File_* fields in SData_Core.Config.Runtime
@@ -334,6 +352,8 @@ package body SData.Interpreter is
    begin
       if Stmt = null then return; end if;
       Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
+      --  A newly queued deferred statement is pending until the next RUN.
+      Pending_Deferred := Pending_Deferred + 1;
    end Add_To_Active_Program;
 
    procedure Clear_Active_Program is
@@ -343,6 +363,7 @@ package body SData.Interpreter is
          SData.AST.Free_Program (E.Stmt);
       end loop;
       Active_Program_Vec.Clear;
+      Pending_Deferred := 0;
       SData_Core.Table.Clear_Index_Map;
       SData_Core.Table.Clear_By_Vars;
    end Clear_Active_Program;
@@ -404,6 +425,8 @@ package body SData.Interpreter is
             SData.AST.Free_Program (Run_Cap);
          end;
       end if;
+      --  The buffer has now been run; nothing is pending.
+      Pending_Deferred := 0;
    end Run_Active_Program;
 
    procedure Add_Pending_Mod (Kind : Column_Mod_Kind; Name : String) is
@@ -731,6 +754,10 @@ package body SData.Interpreter is
       for I in reverse From .. To loop
          Active_Program_Vec.Delete (I);
       end loop;
+      --  Deleting queued lines may have removed pending (un-run) statements;
+      --  the pending count can never exceed what remains in the buffer.
+      Pending_Deferred :=
+        Natural'Min (Pending_Deferred, Natural (Active_Program_Vec.Length));
    end Execute_Program_Delete;
 
    --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW / OPTIONS.
@@ -738,6 +765,57 @@ package body SData.Interpreter is
 
    --  SUBMIT / SYSTEM / OUTPUT / FPATH — external interaction and I/O routing.
    procedure Execute_IO (Stmt : Statement_Access) is separate;
+
+   --  AGGREGATE (immediate).  Enforces error #10 (no pending deferred
+   --  statements), converts the AST spec vector into the core spec type, and
+   --  delegates the heavy lifting to SData_Core.Commands.Execute_AGGREGATE.
+   procedure Execute_Aggregate (Stmt : Statement_Access) is
+      Core_Specs : SData_Core.Commands.Aggregate_Spec_Vectors.Vector;
+   begin
+      --  #10 — there must be no pending (un-run) deferred statements.  A
+      --  data-step program that has already been run may remain resident
+      --  (RUN does not clear it); only statements queued since the last RUN
+      --  block AGGREGATE, since those would otherwise be silently dropped.
+      if Pending_Deferred > 0 then
+         raise SData_Core.Script_Error with
+           "AGGREGATE: pending program statements exist; issue RUN or NEW first";
+      end if;
+
+      for I in Stmt.Agg_List.First_Index .. Stmt.Agg_List.Last_Index loop
+         declare
+            A : constant SData.AST.Aggregate_Spec_Access := Stmt.Agg_List (I);
+            C : SData_Core.Commands.Aggregate_Spec;
+         begin
+            C.Outvar      := To_Unbounded_String (A.Outvar (1 .. A.Outvar_Len));
+            C.Fn_Name     := To_Unbounded_String (A.Fn_Name (1 .. A.Fn_Name_Len));
+            C.Invar_Name  :=
+              To_Unbounded_String (A.Invar_Name (1 .. A.Invar_Name_Len));
+            C.Invar_Index := A.Invar_Index;
+            case A.Invar_Kind is
+               when Invar_Empty         =>
+                  C.Invar_Kind := SData_Core.Commands.Invar_Empty;
+               when Invar_Scalar        =>
+                  C.Invar_Kind := SData_Core.Commands.Invar_Scalar;
+               when Invar_Array_Element =>
+                  C.Invar_Kind := SData_Core.Commands.Invar_Array_Element;
+               when Invar_Array_Name    =>
+                  C.Invar_Kind := SData_Core.Commands.Invar_Array_Name;
+            end case;
+            Core_Specs.Append (C);
+         end;
+      end loop;
+
+      SData_Core.Commands.Execute_AGGREGATE (Core_Specs);
+
+      declare
+         RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
+         VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
+      begin
+         Put_Line ("AGGREGATE complete. " &
+                   RC (RC'First + 1 .. RC'Last) & " records and " &
+                   VC (VC'First + 1 .. VC'Last) & " variables processed.");
+      end;
+   end Execute_Aggregate;
 
    procedure Execute_Statement (Stmt : Statement_Access; Ctx : in out Step_Context) is
 
@@ -844,6 +922,8 @@ package body SData.Interpreter is
             Execute_Metadata (Stmt);
          when Stmt_PROGRAM_DELETE =>
             Execute_Program_Delete (Stmt);
+         when Stmt_AGGREGATE =>
+            Execute_Aggregate (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
             | Stmt_OPTIONS =>
@@ -1135,7 +1215,9 @@ package body SData.Interpreter is
             if Act = Action_Run then
                Step_Mode := False;
             end if;
+            SData_Core.IO.Show_Progress ("RUN", Logical_I);
          end loop;
+         SData_Core.IO.Show_Progress ("RUN", Logical_Count, Final => True);
       end;
       Commit_Step;
    end Run_One_Step;
@@ -1172,6 +1254,8 @@ package body SData.Interpreter is
                             VC (VC'First + 1 .. VC'Last) & " variables processed.");
                end if;
             end;
+            --  Deferred body just ran; nothing pending until more is queued.
+            Pending_Deferred := 0;
             Step_Start := Current.Next;
          elsif Current.Kind /= Stmt_LET and then Current.Kind /= Stmt_SET
             and then Current.Kind /= Stmt_PRINT  and then Current.Kind /= Stmt_IF
@@ -1198,6 +1282,11 @@ package body SData.Interpreter is
                         (1, SData_Core.Table.Get_Current_Record_Index);
                   else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
             end;
+         else
+            --  A deferred statement (LET/SET/PRINT/IF/...) skipped by this
+            --  walker: it runs later at the next RUN.  Until then it is pending,
+            --  which AGGREGATE's #10 guard observes.
+            Pending_Deferred := Pending_Deferred + 1;
          end if;
          Current := Current.Next;
       end loop;

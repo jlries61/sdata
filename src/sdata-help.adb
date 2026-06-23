@@ -18,7 +18,7 @@ package body SData.Help is
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
       Put_Line ("  Arrays:      ARRAY, DIM");
       Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK");
-      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, REPEAT");
+      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, REPEAT");
       Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
       Put_Line ("  Files/paths: FPATH");
       Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
@@ -54,7 +54,7 @@ package body SData.Help is
       New_Line;
       Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
       Put_Line ("Use HELP EXECUTION for an explanation of the three execution tiers.");
-      Put_Line ("Use HELP CONCEPTS for an introduction to the PDV, LET/SET, and BY groups.");
+      Put_Line ("Use HELP CONCEPTS for an introduction to the PDV, LET/SET, BY groups, and quoted identifiers.");
    end Help_Index;
 
    -- ==========================================================================
@@ -75,6 +75,24 @@ package body SData.Help is
       Put_Line ("  /FMT=format  Specifies the file format (CSV, ODF, OOXML).");
       Put_Line ("               Default is auto-detected from file extension.");
       Put_Line ("  /NSCAN=n     Number of rows to scan for type detection (default: 20).");
+      Put_Line ("Per-dataset options (in parentheses after a filename):");
+      Put_Line ("  (KEEP=name ...)          Keep only the named columns.");
+      Put_Line ("  (DROP=name ...)          Drop the named columns.");
+      Put_Line ("  (RENAME=(old=new ...))   Rename columns (applied before KEEP/DROP);");
+      Put_Line ("                           all pairs apply against the original names.");
+      Put_Line ("                           If the new name's type suffix differs, the");
+      Put_Line ("                           column is retyped: float<->integer converts");
+      Put_Line ("                           values (float to integer truncates toward");
+      Put_Line ("                           zero); a numeric<->character change ($ added");
+      Put_Line ("                           or removed) is rejected and the whole RENAME");
+      Put_Line ("                           is aborted.");
+      Put_Line ("Merge (two or more comma-separated datasets):");
+      Put_Line ("  USE a, b                 Positional merge (combine rows by position).");
+      Put_Line ("  USE a, b /BY=var ...     Match merge (full outer; auto-sorted by BY).");
+      Put_Line ("  ... /INTERLEAVE          Interleave all rows in BY-sorted order.");
+      Put_Line ("  ... /JOIN                Cartesian inner join within each BY group.");
+      Put_Line ("  USE a, b /APPEND         Stack rows vertically (union of columns).");
+      Put_Line ("  IN=name marks a 0/1 provenance column, e.g. USE a(IN=ina), b(IN=inb).");
       Put_Line ("Formula cells (ODF/OOXML):");
       Put_Line ("  sdata has no built-in formula evaluator.");
       Put_Line ("  If LibreOffice (soffice) is on PATH, it is invoked to recalculate");
@@ -96,6 +114,18 @@ package body SData.Help is
       Put_Line ("  /FMT=format  Specifies the output format (CSV, ODF, OOXML).");
       Put_Line ("               Default is auto-detected from file extension.");
       Put_Line ("  /HEADER=val  Whether to write a header row (YES or NO). Default: YES.");
+      Put_Line ("Multiple targets (comma-separated) with per-target options:");
+      Put_Line ("  SAVE ""a"" (KEEP=ID), ""b"" (DROP=ID), ""c"" (RENAME=(X=Y))");
+      Put_Line ("  (KEEP=name ...)          Keep only the named columns in this target.");
+      Put_Line ("  (DROP=name ...)          Drop the named columns from this target.");
+      Put_Line ("  (RENAME=(old=new ...))   Rename columns in the output (before KEEP/");
+      Put_Line ("                           DROP).  A suffix change retypes the column:");
+      Put_Line ("                           float<->integer converts values (float to");
+      Put_Line ("                           integer truncates toward zero); a");
+      Put_Line ("                           numeric<->character change is rejected.");
+      Put_Line ("  (IF=expr)                Write a record to this target only when expr");
+      Put_Line ("                           is true (use with WRITE for per-record routing).");
+      Put_Line ("  These options also apply to a single-target SAVE.");
       Put_Line ("Execution: Declarative -- the file is written at the end of the next RUN.");
    end Help_SAVE;
 
@@ -198,6 +228,20 @@ package body SData.Help is
       Put_Line ("Reorders the Data Table based on the specified variables.");
       Put_Line ("Execution: Immediate -- re-orders the table at once.");
    end Help_SORT;
+
+   procedure Help_AGGREGATE is
+   begin
+      Put_Line ("Command: AGGREGATE outvar=fn(invar) [outvar=fn(invar) ...]");
+      Put_Line ("Collapses the Data Table to one row per active BY group, computing");
+      Put_Line ("aggregate functions over the chosen input columns. With no active BY,");
+      Put_Line ("the whole (SELECT-filtered) table is one group.");
+      Put_Line ("Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN.");
+      Put_Line ("  N() with no argument yields the group row count.");
+      Put_Line ("Input may be a scalar column, a whole array (applied element-wise), or");
+      Put_Line ("an array element such as x(1). The active SELECT filter is respected; a");
+      Put_Line ("pending SAVE is written; the active SELECT and BY are then cleared.");
+      Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
+   end Help_AGGREGATE;
 
    procedure Help_NEW is
    begin
@@ -510,12 +554,15 @@ package body SData.Help is
       Put_Line ("  OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)");
       Put_Line ("                               0.0/0.0 always raises an error. Cleared by NEW.");
       Put_Line ("  OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.");
+      Put_Line ("  OPTIONS PROGRESS YES|NO    : Emit record-count progress on stderr for long USE/RUN/SORT runs (default: NO)");
+      Put_Line ("  OPTIONS WARNRESERVED YES|NO: Warn when a loaded column matches a reserved keyword (default: YES)");
       Put_Line ("");
       Put_Line ("CLI flags (set at startup, not runtime):");
       Put_Line ("  --shell-timeout=N    : SYSTEM/SHELL timeout in seconds (0 = unlimited; default 300 in batch)");
       Put_Line ("  --noshell            : Disable SYSTEM/SHELL; also disables -p");
       Put_Line ("  --nosubmit           : Disable SUBMIT");
       Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
+      Put_Line ("  --progress           : Same as OPTIONS PROGRESS YES, enabled from startup");
       Put_Line ("  --clen <n>           : Set max character variable length");
       Put_Line ("  -m <n>               : Set max in-memory table cells (rows*cols; 0 = unlimited)");
       Put_Line ("  -t <n>               : Set max temporary variables");
@@ -610,6 +657,19 @@ package body SData.Help is
       Put_Line ("  RUN");
       New_Line;
       Put_Line ("See also: HELP LET  HELP SET  HELP BY  HELP HOLD  HELP EXECUTION");
+      New_Line;
+      Put_Line ("--- Quoted Identifiers ---");
+      Put_Line ("A column or variable whose name collides with a reserved keyword, or");
+      Put_Line ("contains spaces or dots, can be referenced by enclosing it in backticks:");
+      Put_Line ("  `AS`             -- column named AS (a reserved keyword)");
+      Put_Line ("  `col with spaces`  -- column with embedded spaces");
+      Put_Line ("The backtick form is accepted wherever a bare identifier is accepted");
+      Put_Line ("(LET/SET, PRINT, KEEP/DROP, RENAME, BY, ARRAY/DIM, SORT, etc.).");
+      Put_Line ("Empty backticks (``) and unterminated backticks are lexical errors.");
+      Put_Line ("NAMES output and error messages show the bare name without backticks;");
+      Put_Line ("the backtick form is an input notation only.");
+      Put_Line ("Use OPTIONS WARNRESERVED NO to suppress the advisory warning that");
+      Put_Line ("USE emits when a loaded column matches a reserved keyword.");
    end Help_CONCEPTS;
 
    -- ==========================================================================
@@ -1137,6 +1197,7 @@ package body SData.Help is
    K_DIM          : aliased constant String := "DIM";
    K_BY           : aliased constant String := "BY";
    K_SORT         : aliased constant String := "SORT";
+   K_AGGREGATE    : aliased constant String := "AGGREGATE";
    K_NEW          : aliased constant String := "NEW";
    K_LIST         : aliased constant String := "LIST";
    K_DISPLAY      : aliased constant String := "DISPLAY";
@@ -1350,6 +1411,7 @@ package body SData.Help is
       (K_DIM'Access,      Help_DIM'Access,      C, N),
       (K_BY'Access,       Help_BY'Access,       C, N),
       (K_SORT'Access,     Help_SORT'Access,     C, N),
+      (K_AGGREGATE'Access, Help_AGGREGATE'Access, C, N),
       (K_NEW'Access,      Help_NEW'Access,      C, N),
       (K_LIST'Access,     Help_LIST'Access,     C, N),
       (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),

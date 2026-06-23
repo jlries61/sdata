@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-06-03" "sdata 0.9.4" "User Commands"
+.TH SDATA 1 "2026-06-23" "sdata 0.10.0" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -81,6 +81,12 @@ returns the record number where the error occurred.
 .B \-\-ignore\-math\-errors
 Instead of halting on a floating\-point domain error (e.g. LOG of a negative
 number), emit a warning and return the missing value.
+.TP
+.B \-\-progress
+Report record\-count progress on standard error for long\-running operations
+(\fBUSE\fR file loads, the per\-record \fBRUN\fR data step, and \fBSORT\fR).
+A counter is printed every 10,000 records and updated in place; progress is
+written only to standard error, never to the data stream.
 .TP
 .BI \-o " file"
 Redirect console output to
@@ -174,6 +180,55 @@ The
 .B sdata
 command language is statement\-based.
 Statements fall into three categories:
+.SS Identifiers and quoted identifiers
+Variable and column names consist of uppercase letters, digits, underscores,
+and an optional type suffix
+.RB "(" "$" " for character," "%" " for integer)".
+The language is case\-insensitive.
+.PP
+A column whose name collides with a reserved keyword (such as
+.BR AS ,
+.BR USE ,
+or
+.BR BY )
+or contains spaces or dots can be referenced by enclosing it in
+.IR backticks :
+.PP
+.RS
+.B `AS`
+\(em reference a column literally named AS
+.br
+.B `col with spaces`
+\(em reference a column with embedded spaces
+.RE
+.PP
+The backtick form is accepted wherever a bare identifier is accepted:
+expressions,
+.BR LET / SET ,
+.BR PRINT ,
+.BR KEEP / DROP ,
+.BR RENAME ,
+.BR BY ,
+.BR ARRAY / DIM ,
+.BR SORT ,
+and per\-dataset
+.BR KEEP= / DROP= / RENAME= / IN=
+options.
+Empty backticks
+.RB ( `` )
+and unterminated or multi\-line backtick strings are lexical errors.
+.B NAMES
+output and error messages show the bare name without backticks;
+the backtick form is an input notation only.
+.PP
+When
+.B USE
+loads a dataset whose column names include reserved keywords,
+.B sdata
+emits an advisory warning and shows the backtick form to use.
+Set
+.B "OPTIONS WARNRESERVED NO"
+to suppress these warnings.
 .SS Declarative commands
 Execute immediately and configure state for the next data step.
 .RS
@@ -265,6 +320,12 @@ is applied before
 .B KEEP
 and
 .BR DROP .
+If the new name's type suffix differs from the column's current type, the column
+is retyped: a change within the numeric family converts the values (float to
+integer truncates toward zero).
+A rename crossing the numeric/character boundary (a "$" suffix added to or
+removed from a numeric column, or removed from a character column) is rejected
+and the entire RENAME is aborted with no change applied.
 .TP
 .BI IN= varname
 Create a temporary integer variable set to 1 for records that originate from
@@ -340,6 +401,11 @@ may not both appear for the same target.
 .BI RENAME= "(" "old=new" " [, " "old=new" " ...]" ")"
 Rename columns in the output projection for this target.
 The in-memory PDV is not modified.
+If the new name's type suffix differs from the column's current type, the column
+is retyped in the output: a change within the numeric family converts the values
+(float to integer truncates toward zero).
+A rename crossing the numeric/character boundary is rejected and the entire
+RENAME is aborted with no change applied.
 .TP
 .BI IF= expr
 Row-level filter for this target.
@@ -423,6 +489,48 @@ SELECT filter or BY grouping.
 .B SORT \fIvar\fR [\fIvar\fR ...]
 Re\-order the data table.
 .TP
+.B AGGREGATE \fIoutvar\fB=\fIfn\fB(\fIinvar\fB)\fR [\fIoutvar\fB=\fIfn\fB(\fIinvar\fB)\fR ...]
+Collapse the data table to one row per active
+.B BY
+group, computing an aggregate
+.I fn
+.RB ( SUM ,
+.BR MEAN ,
+.BR STD ,
+.BR VAR ,
+.BR MIN ,
+.BR MAX ,
+.BR N ,
+.BR NMISS ,
+.BR GMEAN ,
+.BR HMEAN ,
+or
+.BR MEDIAN )
+over each input column.
+With no active
+.B BY
+the whole table is one group.
+.I invar
+may be a scalar column, a whole array (applied element\-wise to each subscript),
+or an array element such as
+.IR x(1) ;
+.B N()
+with no argument is the group row count.
+The active
+.B SELECT
+filter is respected during the scan; a pending
+.B SAVE
+is written; then the active
+.B SELECT
+and
+.B BY
+are cleared.
+The deferred program buffer must hold no un\-run statements (issue
+.B RUN
+or
+.B NEW
+first).
+.TP
 .B NAMES
 List all permanent and temporary variables currently defined.
 .TP
@@ -481,7 +589,15 @@ and
 .B JOIN_WARN_THRESHOLD \fIn\fR
 (per-BY-group Cartesian product threshold above which
 .B /JOIN
-merges emit a warning; default 1,000,000; set to 0 to disable).
+merges emit a warning; default 1,000,000; set to 0 to disable),
+and
+.B PROGRESS YES|NO
+(runtime equivalent of
+.BR \-\-progress ;
+emit record-count progress on standard error for long USE/RUN/SORT runs),
+and
+.B WARNRESERVED YES|NO
+(emit a warning when a loaded column name matches a reserved keyword; default YES).
 .TP
 .B SYSTEM \fIcmd\fR
 Run an external shell command.
@@ -889,6 +1005,31 @@ File format is auto\-detected from the file extension when not specified
 explicitly.
 Script files conventionally use the extension
 .BR .CMD .
+.SS Column types
+On load, each column's data type is taken from the trailing character of
+its header name:
+.TP
+.IR name $
+A string (character) column.
+.TP
+.IR name %
+An integer column.
+Non\-integer numeric values are truncated toward zero (with a warning);
+values that are not valid integers \(em non\-numeric, or outside the
+representable integer range \(em are stored as missing (with a warning).
+.TP
+.I name
+(no suffix) A floating\-point numeric column.
+If its values are non\-numeric, the column is loaded as a string column
+instead and a
+.B $
+is appended to its name.
+.PP
+This is the same
+.B $
+(string) and
+.B %
+(integer) suffix convention used for variable names.
 .SS Formula cells in spreadsheets
 .B sdata
 does not contain a spreadsheet formula evaluator.

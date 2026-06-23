@@ -1,0 +1,11 @@
+Dataset opened: tests/data/sample.csv
+AGGREGATE complete. 2 records and 3 variables processed.
+REC# CATEGORY$ NPOS TOT 
+1 B 3 30.00000 
+2 C 1 16.00000 
+Dataset opened: tests/data/sample.csv
+AGGREGATE complete. 3 records and 2 variables processed.
+REC# CATEGORY$ NALL 
+1 A 2 
+2 B 3 
+3 C 1 

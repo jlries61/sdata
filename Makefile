@@ -1,6 +1,6 @@
 # Makefile for SData
 
-VERSION          := 0.9.4
+VERSION          := 0.10.0
 ZIPADA_VERSION      := 61.0.0
 XMLADA_VERSION      := 26.0.0
 MATHPAQS_VERSION    := 20260205.0.0
@@ -70,7 +70,7 @@ INSTALL_DIR  = $(DESTDIR)$(BINDIR)
 MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 DOC_DIR      = $(DESTDIR)$(DOCDIR)
 
-.PHONY: all build clean run check fuzz-corpus gnatcheck install srpm pkg msi \
+.PHONY: all build clean run check fuzz-corpus gnatcheck complexity-check install srpm pkg msi \
         sdata-core-tarball
 
 all: build
@@ -115,6 +115,14 @@ check: build
 	 fi
 	@echo ""
 	@echo "Running tests..."
+	@#  Generate the SUBMIT depth-limit chain (gitignored; see submit_depth_test.cmd).
+	@mkdir -p tests/data/submit_depth_gen; \
+	 i=1; while [ $$i -le 64 ]; do \
+	   n=$$(printf "%03d" $$i); m=$$(printf "%03d" $$((i+1))); \
+	   printf 'SUBMIT "tests/data/submit_depth_gen/c%s.cmd"\n' "$$m" > "tests/data/submit_depth_gen/c$$n.cmd"; \
+	   i=$$((i+1)); \
+	 done; \
+	 printf -- '-- depth-chain terminal (reached only without the guard)\n' > tests/data/submit_depth_gen/c065.cmd
 	@failures=0; failed_list=""; total=0; \
 	for f in tests/*.cmd; do \
 		total=$$((total+1)); \
@@ -166,6 +174,9 @@ check: build
 gnatcheck: build
 	gnatcheck -P $(GPR_FILE) --rules-file=gnatcheck.rules -j0
 
+complexity-check:
+	@GNATMETRIC=$$(scripts/provision-gnatmetric.sh) scripts/check-complexity.sh
+
 fuzz-corpus: build
 	@echo "Running corpus regression (csv_fuzz_driver)..."
 	@failed=0; \
@@ -203,6 +214,16 @@ fuzz-corpus: build
 		[ -f "$$f" ] || continue; \
 		printf "  %-52s" "$$f"; \
 		if $(TIMEOUT) 5 ./bin/xlsx_fuzz_driver "$$f" >/dev/null 2>&1; then \
+			echo "OK"; \
+		else \
+			echo "CRASH (exit $$?)"; failed=$$((failed+1)); \
+		fi; \
+	done; \
+	echo "Running corpus regression (merge_fuzz_driver)..."; \
+	for f in tests/fuzz_corpus/merge/*; do \
+		[ -f "$$f" ] || continue; \
+		printf "  %-52s" "$$f"; \
+		if $(TIMEOUT) 5 ./bin/merge_fuzz_driver < "$$f" >/dev/null 2>&1; then \
 			echo "OK"; \
 		else \
 			echo "CRASH (exit $$?)"; failed=$$((failed+1)); \

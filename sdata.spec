@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.9.4
+Version:        0.10.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,21 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Jun 23 2026 John L. Ries <john@theyarnbard.com> - 0.10.0-1
+- AGGREGATE command
+
+* Sat Jun 20 2026 John L. Ries <john@theyarnbard.com> - 0.9.8-1
+- Backtick-quoted identifiers; USE-time reserved-keyword warning; OPTIONS WARNRESERVED command
+
+* Tue Jun 09 2026 John L. Ries <john@theyarnbard.com> - 0.9.7-1
+- Performance: fix three O(n^2) hotspots in the data step (Get_Column_Type whole-column copy, transient-table copy-per-cell, BY re-sort per record) -- large data-step scripts ~70x faster
+
+* Sat Jun 06 2026 John L. Ries <john@theyarnbard.com> - 0.9.6-1
+- USE/SAVE RENAME= applies suffix-determines-type: float<->integer convert (truncating toward zero), numeric<->character rejected; single-dataset USE and single-target SAVE now honor rename/keep/drop options
+
+* Fri Jun 05 2026 John L. Ries <john@theyarnbard.com> - 0.9.5-1
+- Load %-suffixed header columns as integer (sdata-core 0.1.5).
+
 * Wed Jun 03 2026 John L. Ries <john@theyarnbard.com> - 0.9.4-1
 - Add USE /APPEND merge mode for vertical concatenation of datasets
 

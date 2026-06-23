@@ -56,8 +56,8 @@ begin
                end loop;
             end Convert_Rename_List;
 
-         begin
-            if Stmt.Mode = MM_Single then
+            procedure Execute_USE_Single is
+            begin
                --  -------------------------------------------------------
                --  Legacy single-dataset path — no behavioral change.
                --  -------------------------------------------------------
@@ -65,20 +65,21 @@ begin
                   File_Name : constant String :=
                      (if Stmt.Is_Mock then "MOCK"
                       else Stmt.File_Path (1 .. Stmt.File_Len));
-                  Eff_DLM   : constant String :=
-                     (if Stmt.DLM_Len > 0
-                      then Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len))
-                      else SData_Core.Config.Runtime.Options_CSVDLM
-                              (1 .. SData_Core.Config.Runtime.Options_CSVDLM_Len));
-                  Eff_Header  : constant Boolean :=
-                     (if Stmt.Header_Specified
-                      then Stmt.Header_Val
-                      else SData_Core.Config.Runtime.Options_Header);
-                  Eff_Charset : constant String :=
-                     (if Stmt.Output_CHARSET_Len > 0
-                      then Stmt.Output_CHARSET_Val (1 .. Stmt.Output_CHARSET_Len)
-                      else SData_Core.Config.Runtime.Options_CHARSET
-                              (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len));
+                  --  Resolve delimiter / header / charset against OPTIONS
+                  --  state in core (single authority — see ADR / Evans
+                  --  E1).  Format still resolves consumer-side (it falls
+                  --  back to Input_Format, not an OPTIONS field).
+                  Eff : constant SData_Core.Commands.Use_Defaults :=
+                     SData_Core.Commands.Resolve_Use_Defaults
+                       (Delimiter           =>
+                           Dlm_To_Str (Stmt.DLM_Path (1 .. Stmt.DLM_Len)),
+                        Delimiter_Specified => Stmt.DLM_Len > 0,
+                        Read_Header         => Stmt.Header_Val,
+                        Header_Specified    => Stmt.Header_Specified,
+                        Charset             =>
+                           Stmt.Output_CHARSET_Val
+                             (1 .. Stmt.Output_CHARSET_Len),
+                        Charset_Specified   => Stmt.Output_CHARSET_Len > 0);
                   Eff_Fmt : constant SData_Core.Config.Format_Type :=
                      (if Stmt.Format_Specified then Stmt.Fmt_Override
                       else SData_Core.Config.Input_Format);
@@ -87,14 +88,79 @@ begin
                     (File_Name   => File_Name,
                      Fmt         => Eff_Fmt,
                      Sheet_Name  => Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
-                     Delimiter   => Eff_DLM,
-                     Read_Header => Eff_Header,
-                     Charset     => Eff_Charset,
+                     Delimiter   => Eff.Delimiter (1 .. Eff.Delimiter_Len),
+                     Read_Header => Eff.Read_Header,
+                     Charset     => Eff.Charset (1 .. Eff.Charset_Len),
                      Skip_Rows   => Stmt.Skip_Val,
                      Max_Rows    => Stmt.Maxrows_Val,
                      Nscan_Rows  => Stmt.NSCAN_Val,
                      Is_Mock     => Stmt.Is_Mock);
                end;
+
+               --  Apply per-dataset RENAME / KEEP / DROP for single-dataset
+               --  USE.  The MM_Single path historically ignored these paren
+               --  options; apply them here (via a snapshot of the freshly
+               --  loaded table) so single-dataset USE matches the
+               --  multi-dataset behavior.  Done BEFORE caching
+               --  Input_File_Columns so the cache reflects the post-projection
+               --  schema.
+               if not Stmt.Dataset_List.Is_Empty then
+                  declare
+                     Spec : constant Dataset_Spec_Access :=
+                              Stmt.Dataset_List.First_Element;
+                  begin
+                     if Spec.Opts.Keep_Vars /= null
+                        and then Spec.Opts.Drop_Vars /= null
+                     then
+                        raise SData_Core.Script_Error
+                          with "KEEP and DROP cannot both be specified"
+                               & " on the same USE dataset spec";
+                     end if;
+                     if Spec.Opts.Rename_Pairs /= null
+                        or else Spec.Opts.Keep_Vars /= null
+                        or else Spec.Opts.Drop_Vars /= null
+                     then
+                        declare
+                           Snap : SData.Transient_Table.Table :=
+                                    SData.Transient_Table
+                                       .Snapshot_From_Current;
+                        begin
+                           if Spec.Opts.Rename_Pairs /= null then
+                              declare
+                                 Pairs : SData.Transient_Table
+                                            .Rename_Map_Vectors.Vector;
+                              begin
+                                 Convert_Rename_List
+                                   (Spec.Opts.Rename_Pairs, Pairs);
+                                 Snap.Apply_Rename (Pairs);
+                              end;
+                           end if;
+                           if Spec.Opts.Keep_Vars /= null then
+                              declare
+                                 Names : SData.Transient_Table
+                                            .Name_Vectors.Vector;
+                              begin
+                                 Convert_Variable_List
+                                   (Spec.Opts.Keep_Vars, Names);
+                                 Snap.Apply_Keep (Names);
+                              end;
+                           end if;
+                           if Spec.Opts.Drop_Vars /= null then
+                              declare
+                                 Names : SData.Transient_Table
+                                            .Name_Vectors.Vector;
+                              begin
+                                 Convert_Variable_List
+                                   (Spec.Opts.Drop_Vars, Names);
+                                 Snap.Apply_Drop (Names);
+                              end;
+                           end if;
+                           SData.Transient_Table.Install_To_Current (Snap);
+                        end;
+                     end if;
+                  end;
+               end if;
+
                --  Single-dataset USE: clear any IN= read-only names from a
                --  prior multi-dataset USE.  No IN= columns are created here.
                Clear_Readonly_IN_Names;
@@ -104,6 +170,9 @@ begin
                for I in 1 .. Column_Count loop
                   Input_File_Columns.Include (Column_Name (I));
                end loop;
+               --  Warn for any column whose name collides with a reserved keyword.
+               SData_Core.Commands.Warn_Reserved_Columns
+                 (SData.Reserved_Keywords.Set);
                Debug_Trace ("USE: opened "
                             & Stmt.File_Path (1 .. Stmt.File_Len)
                             & " ("
@@ -115,13 +184,14 @@ begin
                                  (Natural'Image (SData_Core.Table.Column_Count),
                                   Ada.Strings.Both)
                             & " variables)", 1);
-            else
+            end Execute_USE_Single;
+
                --  -------------------------------------------------------
                --  Multi-dataset path: snapshot each input, apply per-
                --  dataset RENAME/KEEP/DROP, sort by BY vars if needed,
                --  then combine and install.
                --  -------------------------------------------------------
-               declare
+            procedure Execute_USE_Multi is
                   procedure Free_Snap is new Ada.Unchecked_Deallocation
                     (SData.Transient_Table.Table,
                      SData.Merge.Table_Access);
@@ -146,7 +216,7 @@ begin
                      Snapshots.Clear;
                   end Free_All_Snapshots;
 
-               begin
+            begin
                   --  Alias-uniqueness check: mirror the SAVE-side pattern.
                   --  Walk the dataset list before allocating any snapshots so
                   --  that a duplicate alias fails fast without leaking heap.
@@ -200,25 +270,24 @@ begin
                                          Stmt.Dataset_List (Spec_Idx);
                            Snap_Ptr : constant SData.Merge.Table_Access :=
                                          new SData.Transient_Table.Table;
-                           Eff_DLM  : constant String :=
-                              (if Spec.Opts.DLM_Len > 0
-                               then Dlm_To_Str
+                           --  Resolve delimiter / header / charset against
+                           --  OPTIONS state in core (single authority — see
+                           --  ADR / Evans E1).  Format stays consumer-side.
+                           Eff : constant SData_Core.Commands.Use_Defaults :=
+                              SData_Core.Commands.Resolve_Use_Defaults
+                                (Delimiter           =>
+                                    Dlm_To_Str
                                       (Spec.Opts.DLM_Val
-                                          (1 .. Spec.Opts.DLM_Len))
-                               else SData_Core.Config.Runtime.Options_CSVDLM
-                                       (1 .. SData_Core.Config.Runtime
-                                                .Options_CSVDLM_Len));
-                           Eff_Header : constant Boolean :=
-                              (if Spec.Opts.Header_Specified
-                               then Spec.Opts.Header_Val
-                               else SData_Core.Config.Runtime.Options_Header);
-                           Eff_Charset : constant String :=
-                              (if Spec.Opts.Charset_Len > 0
-                               then Spec.Opts.Charset_Val
-                                       (1 .. Spec.Opts.Charset_Len)
-                               else SData_Core.Config.Runtime.Options_CHARSET
-                                       (1 .. SData_Core.Config.Runtime
-                                                .Options_CHARSET_Len));
+                                         (1 .. Spec.Opts.DLM_Len)),
+                                 Delimiter_Specified => Spec.Opts.DLM_Len > 0,
+                                 Read_Header         => Spec.Opts.Header_Val,
+                                 Header_Specified    =>
+                                    Spec.Opts.Header_Specified,
+                                 Charset             =>
+                                    Spec.Opts.Charset_Val
+                                      (1 .. Spec.Opts.Charset_Len),
+                                 Charset_Specified   =>
+                                    Spec.Opts.Charset_Len > 0);
                            Eff_Fmt : constant SData_Core.Config.Format_Type :=
                               (if Spec.Opts.Format_Specified
                                then Spec.Opts.Fmt_Override
@@ -236,9 +305,11 @@ begin
                               Fmt         => Eff_Fmt,
                               Sheet_Name  => Spec.Opts.Sheet_Name
                                                (1 .. Spec.Opts.Sheet_Name_Len),
-                              Delimiter   => Eff_DLM,
-                              Read_Header => Eff_Header,
-                              Charset     => Eff_Charset,
+                              Delimiter   =>
+                                 Eff.Delimiter (1 .. Eff.Delimiter_Len),
+                              Read_Header => Eff.Read_Header,
+                              Charset     =>
+                                 Eff.Charset (1 .. Eff.Charset_Len),
                               Skip_Rows   => Spec.Opts.Skip_Val,
                               Max_Rows    => Spec.Opts.Maxrows_Val,
                               Nscan_Rows  => Spec.Opts.NSCAN_Val,
@@ -438,6 +509,10 @@ begin
                      for I in 1 .. Column_Count loop
                         Input_File_Columns.Include (Column_Name (I));
                      end loop;
+                     --  Warn for any column whose name collides with a
+                     --  reserved keyword.
+                     SData_Core.Commands.Warn_Reserved_Columns
+                       (SData.Reserved_Keywords.Set);
 
                      Debug_Trace ("USE (multi): merged "
                                   & Ada.Strings.Fixed.Trim
@@ -461,7 +536,13 @@ begin
                         Free_All_Snapshots;
                         raise;
                   end;
-               end;
+            end Execute_USE_Multi;
+
+         begin
+            if Stmt.Mode = MM_Single then
+               Execute_USE_Single;
+            else
+               Execute_USE_Multi;
             end if;
          end;
       when Stmt_SAVE =>
@@ -507,8 +588,17 @@ begin
             --  Single-target legacy path: the parser always puts the file into
             --  Save_List (Length = 1) and also copies it into the legacy Stmt
             --  fields.  Delegate to the legacy handler so that single-target
-            --  SAVE continues to work exactly as before.
-            if Natural (Stmt.Save_List.Length) = 1 then
+            --  SAVE continues to work exactly as before -- UNLESS the target
+            --  carries per-target paren options (RENAME/KEEP/DROP), which the
+            --  legacy pending-save path ignores.  In that case fall through to
+            --  the registration path below so the multi-target flush applies
+            --  the options (per-record auto-flush populates the buffer when no
+            --  WRITE fires).
+            if Natural (Stmt.Save_List.Length) = 1
+               and then Stmt.Save_List.First_Element.Opts.Rename_Pairs = null
+               and then Stmt.Save_List.First_Element.Opts.Keep_Vars = null
+               and then Stmt.Save_List.First_Element.Opts.Drop_Vars = null
+            then
                Legacy_Execute_SAVE;
                return;
             end if;
@@ -622,14 +712,42 @@ begin
          if SData_Core.Table.Column_Count = 0 and then not SData_Core.Config.Runtime.Repeat_Active then
             raise Script_Error with "BY statement requires an active dataset (use USE or REPEAT first).";
          end if;
-         SData_Core.Table.Clear_By_Vars;
+         --  BY is declarative: it sorts the input table and establishes the BY
+         --  variables.  Inside a data step the parser leaves the BY statement
+         --  in the per-record body, so it is dispatched once per record; the
+         --  guard below makes the 2nd..Nth dispatch a cheap no-op instead of
+         --  re-sorting the whole table every record (which was O(n^2 log n)).
+         --  The input table is immutable during the step and the sort is
+         --  stable, so if the requested BY variables already match the
+         --  established ones the table is already sorted by them.
          declare
             Curr_Var : Variable_List := Stmt.Sort_Vars;
             Count    : Natural := 0;
             Tmp      : Variable_List := Curr_Var;
+
+            function Already_Established return Boolean is
+               C : Variable_List := Stmt.Sort_Vars;
+            begin
+               if Count = 0 or else Count /= SData_Core.Table.By_Var_Count then
+                  return False;
+               end if;
+               for I in 1 .. Count loop
+                  if To_Upper (C.Var.Start_Name (1 .. C.Var.Start_Len))
+                       /= SData_Core.Table.By_Var_Name (I)
+                  then
+                     return False;
+                  end if;
+                  C := C.Next;
+               end loop;
+               return True;
+            end Already_Established;
          begin
             while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
-            if Count > 0 then
+            if Count = 0 then
+               --  Bare BY cancels grouping.
+               SData_Core.Table.Clear_By_Vars;
+            elsif not Already_Established then
+               SData_Core.Table.Clear_By_Vars;
                declare
                   Crit : Sort_Criteria_Array (1 .. Count);
                   Idx  : Positive := 1;
@@ -716,6 +834,8 @@ begin
                Put_Line ("OPTIONS SHELLTIMEOUT " & Ada.Strings.Fixed.Trim (SData_Core.Config.Runtime.Options_Shell_Timeout'Image, Ada.Strings.Both));
                Put_Line ("OPTIONS DEBUG " & Ada.Strings.Fixed.Trim (SData_Core.Config.Debug_Level'Image, Ada.Strings.Both));
                Put_Line ("OPTIONS JOIN_WARN_THRESHOLD " & Ada.Strings.Fixed.Trim (SData_Core.Config.Runtime.Options_Join_Warn_Threshold'Image, Ada.Strings.Both));
+               Put_Line ("OPTIONS PROGRESS " & Bool_Display (SData_Core.Config.Progress));
+               Put_Line ("OPTIONS WARNRESERVED " & Bool_Display (SData_Core.Config.Runtime.Options_Warn_Reserved));
             elsif Key = "MAXINTAB" then
                SData_Core.Config.Max_Table_Cells := Natural'Value (Val);
             elsif Key = "MAXTEMPMEM" then
@@ -742,6 +862,10 @@ begin
             elsif Key = "JOIN_WARN_THRESHOLD" then
                SData_Core.Commands.Execute_OPTIONS_Join_Warn_Threshold
                   (Natural'Value (Val));
+            elsif Key = "PROGRESS" then
+               SData_Core.Config.Progress := (Val_Upper = "YES");
+            elsif Key = "WARNRESERVED" then
+               SData_Core.Commands.Execute_OPTIONS_WarnReserved (Val_Upper = "YES");
             else
                Put_Line_Error ("Warning: Unknown OPTIONS key: " & Key);
             end if;

@@ -9,7 +9,8 @@ project SData is
                  "evaluator_unit_test.adb", "file_io_unit_test.adb",
                  "interpreter_unit_test.adb",
                  "csv_fuzz_driver.adb", "parser_fuzz_driver.adb",
-                 "ods_fuzz_driver.adb", "xlsx_fuzz_driver.adb");
+                 "ods_fuzz_driver.adb", "xlsx_fuzz_driver.adb",
+                 "merge_fuzz_driver.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use ("-gnat2012", "-gnatwa", "-gnatwl", "-gnatwu", "-g", "-O2");
@@ -27,5 +28,6 @@ project SData is
       for Executable ("parser_fuzz_driver.adb")     use "parser_fuzz_driver";
       for Executable ("ods_fuzz_driver.adb")        use "ods_fuzz_driver";
       for Executable ("xlsx_fuzz_driver.adb")       use "xlsx_fuzz_driver";
+      for Executable ("merge_fuzz_driver.adb")      use "merge_fuzz_driver";
    end Builder;
 end SData;

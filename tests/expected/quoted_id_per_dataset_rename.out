@@ -1,0 +1,15 @@
+Dataset opened: tests/data/reserved_cols.csv
+warning: column "USE" matches a reserved keyword; reference it as `USE` or rename it
+Permanent Variables (Table Columns):
+ID AS_COL USE 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
+ID AS_COL USE 
+Session Variables (SET):
+(none)
+Permanent Variables (Table Columns):
+ID AS_COL USE 
+Session Variables (SET):
+(none)
+RUN complete. 2 records and 3 variables processed.

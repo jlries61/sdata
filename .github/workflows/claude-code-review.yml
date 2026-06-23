@@ -22,6 +22,8 @@ jobs:
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
     runs-on: ubuntu-latest
+    # Cap the agentic review so a stuck run can't occupy a runner indefinitely.
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: read
@@ -30,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
