@@ -12,6 +12,7 @@ package body SData.AST is
    procedure Free_Stmt_Node     is new Ada.Unchecked_Deallocation (Statement,            Statement_Access);
    procedure Free_Dataset_Spec  is new Ada.Unchecked_Deallocation (Dataset_Spec,         Dataset_Spec_Access);
    procedure Free_Save_Spec     is new Ada.Unchecked_Deallocation (Save_Spec,            Save_Spec_Access);
+   procedure Free_Aggregate_Spec is new Ada.Unchecked_Deallocation (Aggregate_Spec,      Aggregate_Spec_Access);
 
    --  Forward declarations to resolve mutual recursion:
    --    Free(Statement_Access) <-> Free_Program
@@ -175,6 +176,15 @@ package body SData.AST is
             Free (Stmt.Sort_Vars);
          when Stmt_WRITE =>
             Free (Stmt.Write_Targets);
+         when Stmt_AGGREGATE =>
+            for I in Stmt.Agg_List.First_Index .. Stmt.Agg_List.Last_Index loop
+               declare
+                  AS : Aggregate_Spec_Access := Stmt.Agg_List (I);
+               begin
+                  Free_Aggregate_Spec (AS);
+               end;
+            end loop;
+            Stmt.Agg_List.Clear;
          when others =>
             null;
       end case;
