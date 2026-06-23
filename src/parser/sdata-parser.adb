@@ -1662,6 +1662,157 @@ package body SData.Parser is
 
    end Parse_SAVE_Stmt;
 
+   ----------------------
+   -- Parse_AGGREGATE  --
+   ----------------------
+   --  Parses "<outvar> = <fn>(<invar>) ..." into Stmt.Agg_List.  Catches the
+   --  parse-time errors of the AGGREGATE catalog (design spec sec 5):
+   --    #1 empty spec list, #2 unknown function, #3 missing argument,
+   --    #9 duplicate outvar.  The remaining errors (#4..#8, #10) are checked
+   --    later (interpreter / Execute_AGGREGATE).  Invar kind is resolved here
+   --    against the live array registry (Has_Array), matching Parse_Primary.
+   procedure Parse_AGGREGATE
+     (Ctx  : in out Parser_Context;
+      Stmt : Statement_Access)
+   is
+      --  #9 helper: has this (upper-cased) outvar already been parsed?
+      function Already_Seen (Name : String) return Boolean is
+         U : constant String := To_Upper (Name);
+      begin
+         for I in Stmt.Agg_List.First_Index .. Stmt.Agg_List.Last_Index loop
+            declare
+               S : constant Aggregate_Spec_Access := Stmt.Agg_List (I);
+            begin
+               if To_Upper (S.Outvar (1 .. S.Outvar_Len)) = U then
+                  return True;
+               end if;
+            end;
+         end loop;
+         return False;
+      end Already_Seen;
+   begin
+      while Is_Identifier_Token (Peek_Next_Token (Ctx.Lex_Ctx)) loop
+         declare
+            Out_Tok : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+            Outvar  : constant String := Identifier_Text (Out_Tok);
+            Spec    : constant Aggregate_Spec_Access := new Aggregate_Spec;
+            Eq_Tok  : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+         begin
+            if Eq_Tok.Kind /= Token_Equal then
+               raise Script_Error with
+                 "AGGREGATE: expected '=' after outvar '" & Outvar & "'";
+            end if;
+
+            --  #9 duplicate outvar (within this command).
+            if Already_Seen (Outvar) then
+               raise Script_Error with
+                 "AGGREGATE: duplicate outvar name '" & Outvar & "'";
+            end if;
+
+            Spec.Outvar_Len := Out_Tok.Length;
+            Spec.Outvar (1 .. Out_Tok.Length) := Outvar;
+
+            declare
+               Fn_Tok : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+               Fn     : constant String := Identifier_Text (Fn_Tok);
+            begin
+               if not Is_Identifier_Token (Fn_Tok) then
+                  raise Script_Error with
+                    "AGGREGATE: expected a function name after '" &
+                    Outvar & " ='";
+               end if;
+               --  #2 unknown function.
+               if not Is_Aggregate (To_Upper (Fn)) then
+                  raise Script_Error with
+                    "AGGREGATE: '" & Fn &
+                    "' is not a registered aggregate function";
+               end if;
+               Spec.Fn_Name_Len := Fn_Tok.Length;
+               Spec.Fn_Name (1 .. Fn_Tok.Length) := Fn;
+
+               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Left_Paren then
+                  raise Script_Error with
+                    "AGGREGATE: expected '(' after function '" & Fn & "'";
+               end if;
+
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Right_Paren then
+                  --  Empty argument list: only N() is legal (#3 otherwise).
+                  --  Consume the ')' so a following spec is not swallowed.
+                  declare
+                     Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     null;
+                  end;
+                  if To_Upper (Fn) /= "N" then
+                     raise Script_Error with
+                       "AGGREGATE: function '" & Fn & "' requires an argument";
+                  end if;
+                  Spec.Invar_Kind := Invar_Empty;
+               else
+                  declare
+                     In_Tok : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+                     Invar  : constant String := Identifier_Text (In_Tok);
+                  begin
+                     if not Is_Identifier_Token (In_Tok) then
+                        raise Script_Error with
+                          "AGGREGATE: expected a variable name as the "
+                          & "argument to '" & Fn & "'";
+                     end if;
+                     Spec.Invar_Name_Len := In_Tok.Length;
+                     Spec.Invar_Name (1 .. In_Tok.Length) := Invar;
+
+                     if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren
+                     then
+                        --  Array element: <name>(<positive int literal>)
+                        declare
+                           Discard : constant Token :=
+                             Get_Next_Token (Ctx.Lex_Ctx);  --  '('
+                           Idx_Tok : constant Token :=
+                             Get_Next_Token (Ctx.Lex_Ctx);
+                        begin
+                           if Idx_Tok.Kind /= Token_Numeric_Literal then
+                              raise Script_Error with
+                                "AGGREGATE: array subscript for '" & Invar &
+                                "' must be a positive integer literal";
+                           end if;
+                           Spec.Invar_Index :=
+                             Integer'Value (Idx_Tok.Text (1 .. Idx_Tok.Length));
+                           Spec.Invar_Kind := Invar_Array_Element;
+                           if Get_Next_Token (Ctx.Lex_Ctx).Kind
+                             /= Token_Right_Paren
+                           then
+                              raise Script_Error with
+                                "AGGREGATE: expected ')' after subscript for '"
+                                & Invar & "'";
+                           end if;
+                        end;
+                     else
+                        --  Bare name: could be a scalar column or a whole
+                        --  array.  The array registry is not yet populated at
+                        --  parse time in batch mode (USE has not run), so defer
+                        --  the scalar-vs-array decision to Execute_AGGREGATE.
+                        Spec.Invar_Kind := Invar_Scalar;
+                     end if;
+                  end;
+
+                  if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
+                     raise Script_Error with
+                       "AGGREGATE: expected ')' to close '" & Fn & "('";
+                  end if;
+               end if;
+            end;
+
+            Stmt.Agg_List.Append (Spec);
+         end;
+      end loop;
+
+      --  #1 at least one outvar spec required.
+      if Stmt.Agg_List.Is_Empty then
+         raise Script_Error with
+           "AGGREGATE: at least one outvar spec required";
+      end if;
+   end Parse_AGGREGATE;
+
    ---------------------
    -- Parse_Statement --
    ---------------------
@@ -2233,6 +2384,10 @@ package body SData.Parser is
          when Token_SORT | Token_BY =>
             Stmt := new Statement ((if Tok.Kind = Token_SORT then Stmt_SORT else Stmt_BY));
             Stmt.Sort_Vars := Parse_Variable_List (Ctx);
+
+         when Token_AGGREGATE =>
+            Stmt := new Statement (Stmt_AGGREGATE);
+            Parse_AGGREGATE (Ctx, Stmt);
 
          when Token_DELETE =>
             declare

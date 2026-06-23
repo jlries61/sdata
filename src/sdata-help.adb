@@ -18,7 +18,7 @@ package body SData.Help is
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
       Put_Line ("  Arrays:      ARRAY, DIM");
       Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK");
-      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, REPEAT");
+      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, REPEAT");
       Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
       Put_Line ("  Files/paths: FPATH");
       Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
@@ -228,6 +228,20 @@ package body SData.Help is
       Put_Line ("Reorders the Data Table based on the specified variables.");
       Put_Line ("Execution: Immediate -- re-orders the table at once.");
    end Help_SORT;
+
+   procedure Help_AGGREGATE is
+   begin
+      Put_Line ("Command: AGGREGATE outvar=fn(invar) [outvar=fn(invar) ...]");
+      Put_Line ("Collapses the Data Table to one row per active BY group, computing");
+      Put_Line ("aggregate functions over the chosen input columns. With no active BY,");
+      Put_Line ("the whole (SELECT-filtered) table is one group.");
+      Put_Line ("Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN.");
+      Put_Line ("  N() with no argument yields the group row count.");
+      Put_Line ("Input may be a scalar column, a whole array (applied element-wise), or");
+      Put_Line ("an array element such as x(1). The active SELECT filter is respected; a");
+      Put_Line ("pending SAVE is written; the active SELECT and BY are then cleared.");
+      Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
+   end Help_AGGREGATE;
 
    procedure Help_NEW is
    begin
@@ -1183,6 +1197,7 @@ package body SData.Help is
    K_DIM          : aliased constant String := "DIM";
    K_BY           : aliased constant String := "BY";
    K_SORT         : aliased constant String := "SORT";
+   K_AGGREGATE    : aliased constant String := "AGGREGATE";
    K_NEW          : aliased constant String := "NEW";
    K_LIST         : aliased constant String := "LIST";
    K_DISPLAY      : aliased constant String := "DISPLAY";
@@ -1396,6 +1411,7 @@ package body SData.Help is
       (K_DIM'Access,      Help_DIM'Access,      C, N),
       (K_BY'Access,       Help_BY'Access,       C, N),
       (K_SORT'Access,     Help_SORT'Access,     C, N),
+      (K_AGGREGATE'Access, Help_AGGREGATE'Access, C, N),
       (K_NEW'Access,      Help_NEW'Access,      C, N),
       (K_LIST'Access,     Help_LIST'Access,     C, N),
       (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),

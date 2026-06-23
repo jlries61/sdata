@@ -1,0 +1,6 @@
+Dataset opened: tests/data/sample.csv
+AGGREGATE complete. 3 records and 4 variables processed.
+REC# CATEGORY$ TOTAL MEANV NREC 
+1 A 5.00000 2.50000 2 
+2 B 30.00000 10.00000 3 
+3 C 16.00000 16.00000 1 

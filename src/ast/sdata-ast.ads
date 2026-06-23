@@ -97,6 +97,32 @@ package SData.AST is
    package Save_Spec_Vectors is new Ada.Containers.Vectors
      (Index_Type => Positive, Element_Type => Save_Spec_Access);
 
+   --  One "<outvar> = <fn>(<invar>)" clause of an AGGREGATE statement.
+   --  Mirrors SData_Core.Commands.Aggregate_Spec; the interpreter converts a
+   --  vector of these into the core type at dispatch.  Invar_Kind classifies
+   --  the input reference (resolved at parse time via Has_Array):
+   --    Invar_Empty         N() with no argument -> group row count
+   --    Invar_Scalar        a scalar column name
+   --    Invar_Array_Element an array element, e.g. x(1) (Invar_Index set)
+   --    Invar_Array_Name    a whole registered array, applied element-wise
+   type Aggregate_Invar_Kind is
+     (Invar_Empty, Invar_Scalar, Invar_Array_Element, Invar_Array_Name);
+
+   type Aggregate_Spec is record
+      Outvar         : String (1 .. Max_Name_Len) := (others => ' ');
+      Outvar_Len     : Natural := 0;
+      Fn_Name        : String (1 .. Max_Name_Len) := (others => ' ');
+      Fn_Name_Len    : Natural := 0;
+      Invar_Kind     : Aggregate_Invar_Kind := Invar_Empty;
+      Invar_Name     : String (1 .. Max_Name_Len) := (others => ' ');
+      Invar_Name_Len : Natural := 0;
+      Invar_Index    : Natural := 0;
+   end record;
+   type Aggregate_Spec_Access is access all Aggregate_Spec;
+
+   package Aggregate_Spec_Vectors is new Ada.Containers.Vectors
+     (Index_Type => Positive, Element_Type => Aggregate_Spec_Access);
+
    type Merge_Mode is (MM_Single, MM_Positional, MM_Match,
                        MM_Interleave, MM_Join, MM_Append);
 
@@ -155,7 +181,8 @@ package SData.AST is
       Stmt_NEW,            -- Reset environment
       Stmt_PROGRAM_DELETE, -- Delete line(s) from program buffer (immediate)
       Stmt_DISPLAY,        -- Display Data Table rows (immediate)
-      Stmt_OPTIONS         -- Set runtime option (OPTIONS key value)
+      Stmt_OPTIONS,        -- Set runtime option (OPTIONS key value)
+      Stmt_AGGREGATE       -- Collapse table to one row per BY group (immediate)
    );
 
    type Statement (Kind : Statement_Kind) is record
@@ -262,6 +289,8 @@ package SData.AST is
             --  Empty Write_Targets = legacy bare WRITE (write to all
             --  registered SAVE targets). Non-empty = route only to these.
             Write_Targets : Variable_List;
+         when Stmt_AGGREGATE =>
+            Agg_List : Aggregate_Spec_Vectors.Vector;
          when others =>
             null;
       end case;

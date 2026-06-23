@@ -42,7 +42,17 @@ begin
                   Sub_Prog := Parse_Program (Sub_Ctx);
                   Debug_Trace ("SUBMIT: entering "
                                & Stmt.File_Path (1 .. Stmt.File_Len), 1);
-                  Execute (Sub_Prog);
+                  --  A SUBMIT sub-program is a self-contained statement stream:
+                  --  its pending-deferred state must not perturb the caller's
+                  --  (otherwise a sub-script's trailing RUN would clear, or its
+                  --  un-run tail would inflate, the outer count that AGGREGATE's
+                  --  #10 guard observes).  Snapshot and restore around it.
+                  declare
+                     Saved_Pending : constant Natural := Pending_Deferred;
+                  begin
+                     Execute (Sub_Prog);
+                     Pending_Deferred := Saved_Pending;
+                  end;
                   SData.AST.Free_Program (Sub_Prog);
                end;
                Free_Buf (Contents);

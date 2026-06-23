@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-06-20" "sdata 0.9.8" "User Commands"
+.TH SDATA 1 "2026-06-23" "sdata 0.10.0" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -488,6 +488,48 @@ SELECT filter or BY grouping.
 .TP
 .B SORT \fIvar\fR [\fIvar\fR ...]
 Re\-order the data table.
+.TP
+.B AGGREGATE \fIoutvar\fB=\fIfn\fB(\fIinvar\fB)\fR [\fIoutvar\fB=\fIfn\fB(\fIinvar\fB)\fR ...]
+Collapse the data table to one row per active
+.B BY
+group, computing an aggregate
+.I fn
+.RB ( SUM ,
+.BR MEAN ,
+.BR STD ,
+.BR VAR ,
+.BR MIN ,
+.BR MAX ,
+.BR N ,
+.BR NMISS ,
+.BR GMEAN ,
+.BR HMEAN ,
+or
+.BR MEDIAN )
+over each input column.
+With no active
+.B BY
+the whole table is one group.
+.I invar
+may be a scalar column, a whole array (applied element\-wise to each subscript),
+or an array element such as
+.IR x(1) ;
+.B N()
+with no argument is the group row count.
+The active
+.B SELECT
+filter is respected during the scan; a pending
+.B SAVE
+is written; then the active
+.B SELECT
+and
+.B BY
+are cleared.
+The deferred program buffer must hold no un\-run statements (issue
+.B RUN
+or
+.B NEW
+first).
 .TP
 .B NAMES
 List all permanent and temporary variables currently defined.
