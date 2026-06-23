@@ -13,6 +13,7 @@ package body SData.Reserved_Keywords is
       --  Slash-only forms ("/USE", "/MOCK", etc.) are excluded: a CSV column
       --  name cannot start with '/', so they pose no collision risk. Their bare
       --  equivalents (USE, MOCK, SAVE, SUBMIT, SYSTEM, OUTPUT, ALL) ARE included.
+      S.Insert ("AGGREGATE");
       S.Insert ("ALL");
       S.Insert ("AND");
       S.Insert ("APPEND");
