@@ -1,0 +1,6 @@
+-- AGGREGATE: single BY variable.
+USE "tests/data/sample.csv"
+BY CATEGORY$
+AGGREGATE TOTAL=SUM(VAL1) MEANV=MEAN(VAL1) NREC=N()
+DISPLAY
+QUIT

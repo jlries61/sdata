@@ -1,0 +1,6 @@
+Dataset opened: tests/data/sample.csv
+AGGREGATE complete. 3 records and 2 variables processed.
+REC# CATEGORY$ NREC 
+1 A 2 
+2 B 3 
+3 C 1 

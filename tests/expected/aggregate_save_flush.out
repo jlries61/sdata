@@ -1,0 +1,7 @@
+Dataset opened: tests/data/sample.csv
+Dataset saved: /tmp/aggregate_save_flush_out.csv
+AGGREGATE complete. 3 records and 3 variables processed.
+REC# CATEGORY$ TOTAL NREC 
+1 A 5.00000 2 
+2 B 30.00000 3 
+3 C 16.00000 1 
