@@ -905,6 +905,12 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>Sort the output dataset by the variables named.</td>
 </tr>
 <tr>
+<td><em>AGGREGATE</em></td>
+<td><em>AGGREGATE</em> &lt;<em>outvar</em>&gt;=&lt;<em>fn</em>&gt;(&lt;<em>invar</em>&gt;) [&lt;<em>outvar</em>&gt;=&lt;<em>fn</em>&gt;(&lt;<em>invar</em>&gt;)...]</td>
+<td>Immediate Execution</td>
+<td>Collapse the data table to one row per active <em>BY</em> group, computing an aggregate function for each <em>outvar</em>. With no active <em>BY</em>, the whole table is one group. <em>fn</em> is any registered aggregate function (<em>SUM</em>, <em>MEAN</em>, <em>STD</em>, <em>VAR</em>, <em>MIN</em>, <em>MAX</em>, <em>N</em>, <em>NMISS</em>, <em>GMEAN</em>, <em>HMEAN</em>, <em>MEDIAN</em>); non-aggregate functions are rejected at parse time. An aggregate function accepts a character input only if its dispatch metadata permits it (currently only <em>N</em> and <em>NMISS</em>). <em>invar</em> may be a scalar column, a whole array (the output is an array with the input's bounds, computed element-wise), or an array element such as <em>x(1)</em>. Every function except <em>N</em> requires an argument; <em>N()</em> with no argument yields the integer group row count. The output table has the active BY variables (one row per group) followed by the outvar columns in command order. The active <em>SELECT</em> filter is respected during the group scan; if a <em>SAVE</em> is pending the result is written to it; then the active <em>SELECT</em> and <em>BY</em> are cleared. AGGREGATE refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). Note that because <em>BY</em> sorts the table, equal BY-key values are always grouped together even if they were non-adjacent in the input.</td>
+</tr>
+<tr>
 <td><em>SUBMIT</em></td>
 <td><em>SUBMIT</em> &lt;<em>filename</em> &gt;</td>
 <td>Deferred Execution</td>

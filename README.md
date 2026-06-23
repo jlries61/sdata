@@ -13,7 +13,7 @@ include:
 - Aggregate functions (mean, median, standard deviation, etc.)
 - Permanent and temporary variables, arrays (permanent, temporary, and virtual)
 - Control flow (IF/THEN/ELSE, FOR/NEXT, WHILE, REPEAT/UNTIL, SELECT/CASE)
-- BY-group processing
+- BY-group processing, including the `AGGREGATE` command (collapse to one summary row per group)
 - SYSTEM/SHELL integration (can be disabled)
 
 ## Build Requirements
