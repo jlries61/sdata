@@ -81,13 +81,16 @@ package body SData.Interpreter is
    package Program_Vectors is new Ada.Containers.Vectors (Positive, Program_Entry);
    Active_Program_Vec : Program_Vectors.Vector;
 
-   --  Length of Active_Program_Vec at the most recent RUN.  Statements appended
-   --  after the last RUN (buffer length beyond this watermark) are "pending /
-   --  un-run".  AGGREGATE refuses to run while such pending statements exist
-   --  (error #10) — running them (which advances this watermark to the full
-   --  buffer length) or clearing the program resolves the condition, so the
-   --  "issue RUN or NEW first" guidance is accurate.
-   Committed_Program_Len : Natural := 0;
+   --  Count of deferred statements queued since the most recent RUN (or NEW).
+   --  These are "pending / un-run": their per-record effect has not yet been
+   --  committed to the table.  AGGREGATE refuses to run while any are pending
+   --  (error #10) because it would otherwise silently aggregate the table
+   --  without their effect; a RUN (which executes and resets the count) or NEW
+   --  resolves the condition.  Maintained by BOTH execution paths — the REPL
+   --  (Add_To_Active_Program / Run_Active_Program) and the batch linked-list
+   --  walker in Execute — so #10 fires consistently in interactive and script
+   --  modes.
+   Pending_Deferred : Natural := 0;
 
    function Is_Immediate (Kind : Statement_Kind) return Boolean is
    begin
@@ -349,6 +352,8 @@ package body SData.Interpreter is
    begin
       if Stmt = null then return; end if;
       Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
+      --  A newly queued deferred statement is pending until the next RUN.
+      Pending_Deferred := Pending_Deferred + 1;
    end Add_To_Active_Program;
 
    procedure Clear_Active_Program is
@@ -358,7 +363,7 @@ package body SData.Interpreter is
          SData.AST.Free_Program (E.Stmt);
       end loop;
       Active_Program_Vec.Clear;
-      Committed_Program_Len := 0;
+      Pending_Deferred := 0;
       SData_Core.Table.Clear_Index_Map;
       SData_Core.Table.Clear_By_Vars;
    end Clear_Active_Program;
@@ -420,8 +425,8 @@ package body SData.Interpreter is
             SData.AST.Free_Program (Run_Cap);
          end;
       end if;
-      --  The whole buffer has now been run; nothing is pending.
-      Committed_Program_Len := Natural (Active_Program_Vec.Length);
+      --  The buffer has now been run; nothing is pending.
+      Pending_Deferred := 0;
    end Run_Active_Program;
 
    procedure Add_Pending_Mod (Kind : Column_Mod_Kind; Name : String) is
@@ -765,9 +770,9 @@ package body SData.Interpreter is
    begin
       --  #10 — there must be no pending (un-run) deferred statements.  A
       --  data-step program that has already been run may remain resident
-      --  (RUN does not clear it); only statements appended since the last RUN
+      --  (RUN does not clear it); only statements queued since the last RUN
       --  block AGGREGATE, since those would otherwise be silently dropped.
-      if Program_Buffer_Length > Committed_Program_Len then
+      if Pending_Deferred > 0 then
          raise SData_Core.Script_Error with
            "AGGREGATE: pending program statements exist; issue RUN or NEW first";
       end if;
@@ -1245,6 +1250,8 @@ package body SData.Interpreter is
                             VC (VC'First + 1 .. VC'Last) & " variables processed.");
                end if;
             end;
+            --  Deferred body just ran; nothing pending until more is queued.
+            Pending_Deferred := 0;
             Step_Start := Current.Next;
          elsif Current.Kind /= Stmt_LET and then Current.Kind /= Stmt_SET
             and then Current.Kind /= Stmt_PRINT  and then Current.Kind /= Stmt_IF
@@ -1271,6 +1278,11 @@ package body SData.Interpreter is
                         (1, SData_Core.Table.Get_Current_Record_Index);
                   else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
             end;
+         else
+            --  A deferred statement (LET/SET/PRINT/IF/...) skipped by this
+            --  walker: it runs later at the next RUN.  Until then it is pending,
+            --  which AGGREGATE's #10 guard observes.
+            Pending_Deferred := Pending_Deferred + 1;
          end if;
          Current := Current.Next;
       end loop;

@@ -1737,6 +1737,12 @@ package body SData.Parser is
 
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Right_Paren then
                   --  Empty argument list: only N() is legal (#3 otherwise).
+                  --  Consume the ')' so a following spec is not swallowed.
+                  declare
+                     Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     null;
+                  end;
                   if To_Upper (Fn) /= "N" then
                      raise Script_Error with
                        "AGGREGATE: function '" & Fn & "' requires an argument";
@@ -1780,9 +1786,11 @@ package body SData.Parser is
                                 & Invar & "'";
                            end if;
                         end;
-                     elsif Has_Array (To_Upper (Invar)) then
-                        Spec.Invar_Kind := Invar_Array_Name;
                      else
+                        --  Bare name: could be a scalar column or a whole
+                        --  array.  The array registry is not yet populated at
+                        --  parse time in batch mode (USE has not run), so defer
+                        --  the scalar-vs-array decision to Execute_AGGREGATE.
                         Spec.Invar_Kind := Invar_Scalar;
                      end if;
                   end;
