@@ -754,6 +754,10 @@ package body SData.Interpreter is
       for I in reverse From .. To loop
          Active_Program_Vec.Delete (I);
       end loop;
+      --  Deleting queued lines may have removed pending (un-run) statements;
+      --  the pending count can never exceed what remains in the buffer.
+      Pending_Deferred :=
+        Natural'Min (Pending_Deferred, Natural (Active_Program_Vec.Length));
    end Execute_Program_Delete;
 
    --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW / OPTIONS.
