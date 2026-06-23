@@ -125,6 +125,17 @@ Command: SORT variable(s)
 Reorders the Data Table based on the specified variables.
 Execution: Immediate -- re-orders the table at once.
 
+Command: AGGREGATE outvar=fn(invar) [outvar=fn(invar) ...]
+Collapses the Data Table to one row per active BY group, computing
+aggregate functions over the chosen input columns. With no active BY,
+the whole (SELECT-filtered) table is one group.
+Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN.
+  N() with no argument yields the group row count.
+Input may be a scalar column, a whole array (applied element-wise), or
+an array element such as x(1). The active SELECT filter is respected; a
+pending SAVE is written; the active SELECT and BY are then cleared.
+Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
+
 Command: NEW
 Clears the Data Table, all variables, and the queued program.
 Also resets the active SELECT record filter and BY grouping.
