@@ -143,6 +143,13 @@ Examples:
 - *FINGER_LEN(1)* - Member of a numeric array.
 - *ALIAS\$(2)* - Member of a character array.
 
+Type Compatibility:
+
+- The type indicated by a name's suffix is fixed: a *\$* name is always character, a *%* name is always integer, and an unsuffixed name is always floating point.
+- Numeric kinds interconvert on assignment (an integer value assigned to a floating-point name is promoted; a floating-point value assigned to a *%* name is truncated), but character and numeric values never interconvert.
+- Assigning a character value to a numeric name (or a numeric value to a *\$* name) is therefore always an error. For example, *SET NAME = "foo"* fails because *NAME* is numeric; the character form is *SET NAME\$ = "foo"*.
+- When the right-hand side of a *LET* or *SET* is a literal, this conflict is detected immediately, as the statement is entered, rather than being deferred to the next *RUN*. (When the right-hand side is a variable or expression, whose kind is not known until the data step executes, the check remains deferred to *RUN*.)
+
 Quoted Identifiers (Backtick Form):
 
 - A column or variable whose name collides with a reserved keyword, or contains spaces or dots, can be referenced by enclosing it in backticks (`` ` ``).
@@ -728,6 +735,12 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>Delete the current record and start processing the next record.</td>
 </tr>
 <tr>
+<td><em>INSERT</em></td>
+<td><em>INSERT</em> [ &lt;<em>line</em>&gt; | <em>$</em> ]</td>
+<td>Immediate Execution</td>
+<td>Set the program-buffer insertion point so subsequently entered deferred statements are inserted there instead of appended. <em>INSERT 0</em> inserts before the first line; <em>INSERT n</em> inserts after existing line <em>n</em>; <em>INSERT $</em> (or bare <em>INSERT</em>) appends at the end (the default). The cursor is sticky: it persists across <em>RUN</em> and advances as lines are inserted; <em>NEW</em> or another <em>INSERT</em> resets it. A line number past the end warns and clamps to the end; a negative line number is rejected with a warning. Only meaningful in interactive (REPL) mode.</td>
+</tr>
+<tr>
 <td><em>DIGITS</em></td>
 <td><em>DIGITS(n)</em></td>
 <td>Declarative</td>
@@ -909,6 +922,12 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>AGGREGATE</em> &lt;<em>outvar</em>&gt;=&lt;<em>fn</em>&gt;(&lt;<em>invar</em>&gt;) [&lt;<em>outvar</em>&gt;=&lt;<em>fn</em>&gt;(&lt;<em>invar</em>&gt;)...]</td>
 <td>Immediate Execution</td>
 <td>Collapse the data table to one row per active <em>BY</em> group, computing an aggregate function for each <em>outvar</em>. With no active <em>BY</em>, the whole table is one group. <em>fn</em> is any registered aggregate function (<em>SUM</em>, <em>MEAN</em>, <em>STD</em>, <em>VAR</em>, <em>MIN</em>, <em>MAX</em>, <em>N</em>, <em>NMISS</em>, <em>GMEAN</em>, <em>HMEAN</em>, <em>MEDIAN</em>); non-aggregate functions are rejected at parse time. An aggregate function accepts a character input only if its dispatch metadata permits it (currently only <em>N</em> and <em>NMISS</em>). <em>invar</em> may be a scalar column, a whole array (the output is an array with the input's bounds, computed element-wise), or an array element such as <em>x(1)</em>. Every function except <em>N</em> requires an argument; <em>N()</em> with no argument yields the integer group row count. The output table has the active BY variables (one row per group) followed by the outvar columns in command order. The active <em>SELECT</em> filter is respected during the group scan; if a <em>SAVE</em> is pending the result is written to it; then the active <em>SELECT</em> and <em>BY</em> are cleared. AGGREGATE refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). Note that because <em>BY</em> sorts the table, equal BY-key values are always grouped together even if they were non-adjacent in the input.</td>
+</tr>
+<tr>
+<td><em>TRANSPOSE</em></td>
+<td><em>TRANSPOSE</em> [/<em>KEEP</em>=<em>varlist</em>] [/<em>DROP</em>=<em>varlist</em>] [/<em>NAME</em>=<em>var$</em>] [/<em>ID</em>=<em>var</em>] [/<em>ARRAY</em>=<em>var</em>]</td>
+<td>Immediate Execution</td>
+<td>Reshape the data table: each column in the <em>transposed set</em> becomes one output row; each input row becomes one value column. With an active <em>BY</em>, each BY block is transposed separately into the same output table. The <em>transposed set</em> is determined by <em>/KEEP</em> and <em>/DROP</em> (combined as KEEP∖DROP; default: all non-BY columns). All columns in the transposed set must share a single type (all numeric or all character); a mixed set is an error. The output schema is: BY variables (one value per output row for that block), a name column (default <em>_NAME_$</em>, overridden by <em>/NAME=var$</em>) whose value is the original column name, and then the transposed value columns. <em>/ARRAY</em> and <em>/ID</em> are mutually exclusive; if neither is given, <em>/ARRAY=_X_</em> is implied. <em>/ARRAY=var</em> produces a long-form output: <em>var(1)..var(K)</em> where K is the maximum block row count across all blocks; shorter blocks are padded with missing values. The <em>/ARRAY</em> name's <em>$</em>-suffix must match the transposed-set type. <em>/ID=var</em> produces a wide-form output: the values of <em>var</em> become output column names (in first-encounter order across all blocks), and <em>var</em> is auto-excluded from the transposed set; sparse blocks (missing an ID value) leave that cell missing. The active <em>SELECT</em> filter is respected during the scan; a pending <em>SAVE</em> is written; then the active <em>SELECT</em> and <em>BY</em> are cleared. TRANSPOSE refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). See also <em>AGGREGATE</em>.</td>
 </tr>
 <tr>
 <td><em>SUBMIT</em></td>

@@ -35,8 +35,8 @@ with SData_Core.File_IO;
 --  Execution model (three tiers):
 --    Declarative       Commands such as USE, BY, SELECT, REPEAT, SAVE, FPATH
 --                      execute immediately and configure interpreter state.
---    Immediate         RUN, SORT, AGGREGATE, NEW, NAMES, SYSTEM, HELP execute
---                      immediately but are not purely declarative.
+--    Immediate         RUN, SORT, AGGREGATE, TRANSPOSE, NEW, NAMES, SYSTEM, HELP
+--                      execute immediately but are not purely declarative.
 --    Deferred          LET, SET, PRINT, IF, FOR, WHILE, WRITE, DELETE are
 --                      queued in the statement list between two RUN markers and
 --                      executed once per record inside Run_One_Step.
@@ -92,6 +92,15 @@ package body SData.Interpreter is
    --  modes.
    Pending_Deferred : Natural := 0;
 
+   --  Program-buffer insertion cursor (REPL editing, issue #32).
+   --  When Append_Mode is True, newly queued deferred statements append
+   --  (default).  When False, they are inserted after line Insert_Point
+   --  (0 = before line 1) and the cursor advances past each one.  Sticky:
+   --  persists across RUN; reset to append only by NEW (Clear_Active_Program)
+   --  or another INSERT.
+   Append_Mode  : Boolean := True;
+   Insert_Point : Natural := 0;
+
    function Is_Immediate (Kind : Statement_Kind) return Boolean is
    begin
       return Kind in
@@ -100,7 +109,8 @@ package body SData.Interpreter is
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
-         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE;
+         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE |
+         Stmt_TRANSPOSE | Stmt_PROGRAM_INSERT;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -124,6 +134,7 @@ package body SData.Interpreter is
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context);
    procedure Execute_Metadata        (Stmt : Statement_Access);
    procedure Execute_Program_Delete  (Stmt : Statement_Access);
+   procedure Execute_Program_Insert  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
    function  Group_Flags (Logical_I     : Positive;
@@ -351,7 +362,16 @@ package body SData.Interpreter is
    procedure Add_To_Active_Program (Stmt : Statement_Access; Source : String := "") is
    begin
       if Stmt = null then return; end if;
-      Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
+      if Append_Mode then
+         Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
+      else
+         --  Insert after line Insert_Point (vector index Insert_Point + 1),
+         --  then advance the cursor so consecutive inserts keep their order.
+         Active_Program_Vec.Insert
+           (Before   => Insert_Point + 1,
+            New_Item => (Stmt => Stmt, Source => To_Unbounded_String (Source)));
+         Insert_Point := Insert_Point + 1;
+      end if;
       --  A newly queued deferred statement is pending until the next RUN.
       Pending_Deferred := Pending_Deferred + 1;
    end Add_To_Active_Program;
@@ -364,6 +384,8 @@ package body SData.Interpreter is
       end loop;
       Active_Program_Vec.Clear;
       Pending_Deferred := 0;
+      Append_Mode  := True;
+      Insert_Point := 0;
       SData_Core.Table.Clear_Index_Map;
       SData_Core.Table.Clear_By_Vars;
    end Clear_Active_Program;
@@ -408,6 +430,23 @@ package body SData.Interpreter is
          declare
             Last    : constant Positive := Natural (Active_Program_Vec.Length);
             Run_Cap : Statement_Access := new Statement (Stmt_RUN);
+
+            --  Restore every transiently-set Next pointer to null and free the
+            --  synthetic cap.  This MUST run whether Execute returns normally
+            --  or propagates an exception (e.g. a per-record type mismatch in
+            --  the REPL, where the error is not continued-on): otherwise the
+            --  vector entries stay chained together, and a later
+            --  Clear_Active_Program walks one entry's Next chain and frees the
+            --  following entries too, double-freeing them on the next loop
+            --  iteration (issue #31 — NEW after a failed RUN crashing with
+            --  "s-intman.adb:136 explicit raise").
+            procedure Unchain is
+            begin
+               for I in 1 .. Last loop
+                  Active_Program_Vec (I).Stmt.Next := null;
+               end loop;
+               SData.AST.Free_Program (Run_Cap);
+            end Unchain;
          begin
             --  Transiently chain vector entries and cap with a synthetic
             --  Stmt_RUN so Execute's outer loop triggers deferred processing.
@@ -417,12 +456,14 @@ package body SData.Interpreter is
                   Active_Program_Vec (I + 1).Stmt;
             end loop;
             Active_Program_Vec (Last).Stmt.Next := Run_Cap;
-            Execute (Active_Program_Vec (1).Stmt);
-            --  Unchain: restore all Next pointers to null, then free the cap.
-            for I in 1 .. Last loop
-               Active_Program_Vec (I).Stmt.Next := null;
-            end loop;
-            SData.AST.Free_Program (Run_Cap);
+            begin
+               Execute (Active_Program_Vec (1).Stmt);
+            exception
+               when others =>
+                  Unchain;
+                  raise;
+            end;
+            Unchain;
          end;
       end if;
       --  The buffer has now been run; nothing is pending.
@@ -758,7 +799,57 @@ package body SData.Interpreter is
       --  the pending count can never exceed what remains in the buffer.
       Pending_Deferred :=
         Natural'Min (Pending_Deferred, Natural (Active_Program_Vec.Length));
+      --  Keep the insertion cursor meaningful after deletion (issue #32).
+      if not Append_Mode then
+         declare
+            Span : constant Natural := To - From + 1;  --  lines removed
+            New_Last : constant Natural := Natural (Active_Program_Vec.Length);
+         begin
+            if Insert_Point >= To then
+               Insert_Point := Insert_Point - Span;       --  cursor after span
+            elsif Insert_Point >= From - 1 then
+               Insert_Point := From - 1;                  --  cursor inside span
+            end if;                                        --  else: before span, keep
+            if Insert_Point > New_Last then
+               Insert_Point := New_Last;                  --  final clamp
+            end if;
+         end;
+      end if;
    end Execute_Program_Delete;
+
+   --  Execute_Program_Insert — set the program-buffer insertion cursor.
+   --  $/bare INSERT -> append mode.  INSERT n -> after line n (0 = start);
+   --  n beyond the buffer warns and clamps to end (append).  Prints a
+   --  one-line confirmation either way.
+   procedure Execute_Program_Insert (Stmt : Statement_Access) is
+      Last : constant Natural := Natural (Active_Program_Vec.Length);
+   begin
+      if Stmt.Insert_Bad then
+         Put_Line_Error ("Warning: INSERT line number must be >= 0; "
+                         & "insertion point unchanged.");
+         return;
+      elsif Stmt.Insert_At_End then
+         Append_Mode  := True;
+         Insert_Point := 0;
+         Put_Line ("Insertion point set at end (append).");
+      elsif Stmt.Insert_Line > Last then
+         Put_Line_Error ("Warning: INSERT line" & Stmt.Insert_Line'Image
+                         & " out of range (buffer has" & Last'Image
+                         & " entries); inserting at end.");
+         Append_Mode  := True;
+         Insert_Point := 0;
+         Put_Line ("Insertion point set at end (append).");
+      elsif Stmt.Insert_Line = 0 then
+         Append_Mode  := False;
+         Insert_Point := 0;
+         Put_Line ("Insertion point set at beginning.");
+      else
+         Append_Mode  := False;
+         Insert_Point := Stmt.Insert_Line;
+         Put_Line ("Insertion point set after line"
+                   & Stmt.Insert_Line'Image & ".");
+      end if;
+   end Execute_Program_Insert;
 
    --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW / OPTIONS.
    procedure Execute_Declarative (Stmt : Statement_Access) is separate;
@@ -816,6 +907,64 @@ package body SData.Interpreter is
                    VC (VC'First + 1 .. VC'Last) & " variables processed.");
       end;
    end Execute_Aggregate;
+
+   --  TRANSPOSE (immediate).  Enforces error #12 (no pending deferred
+   --  statements), converts the AST fields into the core Transpose_Options
+   --  type, and delegates the heavy lifting to
+   --  SData_Core.Commands.Execute_TRANSPOSE.
+   procedure Execute_Transpose (Stmt : Statement_Access) is
+      Opts : SData_Core.Commands.Transpose_Options;
+   begin
+      --  #12 — there must be no pending (un-run) deferred statements.
+      if Pending_Deferred > 0 then
+         raise SData_Core.Script_Error with
+           "TRANSPOSE: pending program statements exist; issue RUN or NEW first";
+      end if;
+
+      --  Convert Keep_Vars Variable_List → Keep_List Name_Vectors.Vector.
+      declare
+         Curr : Variable_List := Stmt.Keep_Vars;
+      begin
+         while Curr /= null loop
+            Opts.Keep_List.Append
+              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
+            Curr := Curr.Next;
+         end loop;
+      end;
+
+      --  Convert Drop_Vars Variable_List → Drop_List Name_Vectors.Vector.
+      declare
+         Curr : Variable_List := Stmt.Drop_Vars;
+      begin
+         while Curr /= null loop
+            Opts.Drop_List.Append
+              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
+            Curr := Curr.Next;
+         end loop;
+      end;
+
+      --  Fixed-string fields → Unbounded_String.  Pass empty strings as-is;
+      --  Execute_TRANSPOSE applies the defaults (_NAME_$ and _X_).
+      Opts.Name_Col   :=
+        To_Unbounded_String (Stmt.Name_Col (1 .. Stmt.Name_Col_Len));
+      Opts.Id_Col     :=
+        To_Unbounded_String (Stmt.Id_Col (1 .. Stmt.Id_Col_Len));
+      Opts.Array_Name :=
+        To_Unbounded_String (Stmt.Array_Col (1 .. Stmt.Array_Col_Len));
+      Opts.Has_Id    := Stmt.Has_Id;
+      Opts.Has_Array := Stmt.Has_Array;
+
+      SData_Core.Commands.Execute_TRANSPOSE (Opts);
+
+      declare
+         RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
+         VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
+      begin
+         Put_Line ("TRANSPOSE complete. " &
+                   RC (RC'First + 1 .. RC'Last) & " records and " &
+                   VC (VC'First + 1 .. VC'Last) & " variables processed.");
+      end;
+   end Execute_Transpose;
 
    procedure Execute_Statement (Stmt : Statement_Access; Ctx : in out Step_Context) is
 
@@ -922,8 +1071,12 @@ package body SData.Interpreter is
             Execute_Metadata (Stmt);
          when Stmt_PROGRAM_DELETE =>
             Execute_Program_Delete (Stmt);
+         when Stmt_PROGRAM_INSERT =>
+            Execute_Program_Insert (Stmt);
          when Stmt_AGGREGATE =>
             Execute_Aggregate (Stmt);
+         when Stmt_TRANSPOSE =>
+            Execute_Transpose (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
             | Stmt_OPTIONS =>

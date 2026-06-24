@@ -167,6 +167,7 @@ Commands that trigger an action at once, outside any data step. They are not que
 | `NEW` | Reset interpreter state; discard deferred list and pending configuration |
 | `SORT BY var … [/DESC]` | Sort the current table in place |
 | `AGGREGATE out=fn(in) …` | Collapse the table to one row per active BY group via `SData_Core.Commands.Execute_AGGREGATE` (build-and-swap; flushes pending SAVE; clears SELECT and BY) |
+| `TRANSPOSE [/KEEP=…] [/DROP=…] [/NAME=…] [/ID=…] [/ARRAY=…]` | Pivot columns→rows via `SData_Core.Commands.Execute_TRANSPOSE` (build-and-swap; flushes pending SAVE; clears SELECT and BY) |
 | `NAMES` | Print column names of the current dataset |
 | `SYSTEM cmd` | Pass a shell command to the OS |
 | `HELP [topic]` | Print help text |

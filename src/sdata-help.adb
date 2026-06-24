@@ -14,11 +14,11 @@ package body SData.Help is
    procedure Help_Index is
    begin
       Put_Line ("Available Commands:");
-      Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, DISPLAY");
+      Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, INSERT, DISPLAY");
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
       Put_Line ("  Arrays:      ARRAY, DIM");
       Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK");
-      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, REPEAT");
+      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, TRANSPOSE, REPEAT");
       Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
       Put_Line ("  Files/paths: FPATH");
       Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
@@ -243,6 +243,24 @@ package body SData.Help is
       Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
    end Help_AGGREGATE;
 
+   procedure Help_TRANSPOSE is
+   begin
+      Put_Line ("Command: TRANSPOSE [/KEEP=varlist] [/DROP=varlist] [/NAME=var$]" &
+                " [/ID=var] [/ARRAY=var]");
+      Put_Line ("Reshapes the Data Table so that each transposed column becomes a row.");
+      Put_Line ("  /KEEP, /DROP: select which columns to transpose (default: all non-BY");
+      Put_Line ("                columns); the effective set is KEEP minus DROP.");
+      Put_Line ("  /NAME:  character column that receives the source column name");
+      Put_Line ("          in each output row (default: _NAME_$).");
+      Put_Line ("  /ID:    column whose values become output column names (wide form);");
+      Put_Line ("          mutually exclusive with /ARRAY.");
+      Put_Line ("  /ARRAY: base name of the array of transposed values in each output");
+      Put_Line ("          row (long form, default: _X_); used when /ID is absent.");
+      Put_Line ("Respects the active SELECT filter; transposes each BY block separately.");
+      Put_Line ("Flushes a pending SAVE; clears the active SELECT and BY afterward.");
+      Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
+   end Help_TRANSPOSE;
+
    procedure Help_NEW is
    begin
       Put_Line ("Command: NEW");
@@ -259,6 +277,7 @@ package body SData.Help is
       Put_Line ("queued for the next RUN).  If the buffer is empty, reports that fact.");
       Put_Line ("See also: DISPLAY to show Data Table records.");
       Put_Line ("          DELETE n[-m] to remove program buffer entries.");
+      Put_Line ("          INSERT [n|$] to set where new statements are inserted.");
    end Help_LIST;
 
    procedure Help_DISPLAY is
@@ -290,6 +309,23 @@ package body SData.Help is
       Put_Line ("                   Execution: Immediate -- takes effect at once.");
       Put_Line ("                   Only meaningful in interactive (REPL) mode.");
    end Help_DELETE;
+
+   procedure Help_INSERT is
+   begin
+      Put_Line ("Command: INSERT");
+      Put_Line ("Execution: Immediate -- takes effect at once.");
+      Put_Line ("Sets the program-buffer insertion point so that subsequently");
+      Put_Line ("entered deferred statements are inserted there instead of appended.");
+      Put_Line ("  INSERT 0    Insert before the first line (start of program).");
+      Put_Line ("  INSERT n    Insert after existing line n (1-based).");
+      Put_Line ("  INSERT $    Insert at the end (append).  This is the default.");
+      Put_Line ("  INSERT      Bare form; same as INSERT $.");
+      Put_Line ("The cursor is sticky: it persists across RUN and advances as lines");
+      Put_Line ("are inserted.  NEW or another INSERT resets it.  n past the end");
+      Put_Line ("warns and clamps to the end; a negative n is rejected (no-op).");
+      Put_Line ("Only meaningful in interactive (REPL) mode.");
+      Put_Line ("See LIST (shows the marker) and DELETE.");
+   end Help_INSERT;
 
    procedure Help_BREAK is
    begin
@@ -588,7 +624,7 @@ package body SData.Help is
       Put_Line ("  Immediate -- execute at once, outside any data step.");
       Put_Line ("    Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET, RENAME,");
       Put_Line ("              SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,");
-      Put_Line ("              DELETE n[-m], QUIT, END");
+      Put_Line ("              DELETE n[-m], INSERT [n|$], QUIT, END");
       New_Line;
       Put_Line ("  Deferred -- queued between RUN markers; executed once per");
       Put_Line ("    record during the data step.");
@@ -1198,11 +1234,13 @@ package body SData.Help is
    K_BY           : aliased constant String := "BY";
    K_SORT         : aliased constant String := "SORT";
    K_AGGREGATE    : aliased constant String := "AGGREGATE";
+   K_TRANSPOSE    : aliased constant String := "TRANSPOSE";
    K_NEW          : aliased constant String := "NEW";
    K_LIST         : aliased constant String := "LIST";
    K_DISPLAY      : aliased constant String := "DISPLAY";
    K_NAMES        : aliased constant String := "NAMES";
    K_DELETE       : aliased constant String := "DELETE";
+   K_INSERT       : aliased constant String := "INSERT";
    K_HOLD         : aliased constant String := "HOLD";
    K_UNHOLD       : aliased constant String := "UNHOLD";
    K_KEEP         : aliased constant String := "KEEP";
@@ -1411,12 +1449,14 @@ package body SData.Help is
       (K_DIM'Access,      Help_DIM'Access,      C, N),
       (K_BY'Access,       Help_BY'Access,       C, N),
       (K_SORT'Access,     Help_SORT'Access,     C, N),
-      (K_AGGREGATE'Access, Help_AGGREGATE'Access, C, N),
+      (K_AGGREGATE'Access,  Help_AGGREGATE'Access,  C, N),
+      (K_TRANSPOSE'Access,  Help_TRANSPOSE'Access,  C, N),
       (K_NEW'Access,      Help_NEW'Access,      C, N),
       (K_LIST'Access,     Help_LIST'Access,     C, N),
       (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),
       (K_NAMES'Access,    Help_NAMES'Access,    C, N),
       (K_DELETE'Access,   Help_DELETE'Access,   C, N),
+      (K_INSERT'Access,   Help_INSERT'Access,   C, N),
       (K_BREAK'Access,    Help_BREAK'Access,    C, N),
       (K_HOLD'Access,     Help_HOLD'Access,     C, N),
       (K_UNHOLD'Access,   Help_UNHOLD'Access,   C, N),

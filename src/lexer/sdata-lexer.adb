@@ -20,6 +20,7 @@ package body SData.Lexer is
       Ctx.Line := 1;
       Ctx.Column := 1;
       Ctx.Has_Peeked := False;
+      Ctx.Continued_At_EOF := False;
    end Initialize;
 
    -----------------------
@@ -67,7 +68,12 @@ package body SData.Lexer is
    --  and identifies the next token.
    function Get_Next_Token_Internal (Ctx : in out Lexer_Context) return Token is
       T : Token;
+      Saw_Continuation : Boolean := False;
    begin
+      --  A fresh scan: clear any stale continuation-at-EOF marker.  It is
+      --  re-asserted below only if this call consumes a trailing-comma
+      --  continuation and then runs into end-of-source.
+      Ctx.Continued_At_EOF := False;
       --  Skip whitespace and handle line continuations/comments.
       loop
          --  Skip simple whitespace.
@@ -138,6 +144,7 @@ package body SData.Lexer is
 
                if Found_Newline then
                   --  Continuation detected, restart skipping whitespace for the next token.
+                  Saw_Continuation := True;
                   goto Continue_Loop;
                else
                   --  Just a normal comma, backtrack to it and return it as a token later.
@@ -187,6 +194,10 @@ package body SData.Lexer is
 
       if Is_End_Of_Source (Ctx) then
          T.Kind := Token_EOF;
+         --  Remember if we got here only by consuming a trailing-comma
+         --  continuation with nothing following it; the REPL treats this
+         --  as an incomplete statement awaiting its continuation line.
+         Ctx.Continued_At_EOF := Saw_Continuation;
          return T;
       end if;
 
@@ -281,6 +292,7 @@ package body SData.Lexer is
                elsif Upper = "ECHO" then T.Kind := Token_ECHO;
                elsif Upper = "BY" then T.Kind := Token_BY;
                elsif Upper = "AGGREGATE" then T.Kind := Token_AGGREGATE;
+               elsif Upper = "TRANSPOSE" then T.Kind := Token_TRANSPOSE;
                elsif Upper = "SORT" then T.Kind := Token_SORT;
                elsif Upper = "RENAME" then T.Kind := Token_RENAME;
                elsif Upper = "DELETE" then T.Kind := Token_DELETE;
@@ -311,6 +323,7 @@ package body SData.Lexer is
                elsif Upper = "RUN" then T.Kind := Token_RUN;
                elsif Upper = "NAMES" then T.Kind := Token_NAMES;
                elsif Upper = "LIST" then T.Kind := Token_LIST;
+               elsif Upper = "INSERT" then T.Kind := Token_INSERT;
                elsif Upper = "DISPLAY" then T.Kind := Token_DISPLAY;
                elsif Upper = "TO" then T.Kind := Token_TO;
                elsif Upper = "STEP" then T.Kind := Token_STEP;
@@ -425,6 +438,11 @@ package body SData.Lexer is
                when ',' => T.Kind := Token_Comma; Advance (Ctx);
                when ';' => T.Kind := Token_Semicolon; Advance (Ctx);
                when ':' => T.Kind := Token_Colon; Advance (Ctx);
+               when '$' =>
+                  T.Kind := Token_Dollar;
+                  T.Text (1) := '$';
+                  T.Length := 1;
+                  Advance (Ctx);
                when '|' =>
                   T.Kind := Token_Pipe;
                   T.Text (1) := '|';
@@ -490,5 +508,13 @@ package body SData.Lexer is
       end if;
       return Ctx.Peeked;
    end Peek_Next_Token;
+
+   -------------------------------
+   -- Ended_With_Continuation --
+   -------------------------------
+   function Ended_With_Continuation (Ctx : Lexer_Context) return Boolean is
+   begin
+      return Ctx.Continued_At_EOF;
+   end Ended_With_Continuation;
 
 end SData.Lexer;

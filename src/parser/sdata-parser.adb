@@ -8,6 +8,7 @@ with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
 with SData_Core.Config;
 with SData_Core.Variables; use SData_Core.Variables;
+with SData_Core.Values;    use SData_Core.Values;
 
 --  SData.Parser — recursive-descent parser for the SData command language.
 --
@@ -1814,6 +1815,186 @@ package body SData.Parser is
    end Parse_AGGREGATE;
 
    ---------------------
+   -- Parse_TRANSPOSE --
+   ---------------------
+   --  Parses the slash-options for TRANSPOSE and records them in Stmt's
+   --  Stmt_TRANSPOSE fields.  Uses a USE-style slash-option loop.
+   --  Parse-time errors (hard-stop):
+   --    #1 both /ID and /ARRAY → mutually exclusive
+   --    #2 /KEEP= or /DROP= with empty list → requires at least one variable
+   --    #3 /NAME value not ending in $ → character column required
+   procedure Parse_TRANSPOSE
+     (Ctx  : in out Parser_Context;
+      Stmt : Statement_Access)
+   is
+      Peeked    : Token;
+      Saw_KEEP  : Boolean := False;
+      Saw_DROP  : Boolean := False;
+      Saw_NAME  : Boolean := False;
+      Saw_ID    : Boolean := False;
+      Saw_ARRAY : Boolean := False;
+   begin
+      loop
+         Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+         exit when Peeked.Kind /= Token_Slash;
+
+         declare
+            Discard   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  /
+            Flag_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Flag_Name : constant String :=
+               To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+            pragma Unreferenced (Discard);
+         begin
+            if Flag_Name = "KEEP" then
+               if Saw_KEEP then
+                  raise Script_Error with
+                    "TRANSPOSE: /KEEP may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /KEEP";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               Stmt.Keep_Vars := Parse_Variable_List (Ctx);
+               if Stmt.Keep_Vars = null then
+                  raise Script_Error with
+                    "TRANSPOSE: /KEEP= requires at least one variable";
+               end if;
+               Saw_KEEP := True;
+
+            elsif Flag_Name = "DROP" then
+               if Saw_DROP then
+                  raise Script_Error with
+                    "TRANSPOSE: /DROP may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /DROP";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               Stmt.Drop_Vars := Parse_Variable_List (Ctx);
+               if Stmt.Drop_Vars = null then
+                  raise Script_Error with
+                    "TRANSPOSE: /DROP= requires at least one variable";
+               end if;
+               Saw_DROP := True;
+
+            elsif Flag_Name = "NAME" then
+               if Saw_NAME then
+                  raise Script_Error with
+                    "TRANSPOSE: /NAME may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /NAME";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               declare
+                  Id_Tok  : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+                  Id_Text : constant String := Identifier_Text (Id_Tok);
+               begin
+                  if not Is_Identifier_Token (Id_Tok) then
+                     raise Script_Error with
+                       "TRANSPOSE: expected an identifier after /NAME=";
+                  end if;
+                  if Id_Text (Id_Text'Last) /= '$' then
+                     raise Script_Error with
+                       "TRANSPOSE: /NAME column '" & Id_Text &
+                       "' must end in $ (character column required)";
+                  end if;
+                  Stmt.Name_Col (1 .. Id_Tok.Length) := Id_Text;
+                  Stmt.Name_Col_Len := Id_Tok.Length;
+               end;
+               Saw_NAME := True;
+
+            elsif Flag_Name = "ID" then
+               if Saw_ID then
+                  raise Script_Error with
+                    "TRANSPOSE: /ID may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /ID";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               declare
+                  Id_Tok  : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+                  Id_Text : constant String := Identifier_Text (Id_Tok);
+               begin
+                  if not Is_Identifier_Token (Id_Tok) then
+                     raise Script_Error with
+                       "TRANSPOSE: expected an identifier after /ID=";
+                  end if;
+                  Stmt.Id_Col (1 .. Id_Tok.Length) := Id_Text;
+                  Stmt.Id_Col_Len := Id_Tok.Length;
+               end;
+               Stmt.Has_Id := True;
+               Saw_ID := True;
+
+            elsif Flag_Name = "ARRAY" then
+               if Saw_ARRAY then
+                  raise Script_Error with
+                    "TRANSPOSE: /ARRAY may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /ARRAY";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               declare
+                  Id_Tok  : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+                  Id_Text : constant String := Identifier_Text (Id_Tok);
+               begin
+                  if not Is_Identifier_Token (Id_Tok) then
+                     raise Script_Error with
+                       "TRANSPOSE: expected an identifier after /ARRAY=";
+                  end if;
+                  Stmt.Array_Col (1 .. Id_Tok.Length) := Id_Text;
+                  Stmt.Array_Col_Len := Id_Tok.Length;
+               end;
+               Stmt.Has_Array := True;
+               Saw_ARRAY := True;
+
+            else
+               raise Script_Error with
+                 "TRANSPOSE: unknown option /" & Flag_Name;
+            end if;
+         end;
+      end loop;
+
+      --  Error #1: /ID and /ARRAY are mutually exclusive.
+      if Saw_ID and then Saw_ARRAY then
+         raise Script_Error with
+           "TRANSPOSE: /ID and /ARRAY are mutually exclusive";
+      end if;
+   end Parse_TRANSPOSE;
+
+   ---------------------
    -- Parse_Statement --
    ---------------------
    function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access is
@@ -1904,6 +2085,47 @@ package body SData.Parser is
                Stmt.Arr_Idx_List := A_Idx_List;
                Stmt.Arr_Is_Slice := A_Is_Slice;
                Stmt.Expr         := Parse_Expression (Ctx);
+
+               --  Early type-conflict detection (issue #31).  A scalar
+               --  assignment whose right-hand side is a literal of a kind that
+               --  conflicts with the target's suffix-derived kind can never
+               --  succeed at run time, so reject it here — when the statement
+               --  is first entered — instead of deferring to RUN.  The check
+               --  is limited to literals: the runtime type rule compares the
+               --  suffix-derived Expected kind against the value kind *before*
+               --  consulting the column's actual (data-dependent) type, so a
+               --  string literal into a non-'$' name (or a numeric literal
+               --  into a '$' name) is unconditionally a mismatch regardless of
+               --  what the variable later holds.  Non-literal right-hand sides
+               --  (variables, expressions, function calls) stay deferred.
+               if not Is_Arr and then Stmt.Expr /= null
+                 and then (Stmt.Expr.Kind = Expr_String_Literal
+                           or else Stmt.Expr.Kind = Expr_Numeric_Literal)
+               then
+                  declare
+                     Name      : constant String := Identifier_Text (Var_Tok);
+                     Expected  : constant Value_Kind := Get_Expected_Kind (Name);
+                     RHS_Is_Str : constant Boolean :=
+                        Stmt.Expr.Kind = Expr_String_Literal;
+                     function Kind_Name (K : Value_Kind) return String is
+                       (case K is
+                          when Val_String  => "string",
+                          when Val_Integer => "integer",
+                          when others      => "numeric");
+                  begin
+                     if (Expected = Val_String) /= RHS_Is_Str then
+                        raise Script_Error with
+                          "Type mismatch for variable """ & Name
+                          & """: cannot assign a "
+                          & (if RHS_Is_Str then "string" else "numeric")
+                          & " literal to " & Kind_Name (Expected)
+                          & " variable """ & Name & """"
+                          & (if RHS_Is_Str
+                             then "; use a '$' suffix for a string variable"
+                             else "");
+                     end if;
+                  end;
+               end if;
             end;
 
          when Token_REPEAT =>
@@ -2389,6 +2611,10 @@ package body SData.Parser is
             Stmt := new Statement (Stmt_AGGREGATE);
             Parse_AGGREGATE (Ctx, Stmt);
 
+         when Token_TRANSPOSE =>
+            Stmt := new Statement (Stmt_TRANSPOSE);
+            Parse_TRANSPOSE (Ctx, Stmt);
+
          when Token_DELETE =>
             declare
                Next_Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
@@ -2422,6 +2648,45 @@ package body SData.Parser is
                   Stmt := new Statement (Stmt_DELETE);
                end if;
             end;
+
+         when Token_INSERT =>
+            --  INSERT [ n | $ ] — set the program-buffer insertion cursor.
+            --  Numeric n -> after line n (0 = beginning).  $ or nothing -> end.
+            Stmt := new Statement (Stmt_PROGRAM_INSERT);
+            declare
+               Next_Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if Next_Tok.Kind = Token_Numeric_Literal then
+                  declare
+                     Num_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     Stmt.Insert_At_End := False;
+                     Stmt.Insert_Line   :=
+                        Natural (Float'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
+                  end;
+               elsif Next_Tok.Kind = Token_Minus then
+                  --  Negative argument (e.g. INSERT -3): consume the '-' and the
+                  --  following number (if any) so they do not dangle, and flag
+                  --  the statement invalid for a runtime warning (Task 2).
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin null; end;
+                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Numeric_Literal then
+                     declare Discard2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     begin null; end;
+                  end if;
+                  Stmt.Insert_At_End := False;
+                  Stmt.Insert_Bad    := True;
+               elsif Next_Tok.Kind = Token_Dollar then
+                  --  Consume the $; end-of-buffer is the default.
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin null; end;
+                  Stmt.Insert_At_End := True;
+               else
+                  --  Bare INSERT — end of buffer.
+                  Stmt.Insert_At_End := True;
+               end if;
+            end;
+
          when Token_BREAK =>
             declare
                S : constant Statement_Access :=
@@ -2727,5 +2992,13 @@ package body SData.Parser is
       end loop;
       return First;
    end Parse_Program;
+
+   -------------------------------
+   -- Ended_With_Continuation --
+   -------------------------------
+   function Ended_With_Continuation (Ctx : Parser_Context) return Boolean is
+   begin
+      return SData.Lexer.Ended_With_Continuation (Ctx.Lex_Ctx);
+   end Ended_With_Continuation;
 
 end SData.Parser;

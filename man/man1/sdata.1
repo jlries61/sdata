@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-06-23" "sdata 0.10.0" "User Commands"
+.TH SDATA 1 "2026-06-26" "sdata 0.11.1" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -531,6 +531,73 @@ or
 .B NEW
 first).
 .TP
+.B TRANSPOSE\fR [\fB/KEEP=\fIvarlist\fB]\fR [\fB/DROP=\fIvarlist\fB]\fR [\fB/NAME=\fIvar$\fB]\fR [\fB/ID=\fIvar\fB]\fR [\fB/ARRAY=\fIvar\fB]
+Reshape the data table so that each column in the transposed set becomes one
+output row and each input row becomes a value column.
+With an active
+.B BY
+each block is transposed separately into the same output table.
+.PP
+.RS
+.TP
+.B /KEEP=\fIvarlist\fR , \fB/DROP=\fIvarlist
+Select the
+.I transposed set
+(columns to become rows): the effective set is KEEP\e\|DROP; default is all
+non\-BY columns.
+All columns in the set must share a single type (all numeric or all character).
+.TP
+.B /NAME=\fIvar$
+Name the output character column that holds each source column's name;
+default
+.IR _NAME_$ .
+Must end in
+.BR $ .
+.TP
+.B /ARRAY=\fIvar
+Long form: produces
+.IR var (1).. var (K)
+where K is the maximum block row count.
+Shorter blocks are padded with missing values.
+The
+.B $
+suffix of
+.I var
+must match the transposed\-set type.
+Mutually exclusive with
+.BR /ID .
+If neither is given,
+.B /ARRAY=_X_
+is implied.
+.TP
+.B /ID=\fIvar
+Wide form: the values of
+.I var
+become output column names in first\-encounter order across all blocks.
+.I var
+is auto\-excluded from the transposed set.
+Blocks missing a given ID value leave that cell missing.
+Mutually exclusive with
+.BR /ARRAY .
+.RE
+.PP
+The active
+.B SELECT
+filter is respected; a pending
+.B SAVE
+is written; then the active
+.B SELECT
+and
+.B BY
+are cleared.
+The deferred program buffer must be empty (issue
+.B RUN
+or
+.B NEW
+first).
+See also
+.BR AGGREGATE .
+.TP
 .B NAMES
 List all permanent and temporary variables currently defined.
 .TP
@@ -563,6 +630,32 @@ Omitting
 removes only entry
 .IR n .
 Only meaningful in interactive mode.
+.TP
+.BR "INSERT " [ \fIn\fR | \fB$\fR ]
+Set the program\-buffer insertion point.
+.B INSERT 0
+inserts before the first line;
+.BI INSERT " n"
+inserts after existing line
+.IR n ;
+.B "INSERT $"
+(or bare
+.BR INSERT )
+appends at the end (the default).
+The cursor is sticky \(em it persists across
+.B RUN
+and advances as lines are inserted;
+.B NEW
+or another
+.B INSERT
+resets it.
+An
+.I n
+past the end warns and clamps to the end.
+A negative
+.I n
+is rejected (no-op, with a warning).
+Only meaningful in interactive (REPL) mode.
 .TP
 .B SUBMIT \fIfile\fR
 Execute commands from an external script file (default extension

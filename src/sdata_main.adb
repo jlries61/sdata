@@ -136,6 +136,17 @@ procedure SData_Main is
             begin
                Prog := Parse_Program (Ctx);
 
+               --  A statement ending with a comma continues on the next
+               --  line (design spec).  If the buffer ended on such a
+               --  dangling continuation, keep buffering and prompt for the
+               --  rest rather than running a half-finished statement.
+               if Ended_With_Continuation (Ctx) then
+                  --  Discard the half-parsed program; the full buffer is
+                  --  re-parsed once the continuation line arrives.
+                  SData.AST.Free_Program (Prog);
+                  raise SData.Parser.Incomplete_Statement;
+               end if;
+
                --  Save source for program buffer display before clearing.
                declare
                   Source_Text : constant String := Ada.Strings.Fixed.Trim

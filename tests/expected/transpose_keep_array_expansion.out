@@ -1,0 +1,6 @@
+Dataset opened: tests/data/transpose_arr.csv
+TRANSPOSE complete. 3 records and 3 variables processed.
+REC# _NAME_$ _X_(1) _X_(2) 
+1 X(1) 10.00000 40.00000 
+2 X(2) 20.00000 50.00000 
+3 X(3) 30.00000 60.00000 

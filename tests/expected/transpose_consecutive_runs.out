@@ -1,0 +1,5 @@
+Dataset opened: tests/data/transpose_runs.csv
+TRANSPOSE complete. 2 records and 4 variables processed.
+REC# G$ _NAME_$ _X_(1) _X_(2) 
+1 P V 10.00000 30.00000 
+2 Q V 20.00000 . 

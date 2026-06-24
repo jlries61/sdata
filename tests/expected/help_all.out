@@ -136,6 +136,20 @@ an array element such as x(1). The active SELECT filter is respected; a
 pending SAVE is written; the active SELECT and BY are then cleared.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
+Command: TRANSPOSE [/KEEP=varlist] [/DROP=varlist] [/NAME=var$] [/ID=var] [/ARRAY=var]
+Reshapes the Data Table so that each transposed column becomes a row.
+  /KEEP, /DROP: select which columns to transpose (default: all non-BY
+                columns); the effective set is KEEP minus DROP.
+  /NAME:  character column that receives the source column name
+          in each output row (default: _NAME_$).
+  /ID:    column whose values become output column names (wide form);
+          mutually exclusive with /ARRAY.
+  /ARRAY: base name of the array of transposed values in each output
+          row (long form, default: _X_); used when /ID is absent.
+Respects the active SELECT filter; transposes each BY block separately.
+Flushes a pending SAVE; clears the active SELECT and BY afterward.
+Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
+
 Command: NEW
 Clears the Data Table, all variables, and the queued program.
 Also resets the active SELECT record filter and BY grouping.
@@ -147,6 +161,7 @@ Displays the numbered contents of the program buffer (deferred statements
 queued for the next RUN).  If the buffer is empty, reports that fact.
 See also: DISPLAY to show Data Table records.
           DELETE n[-m] to remove program buffer entries.
+          INSERT [n|$] to set where new statements are inserted.
 
 Command: DISPLAY [variable(s)]
 Execution: Immediate
@@ -168,6 +183,20 @@ Two forms:
                    A single number removes one entry; n-m removes a range.
                    Execution: Immediate -- takes effect at once.
                    Only meaningful in interactive (REPL) mode.
+
+Command: INSERT
+Execution: Immediate -- takes effect at once.
+Sets the program-buffer insertion point so that subsequently
+entered deferred statements are inserted there instead of appended.
+  INSERT 0    Insert before the first line (start of program).
+  INSERT n    Insert after existing line n (1-based).
+  INSERT $    Insert at the end (append).  This is the default.
+  INSERT      Bare form; same as INSERT $.
+The cursor is sticky: it persists across RUN and advances as lines
+are inserted.  NEW or another INSERT resets it.  n past the end
+warns and clamps to the end; a negative n is rejected (no-op).
+Only meaningful in interactive (REPL) mode.
+See LIST (shows the marker) and DELETE.
 
 Command: BREAK  |  BREAK WHEN <boolean-expr>
 Pauses execution and enters the debug inspection prompt.
@@ -364,7 +393,7 @@ sdata commands fall into three execution tiers:
   Immediate -- execute at once, outside any data step.
     Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET, RENAME,
               SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,
-              DELETE n[-m], QUIT, END
+              DELETE n[-m], INSERT [n|$], QUIT, END
 
   Deferred -- queued between RUN markers; executed once per
     record during the data step.

@@ -8,9 +8,12 @@
 --  Parses and executes script fragments, then inspects SData_Core.Variables and
 --  SData_Core.Table state via their public APIs.
 
+with Ada.Exceptions;
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
+with Ada.Strings.Fixed;     use Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with SData_Core.IO;
 with SData_Core.Commands;
 with SData_Core.Config;
 with SData_Core.Table;
@@ -102,6 +105,41 @@ procedure Interpreter_Unit_Test is
          raise;
    end Run;
 
+   --  Parse a single statement and return its AST head (caller frees).
+   function Parse_One (Source : String) return Statement_Access is
+      Ctx : SData.Parser.Parser_Context;
+   begin
+      SData.Parser.Initialize (Ctx, Source);
+      return SData.Parser.Parse_Program (Ctx);
+   end Parse_One;
+
+   --  Queue one deferred statement through the REPL buffer path (honors cursor).
+   procedure Queue (Source : String) is
+   begin
+      SData.Interpreter.Add_To_Active_Program (Parse_One (Source), Source);
+   end Queue;
+
+   --  Execute one immediate statement (e.g. INSERT / LIST) through the REPL.
+   procedure Immediate (Source : String) is
+      P : Statement_Access := Parse_One (Source);
+   begin
+      SData.Interpreter.Execute (P);
+      SData.AST.Free_Program (P);
+   end Immediate;
+
+   --  Read an entire text file into a String (for output-capture asserts).
+   function Slurp (Path : String) return String is
+      F   : Ada.Text_IO.File_Type;
+      Acc : Unbounded_String := Null_Unbounded_String;
+   begin
+      Ada.Text_IO.Open (F, Ada.Text_IO.In_File, Path);
+      while not Ada.Text_IO.End_Of_File (F) loop
+         Append (Acc, Ada.Text_IO.Get_Line (F) & ASCII.LF);
+      end loop;
+      Ada.Text_IO.Close (F);
+      return To_String (Acc);
+   end Slurp;
+
    --  Returns True if executing Script raises any exception.
    function Raises (Script : String) return Boolean is
    begin
@@ -152,6 +190,9 @@ procedure Interpreter_Unit_Test is
          when others      => return -99_999;
       end case;
    end TGI;
+
+   --  Scratch directory for temporary test output files.
+   Scratch : constant String := "/tmp/";
 
    --  Read an array element as integer.
    function GI_Arr (Name : String; Idx : Integer) return Integer is
@@ -555,6 +596,387 @@ begin
       T := Lex1 ("`AS");
       Check ("LC-05: unterminated backtick kind = Token_Bad",
              T.Kind = Token_Bad, True);
+   end;
+
+   -----------------------------------------------------------------------
+   --  L.  Active-program buffer recovery after a failed RUN (issue #31)
+   --      Mimics the interactive REPL: deferred statements are queued one at
+   --      a time via Add_To_Active_Program, RUN raises mid-step, and a
+   --      subsequent NEW (Clear_Active_Program) must not double-free the
+   --      still-chained statement list.
+   -----------------------------------------------------------------------
+   Put_Line ("");
+   Put_Line ("--- L: Active-program recovery after failed RUN (issue #31) ---");
+
+   declare
+      --  Parse a single statement in isolation (Next = null), exactly as the
+      --  REPL does when each command arrives on its own line.
+      function Parse_One (Src : String) return Statement_Access is
+         Ctx : SData.Parser.Parser_Context;
+      begin
+         SData.Parser.Initialize (Ctx, Src & L);
+         return SData.Parser.Parse_Program (Ctx);
+      end Parse_One;
+
+      Run_Raised : Boolean := False;
+   begin
+      Reset;
+      SData.Interpreter.Clear_Active_Program;
+
+      --  Queue two deferred statements that parse cleanly but fail during the
+      --  data step: the second assigns the string variable S$ to the numeric
+      --  variable N (a NON-literal right-hand side, so the parse-time literal
+      --  check does not pre-empt it), which raises a type mismatch at RUN.
+      --  Two statements are required to trigger the double-free: a single
+      --  queued statement leaves no second vector entry to re-free.
+      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET S$ = ""hi"""));
+      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET N = S$"));
+
+      begin
+         SData.Interpreter.Run_Active_Program;
+      exception
+         when others => Run_Raised := True;
+      end;
+      Check ("IC-42: failed RUN propagates the type-mismatch error",
+             Run_Raised, True);
+
+      --  Pre-fix this double-frees the still-chained list and crashes the
+      --  process; post-fix Run_Active_Program has unchained on the way out,
+      --  so Clear_Active_Program completes cleanly.
+      SData.Interpreter.Clear_Active_Program;
+      Check ("IC-43: NEW after a failed RUN does not double-free (issue #31)",
+             SData.Interpreter.Program_Buffer_Length, 0);
+   end;
+
+   -----------------------------------------------------------------------
+   --  M.  TRANSPOSE: parser / dispatch unit tests
+   -----------------------------------------------------------------------
+   Put_Line ("");
+   Put_Line ("--- M: TRANSPOSE parser / dispatch ---");
+
+   --  TT-01: /ID and /ARRAY are mutually exclusive (parse-time error).
+   declare
+      Did_Raise : Boolean := False;
+   begin
+      begin
+         Run ("transpose /id=id$ /array=y");
+      exception
+         when E : others =>
+            Did_Raise := True;
+            Check ("TT-01: /ID + /ARRAY error message",
+                   Ada.Exceptions.Exception_Message (E),
+                   "TRANSPOSE: /ID and /ARRAY are mutually exclusive");
+      end;
+      Check ("TT-01: /ID + /ARRAY raises error", Did_Raise, True);
+   end;
+
+   --  TT-02: /KEEP= with empty list (parse-time error).
+   declare
+      Did_Raise : Boolean := False;
+   begin
+      begin
+         Run ("transpose /keep=");
+      exception
+         when E : others =>
+            Did_Raise := True;
+            Check ("TT-02: /KEEP= empty error message",
+                   Ada.Exceptions.Exception_Message (E),
+                   "TRANSPOSE: /KEEP= requires at least one variable");
+      end;
+      Check ("TT-02: /KEEP= empty raises error", Did_Raise, True);
+   end;
+
+   --  TT-03: /NAME value without trailing $ (parse-time error).
+   declare
+      Did_Raise : Boolean := False;
+   begin
+      begin
+         Run ("transpose /name=foo");
+      exception
+         when E : others =>
+            Did_Raise := True;
+            Check ("TT-03: /NAME no-$ error message",
+                   Ada.Exceptions.Exception_Message (E),
+                   "TRANSPOSE: /NAME column 'foo' must end in $" &
+                   " (character column required)");
+      end;
+      Check ("TT-03: /NAME no-$ raises error", Did_Raise, True);
+   end;
+
+   --  TT-04: Valid TRANSPOSE /DROP=id$ produces reshaped schema.
+   --  transpose_simple.csv: id$ score height (3 rows A/B/C) → 2 rows, 4 cols.
+   Run ("use ""tests/data/transpose_simple.csv""" & L &
+        "transpose /drop=id$");
+   Check ("TT-04: row count = 2 (SCORE, HEIGHT)",
+          SData_Core.Table.Row_Count, 2);
+   Check ("TT-04: _NAME_$ column present",
+          SData_Core.Table.Has_Column ("_NAME_$"), True);
+   Check ("TT-04: _X_(1) column present",
+          SData_Core.Table.Has_Column ("_X_(1)"), True);
+
+   --  TT-05: TRANSPOSE /ID=id$ names output columns from ID values.
+   --  id$ values A/B/C → columns A, B, C plus _NAME_$.
+   Run ("use ""tests/data/transpose_simple.csv""" & L &
+        "transpose /id=id$");
+   Check ("TT-05: row count = 2 (SCORE, HEIGHT)",
+          SData_Core.Table.Row_Count, 2);
+   Check ("TT-05: column A present (from id$ value ""A"")",
+          SData_Core.Table.Has_Column ("A"), True);
+
+   --  TT-06: Bare TRANSPOSE on all-numeric fixture uses default _X_ array.
+   --  transpose_numeric.csv: score height weight (2 rows) → 3 rows, 3 cols.
+   Run ("use ""tests/data/transpose_numeric.csv""" & L &
+        "transpose");
+   Check ("TT-06: row count = 3 (SCORE, HEIGHT, WEIGHT)",
+          SData_Core.Table.Row_Count, 3);
+   Check ("TT-06: _X_(1) column present (default _X_ array)",
+          SData_Core.Table.Has_Column ("_X_(1)"), True);
+
+   -----------------------------------------------------------------------
+   --  N.  INSERT command: parser unit tests
+   -----------------------------------------------------------------------
+   Put_Line ("");
+   Put_Line ("--- I: INSERT command ---");
+
+   --  IN-01: INSERT $ parses to end-of-buffer.
+   declare
+      P : Statement_Access := Parse_One ("INSERT $");
+   begin
+      Check ("IN-01: INSERT $ kind", P.Kind = Stmt_PROGRAM_INSERT, True);
+      Check ("IN-01: INSERT $ at end", P.Insert_At_End, True);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-02: bare INSERT defaults to end-of-buffer.
+   declare
+      P : Statement_Access := Parse_One ("INSERT");
+   begin
+      Check ("IN-02: bare INSERT at end", P.Insert_At_End, True);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-03: INSERT 0 parses to beginning (line 0).
+   declare
+      P : Statement_Access := Parse_One ("INSERT 0");
+   begin
+      Check ("IN-03: INSERT 0 not-at-end", P.Insert_At_End, False);
+      Check ("IN-03: INSERT 0 line", P.Insert_Line, 0);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-04: INSERT 5 parses to after line 5.
+   declare
+      P : Statement_Access := Parse_One ("INSERT 5");
+   begin
+      Check ("IN-04: INSERT 5 not-at-end", P.Insert_At_End, False);
+      Check ("IN-04: INSERT 5 line", P.Insert_Line, 5);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-04b: INSERT -3 parses as an invalid (negative) argument.
+   declare
+      P : Statement_Access := Parse_One ("INSERT -3");
+   begin
+      Check ("IN-04b: INSERT -3 flagged bad", P.Insert_Bad, True);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-05: default queueing appends (control case): X ends at 2.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Queue ("LET X = 2");
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-05: append order -> X=2", GI ("X"), 2);
+
+   --  IN-06: INSERT 0 inserts at the front; reversed order -> X ends at 1.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Immediate ("INSERT 0");
+   Queue ("LET X = 2");          --  buffer becomes [X=2, X=1]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-06: INSERT 0 front -> X=1", GI ("X"), 1);
+
+   --  IN-07: cursor advances across consecutive inserts (Y then Z after line 0,
+   --  inserted in typed order ahead of the original) -> R = 10.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET R = 10");
+   Immediate ("INSERT 0");
+   Queue ("LET R = 20");         --  [R=20, R=10]
+   Queue ("LET R = 30");         --  [R=20, R=30, R=10]  (cursor advanced)
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-07: cursor advances -> R=10", GI ("R"), 10);
+
+   --  IN-08: buffer length grows by one per queued statement regardless of mode.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET A = 1");
+   Immediate ("INSERT 0");
+   Queue ("LET A = 2");
+   Check ("IN-08: length after insert", SData.Interpreter.Program_Buffer_Length, 2);
+
+   --  IN-09: out-of-range INSERT clamps to end (append) -> X=2.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Immediate ("INSERT 9");       --  buffer has 1 entry; clamp to end
+   Queue ("LET X = 2");          --  appended -> [X=1, X=2]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-09: out-of-range clamps to end -> X=2", GI ("X"), 2);
+
+   --  IN-10: NEW/Clear resets the cursor back to append.
+   SData.Interpreter.Clear_Active_Program;
+   Immediate ("INSERT 0");       --  cursor at front...
+   SData.Interpreter.Clear_Active_Program;  --  ...reset by Clear (NEW path)
+   Queue ("LET X = 1");
+   Queue ("LET X = 2");          --  must append -> [X=1, X=2]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-10: Clear resets cursor -> X=2", GI ("X"), 2);
+
+   --  IN-17: negative INSERT is rejected and leaves the cursor unchanged.
+   --  Cursor parked at beginning; INSERT -3 is a no-op, so the next queued
+   --  statement still inserts at the front -> [X=2, X=1] -> final X=1.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Immediate ("INSERT 0");       --  cursor at beginning
+   Immediate ("INSERT -3");      --  rejected; cursor unchanged
+   Queue ("LET X = 2");          --  still inserts at front -> [X=2, X=1]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-17: negative INSERT no-op -> X=1", GI ("X"), 1);
+
+   --  IN-11: INSERT prints a confirmation (captured via Open_Output).
+   declare
+      Cap : constant String := Scratch & "insert_confirm.txt";
+   begin
+      SData.Interpreter.Clear_Active_Program;
+      Queue ("LET A = 1");
+      Queue ("LET B = 2");
+      SData_Core.IO.Open_Output (Cap);
+      Immediate ("INSERT 1");
+      SData_Core.IO.Close_Output;
+      Check ("IN-11: confirmation text",
+             Index (Slurp (Cap), "Insertion point set after line 1.") > 0, True);
+   end;
+
+   --  IN-12: DELETE before the cursor shifts it back so inserts stay in place.
+   --  Buffer [A=1, A=2, A=3]; cursor after line 3; delete line 1 -> buffer
+   --  [A=2, A=3], cursor now after line 2 (still the end).  Insert A=9 lands
+   --  last -> A=9.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET A = 1");
+   Queue ("LET A = 2");
+   Queue ("LET A = 3");
+   Immediate ("INSERT 3");        --  cursor after line 3
+   Immediate ("DELETE 1");        --  removes A=1; cursor -> after line 2
+   Queue ("LET A = 9");           --  appended after A=3 -> [A=2, A=3, A=9]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-12: delete-before shifts cursor -> A=9", GI ("A"), 9);
+
+   --  IN-13: DELETE the line the cursor sits after moves cursor before the
+   --  deleted span.  Buffer [B=1, B=2, B=3]; cursor after line 2; delete
+   --  line 2 -> [B=1, B=3], cursor -> after line 1.  Insert B=7 -> [B=1, B=7,
+   --  B=3] -> final B=3.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET B = 1");
+   Queue ("LET B = 2");
+   Queue ("LET B = 3");
+   Immediate ("INSERT 2");        --  cursor after line 2
+   Immediate ("DELETE 2");        --  cursor at/after deleted line; after-span branch fires -> after line 1
+   Queue ("LET B = 7");           --  [B=1, B=7, B=3]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-13: delete-at-cursor -> B=3", GI ("B"), 3);
+
+   --  IN-14: DELETE after the cursor leaves it unchanged.  Buffer
+   --  [C=1, C=2, C=3]; cursor after line 1; delete line 3 -> [C=1, C=2],
+   --  cursor still after line 1.  Insert C=5 -> [C=1, C=5, C=2] -> final C=2.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET C = 1");
+   Queue ("LET C = 2");
+   Queue ("LET C = 3");
+   Immediate ("INSERT 1");        --  cursor after line 1
+   Immediate ("DELETE 3");        --  after cursor -> unchanged
+   Queue ("LET C = 5");           --  [C=1, C=5, C=2]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-14: delete-after-cursor -> C=2", GI ("C"), 2);
+
+   --  IN-15: LIST marks the cursor between lines (cursor after line 1).
+   declare
+      Cap : constant String := Scratch & "list_mid.txt";
+      Out_Txt : Unbounded_String;
+   begin
+      SData.Interpreter.Clear_Active_Program;
+      Queue ("LET A = 1");
+      Queue ("LET B = 2");
+      Immediate ("INSERT 1");
+      SData_Core.IO.Open_Output (Cap);
+      Immediate ("LIST");
+      SData_Core.IO.Close_Output;
+      Out_Txt := To_Unbounded_String (Slurp (Cap));
+      --  Marker appears, and it appears before "2: " (i.e. between the lines).
+      Check ("IN-15: LIST has marker",
+             Index (Out_Txt, "--> insertion point") > 0, True);
+      Check ("IN-15: marker before line 2",
+             Index (Out_Txt, "--> insertion point") < Index (Out_Txt, "2: "),
+             True);
+   end;
+
+   --  IN-16: append mode -> marker prints after the last entry.
+   declare
+      Cap : constant String := Scratch & "list_end.txt";
+      Out_Txt : Unbounded_String;
+   begin
+      SData.Interpreter.Clear_Active_Program;
+      Queue ("LET A = 1");
+      Queue ("LET B = 2");           --  Append_Mode still True (default)
+      SData_Core.IO.Open_Output (Cap);
+      Immediate ("LIST");
+      SData_Core.IO.Close_Output;
+      Out_Txt := To_Unbounded_String (Slurp (Cap));
+      Check ("IN-16: marker after last line",
+             Index (Out_Txt, "2: ") < Index (Out_Txt, "--> insertion point"),
+             True);
+   end;
+
+   --  IN-18: the insertion cursor persists across RUN (sticky). With the cursor
+   --  parked at the front, a RUN must NOT reset it, so the next queued statement
+   --  still inserts at the front -> [X=2, X=1] -> final X=1 (append would give 2).
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Immediate ("INSERT 0");           --  cursor at beginning
+   SData.Interpreter.Run_Active_Program;   --  RUN must not move the cursor
+   Queue ("LET X = 2");              --  still inserts at front -> [X=2, X=1]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-18: cursor survives RUN -> X=1", GI ("X"), 1);
+
+   --  IN-19: cursor strictly inside a multi-line deleted span moves to just
+   --  before the span. Buffer [A=1,A=2,A=3,A=4]; cursor after line 2; DELETE 2-3
+   --  removes lines 2 and 3 (cursor inside -> moves to after line 1). Buffer
+   --  becomes [A=1,A=4]; inserting A=9 -> [A=1,A=9,A=4] -> final A=4
+   --  (a stale cursor at 2 would append -> A=9).
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET A = 1");
+   Queue ("LET A = 2");
+   Queue ("LET A = 3");
+   Queue ("LET A = 4");
+   Immediate ("INSERT 2");           --  cursor after line 2
+   Immediate ("DELETE 2-3");         --  cursor inside span -> after line 1
+   Queue ("LET A = 9");              --  [A=1, A=9, A=4]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-19: DELETE inside-span -> A=4", GI ("A"), 4);
+
+   --  IN-20: LIST prints the marker before line 1 when the cursor is at 0.
+   declare
+      Cap : constant String := Scratch & "list_top.txt";
+      Out_Txt : Unbounded_String;
+   begin
+      SData.Interpreter.Clear_Active_Program;
+      Queue ("LET A = 1");
+      Queue ("LET B = 2");
+      Immediate ("INSERT 0");        --  cursor before line 1
+      SData_Core.IO.Open_Output (Cap);
+      Immediate ("LIST");
+      SData_Core.IO.Close_Output;
+      Out_Txt := To_Unbounded_String (Slurp (Cap));
+      Check ("IN-20: marker present", Index (Out_Txt, "--> insertion point") > 0, True);
+      Check ("IN-20: marker before line 1",
+             Index (Out_Txt, "--> insertion point") < Index (Out_Txt, "1: "), True);
    end;
 
    -----------------------------------------------------------------------

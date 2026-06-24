@@ -40,6 +40,7 @@ package body SData.Reserved_Keywords is
       S.Insert ("IN");
       S.Insert ("INTERLEAVE");
       S.Insert ("INTO");
+      S.Insert ("INSERT");
       S.Insert ("JOIN");
       S.Insert ("KEEP");
       S.Insert ("LET");
@@ -69,6 +70,7 @@ package body SData.Reserved_Keywords is
       S.Insert ("SYSTEM");
       S.Insert ("THEN");
       S.Insert ("TO");
+      S.Insert ("TRANSPOSE");
       S.Insert ("UNHOLD");
       S.Insert ("UNSET");
       S.Insert ("UNTIL");

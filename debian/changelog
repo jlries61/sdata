@@ -1,3 +1,21 @@
+sdata (0.11.1-1) unstable; urgency=medium
+
+  * INSERT command for interactive program-buffer editing (issue #32).
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 26 Jun 2026 16:40:12 -0700
+
+sdata (0.11.0-1) unstable; urgency=medium
+
+  * TRANSPOSE command — reshape table columns to rows
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 26 Jun 2026 12:31:51 -0700
+
+sdata (0.10.1-1) unstable; urgency=medium
+
+  * Fix NEW crash after a failed RUN; detect literal LET/SET type conflicts at entry (#31).
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 24 Jun 2026 18:00:17 -0700
+
 sdata (0.10.0-1) unstable; urgency=medium
 
   * AGGREGATE command

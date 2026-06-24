@@ -67,3 +67,6 @@ tests/data/submit_depth_gen/
 # gnatmetric complexity gate
 /tools/
 /metrix.xml
+
+# Local working backup of the standards review
+/doc/SOFTWARE_STANDARDS_REVIEW_bak.md
