@@ -143,6 +143,13 @@ Examples:
 - *FINGER_LEN(1)* - Member of a numeric array.
 - *ALIAS\$(2)* - Member of a character array.
 
+Type Compatibility:
+
+- The type indicated by a name's suffix is fixed: a *\$* name is always character, a *%* name is always integer, and an unsuffixed name is always floating point.
+- Numeric kinds interconvert on assignment (an integer value assigned to a floating-point name is promoted; a floating-point value assigned to a *%* name is truncated), but character and numeric values never interconvert.
+- Assigning a character value to a numeric name (or a numeric value to a *\$* name) is therefore always an error. For example, *SET NAME = "foo"* fails because *NAME* is numeric; the character form is *SET NAME\$ = "foo"*.
+- When the right-hand side of a *LET* or *SET* is a literal, this conflict is detected immediately, as the statement is entered, rather than being deferred to the next *RUN*. (When the right-hand side is a variable or expression, whose kind is not known until the data step executes, the check remains deferred to *RUN*.)
+
 Quoted Identifiers (Backtick Form):
 
 - A column or variable whose name collides with a reserved keyword, or contains spaces or dots, can be referenced by enclosing it in backticks (`` ` ``).

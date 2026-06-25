@@ -558,6 +558,56 @@ begin
    end;
 
    -----------------------------------------------------------------------
+   --  L.  Active-program buffer recovery after a failed RUN (issue #31)
+   --      Mimics the interactive REPL: deferred statements are queued one at
+   --      a time via Add_To_Active_Program, RUN raises mid-step, and a
+   --      subsequent NEW (Clear_Active_Program) must not double-free the
+   --      still-chained statement list.
+   -----------------------------------------------------------------------
+   Put_Line ("");
+   Put_Line ("--- L: Active-program recovery after failed RUN (issue #31) ---");
+
+   declare
+      --  Parse a single statement in isolation (Next = null), exactly as the
+      --  REPL does when each command arrives on its own line.
+      function Parse_One (Src : String) return Statement_Access is
+         Ctx : SData.Parser.Parser_Context;
+      begin
+         SData.Parser.Initialize (Ctx, Src & L);
+         return SData.Parser.Parse_Program (Ctx);
+      end Parse_One;
+
+      Run_Raised : Boolean := False;
+   begin
+      Reset;
+      SData.Interpreter.Clear_Active_Program;
+
+      --  Queue two deferred statements that parse cleanly but fail during the
+      --  data step: the second assigns the string variable S$ to the numeric
+      --  variable N (a NON-literal right-hand side, so the parse-time literal
+      --  check does not pre-empt it), which raises a type mismatch at RUN.
+      --  Two statements are required to trigger the double-free: a single
+      --  queued statement leaves no second vector entry to re-free.
+      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET S$ = ""hi"""));
+      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET N = S$"));
+
+      begin
+         SData.Interpreter.Run_Active_Program;
+      exception
+         when others => Run_Raised := True;
+      end;
+      Check ("IC-42: failed RUN propagates the type-mismatch error",
+             Run_Raised, True);
+
+      --  Pre-fix this double-frees the still-chained list and crashes the
+      --  process; post-fix Run_Active_Program has unchained on the way out,
+      --  so Clear_Active_Program completes cleanly.
+      SData.Interpreter.Clear_Active_Program;
+      Check ("IC-43: NEW after a failed RUN does not double-free (issue #31)",
+             SData.Interpreter.Program_Buffer_Length, 0);
+   end;
+
+   -----------------------------------------------------------------------
    --  Summary
    -----------------------------------------------------------------------
    Put_Line ("");

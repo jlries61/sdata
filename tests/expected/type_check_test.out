@@ -1,4 +1,4 @@
 Generating mock data...
-ID BEFORE:
-1
-Error: Type mismatch for variable ID: Cannot assign VAL_STRING to VAL_NUMERIC
+SALARY BEFORE:
+50000.00000
+Error: Type mismatch for variable SALARY: Cannot assign VAL_STRING to VAL_NUMERIC

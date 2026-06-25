@@ -8,6 +8,7 @@ with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
 with SData_Core.Config;
 with SData_Core.Variables; use SData_Core.Variables;
+with SData_Core.Values;    use SData_Core.Values;
 
 --  SData.Parser — recursive-descent parser for the SData command language.
 --
@@ -1904,6 +1905,47 @@ package body SData.Parser is
                Stmt.Arr_Idx_List := A_Idx_List;
                Stmt.Arr_Is_Slice := A_Is_Slice;
                Stmt.Expr         := Parse_Expression (Ctx);
+
+               --  Early type-conflict detection (issue #31).  A scalar
+               --  assignment whose right-hand side is a literal of a kind that
+               --  conflicts with the target's suffix-derived kind can never
+               --  succeed at run time, so reject it here — when the statement
+               --  is first entered — instead of deferring to RUN.  The check
+               --  is limited to literals: the runtime type rule compares the
+               --  suffix-derived Expected kind against the value kind *before*
+               --  consulting the column's actual (data-dependent) type, so a
+               --  string literal into a non-'$' name (or a numeric literal
+               --  into a '$' name) is unconditionally a mismatch regardless of
+               --  what the variable later holds.  Non-literal right-hand sides
+               --  (variables, expressions, function calls) stay deferred.
+               if not Is_Arr and then Stmt.Expr /= null
+                 and then (Stmt.Expr.Kind = Expr_String_Literal
+                           or else Stmt.Expr.Kind = Expr_Numeric_Literal)
+               then
+                  declare
+                     Name      : constant String := Identifier_Text (Var_Tok);
+                     Expected  : constant Value_Kind := Get_Expected_Kind (Name);
+                     RHS_Is_Str : constant Boolean :=
+                        Stmt.Expr.Kind = Expr_String_Literal;
+                     function Kind_Name (K : Value_Kind) return String is
+                       (case K is
+                          when Val_String  => "string",
+                          when Val_Integer => "integer",
+                          when others      => "numeric");
+                  begin
+                     if (Expected = Val_String) /= RHS_Is_Str then
+                        raise Script_Error with
+                          "Type mismatch for variable """ & Name
+                          & """: cannot assign a "
+                          & (if RHS_Is_Str then "string" else "numeric")
+                          & " literal to " & Kind_Name (Expected)
+                          & " variable """ & Name & """"
+                          & (if RHS_Is_Str
+                             then "; use a '$' suffix for a string variable"
+                             else "");
+                     end if;
+                  end;
+               end if;
             end;
 
          when Token_REPEAT =>
