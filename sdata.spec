@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.10.0
+Version:        0.10.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Jun 24 2026 John L. Ries <john@theyarnbard.com> - 0.10.1-1
+- Fix NEW crash after a failed RUN; detect literal LET/SET type conflicts at entry (#31).
+
 * Tue Jun 23 2026 John L. Ries <john@theyarnbard.com> - 0.10.0-1
 - AGGREGATE command
 
