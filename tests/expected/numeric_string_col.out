@@ -1,0 +1,4 @@
+Dataset opened: tests/data/numeric_string_col.csv
+LABEL=[ 77516 ] N= 1.00000
+LABEL=[ 83311 ] N= 2.00000
+RUN complete. 2 records and 2 variables processed.

@@ -9,6 +9,7 @@
 
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
+with Ada.Exceptions;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData_Core.Config;
 with SData_Core.Table;           use SData_Core.Table;
@@ -356,6 +357,56 @@ begin
           Integer (SData_Core.Table.Get_Value (1, "A").Num_Val), 77);
    Check ("PX-24 no-workbook xlsx B1 = 88",
           Integer (SData_Core.Table.Get_Value (1, "B").Num_Val), 88);
+
+   ---------------------------------------------------------------------------
+   --  NSC-* : numeric-looking values in a '$' (Col_String) column must load
+   --  as STRINGS across all three readers, not abort (CSV) or be dropped to
+   --  missing (ODF/OOXML).  Regression for the adultdata1 'fnlwgt$' bug: a
+   --  CSV header of "fnlwgt$" forces Col_String, but cells like 77516 were
+   --  built as Val_Numeric and rejected by the table's type coercion.
+   --  Fixtures: tests/data/numeric_string_col.{csv,ods,xlsx}, header LABEL$,N
+   --  with LABEL$ holding 77516 / 83311.
+   ---------------------------------------------------------------------------
+
+   --  NSC-CSV: load must not raise, and LABEL$ must hold the text "77516".
+   declare
+      Loaded_OK : Boolean := True;
+   begin
+      SData_Core.Table.Clear;
+      begin
+         Parse_CSV ("tests/data/numeric_string_col.csv");
+      exception
+         when E : others =>
+            Loaded_OK := False;
+            Put_Line ("   (CSV raised: "
+               & Ada.Exceptions.Exception_Message (E) & ")");
+      end;
+      Check ("NSC-CSV-01 loads without type error", Loaded_OK, True);
+      if Loaded_OK then
+         Check ("NSC-CSV-02 col 1 name", Column_Name (1), "LABEL$");
+         V := Get_Value (1, "LABEL$");
+         Check ("NSC-CSV-03 row1 LABEL$ kind", V.Kind = Val_String, True);
+         Check ("NSC-CSV-04 row1 LABEL$ value", To_String (V), "77516");
+         V := Get_Value (2, "LABEL$");
+         Check ("NSC-CSV-05 row2 LABEL$ value", To_String (V), "83311");
+      end if;
+   end;
+
+   --  NSC-ODF: same, via the ODS reader (cell is office:value-type="float").
+   SData_Core.Table.Clear;
+   Parse_ODF ("tests/data/numeric_string_col.ods");
+   Check ("NSC-ODF-01 col 1 name", Column_Name (1), "LABEL$");
+   V := Get_Value (1, "LABEL$");
+   Check ("NSC-ODF-02 row1 LABEL$ kind", V.Kind = Val_String, True);
+   Check ("NSC-ODF-03 row1 LABEL$ value", To_String (V), "77516");
+
+   --  NSC-OOXML: same, via the XLSX reader (cell is t="n").
+   SData_Core.Table.Clear;
+   Parse_OOXML ("tests/data/numeric_string_col.xlsx");
+   Check ("NSC-XLSX-01 col 1 name", Column_Name (1), "LABEL$");
+   V := Get_Value (1, "LABEL$");
+   Check ("NSC-XLSX-02 row1 LABEL$ kind", V.Kind = Val_String, True);
+   Check ("NSC-XLSX-03 row1 LABEL$ value", To_String (V), "77516");
 
    ---------------------------------------------------------------------------
    --  Summary
