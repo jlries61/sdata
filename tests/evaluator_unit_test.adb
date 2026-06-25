@@ -151,9 +151,14 @@ procedure Evaluator_Unit_Test is
       Prog : Statement_Access;
       V    : Value;
    begin
-      SData.Parser.Initialize (Ctx, "LET _R = " & S);
+      --  Wrap the expression in PRINT (not LET) purely to obtain its parsed
+      --  AST: PRINT accepts an expression of any kind, whereas LET now performs
+      --  early literal type-checking against the target's suffix kind
+      --  (issue #31) and would reject a bare string literal assigned to the
+      --  numeric name _R before the evaluator is ever reached.
+      SData.Parser.Initialize (Ctx, "PRINT " & S);
       Prog := SData.Parser.Parse_Program (Ctx);
-      V := Evaluate (Prog.Expr);
+      V := Evaluate (Prog.Print_Args.Expr);
       Free_Program (Prog);
       return V;
    exception

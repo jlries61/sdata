@@ -408,6 +408,23 @@ package body SData.Interpreter is
          declare
             Last    : constant Positive := Natural (Active_Program_Vec.Length);
             Run_Cap : Statement_Access := new Statement (Stmt_RUN);
+
+            --  Restore every transiently-set Next pointer to null and free the
+            --  synthetic cap.  This MUST run whether Execute returns normally
+            --  or propagates an exception (e.g. a per-record type mismatch in
+            --  the REPL, where the error is not continued-on): otherwise the
+            --  vector entries stay chained together, and a later
+            --  Clear_Active_Program walks one entry's Next chain and frees the
+            --  following entries too, double-freeing them on the next loop
+            --  iteration (issue #31 — NEW after a failed RUN crashing with
+            --  "s-intman.adb:136 explicit raise").
+            procedure Unchain is
+            begin
+               for I in 1 .. Last loop
+                  Active_Program_Vec (I).Stmt.Next := null;
+               end loop;
+               SData.AST.Free_Program (Run_Cap);
+            end Unchain;
          begin
             --  Transiently chain vector entries and cap with a synthetic
             --  Stmt_RUN so Execute's outer loop triggers deferred processing.
@@ -417,12 +434,14 @@ package body SData.Interpreter is
                   Active_Program_Vec (I + 1).Stmt;
             end loop;
             Active_Program_Vec (Last).Stmt.Next := Run_Cap;
-            Execute (Active_Program_Vec (1).Stmt);
-            --  Unchain: restore all Next pointers to null, then free the cap.
-            for I in 1 .. Last loop
-               Active_Program_Vec (I).Stmt.Next := null;
-            end loop;
-            SData.AST.Free_Program (Run_Cap);
+            begin
+               Execute (Active_Program_Vec (1).Stmt);
+            exception
+               when others =>
+                  Unchain;
+                  raise;
+            end;
+            Unchain;
          end;
       end if;
       --  The buffer has now been run; nothing is pending.
