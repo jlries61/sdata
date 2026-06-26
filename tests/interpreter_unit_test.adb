@@ -797,7 +797,7 @@ begin
    Check ("IN-06: INSERT 0 front -> X=1", GI ("X"), 1);
 
    --  IN-07: cursor advances across consecutive inserts (Y then Z after line 0,
-   --  inserted in typed order ahead of the original) -> R = 30.
+   --  inserted in typed order ahead of the original) -> R = 10.
    SData.Interpreter.Clear_Active_Program;
    Queue ("LET R = 10");
    Immediate ("INSERT 0");
@@ -878,7 +878,7 @@ begin
    Queue ("LET B = 2");
    Queue ("LET B = 3");
    Immediate ("INSERT 2");        --  cursor after line 2
-   Immediate ("DELETE 2");        --  cursor inside deleted span -> after line 1
+   Immediate ("DELETE 2");        --  cursor at/after deleted line; after-span branch fires -> after line 1
    Queue ("LET B = 7");           --  [B=1, B=7, B=3]
    SData.Interpreter.Run_Active_Program;
    Check ("IN-13: delete-at-cursor -> B=3", GI ("B"), 3);
@@ -932,6 +932,51 @@ begin
       Check ("IN-16: marker after last line",
              Index (Out_Txt, "2: ") < Index (Out_Txt, "--> insertion point"),
              True);
+   end;
+
+   --  IN-18: the insertion cursor persists across RUN (sticky). With the cursor
+   --  parked at the front, a RUN must NOT reset it, so the next queued statement
+   --  still inserts at the front -> [X=2, X=1] -> final X=1 (append would give 2).
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Immediate ("INSERT 0");           --  cursor at beginning
+   SData.Interpreter.Run_Active_Program;   --  RUN must not move the cursor
+   Queue ("LET X = 2");              --  still inserts at front -> [X=2, X=1]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-18: cursor survives RUN -> X=1", GI ("X"), 1);
+
+   --  IN-19: cursor strictly inside a multi-line deleted span moves to just
+   --  before the span. Buffer [A=1,A=2,A=3,A=4]; cursor after line 2; DELETE 2-3
+   --  removes lines 2 and 3 (cursor inside -> moves to after line 1). Buffer
+   --  becomes [A=1,A=4]; inserting A=9 -> [A=1,A=9,A=4] -> final A=4
+   --  (a stale cursor at 2 would append -> A=9).
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET A = 1");
+   Queue ("LET A = 2");
+   Queue ("LET A = 3");
+   Queue ("LET A = 4");
+   Immediate ("INSERT 2");           --  cursor after line 2
+   Immediate ("DELETE 2-3");         --  cursor inside span -> after line 1
+   Queue ("LET A = 9");              --  [A=1, A=9, A=4]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-19: DELETE inside-span -> A=4", GI ("A"), 4);
+
+   --  IN-20: LIST prints the marker before line 1 when the cursor is at 0.
+   declare
+      Cap : constant String := Scratch & "list_top.txt";
+      Out_Txt : Unbounded_String;
+   begin
+      SData.Interpreter.Clear_Active_Program;
+      Queue ("LET A = 1");
+      Queue ("LET B = 2");
+      Immediate ("INSERT 0");        --  cursor before line 1
+      SData_Core.IO.Open_Output (Cap);
+      Immediate ("LIST");
+      SData_Core.IO.Close_Output;
+      Out_Txt := To_Unbounded_String (Slurp (Cap));
+      Check ("IN-20: marker present", Index (Out_Txt, "--> insertion point") > 0, True);
+      Check ("IN-20: marker before line 1",
+             Index (Out_Txt, "--> insertion point") < Index (Out_Txt, "1: "), True);
    end;
 
    -----------------------------------------------------------------------
