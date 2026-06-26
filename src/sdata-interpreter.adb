@@ -799,6 +799,22 @@ package body SData.Interpreter is
       --  the pending count can never exceed what remains in the buffer.
       Pending_Deferred :=
         Natural'Min (Pending_Deferred, Natural (Active_Program_Vec.Length));
+      --  Keep the insertion cursor meaningful after deletion (issue #32).
+      if not Append_Mode then
+         declare
+            Span : constant Natural := To - From + 1;  --  lines removed
+            New_Last : constant Natural := Natural (Active_Program_Vec.Length);
+         begin
+            if Insert_Point >= To then
+               Insert_Point := Insert_Point - Span;       --  cursor after span
+            elsif Insert_Point >= From - 1 then
+               Insert_Point := From - 1;                  --  cursor inside span
+            end if;                                        --  else: before span, keep
+            if Insert_Point > New_Last then
+               Insert_Point := New_Last;                  --  final clamp
+            end if;
+         end;
+      end if;
    end Execute_Program_Delete;
 
    --  Execute_Program_Insert — set the program-buffer insertion cursor.

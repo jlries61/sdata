@@ -855,6 +855,47 @@ begin
              Index (Slurp (Cap), "Insertion point set after line 1.") > 0, True);
    end;
 
+   --  IN-12: DELETE before the cursor shifts it back so inserts stay in place.
+   --  Buffer [A=1, A=2, A=3]; cursor after line 3; delete line 1 -> buffer
+   --  [A=2, A=3], cursor now after line 2 (still the end).  Insert A=9 lands
+   --  last -> A=9.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET A = 1");
+   Queue ("LET A = 2");
+   Queue ("LET A = 3");
+   Immediate ("INSERT 3");        --  cursor after line 3
+   Immediate ("DELETE 1");        --  removes A=1; cursor -> after line 2
+   Queue ("LET A = 9");           --  appended after A=3 -> [A=2, A=3, A=9]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-12: delete-before shifts cursor -> A=9", GI ("A"), 9);
+
+   --  IN-13: DELETE the line the cursor sits after moves cursor before the
+   --  deleted span.  Buffer [B=1, B=2, B=3]; cursor after line 2; delete
+   --  line 2 -> [B=1, B=3], cursor -> after line 1.  Insert B=7 -> [B=1, B=7,
+   --  B=3] -> final B=3.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET B = 1");
+   Queue ("LET B = 2");
+   Queue ("LET B = 3");
+   Immediate ("INSERT 2");        --  cursor after line 2
+   Immediate ("DELETE 2");        --  cursor inside deleted span -> after line 1
+   Queue ("LET B = 7");           --  [B=1, B=7, B=3]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-13: delete-at-cursor -> B=3", GI ("B"), 3);
+
+   --  IN-14: DELETE after the cursor leaves it unchanged.  Buffer
+   --  [C=1, C=2, C=3]; cursor after line 1; delete line 3 -> [C=1, C=2],
+   --  cursor still after line 1.  Insert C=5 -> [C=1, C=5, C=2] -> final C=2.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET C = 1");
+   Queue ("LET C = 2");
+   Queue ("LET C = 3");
+   Immediate ("INSERT 1");        --  cursor after line 1
+   Immediate ("DELETE 3");        --  after cursor -> unchanged
+   Queue ("LET C = 5");           --  [C=1, C=5, C=2]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-14: delete-after-cursor -> C=2", GI ("C"), 2);
+
    -----------------------------------------------------------------------
    --  Summary
    -----------------------------------------------------------------------
