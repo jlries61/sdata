@@ -69,6 +69,7 @@ package body SData.Reserved_Keywords is
       S.Insert ("SYSTEM");
       S.Insert ("THEN");
       S.Insert ("TO");
+      S.Insert ("TRANSPOSE");
       S.Insert ("UNHOLD");
       S.Insert ("UNSET");
       S.Insert ("UNTIL");

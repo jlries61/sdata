@@ -1815,6 +1815,186 @@ package body SData.Parser is
    end Parse_AGGREGATE;
 
    ---------------------
+   -- Parse_TRANSPOSE --
+   ---------------------
+   --  Parses the slash-options for TRANSPOSE and records them in Stmt's
+   --  Stmt_TRANSPOSE fields.  Uses a USE-style slash-option loop.
+   --  Parse-time errors (hard-stop):
+   --    #1 both /ID and /ARRAY → mutually exclusive
+   --    #2 /KEEP= or /DROP= with empty list → requires at least one variable
+   --    #3 /NAME value not ending in $ → character column required
+   procedure Parse_TRANSPOSE
+     (Ctx  : in out Parser_Context;
+      Stmt : Statement_Access)
+   is
+      Peeked    : Token;
+      Saw_KEEP  : Boolean := False;
+      Saw_DROP  : Boolean := False;
+      Saw_NAME  : Boolean := False;
+      Saw_ID    : Boolean := False;
+      Saw_ARRAY : Boolean := False;
+   begin
+      loop
+         Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
+         exit when Peeked.Kind /= Token_Slash;
+
+         declare
+            Discard   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  /
+            Flag_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Flag_Name : constant String :=
+               To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+            pragma Unreferenced (Discard);
+         begin
+            if Flag_Name = "KEEP" then
+               if Saw_KEEP then
+                  raise Script_Error with
+                    "TRANSPOSE: /KEEP may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /KEEP";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               Stmt.Keep_Vars := Parse_Variable_List (Ctx);
+               if Stmt.Keep_Vars = null then
+                  raise Script_Error with
+                    "TRANSPOSE: /KEEP= requires at least one variable";
+               end if;
+               Saw_KEEP := True;
+
+            elsif Flag_Name = "DROP" then
+               if Saw_DROP then
+                  raise Script_Error with
+                    "TRANSPOSE: /DROP may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /DROP";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               Stmt.Drop_Vars := Parse_Variable_List (Ctx);
+               if Stmt.Drop_Vars = null then
+                  raise Script_Error with
+                    "TRANSPOSE: /DROP= requires at least one variable";
+               end if;
+               Saw_DROP := True;
+
+            elsif Flag_Name = "NAME" then
+               if Saw_NAME then
+                  raise Script_Error with
+                    "TRANSPOSE: /NAME may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /NAME";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               declare
+                  Id_Tok  : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+                  Id_Text : constant String := Identifier_Text (Id_Tok);
+               begin
+                  if not Is_Identifier_Token (Id_Tok) then
+                     raise Script_Error with
+                       "TRANSPOSE: expected an identifier after /NAME=";
+                  end if;
+                  if Id_Text (Id_Text'Last) /= '$' then
+                     raise Script_Error with
+                       "TRANSPOSE: /NAME column '" & Id_Text &
+                       "' must end in $ (character column required)";
+                  end if;
+                  Stmt.Name_Col (1 .. Id_Tok.Length) := Id_Text;
+                  Stmt.Name_Col_Len := Id_Tok.Length;
+               end;
+               Saw_NAME := True;
+
+            elsif Flag_Name = "ID" then
+               if Saw_ID then
+                  raise Script_Error with
+                    "TRANSPOSE: /ID may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /ID";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               declare
+                  Id_Tok  : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+                  Id_Text : constant String := Identifier_Text (Id_Tok);
+               begin
+                  if not Is_Identifier_Token (Id_Tok) then
+                     raise Script_Error with
+                       "TRANSPOSE: expected an identifier after /ID=";
+                  end if;
+                  Stmt.Id_Col (1 .. Id_Tok.Length) := Id_Text;
+                  Stmt.Id_Col_Len := Id_Tok.Length;
+               end;
+               Stmt.Has_Id := True;
+               Saw_ID := True;
+
+            elsif Flag_Name = "ARRAY" then
+               if Saw_ARRAY then
+                  raise Script_Error with
+                    "TRANSPOSE: /ARRAY may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with
+                    "TRANSPOSE: expected '=' after /ARRAY";
+               end if;
+               declare
+                  Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Eq);
+               begin
+                  null;
+               end;
+               declare
+                  Id_Tok  : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+                  Id_Text : constant String := Identifier_Text (Id_Tok);
+               begin
+                  if not Is_Identifier_Token (Id_Tok) then
+                     raise Script_Error with
+                       "TRANSPOSE: expected an identifier after /ARRAY=";
+                  end if;
+                  Stmt.Array_Col (1 .. Id_Tok.Length) := Id_Text;
+                  Stmt.Array_Col_Len := Id_Tok.Length;
+               end;
+               Stmt.Has_Array := True;
+               Saw_ARRAY := True;
+
+            else
+               raise Script_Error with
+                 "TRANSPOSE: unknown option /" & Flag_Name;
+            end if;
+         end;
+      end loop;
+
+      --  Error #1: /ID and /ARRAY are mutually exclusive.
+      if Saw_ID and then Saw_ARRAY then
+         raise Script_Error with
+           "TRANSPOSE: /ID and /ARRAY are mutually exclusive";
+      end if;
+   end Parse_TRANSPOSE;
+
+   ---------------------
    -- Parse_Statement --
    ---------------------
    function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access is
@@ -2430,6 +2610,10 @@ package body SData.Parser is
          when Token_AGGREGATE =>
             Stmt := new Statement (Stmt_AGGREGATE);
             Parse_AGGREGATE (Ctx, Stmt);
+
+         when Token_TRANSPOSE =>
+            Stmt := new Statement (Stmt_TRANSPOSE);
+            Parse_TRANSPOSE (Ctx, Stmt);
 
          when Token_DELETE =>
             declare
