@@ -1,0 +1,5 @@
+Dataset opened: tests/data/transpose_char.csv
+TRANSPOSE complete. 2 records and 3 variables processed.
+REC# _NAME_$ VAL$(1) VAL$(2) 
+1 LABEL$ foo bar 
+2 CATEGORY$ alpha beta 

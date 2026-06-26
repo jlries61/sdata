@@ -1,0 +1,9 @@
+Dataset opened: tests/data/transpose_by_simple.csv
+TRANSPOSE complete. 2 records and 4 variables processed.
+REC# GRP$ _NAME_$ _X_(1) _X_(2) 
+1 A SCORE 10.00000 20.00000 
+2 B SCORE 30.00000 . 
+Dataset opened: tests/data/transpose_by_simple.csv
+TRANSPOSE complete. 1 records and 4 variables processed.
+REC# _NAME_$ _X_(1) _X_(2) _X_(3) 
+1 SCORE 10.00000 20.00000 30.00000 

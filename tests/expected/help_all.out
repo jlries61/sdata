@@ -136,6 +136,20 @@ an array element such as x(1). The active SELECT filter is respected; a
 pending SAVE is written; the active SELECT and BY are then cleared.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
+Command: TRANSPOSE [/KEEP=varlist] [/DROP=varlist] [/NAME=var$] [/ID=var] [/ARRAY=var]
+Reshapes the Data Table so that each transposed column becomes a row.
+  /KEEP, /DROP: select which columns to transpose (default: all non-BY
+                columns); the effective set is KEEP minus DROP.
+  /NAME:  character column that receives the source column name
+          in each output row (default: _NAME_$).
+  /ID:    column whose values become output column names (wide form);
+          mutually exclusive with /ARRAY.
+  /ARRAY: base name of the array of transposed values in each output
+          row (long form, default: _X_); used when /ID is absent.
+Respects the active SELECT filter; transposes each BY block separately.
+Flushes a pending SAVE; clears the active SELECT and BY afterward.
+Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
+
 Command: NEW
 Clears the Data Table, all variables, and the queued program.
 Also resets the active SELECT record filter and BY grouping.

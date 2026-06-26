@@ -3,7 +3,7 @@ Available Commands:
   Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME
   Arrays:      ARRAY, DIM
   Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK
-  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, REPEAT
+  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, TRANSPOSE, REPEAT
   Output:      PRINT, OUTPUT, ECHO, DIGITS
   Files/paths: FPATH
   Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END

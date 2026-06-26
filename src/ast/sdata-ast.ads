@@ -182,7 +182,8 @@ package SData.AST is
       Stmt_PROGRAM_DELETE, -- Delete line(s) from program buffer (immediate)
       Stmt_DISPLAY,        -- Display Data Table rows (immediate)
       Stmt_OPTIONS,        -- Set runtime option (OPTIONS key value)
-      Stmt_AGGREGATE       -- Collapse table to one row per BY group (immediate)
+      Stmt_AGGREGATE,      -- Collapse table to one row per BY group (immediate)
+      Stmt_TRANSPOSE       -- Reshape table columns to rows (immediate)
    );
 
    type Statement (Kind : Statement_Kind) is record
@@ -291,6 +292,14 @@ package SData.AST is
             Write_Targets : Variable_List;
          when Stmt_AGGREGATE =>
             Agg_List : Aggregate_Spec_Vectors.Vector;
+         when Stmt_TRANSPOSE =>
+            Keep_Vars    : Variable_List;
+            Drop_Vars    : Variable_List;
+            Name_Col     : String (1 .. Max_Name_Len); Name_Col_Len  : Natural := 0;
+            Id_Col       : String (1 .. Max_Name_Len); Id_Col_Len    : Natural := 0;
+            Array_Col    : String (1 .. Max_Name_Len); Array_Col_Len : Natural := 0;
+            Has_Id       : Boolean := False;
+            Has_Array    : Boolean := False;
          when others =>
             null;
       end case;

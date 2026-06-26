@@ -1,0 +1,5 @@
+Dataset opened: tests/data/transpose_opts.csv
+TRANSPOSE complete. 2 records and 3 variables processed.
+REC# _NAME_$ A B 
+1 SCORE 95.00000 87.00000 
+2 HEIGHT 170.00000 165.00000 

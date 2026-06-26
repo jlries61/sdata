@@ -1,0 +1,6 @@
+Dataset opened: tests/data/transpose_numeric.csv
+TRANSPOSE complete. 3 records and 3 variables processed.
+REC# _NAME_$ _X_(1) _X_(2) 
+1 SCORE 95.00000 87.00000 
+2 HEIGHT 170.00000 165.00000 
+3 WEIGHT 65.00000 70.00000 

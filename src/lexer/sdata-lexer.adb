@@ -292,6 +292,7 @@ package body SData.Lexer is
                elsif Upper = "ECHO" then T.Kind := Token_ECHO;
                elsif Upper = "BY" then T.Kind := Token_BY;
                elsif Upper = "AGGREGATE" then T.Kind := Token_AGGREGATE;
+               elsif Upper = "TRANSPOSE" then T.Kind := Token_TRANSPOSE;
                elsif Upper = "SORT" then T.Kind := Token_SORT;
                elsif Upper = "RENAME" then T.Kind := Token_RENAME;
                elsif Upper = "DELETE" then T.Kind := Token_DELETE;

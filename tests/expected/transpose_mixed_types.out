@@ -1,0 +1,2 @@
+Dataset opened: tests/data/transpose_opts.csv
+Error: TRANSPOSE: columns to transpose must share a type (numeric or character); got mixed

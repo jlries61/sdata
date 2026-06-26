@@ -18,7 +18,7 @@ package body SData.Help is
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
       Put_Line ("  Arrays:      ARRAY, DIM");
       Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK");
-      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, REPEAT");
+      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, TRANSPOSE, REPEAT");
       Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
       Put_Line ("  Files/paths: FPATH");
       Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
@@ -242,6 +242,24 @@ package body SData.Help is
       Put_Line ("pending SAVE is written; the active SELECT and BY are then cleared.");
       Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
    end Help_AGGREGATE;
+
+   procedure Help_TRANSPOSE is
+   begin
+      Put_Line ("Command: TRANSPOSE [/KEEP=varlist] [/DROP=varlist] [/NAME=var$]" &
+                " [/ID=var] [/ARRAY=var]");
+      Put_Line ("Reshapes the Data Table so that each transposed column becomes a row.");
+      Put_Line ("  /KEEP, /DROP: select which columns to transpose (default: all non-BY");
+      Put_Line ("                columns); the effective set is KEEP minus DROP.");
+      Put_Line ("  /NAME:  character column that receives the source column name");
+      Put_Line ("          in each output row (default: _NAME_$).");
+      Put_Line ("  /ID:    column whose values become output column names (wide form);");
+      Put_Line ("          mutually exclusive with /ARRAY.");
+      Put_Line ("  /ARRAY: base name of the array of transposed values in each output");
+      Put_Line ("          row (long form, default: _X_); used when /ID is absent.");
+      Put_Line ("Respects the active SELECT filter; transposes each BY block separately.");
+      Put_Line ("Flushes a pending SAVE; clears the active SELECT and BY afterward.");
+      Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
+   end Help_TRANSPOSE;
 
    procedure Help_NEW is
    begin
@@ -1198,6 +1216,7 @@ package body SData.Help is
    K_BY           : aliased constant String := "BY";
    K_SORT         : aliased constant String := "SORT";
    K_AGGREGATE    : aliased constant String := "AGGREGATE";
+   K_TRANSPOSE    : aliased constant String := "TRANSPOSE";
    K_NEW          : aliased constant String := "NEW";
    K_LIST         : aliased constant String := "LIST";
    K_DISPLAY      : aliased constant String := "DISPLAY";
@@ -1411,7 +1430,8 @@ package body SData.Help is
       (K_DIM'Access,      Help_DIM'Access,      C, N),
       (K_BY'Access,       Help_BY'Access,       C, N),
       (K_SORT'Access,     Help_SORT'Access,     C, N),
-      (K_AGGREGATE'Access, Help_AGGREGATE'Access, C, N),
+      (K_AGGREGATE'Access,  Help_AGGREGATE'Access,  C, N),
+      (K_TRANSPOSE'Access,  Help_TRANSPOSE'Access,  C, N),
       (K_NEW'Access,      Help_NEW'Access,      C, N),
       (K_LIST'Access,     Help_LIST'Access,     C, N),
       (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),
