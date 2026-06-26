@@ -11,7 +11,9 @@
 with Ada.Exceptions;
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
+with Ada.Strings.Fixed;     use Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
+with SData_Core.IO;
 with SData_Core.Commands;
 with SData_Core.Config;
 with SData_Core.Table;
@@ -111,6 +113,33 @@ procedure Interpreter_Unit_Test is
       return SData.Parser.Parse_Program (Ctx);
    end Parse_One;
 
+   --  Queue one deferred statement through the REPL buffer path (honors cursor).
+   procedure Queue (Source : String) is
+   begin
+      SData.Interpreter.Add_To_Active_Program (Parse_One (Source), Source);
+   end Queue;
+
+   --  Execute one immediate statement (e.g. INSERT / LIST) through the REPL.
+   procedure Immediate (Source : String) is
+      P : Statement_Access := Parse_One (Source);
+   begin
+      SData.Interpreter.Execute (P);
+      SData.AST.Free_Program (P);
+   end Immediate;
+
+   --  Read an entire text file into a String (for output-capture asserts).
+   function Slurp (Path : String) return String is
+      F   : Ada.Text_IO.File_Type;
+      Acc : Unbounded_String := Null_Unbounded_String;
+   begin
+      Ada.Text_IO.Open (F, Ada.Text_IO.In_File, Path);
+      while not Ada.Text_IO.End_Of_File (F) loop
+         Append (Acc, Ada.Text_IO.Get_Line (F) & ASCII.LF);
+      end loop;
+      Ada.Text_IO.Close (F);
+      return To_String (Acc);
+   end Slurp;
+
    --  Returns True if executing Script raises any exception.
    function Raises (Script : String) return Boolean is
    begin
@@ -161,6 +190,9 @@ procedure Interpreter_Unit_Test is
          when others      => return -99_999;
       end case;
    end TGI;
+
+   --  Scratch directory for temporary test output files.
+   Scratch : constant String := "/tmp/";
 
    --  Read an array element as integer.
    function GI_Arr (Name : String; Idx : Integer) return Integer is
@@ -747,6 +779,80 @@ begin
    begin
       Check ("IN-04b: INSERT -3 flagged bad", P.Insert_Bad, True);
       SData.AST.Free_Program (P);
+   end;
+
+   --  IN-05: default queueing appends (control case): X ends at 2.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Queue ("LET X = 2");
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-05: append order -> X=2", GI ("X"), 2);
+
+   --  IN-06: INSERT 0 inserts at the front; reversed order -> X ends at 1.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Immediate ("INSERT 0");
+   Queue ("LET X = 2");          --  buffer becomes [X=2, X=1]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-06: INSERT 0 front -> X=1", GI ("X"), 1);
+
+   --  IN-07: cursor advances across consecutive inserts (Y then Z after line 0,
+   --  inserted in typed order ahead of the original) -> R = 30.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET R = 10");
+   Immediate ("INSERT 0");
+   Queue ("LET R = 20");         --  [R=20, R=10]
+   Queue ("LET R = 30");         --  [R=20, R=30, R=10]  (cursor advanced)
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-07: cursor advances -> R=10", GI ("R"), 10);
+
+   --  IN-08: buffer length grows by one per queued statement regardless of mode.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET A = 1");
+   Immediate ("INSERT 0");
+   Queue ("LET A = 2");
+   Check ("IN-08: length after insert", SData.Interpreter.Program_Buffer_Length, 2);
+
+   --  IN-09: out-of-range INSERT clamps to end (append) -> X=2.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Immediate ("INSERT 9");       --  buffer has 1 entry; clamp to end
+   Queue ("LET X = 2");          --  appended -> [X=1, X=2]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-09: out-of-range clamps to end -> X=2", GI ("X"), 2);
+
+   --  IN-10: NEW/Clear resets the cursor back to append.
+   SData.Interpreter.Clear_Active_Program;
+   Immediate ("INSERT 0");       --  cursor at front...
+   SData.Interpreter.Clear_Active_Program;  --  ...reset by Clear (NEW path)
+   Queue ("LET X = 1");
+   Queue ("LET X = 2");          --  must append -> [X=1, X=2]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-10: Clear resets cursor -> X=2", GI ("X"), 2);
+
+   --  IN-17: negative INSERT is rejected and leaves the cursor unchanged.
+   --  Cursor parked at beginning; INSERT -3 is a no-op, so the next queued
+   --  statement still inserts at the front -> [X=2, X=1] -> final X=1.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Immediate ("INSERT 0");       --  cursor at beginning
+   Immediate ("INSERT -3");      --  rejected; cursor unchanged
+   Queue ("LET X = 2");          --  still inserts at front -> [X=2, X=1]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-17: negative INSERT no-op -> X=1", GI ("X"), 1);
+
+   --  IN-11: INSERT prints a confirmation (captured via Open_Output).
+   declare
+      Cap : constant String := Scratch & "insert_confirm.txt";
+   begin
+      SData.Interpreter.Clear_Active_Program;
+      Queue ("LET A = 1");
+      Queue ("LET B = 2");
+      SData_Core.IO.Open_Output (Cap);
+      Immediate ("INSERT 1");
+      SData_Core.IO.Close_Output;
+      Check ("IN-11: confirmation text",
+             Index (Slurp (Cap), "Insertion point set after line 1.") > 0, True);
    end;
 
    -----------------------------------------------------------------------
