@@ -26,4 +26,10 @@ package SData.Parser is
    --  Returns null if the source is empty.
    function Parse_Program (Ctx : in out Parser_Context) return Statement_Access;
 
+   --  True when parsing stopped at end-of-source immediately after a
+   --  trailing-comma line continuation (a statement ending with a comma).
+   --  The interactive REPL uses this to keep buffering and prompt for the
+   --  continuation line rather than executing a half-finished statement.
+   function Ended_With_Continuation (Ctx : Parser_Context) return Boolean;
+
 end SData.Parser;

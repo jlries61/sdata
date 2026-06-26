@@ -2770,4 +2770,12 @@ package body SData.Parser is
       return First;
    end Parse_Program;
 
+   -------------------------------
+   -- Ended_With_Continuation --
+   -------------------------------
+   function Ended_With_Continuation (Ctx : Parser_Context) return Boolean is
+   begin
+      return SData.Lexer.Ended_With_Continuation (Ctx.Lex_Ctx);
+   end Ended_With_Continuation;
+
 end SData.Parser;
