@@ -41,6 +41,17 @@ INSERT [ n | $ ]
 Warning: INSERT line 9 out of range (buffer has 4 entries); inserting at end.
 ```
 
+A **negative** line number (e.g. `INSERT -3`) is **rejected**: it warns and leaves
+the cursor unchanged (no-op). Line numbers are uniformly positive 1-based across
+`LIST` / `DELETE` / `INSERT`; `$` already covers "the end", so Python-style
+count-from-end indexing is intentionally not supported (YAGNI). The parser must
+consume the leading `-` and any following number so it does not dangle as a stray
+token:
+
+```
+Warning: INSERT line number must be >= 0; insertion point unchanged.
+```
+
 ## Cursor model (sticky)
 
 Two new pieces of interpreter state:
@@ -56,6 +67,7 @@ Behavior:
 2. `INSERT 0` → `Append_Mode := False; Insert_Point := 0`.
 3. `INSERT n` (`1 <= n <= length`) → `Append_Mode := False; Insert_Point := n`.
 4. `INSERT n` (`n > length`) → warn; `Append_Mode := True` (clamp to end).
+5. `INSERT -n` (negative, parser-flagged invalid) → warn; cursor unchanged (no-op).
 
 When a deferred statement is queued and `Append_Mode` is false, it is inserted
 **after** `Insert_Point` (vector index `Insert_Point + 1`) and the cursor advances:
@@ -121,8 +133,8 @@ no line number and is never renumbered).
 | Area | File | Change |
 |---|---|---|
 | Lexer | `src/lexer/sdata-lexer.ads` / `.adb` | Add `Token_INSERT` keyword; add `Token_Dollar` for a standalone `$`. |
-| AST | `src/ast/sdata-ast.ads` | Add `Stmt_PROGRAM_INSERT` with `Insert_At_End : Boolean` and `Insert_Line : Natural`. |
-| Parser | `src/parser/sdata-parser.adb` | Parse `INSERT [n｜$]` (peek numeric → `Insert_Line`; `Token_Dollar`/none → end). |
+| AST | `src/ast/sdata-ast.ads` | Add `Stmt_PROGRAM_INSERT` with `Insert_At_End : Boolean`, `Insert_Line : Natural`, and `Insert_Bad : Boolean` (negative/invalid argument). |
+| Parser | `src/parser/sdata-parser.adb` | Parse `INSERT [n｜$]` (peek numeric → `Insert_Line`; `Token_Dollar`/none → end; leading `Token_Minus` [+ number] → `Insert_Bad`). |
 | Interpreter | `src/sdata-interpreter.adb` | `Append_Mode` / `Insert_Point` state; `Add_To_Active_Program` honors the cursor; new `Execute_Program_Insert`; add `Stmt_PROGRAM_INSERT` to `Is_Immediate`; reset cursor in `Clear_Active_Program`; adjust cursor in `Execute_Program_Delete`. |
 | Interpreter | `src/sdata-interpreter-execute_metadata.adb` | `Stmt_LIST` prints the `--> insertion point` marker. |
 | Reserved kw | `src/sdata-reserved_keywords.adb` | Add `"INSERT"` (mirrors the lexer keyword list). |

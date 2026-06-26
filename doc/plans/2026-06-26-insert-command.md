@@ -51,7 +51,7 @@ Lexer token + standalone `$` token + AST node + parser rule + reserved-word entr
 - Test: `tests/interpreter_unit_test.adb`
 
 **Interfaces:**
-- Produces (AST): `Stmt_PROGRAM_INSERT` with fields `Insert_At_End : Boolean := True;` and `Insert_Line : Natural := 0;`. `Insert_At_End = True` means "append at end" (`$`, bare `INSERT`, or out-of-range — though range is checked later in Task 2). `Insert_At_End = False` with `Insert_Line = n` means "after line n" (`n = 0` = beginning).
+- Produces (AST): `Stmt_PROGRAM_INSERT` with fields `Insert_At_End : Boolean := True;`, `Insert_Line : Natural := 0;`, and `Insert_Bad : Boolean := False;`. `Insert_At_End = True` means "append at end" (`$`, bare `INSERT`, or out-of-range — though range is checked later in Task 2). `Insert_At_End = False` with `Insert_Line = n` means "after line n" (`n = 0` = beginning). `Insert_Bad = True` means the argument was negative (e.g. `INSERT -3`) — a runtime warning + no-op, handled in Task 2.
 - Produces (lexer): `Token_INSERT`, `Token_Dollar`.
 
 - [ ] **Step 1: Write the failing test**
@@ -105,6 +105,14 @@ Test block (new section "I: INSERT command"):
    begin
       Check ("IN-04: INSERT 5 not-at-end", P.Insert_At_End, False);
       Check ("IN-04: INSERT 5 line", P.Insert_Line, 5);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-04b: INSERT -3 parses as an invalid (negative) argument.
+   declare
+      P : Statement_Access := Parse_One ("INSERT -3");
+   begin
+      Check ("IN-04b: INSERT -3 flagged bad", P.Insert_Bad, True);
       SData.AST.Free_Program (P);
    end;
 ```
@@ -166,6 +174,7 @@ Add the variant fields before the `when others => null;` arm of the `Statement` 
          when Stmt_PROGRAM_INSERT =>
             Insert_At_End : Boolean := True;   --  True = append at end ($/bare)
             Insert_Line   : Natural := 0;      --  cursor after line N (0 = start)
+            Insert_Bad    : Boolean := False;  --  negative/invalid argument
          when others =>
             null;
 ```
@@ -190,6 +199,18 @@ In `src/parser/sdata-parser.adb`, add a `when Token_INSERT =>` arm to the main s
                      Stmt.Insert_Line   :=
                         Natural (Float'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
                   end;
+               elsif Next_Tok.Kind = Token_Minus then
+                  --  Negative argument (e.g. INSERT -3): consume the '-' and the
+                  --  following number (if any) so they do not dangle, and flag
+                  --  the statement invalid for a runtime warning (Task 2).
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin null; end;
+                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Numeric_Literal then
+                     declare Discard2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     begin null; end;
+                  end if;
+                  Stmt.Insert_At_End := False;
+                  Stmt.Insert_Bad    := True;
                elsif Next_Tok.Kind = Token_Dollar then
                   --  Consume the $; end-of-buffer is the default.
                   declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
@@ -334,6 +355,17 @@ Test block (append to the "I: INSERT command" section):
    SData.Interpreter.Run_Active_Program;
    Check ("IN-10: Clear resets cursor -> X=2", GI ("X"), 2);
 
+   --  IN-17: negative INSERT is rejected and leaves the cursor unchanged.
+   --  Cursor parked at beginning; INSERT -3 is a no-op, so the next queued
+   --  statement still inserts at the front -> [X=2, X=1] -> final X=1.
+   SData.Interpreter.Clear_Active_Program;
+   Queue ("LET X = 1");
+   Immediate ("INSERT 0");       --  cursor at beginning
+   Immediate ("INSERT -3");      --  rejected; cursor unchanged
+   Queue ("LET X = 2");          --  still inserts at front -> [X=2, X=1]
+   SData.Interpreter.Run_Active_Program;
+   Check ("IN-17: negative INSERT no-op -> X=1", GI ("X"), 1);
+
    --  IN-11: INSERT prints a confirmation (captured via Open_Output).
    declare
       Cap : constant String := Scratch & "insert_confirm.txt";
@@ -429,7 +461,11 @@ Add the body next to `Execute_Program_Delete` (after its `end Execute_Program_De
    procedure Execute_Program_Insert (Stmt : Statement_Access) is
       Last : constant Natural := Natural (Active_Program_Vec.Length);
    begin
-      if Stmt.Insert_At_End then
+      if Stmt.Insert_Bad then
+         Put_Line_Error ("Warning: INSERT line number must be >= 0; "
+                         & "insertion point unchanged.");
+         return;
+      elsif Stmt.Insert_At_End then
          Append_Mode  := True;
          Insert_Point := 0;
          Put_Line ("Insertion point set at end (append).");
@@ -745,8 +781,9 @@ In `src/sdata-help.adb`, add a `Help_INSERT` procedure immediately after `Help_D
       Put_Line ("  INSERT      Bare form; same as INSERT $.");
       Put_Line ("The cursor is sticky: it persists across RUN and advances as lines");
       Put_Line ("are inserted.  NEW or another INSERT resets it.  n past the end");
-      Put_Line ("warns and clamps to the end.  Only meaningful in interactive (REPL)");
-      Put_Line ("mode.  See LIST (shows the marker) and DELETE.");
+      Put_Line ("warns and clamps to the end; a negative n is rejected (no-op).");
+      Put_Line ("Only meaningful in interactive (REPL) mode.");
+      Put_Line ("See LIST (shows the marker) and DELETE.");
    end Help_INSERT;
 ```
 
