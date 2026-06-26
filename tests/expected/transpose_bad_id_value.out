@@ -1,0 +1,2 @@
+Dataset opened: tests/data/transpose_badid.csv
+Error: TRANSPOSE: /ID value '1st' is not a legal column identifier
