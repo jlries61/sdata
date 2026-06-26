@@ -35,8 +35,8 @@ with SData_Core.File_IO;
 --  Execution model (three tiers):
 --    Declarative       Commands such as USE, BY, SELECT, REPEAT, SAVE, FPATH
 --                      execute immediately and configure interpreter state.
---    Immediate         RUN, SORT, AGGREGATE, NEW, NAMES, SYSTEM, HELP execute
---                      immediately but are not purely declarative.
+--    Immediate         RUN, SORT, AGGREGATE, TRANSPOSE, NEW, NAMES, SYSTEM, HELP
+--                      execute immediately but are not purely declarative.
 --    Deferred          LET, SET, PRINT, IF, FOR, WHILE, WRITE, DELETE are
 --                      queued in the statement list between two RUN markers and
 --                      executed once per record inside Run_One_Step.
@@ -100,7 +100,8 @@ package body SData.Interpreter is
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
-         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE;
+         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE |
+         Stmt_TRANSPOSE;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -836,6 +837,64 @@ package body SData.Interpreter is
       end;
    end Execute_Aggregate;
 
+   --  TRANSPOSE (immediate).  Enforces error #12 (no pending deferred
+   --  statements), converts the AST fields into the core Transpose_Options
+   --  type, and delegates the heavy lifting to
+   --  SData_Core.Commands.Execute_TRANSPOSE.
+   procedure Execute_Transpose (Stmt : Statement_Access) is
+      Opts : SData_Core.Commands.Transpose_Options;
+   begin
+      --  #12 — there must be no pending (un-run) deferred statements.
+      if Pending_Deferred > 0 then
+         raise SData_Core.Script_Error with
+           "TRANSPOSE: pending program statements exist; issue RUN or NEW first";
+      end if;
+
+      --  Convert Keep_Vars Variable_List → Keep_List Name_Vectors.Vector.
+      declare
+         Curr : Variable_List := Stmt.Keep_Vars;
+      begin
+         while Curr /= null loop
+            Opts.Keep_List.Append
+              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
+            Curr := Curr.Next;
+         end loop;
+      end;
+
+      --  Convert Drop_Vars Variable_List → Drop_List Name_Vectors.Vector.
+      declare
+         Curr : Variable_List := Stmt.Drop_Vars;
+      begin
+         while Curr /= null loop
+            Opts.Drop_List.Append
+              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
+            Curr := Curr.Next;
+         end loop;
+      end;
+
+      --  Fixed-string fields → Unbounded_String.  Pass empty strings as-is;
+      --  Execute_TRANSPOSE applies the defaults (_NAME_$ and _X_).
+      Opts.Name_Col   :=
+        To_Unbounded_String (Stmt.Name_Col (1 .. Stmt.Name_Col_Len));
+      Opts.Id_Col     :=
+        To_Unbounded_String (Stmt.Id_Col (1 .. Stmt.Id_Col_Len));
+      Opts.Array_Name :=
+        To_Unbounded_String (Stmt.Array_Col (1 .. Stmt.Array_Col_Len));
+      Opts.Has_Id    := Stmt.Has_Id;
+      Opts.Has_Array := Stmt.Has_Array;
+
+      SData_Core.Commands.Execute_TRANSPOSE (Opts);
+
+      declare
+         RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
+         VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
+      begin
+         Put_Line ("TRANSPOSE complete. " &
+                   RC (RC'First + 1 .. RC'Last) & " records and " &
+                   VC (VC'First + 1 .. VC'Last) & " variables processed.");
+      end;
+   end Execute_Transpose;
+
    procedure Execute_Statement (Stmt : Statement_Access; Ctx : in out Step_Context) is
 
    begin
@@ -943,6 +1002,8 @@ package body SData.Interpreter is
             Execute_Program_Delete (Stmt);
          when Stmt_AGGREGATE =>
             Execute_Aggregate (Stmt);
+         when Stmt_TRANSPOSE =>
+            Execute_Transpose (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
             | Stmt_OPTIONS =>
