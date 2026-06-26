@@ -896,6 +896,44 @@ begin
    SData.Interpreter.Run_Active_Program;
    Check ("IN-14: delete-after-cursor -> C=2", GI ("C"), 2);
 
+   --  IN-15: LIST marks the cursor between lines (cursor after line 1).
+   declare
+      Cap : constant String := Scratch & "list_mid.txt";
+      Out_Txt : Unbounded_String;
+   begin
+      SData.Interpreter.Clear_Active_Program;
+      Queue ("LET A = 1");
+      Queue ("LET B = 2");
+      Immediate ("INSERT 1");
+      SData_Core.IO.Open_Output (Cap);
+      Immediate ("LIST");
+      SData_Core.IO.Close_Output;
+      Out_Txt := To_Unbounded_String (Slurp (Cap));
+      --  Marker appears, and it appears before "2: " (i.e. between the lines).
+      Check ("IN-15: LIST has marker",
+             Index (Out_Txt, "--> insertion point") > 0, True);
+      Check ("IN-15: marker before line 2",
+             Index (Out_Txt, "--> insertion point") < Index (Out_Txt, "2: "),
+             True);
+   end;
+
+   --  IN-16: append mode -> marker prints after the last entry.
+   declare
+      Cap : constant String := Scratch & "list_end.txt";
+      Out_Txt : Unbounded_String;
+   begin
+      SData.Interpreter.Clear_Active_Program;
+      Queue ("LET A = 1");
+      Queue ("LET B = 2");           --  Append_Mode still True (default)
+      SData_Core.IO.Open_Output (Cap);
+      Immediate ("LIST");
+      SData_Core.IO.Close_Output;
+      Out_Txt := To_Unbounded_String (Slurp (Cap));
+      Check ("IN-16: marker after last line",
+             Index (Out_Txt, "2: ") < Index (Out_Txt, "--> insertion point"),
+             True);
+   end;
+
    -----------------------------------------------------------------------
    --  Summary
    -----------------------------------------------------------------------

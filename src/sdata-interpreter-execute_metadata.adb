@@ -179,10 +179,14 @@ begin
             if S_Names /= null then declare Old : String_List_Access := S_Names; begin GNAT.Strings.Free (Old); end; end if;
          end;
       when Stmt_LIST =>
-         --  LIST always shows the program buffer.
+         --  LIST always shows the program buffer, with the insertion-point
+         --  marker at the cursor (issue #32).
          if Active_Program_Vec.Is_Empty then
             Put_Line ("(Empty program buffer)");
          else
+            if not Append_Mode and then Insert_Point = 0 then
+               Put_Line ("   --> insertion point");
+            end if;
             for I in Active_Program_Vec.First_Index .. Active_Program_Vec.Last_Index loop
                declare
                   S : constant String := To_String (Active_Program_Vec (I).Source);
@@ -190,7 +194,13 @@ begin
                   Put (Ada.Strings.Fixed.Trim (I'Image, Ada.Strings.Both) & ": ");
                   Put_Line (if S = "" then "?" else S);
                end;
+               if not Append_Mode and then Insert_Point = I then
+                  Put_Line ("   --> insertion point");
+               end if;
             end loop;
+            if Append_Mode then
+               Put_Line ("   --> insertion point");
+            end if;
          end if;
 
       when Stmt_DISPLAY =>
