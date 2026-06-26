@@ -631,6 +631,32 @@ removes only entry
 .IR n .
 Only meaningful in interactive mode.
 .TP
+.BR "INSERT " [ \fIn\fR | \fB$\fR ]
+Set the program\-buffer insertion point.
+.B INSERT 0
+inserts before the first line;
+.BI INSERT " n"
+inserts after existing line
+.IR n ;
+.B "INSERT $"
+(or bare
+.BR INSERT )
+appends at the end (the default).
+The cursor is sticky \(em it persists across
+.B RUN
+and advances as lines are inserted;
+.B NEW
+or another
+.B INSERT
+resets it.
+An
+.I n
+past the end warns and clamps to the end.
+A negative
+.I n
+is rejected (no-op, with a warning).
+Only meaningful in interactive (REPL) mode.
+.TP
 .B SUBMIT \fIfile\fR
 Execute commands from an external script file (default extension
 .BR .CMD ).

@@ -92,6 +92,15 @@ package body SData.Interpreter is
    --  modes.
    Pending_Deferred : Natural := 0;
 
+   --  Program-buffer insertion cursor (REPL editing, issue #32).
+   --  When Append_Mode is True, newly queued deferred statements append
+   --  (default).  When False, they are inserted after line Insert_Point
+   --  (0 = before line 1) and the cursor advances past each one.  Sticky:
+   --  persists across RUN; reset to append only by NEW (Clear_Active_Program)
+   --  or another INSERT.
+   Append_Mode  : Boolean := True;
+   Insert_Point : Natural := 0;
+
    function Is_Immediate (Kind : Statement_Kind) return Boolean is
    begin
       return Kind in
@@ -101,7 +110,7 @@ package body SData.Interpreter is
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
          Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE |
-         Stmt_TRANSPOSE;
+         Stmt_TRANSPOSE | Stmt_PROGRAM_INSERT;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -125,6 +134,7 @@ package body SData.Interpreter is
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context);
    procedure Execute_Metadata        (Stmt : Statement_Access);
    procedure Execute_Program_Delete  (Stmt : Statement_Access);
+   procedure Execute_Program_Insert  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
    function  Group_Flags (Logical_I     : Positive;
@@ -352,7 +362,16 @@ package body SData.Interpreter is
    procedure Add_To_Active_Program (Stmt : Statement_Access; Source : String := "") is
    begin
       if Stmt = null then return; end if;
-      Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
+      if Append_Mode then
+         Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
+      else
+         --  Insert after line Insert_Point (vector index Insert_Point + 1),
+         --  then advance the cursor so consecutive inserts keep their order.
+         Active_Program_Vec.Insert
+           (Before   => Insert_Point + 1,
+            New_Item => (Stmt => Stmt, Source => To_Unbounded_String (Source)));
+         Insert_Point := Insert_Point + 1;
+      end if;
       --  A newly queued deferred statement is pending until the next RUN.
       Pending_Deferred := Pending_Deferred + 1;
    end Add_To_Active_Program;
@@ -365,6 +384,8 @@ package body SData.Interpreter is
       end loop;
       Active_Program_Vec.Clear;
       Pending_Deferred := 0;
+      Append_Mode  := True;
+      Insert_Point := 0;
       SData_Core.Table.Clear_Index_Map;
       SData_Core.Table.Clear_By_Vars;
    end Clear_Active_Program;
@@ -778,7 +799,57 @@ package body SData.Interpreter is
       --  the pending count can never exceed what remains in the buffer.
       Pending_Deferred :=
         Natural'Min (Pending_Deferred, Natural (Active_Program_Vec.Length));
+      --  Keep the insertion cursor meaningful after deletion (issue #32).
+      if not Append_Mode then
+         declare
+            Span : constant Natural := To - From + 1;  --  lines removed
+            New_Last : constant Natural := Natural (Active_Program_Vec.Length);
+         begin
+            if Insert_Point >= To then
+               Insert_Point := Insert_Point - Span;       --  cursor after span
+            elsif Insert_Point >= From - 1 then
+               Insert_Point := From - 1;                  --  cursor inside span
+            end if;                                        --  else: before span, keep
+            if Insert_Point > New_Last then
+               Insert_Point := New_Last;                  --  final clamp
+            end if;
+         end;
+      end if;
    end Execute_Program_Delete;
+
+   --  Execute_Program_Insert — set the program-buffer insertion cursor.
+   --  $/bare INSERT -> append mode.  INSERT n -> after line n (0 = start);
+   --  n beyond the buffer warns and clamps to end (append).  Prints a
+   --  one-line confirmation either way.
+   procedure Execute_Program_Insert (Stmt : Statement_Access) is
+      Last : constant Natural := Natural (Active_Program_Vec.Length);
+   begin
+      if Stmt.Insert_Bad then
+         Put_Line_Error ("Warning: INSERT line number must be >= 0; "
+                         & "insertion point unchanged.");
+         return;
+      elsif Stmt.Insert_At_End then
+         Append_Mode  := True;
+         Insert_Point := 0;
+         Put_Line ("Insertion point set at end (append).");
+      elsif Stmt.Insert_Line > Last then
+         Put_Line_Error ("Warning: INSERT line" & Stmt.Insert_Line'Image
+                         & " out of range (buffer has" & Last'Image
+                         & " entries); inserting at end.");
+         Append_Mode  := True;
+         Insert_Point := 0;
+         Put_Line ("Insertion point set at end (append).");
+      elsif Stmt.Insert_Line = 0 then
+         Append_Mode  := False;
+         Insert_Point := 0;
+         Put_Line ("Insertion point set at beginning.");
+      else
+         Append_Mode  := False;
+         Insert_Point := Stmt.Insert_Line;
+         Put_Line ("Insertion point set after line"
+                   & Stmt.Insert_Line'Image & ".");
+      end if;
+   end Execute_Program_Insert;
 
    --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW / OPTIONS.
    procedure Execute_Declarative (Stmt : Statement_Access) is separate;
@@ -1000,6 +1071,8 @@ package body SData.Interpreter is
             Execute_Metadata (Stmt);
          when Stmt_PROGRAM_DELETE =>
             Execute_Program_Delete (Stmt);
+         when Stmt_PROGRAM_INSERT =>
+            Execute_Program_Insert (Stmt);
          when Stmt_AGGREGATE =>
             Execute_Aggregate (Stmt);
          when Stmt_TRANSPOSE =>

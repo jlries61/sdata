@@ -1,5 +1,5 @@
 Available Commands:
-  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, DISPLAY
+  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, INSERT, DISPLAY
   Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME
   Arrays:      ARRAY, DIM
   Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK

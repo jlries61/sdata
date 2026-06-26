@@ -30,6 +30,7 @@ package SData.Lexer is
       Token_REM, Token_HELP, Token_END, Token_RUN, Token_QUIT, Token_NAMES, Token_LIST, Token_DISPLAY,
       Token_AGGREGATE,
       Token_TRANSPOSE,
+      Token_INSERT,
       Token_TO, Token_STEP, Token_BREAK, Token_INTO,
       Token_AS, Token_IN, Token_INTERLEAVE, Token_JOIN, Token_APPEND,
 
@@ -38,6 +39,7 @@ package SData.Lexer is
       Token_Equal, Token_Not_Equal, Token_Less, Token_Less_Equal, Token_Greater, Token_Greater_Equal, -- =, <>, <, <=, >, >=
       Token_Left_Paren, Token_Right_Paren, Token_Left_Brace, Token_Right_Brace, -- (, ), {, }
       Token_Comma, Token_Semicolon, Token_Colon, Token_Dot, -- ,, ;, :, .
+      Token_Dollar,          -- standalone $ (INSERT $)
       Token_Pipe,            -- | or || (delimiter value)
       Token_Newline,         -- Explicit newline tracking
       Token_Range_Dash       -- Used in variable ranges: NAME1-NAME5

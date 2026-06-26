@@ -40,6 +40,7 @@ package body SData.Reserved_Keywords is
       S.Insert ("IN");
       S.Insert ("INTERLEAVE");
       S.Insert ("INTO");
+      S.Insert ("INSERT");
       S.Insert ("JOIN");
       S.Insert ("KEEP");
       S.Insert ("LET");
