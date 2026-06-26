@@ -161,6 +161,7 @@ Displays the numbered contents of the program buffer (deferred statements
 queued for the next RUN).  If the buffer is empty, reports that fact.
 See also: DISPLAY to show Data Table records.
           DELETE n[-m] to remove program buffer entries.
+          INSERT [n|$] to set where new statements are inserted.
 
 Command: DISPLAY [variable(s)]
 Execution: Immediate
@@ -182,6 +183,20 @@ Two forms:
                    A single number removes one entry; n-m removes a range.
                    Execution: Immediate -- takes effect at once.
                    Only meaningful in interactive (REPL) mode.
+
+Command: INSERT
+Execution: Immediate -- takes effect at once.
+Sets the program-buffer insertion point so that subsequently
+entered deferred statements are inserted there instead of appended.
+  INSERT 0    Insert before the first line (start of program).
+  INSERT n    Insert after existing line n (1-based).
+  INSERT $    Insert at the end (append).  This is the default.
+  INSERT      Bare form; same as INSERT $.
+The cursor is sticky: it persists across RUN and advances as lines
+are inserted.  NEW or another INSERT resets it.  n past the end
+warns and clamps to the end; a negative n is rejected (no-op).
+Only meaningful in interactive (REPL) mode.
+See LIST (shows the marker) and DELETE.
 
 Command: BREAK  |  BREAK WHEN <boolean-expr>
 Pauses execution and enters the debug inspection prompt.
@@ -378,7 +393,7 @@ sdata commands fall into three execution tiers:
   Immediate -- execute at once, outside any data step.
     Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET, RENAME,
               SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,
-              DELETE n[-m], QUIT, END
+              DELETE n[-m], INSERT [n|$], QUIT, END
 
   Deferred -- queued between RUN markers; executed once per
     record during the data step.

@@ -735,6 +735,12 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>Delete the current record and start processing the next record.</td>
 </tr>
 <tr>
+<td><em>INSERT</em></td>
+<td><em>INSERT</em> [ &lt;<em>line</em>&gt; | <em>$</em> ]</td>
+<td>Immediate Execution</td>
+<td>Set the program-buffer insertion point so subsequently entered deferred statements are inserted there instead of appended. <em>INSERT 0</em> inserts before the first line; <em>INSERT n</em> inserts after existing line <em>n</em>; <em>INSERT $</em> (or bare <em>INSERT</em>) appends at the end (the default). The cursor is sticky: it persists across <em>RUN</em> and advances as lines are inserted; <em>NEW</em> or another <em>INSERT</em> resets it. A line number past the end warns and clamps to the end; a negative line number is rejected with a warning. Only meaningful in interactive (REPL) mode.</td>
+</tr>
+<tr>
 <td><em>DIGITS</em></td>
 <td><em>DIGITS(n)</em></td>
 <td>Declarative</td>

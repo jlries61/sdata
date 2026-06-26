@@ -14,7 +14,7 @@ package body SData.Help is
    procedure Help_Index is
    begin
       Put_Line ("Available Commands:");
-      Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, DISPLAY");
+      Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, INSERT, DISPLAY");
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
       Put_Line ("  Arrays:      ARRAY, DIM");
       Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK");
@@ -277,6 +277,7 @@ package body SData.Help is
       Put_Line ("queued for the next RUN).  If the buffer is empty, reports that fact.");
       Put_Line ("See also: DISPLAY to show Data Table records.");
       Put_Line ("          DELETE n[-m] to remove program buffer entries.");
+      Put_Line ("          INSERT [n|$] to set where new statements are inserted.");
    end Help_LIST;
 
    procedure Help_DISPLAY is
@@ -308,6 +309,23 @@ package body SData.Help is
       Put_Line ("                   Execution: Immediate -- takes effect at once.");
       Put_Line ("                   Only meaningful in interactive (REPL) mode.");
    end Help_DELETE;
+
+   procedure Help_INSERT is
+   begin
+      Put_Line ("Command: INSERT");
+      Put_Line ("Execution: Immediate -- takes effect at once.");
+      Put_Line ("Sets the program-buffer insertion point so that subsequently");
+      Put_Line ("entered deferred statements are inserted there instead of appended.");
+      Put_Line ("  INSERT 0    Insert before the first line (start of program).");
+      Put_Line ("  INSERT n    Insert after existing line n (1-based).");
+      Put_Line ("  INSERT $    Insert at the end (append).  This is the default.");
+      Put_Line ("  INSERT      Bare form; same as INSERT $.");
+      Put_Line ("The cursor is sticky: it persists across RUN and advances as lines");
+      Put_Line ("are inserted.  NEW or another INSERT resets it.  n past the end");
+      Put_Line ("warns and clamps to the end; a negative n is rejected (no-op).");
+      Put_Line ("Only meaningful in interactive (REPL) mode.");
+      Put_Line ("See LIST (shows the marker) and DELETE.");
+   end Help_INSERT;
 
    procedure Help_BREAK is
    begin
@@ -606,7 +624,7 @@ package body SData.Help is
       Put_Line ("  Immediate -- execute at once, outside any data step.");
       Put_Line ("    Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET, RENAME,");
       Put_Line ("              SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,");
-      Put_Line ("              DELETE n[-m], QUIT, END");
+      Put_Line ("              DELETE n[-m], INSERT [n|$], QUIT, END");
       New_Line;
       Put_Line ("  Deferred -- queued between RUN markers; executed once per");
       Put_Line ("    record during the data step.");
@@ -1222,6 +1240,7 @@ package body SData.Help is
    K_DISPLAY      : aliased constant String := "DISPLAY";
    K_NAMES        : aliased constant String := "NAMES";
    K_DELETE       : aliased constant String := "DELETE";
+   K_INSERT       : aliased constant String := "INSERT";
    K_HOLD         : aliased constant String := "HOLD";
    K_UNHOLD       : aliased constant String := "UNHOLD";
    K_KEEP         : aliased constant String := "KEEP";
@@ -1437,6 +1456,7 @@ package body SData.Help is
       (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),
       (K_NAMES'Access,    Help_NAMES'Access,    C, N),
       (K_DELETE'Access,   Help_DELETE'Access,   C, N),
+      (K_INSERT'Access,   Help_INSERT'Access,   C, N),
       (K_BREAK'Access,    Help_BREAK'Access,    C, N),
       (K_HOLD'Access,     Help_HOLD'Access,     C, N),
       (K_UNHOLD'Access,   Help_UNHOLD'Access,   C, N),
