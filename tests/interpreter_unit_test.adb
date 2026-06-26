@@ -8,6 +8,7 @@
 --  Parses and executes script fragments, then inspects SData_Core.Variables and
 --  SData_Core.Table state via their public APIs.
 
+with Ada.Exceptions;
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
@@ -606,6 +607,90 @@ begin
       Check ("IC-43: NEW after a failed RUN does not double-free (issue #31)",
              SData.Interpreter.Program_Buffer_Length, 0);
    end;
+
+   -----------------------------------------------------------------------
+   --  M.  TRANSPOSE: parser / dispatch unit tests
+   -----------------------------------------------------------------------
+   Put_Line ("");
+   Put_Line ("--- M: TRANSPOSE parser / dispatch ---");
+
+   --  TT-01: /ID and /ARRAY are mutually exclusive (parse-time error).
+   declare
+      Did_Raise : Boolean := False;
+   begin
+      begin
+         Run ("transpose /id=id$ /array=y");
+      exception
+         when E : others =>
+            Did_Raise := True;
+            Check ("TT-01: /ID + /ARRAY error message",
+                   Ada.Exceptions.Exception_Message (E),
+                   "TRANSPOSE: /ID and /ARRAY are mutually exclusive");
+      end;
+      Check ("TT-01: /ID + /ARRAY raises error", Did_Raise, True);
+   end;
+
+   --  TT-02: /KEEP= with empty list (parse-time error).
+   declare
+      Did_Raise : Boolean := False;
+   begin
+      begin
+         Run ("transpose /keep=");
+      exception
+         when E : others =>
+            Did_Raise := True;
+            Check ("TT-02: /KEEP= empty error message",
+                   Ada.Exceptions.Exception_Message (E),
+                   "TRANSPOSE: /KEEP= requires at least one variable");
+      end;
+      Check ("TT-02: /KEEP= empty raises error", Did_Raise, True);
+   end;
+
+   --  TT-03: /NAME value without trailing $ (parse-time error).
+   declare
+      Did_Raise : Boolean := False;
+   begin
+      begin
+         Run ("transpose /name=foo");
+      exception
+         when E : others =>
+            Did_Raise := True;
+            Check ("TT-03: /NAME no-$ error message",
+                   Ada.Exceptions.Exception_Message (E),
+                   "TRANSPOSE: /NAME column 'foo' must end in $" &
+                   " (character column required)");
+      end;
+      Check ("TT-03: /NAME no-$ raises error", Did_Raise, True);
+   end;
+
+   --  TT-04: Valid TRANSPOSE /DROP=id$ produces reshaped schema.
+   --  transpose_simple.csv: id$ score height (3 rows A/B/C) → 2 rows, 4 cols.
+   Run ("use ""tests/data/transpose_simple.csv""" & L &
+        "transpose /drop=id$");
+   Check ("TT-04: row count = 2 (SCORE, HEIGHT)",
+          SData_Core.Table.Row_Count, 2);
+   Check ("TT-04: _NAME_$ column present",
+          SData_Core.Table.Has_Column ("_NAME_$"), True);
+   Check ("TT-04: _X_(1) column present",
+          SData_Core.Table.Has_Column ("_X_(1)"), True);
+
+   --  TT-05: TRANSPOSE /ID=id$ names output columns from ID values.
+   --  id$ values A/B/C → columns A, B, C plus _NAME_$.
+   Run ("use ""tests/data/transpose_simple.csv""" & L &
+        "transpose /id=id$");
+   Check ("TT-05: row count = 2 (SCORE, HEIGHT)",
+          SData_Core.Table.Row_Count, 2);
+   Check ("TT-05: column A present (from id$ value ""A"")",
+          SData_Core.Table.Has_Column ("A"), True);
+
+   --  TT-06: Bare TRANSPOSE on all-numeric fixture uses default _X_ array.
+   --  transpose_numeric.csv: score height weight (2 rows) → 3 rows, 3 cols.
+   Run ("use ""tests/data/transpose_numeric.csv""" & L &
+        "transpose");
+   Check ("TT-06: row count = 3 (SCORE, HEIGHT, WEIGHT)",
+          SData_Core.Table.Row_Count, 3);
+   Check ("TT-06: _X_(1) column present (default _X_ array)",
+          SData_Core.Table.Has_Column ("_X_(1)"), True);
 
    -----------------------------------------------------------------------
    --  Summary
