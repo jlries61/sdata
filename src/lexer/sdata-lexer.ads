@@ -68,6 +68,13 @@ package SData.Lexer is
    --  Looks at the next token without advancing the lexer's position.
    function Peek_Next_Token (Ctx : in out Lexer_Context) return Token;
 
+   --  True when the token stream just reached end-of-source immediately
+   --  after consuming a trailing-comma line continuation (a statement
+   --  ending with a comma, per the design spec).  The interactive REPL
+   --  uses this to keep buffering and prompt for the continuation line
+   --  instead of treating the statement as complete.
+   function Ended_With_Continuation (Ctx : Lexer_Context) return Boolean;
+
 private
    --  The internal state of the lexer.
    type Lexer_Context is record
@@ -78,6 +85,9 @@ private
       Column      : Positive := 1;        -- Current column counter
       Peeked      : Token;                -- Buffer for Peek_Next_Token
       Has_Peeked  : Boolean := False;     -- Flag for peek state
+      --  Set when an EOF token is produced right after a trailing-comma
+      --  continuation was consumed with no following content.
+      Continued_At_EOF : Boolean := False;
    end record;
 
 end SData.Lexer;
