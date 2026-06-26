@@ -323,6 +323,7 @@ package body SData.Lexer is
                elsif Upper = "RUN" then T.Kind := Token_RUN;
                elsif Upper = "NAMES" then T.Kind := Token_NAMES;
                elsif Upper = "LIST" then T.Kind := Token_LIST;
+               elsif Upper = "INSERT" then T.Kind := Token_INSERT;
                elsif Upper = "DISPLAY" then T.Kind := Token_DISPLAY;
                elsif Upper = "TO" then T.Kind := Token_TO;
                elsif Upper = "STEP" then T.Kind := Token_STEP;
@@ -437,6 +438,11 @@ package body SData.Lexer is
                when ',' => T.Kind := Token_Comma; Advance (Ctx);
                when ';' => T.Kind := Token_Semicolon; Advance (Ctx);
                when ':' => T.Kind := Token_Colon; Advance (Ctx);
+               when '$' =>
+                  T.Kind := Token_Dollar;
+                  T.Text (1) := '$';
+                  T.Length := 1;
+                  Advance (Ctx);
                when '|' =>
                   T.Kind := Token_Pipe;
                   T.Text (1) := '|';

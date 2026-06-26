@@ -2648,6 +2648,45 @@ package body SData.Parser is
                   Stmt := new Statement (Stmt_DELETE);
                end if;
             end;
+
+         when Token_INSERT =>
+            --  INSERT [ n | $ ] — set the program-buffer insertion cursor.
+            --  Numeric n -> after line n (0 = beginning).  $ or nothing -> end.
+            Stmt := new Statement (Stmt_PROGRAM_INSERT);
+            declare
+               Next_Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if Next_Tok.Kind = Token_Numeric_Literal then
+                  declare
+                     Num_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     Stmt.Insert_At_End := False;
+                     Stmt.Insert_Line   :=
+                        Natural (Float'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
+                  end;
+               elsif Next_Tok.Kind = Token_Minus then
+                  --  Negative argument (e.g. INSERT -3): consume the '-' and the
+                  --  following number (if any) so they do not dangle, and flag
+                  --  the statement invalid for a runtime warning (Task 2).
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin null; end;
+                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Numeric_Literal then
+                     declare Discard2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     begin null; end;
+                  end if;
+                  Stmt.Insert_At_End := False;
+                  Stmt.Insert_Bad    := True;
+               elsif Next_Tok.Kind = Token_Dollar then
+                  --  Consume the $; end-of-buffer is the default.
+                  declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin null; end;
+                  Stmt.Insert_At_End := True;
+               else
+                  --  Bare INSERT — end of buffer.
+                  Stmt.Insert_At_End := True;
+               end if;
+            end;
+
          when Token_BREAK =>
             declare
                S : constant Statement_Access :=

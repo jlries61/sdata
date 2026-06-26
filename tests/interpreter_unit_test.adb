@@ -103,6 +103,14 @@ procedure Interpreter_Unit_Test is
          raise;
    end Run;
 
+   --  Parse a single statement and return its AST head (caller frees).
+   function Parse_One (Source : String) return Statement_Access is
+      Ctx : SData.Parser.Parser_Context;
+   begin
+      SData.Parser.Initialize (Ctx, Source);
+      return SData.Parser.Parse_Program (Ctx);
+   end Parse_One;
+
    --  Returns True if executing Script raises any exception.
    function Raises (Script : String) return Boolean is
    begin
@@ -691,6 +699,55 @@ begin
           SData_Core.Table.Row_Count, 3);
    Check ("TT-06: _X_(1) column present (default _X_ array)",
           SData_Core.Table.Has_Column ("_X_(1)"), True);
+
+   -----------------------------------------------------------------------
+   --  N.  INSERT command: parser unit tests
+   -----------------------------------------------------------------------
+   Put_Line ("");
+   Put_Line ("--- I: INSERT command ---");
+
+   --  IN-01: INSERT $ parses to end-of-buffer.
+   declare
+      P : Statement_Access := Parse_One ("INSERT $");
+   begin
+      Check ("IN-01: INSERT $ kind", P.Kind = Stmt_PROGRAM_INSERT, True);
+      Check ("IN-01: INSERT $ at end", P.Insert_At_End, True);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-02: bare INSERT defaults to end-of-buffer.
+   declare
+      P : Statement_Access := Parse_One ("INSERT");
+   begin
+      Check ("IN-02: bare INSERT at end", P.Insert_At_End, True);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-03: INSERT 0 parses to beginning (line 0).
+   declare
+      P : Statement_Access := Parse_One ("INSERT 0");
+   begin
+      Check ("IN-03: INSERT 0 not-at-end", P.Insert_At_End, False);
+      Check ("IN-03: INSERT 0 line", P.Insert_Line, 0);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-04: INSERT 5 parses to after line 5.
+   declare
+      P : Statement_Access := Parse_One ("INSERT 5");
+   begin
+      Check ("IN-04: INSERT 5 not-at-end", P.Insert_At_End, False);
+      Check ("IN-04: INSERT 5 line", P.Insert_Line, 5);
+      SData.AST.Free_Program (P);
+   end;
+
+   --  IN-04b: INSERT -3 parses as an invalid (negative) argument.
+   declare
+      P : Statement_Access := Parse_One ("INSERT -3");
+   begin
+      Check ("IN-04b: INSERT -3 flagged bad", P.Insert_Bad, True);
+      SData.AST.Free_Program (P);
+   end;
 
    -----------------------------------------------------------------------
    --  Summary
