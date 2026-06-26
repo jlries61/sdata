@@ -185,6 +185,9 @@ package body SData.AST is
                end;
             end loop;
             Stmt.Agg_List.Clear;
+         when Stmt_TRANSPOSE =>
+            Free (Stmt.Keep_Vars);
+            Free (Stmt.Drop_Vars);
          when others =>
             null;
       end case;
