@@ -132,6 +132,21 @@ A fresh table is built with this column order:
      subscripted access is wired up. The `<Array_Name>`'s `$`-suffix must
      match the transposed set's type: numeric set → no `$`; character set →
      trailing `$`. Mismatch is error #11.
+
+     > **Reconciliation note (2026-06-25):** The `Dim_Array` call above is
+     > **incorrect** as a build mechanism. `Dim_Array` (variables.adb:528)
+     > writes the *live* data table via `Add_Column` and cannot participate in
+     > the `Initialize_Output_Table` → `Commit_Output_Table` build sequence
+     > (it operates on the wrong seam). The **as-built** implementation (see
+     > ADR-047 and `.ssd/features/transpose/01-architect.md` §C3) adds
+     > individually-named `_X_(1)..(K)` columns via `Add_Output_Column`, then
+     > calls `Register_Subscripted_Columns` after `Commit_Output_Table`.
+     > `Register_Subscripted_Columns` auto-detects the `name(n)` pattern and
+     > registers the DIM array; the element `Column_Type` is passed explicitly
+     > to `Add_Output_Column` (`Col_String` for a `$` array, else `Col_Numeric`).
+     > The spec text above reflects the original design intent; the ADR captures
+     > the correction.
+
    - **/ID case**: one standalone real column per union-ID value, in
      first-encounter order. Each column has the type of the transposed set
      (numeric or character). **Column-name `$`-suffix rule for /ID values:**
@@ -390,8 +405,8 @@ TRANSPOSE /NAME=region$ /ID=site
 |---|---|
 | `src/sdata_core-commands.ads` | Add public `Transpose_Options` record (using the existing `Name_Vectors.Vector` instantiation in the package). Add `procedure Execute_TRANSPOSE (Options : Transpose_Options)`. |
 | `src/sdata_core-commands.adb` | Implement `Execute_TRANSPOSE`: validate (errors #4–#11) → resolve transposed set (§3.2) → pre-scan for /ARRAY bound or /ID union (§3.4) → build output table per §3.5 → emit rows per §3.6 → swap the new table in → optional SAVE flush via `Execute_OUTPUT_Table` → clear pending SAVE, SELECT, and BY (§3.8). |
-| `src/sdata_core-table.ads` / `.adb` | No expected change. Existing append-column / append-row primitives plus `Register_Subscripted_Columns` cover the implementation needs. Confirm during implementation. |
-| `src/sdata_core-variables.ads` / `.adb` | No expected change. `Dim_Array` already handles creating a real array of arbitrary bounds. Confirm during implementation. |
+| `src/sdata_core-table.ads` / `.adb` | No change required. Existing append-column / append-row primitives plus `Register_Subscripted_Columns` cover the implementation needs (confirmed). |
+| `src/sdata_core-variables.ads` / `.adb` | No change required. `Dim_Array` is **not used** by the as-built implementation (see §3.5 reconciliation note and ADR-047 §C3); `Register_Subscripted_Columns` performs array wiring post-commit. |
 
 ### 6.2 sdata
 
