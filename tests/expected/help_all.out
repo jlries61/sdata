@@ -150,6 +150,21 @@ Respects the active SELECT filter; transposes each BY block separately.
 Flushes a pending SAVE; clears the active SELECT and BY afterward.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
+Command: STATS [var ...] [/STATS=stat ...] [/NOPRINT]
+Computes summary statistics for the chosen variables (default: all
+numeric columns), one row per active BY group per variable, with one
+column per statistic. The result replaces the Data Table.
+  var ...   analysis variables; omit for all numeric columns. A whole
+            array name expands to its elements.
+  /STATS=   statistics to compute (default: N MIN MEAN MAX STD).
+            Any registered aggregate: SUM MEAN STD VAR MIN MAX N NMISS
+            GMEAN HMEAN MEDIAN. Only N/NMISS apply to character vars.
+  /NOPRINT  replace the table (and write a pending SAVE) without
+            printing the result.
+Respects the active SELECT filter; flushes a pending SAVE; clears the
+active SELECT and BY afterward.
+Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
+
 Command: NEW
 Clears the Data Table, all variables, and the queued program.
 Also resets the active SELECT record filter and BY grouping.
