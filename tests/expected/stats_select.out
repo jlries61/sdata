@@ -1,0 +1,4 @@
+Dataset opened: tests/data/sample.csv
+REC# _NAME_$ N MIN MEAN MAX STD 
+1 VAL1 4 7.00000 11.50000 16.00000 3.87298 
+STATS complete. 1 records and 6 variables processed.
