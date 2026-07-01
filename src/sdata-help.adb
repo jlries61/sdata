@@ -265,8 +265,9 @@ package body SData.Help is
    begin
       Put_Line ("Command: STATS [var ...] [/STATS=stat ...] [/NOPRINT]");
       Put_Line ("Computes summary statistics for the chosen variables (default: all");
-      Put_Line ("numeric columns), one row per active BY group per variable, with one");
-      Put_Line ("column per statistic. The result replaces the Data Table.");
+      Put_Line ("numeric columns except active BY variables), one row per active BY");
+      Put_Line ("group per variable, with one column per statistic. The result");
+      Put_Line ("replaces the Data Table.");
       Put_Line ("  var ...   analysis variables; omit for all numeric columns. A whole");
       Put_Line ("            array name expands to its elements.");
       Put_Line ("  /STATS=   statistics to compute (default: N MIN MEAN MAX STD).");

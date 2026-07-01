@@ -152,8 +152,9 @@ Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
 Command: STATS [var ...] [/STATS=stat ...] [/NOPRINT]
 Computes summary statistics for the chosen variables (default: all
-numeric columns), one row per active BY group per variable, with one
-column per statistic. The result replaces the Data Table.
+numeric columns except active BY variables), one row per active BY
+group per variable, with one column per statistic. The result
+replaces the Data Table.
   var ...   analysis variables; omit for all numeric columns. A whole
             array name expands to its elements.
   /STATS=   statistics to compute (default: N MIN MEAN MAX STD).
