@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.11.1
+Version:        0.12.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Jul 01 2026 John L. Ries <john@theyarnbard.com> - 0.12.0-1
+- Add STATS command (PROC MEANS analogue)
+
 * Fri Jun 26 2026 John L. Ries <john@theyarnbard.com> - 0.11.1-1
 - INSERT command for interactive program-buffer editing (issue #32).
 
