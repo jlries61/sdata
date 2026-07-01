@@ -64,13 +64,13 @@ make check           # build + run all tests (unit + integration)
 ```
 
 `make check` runs five unit-test binaries plus the integration suite (counts as
-of v0.9.7; `make check` output is the source of truth):
+of v0.12.0; `make check` output is the source of truth):
 1. `bin/csv_unit_test` — `SData_Core.CSV` functions (71)
 2. `bin/sdata_unit_test` — `SData_Core.Table` / `Variables` / transient-table / merge / PDV (355)
 3. `bin/evaluator_unit_test` — expression evaluator (170)
-4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write (89)
-5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT (48)
-6. 299 `.cmd` integration tests in `tests/` (~733 unit checks total)
+4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write (100)
+5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT (97)
+6. 299 `.cmd` integration tests in `tests/` (~793 unit checks total)
 
 All 299 integration tests must pass before committing. Never use `--no-verify`.
 
