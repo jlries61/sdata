@@ -81,7 +81,7 @@ manually; `sdata-core` similarly needs to be on `GPR_PROJECT_PATH`.
   spec at `doc/specs/2026-05-19-data-vandal-design.md`.
 - **data-vandal** — a standalone interpreter for controlled data degradation
   (the former `VANDALIZE` command, extracted into its own application in
-  v0.12.0). See [ADR-038](doc/adrs.md) (now superseded) and the data-vandal
+  v0.8.0). See [ADR-038](doc/adrs.md) (now superseded) and the data-vandal
   repository for the application's own README.
 
 ## Installation

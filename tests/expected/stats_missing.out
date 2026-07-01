@@ -1,0 +1,5 @@
+Dataset opened: tests/data/stats_missing.csv
+REC# _NAME_$ N NMISS 
+1 NUM 3 1 
+2 CHAR$ 3 1 
+STATS complete. 2 records and 3 variables processed.
