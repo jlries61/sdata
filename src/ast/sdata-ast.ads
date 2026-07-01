@@ -184,6 +184,7 @@ package SData.AST is
       Stmt_OPTIONS,        -- Set runtime option (OPTIONS key value)
       Stmt_AGGREGATE,      -- Collapse table to one row per BY group (immediate)
       Stmt_TRANSPOSE,      -- Reshape table columns to rows (immediate)
+      Stmt_STATS,          -- Compute table statistics (immediate)
       Stmt_PROGRAM_INSERT  -- Set program-buffer insertion cursor (immediate)
    );
 
@@ -301,6 +302,10 @@ package SData.AST is
             Array_Col    : String (1 .. Max_Name_Len); Array_Col_Len : Natural := 0;
             Has_Id       : Boolean := False;
             Has_Array    : Boolean := False;
+         when Stmt_STATS =>
+            Stats_Vars     : Variable_List;   --  analysis vars (empty = all numeric)
+            Stats_Stats    : Variable_List;   --  statistics (empty = N MIN MEAN MAX STD)
+            Stats_No_Print : Boolean := False;
          when Stmt_PROGRAM_INSERT =>
             Insert_At_End : Boolean := True;   --  True = append at end ($/bare)
             Insert_Line   : Natural := 0;      --  cursor after line N (0 = start)

@@ -188,6 +188,9 @@ package body SData.AST is
          when Stmt_TRANSPOSE =>
             Free (Stmt.Keep_Vars);
             Free (Stmt.Drop_Vars);
+         when Stmt_STATS =>
+            Free (Stmt.Stats_Vars);
+            Free (Stmt.Stats_Stats);
          when others =>
             null;
       end case;
