@@ -598,6 +598,53 @@ first).
 See also
 .BR AGGREGATE .
 .TP
+.B STATS\fR [\fIvar\fB ...]\fR [\fB/STATS=\fIstat\fB ...]\fR [\fB/NOPRINT\fR]
+Compute summary statistics for the chosen
+.I var
+list (default: all numeric columns), producing one output row per active
+.B BY
+group per variable, with one column per statistic.
+The result replaces the data table.
+.RS
+.TP
+.B /STATS=\fIstat ...
+Statistics to compute; default
+.BR "N MIN MEAN MAX STD" .
+Any registered aggregate
+.RB ( SUM ", " MEAN ", " STD ", " VAR ", " MIN ", " MAX ", " N ", " NMISS ", " GMEAN ", " HMEAN ", " MEDIAN ).
+Only
+.B N
+and
+.B NMISS
+may be applied to a character variable.
+.TP
+.B /NOPRINT
+Replace the table (and write a pending
+.BR SAVE )
+without printing the result.
+.RE
+.PP
+A whole-array name in
+.I var
+expands to one row per element
+.RI ( name (1).. name (K)).
+The active
+.B SELECT
+filter is respected; a pending
+.B SAVE
+is written; then the active
+.B SELECT
+and
+.B BY
+are cleared.
+The deferred program buffer must hold no un\-run statements (issue
+.B RUN
+or
+.B NEW
+first).
+See also
+.BR AGGREGATE .
+.TP
 .B NAMES
 List all permanent and temporary variables currently defined.
 .TP

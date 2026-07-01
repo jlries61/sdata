@@ -20,7 +20,7 @@ evaluator, and shared command-execution code lives there now — **when touching
 table / variables / evaluator / file I/O, modify `~/Develop/sdata-core/src/`,
 not this crate**. This crate owns the sdata lexer, AST, parser, and the
 sdata-only command implementations (LET, SET, PRINT, IF, FOR, WHILE, SORT,
-AGGREGATE, TRANSPOSE, SUBMIT, BREAK, etc.). Build sdata-core too if you touch it: `cd ~/Develop/sdata-core && alr build`.
+AGGREGATE, TRANSPOSE, STATS, SUBMIT, BREAK, etc.). Build sdata-core too if you touch it: `cd ~/Develop/sdata-core && alr build`.
 
 See ADR-039 through ADR-043 in `doc/adrs.md` for the split rationale.
 
@@ -92,7 +92,7 @@ first, then `cd ~/Develop/sdata && make check` to catch regressions in both laye
 | Tier | Examples | Behaviour |
 |---|---|---|
 | Declarative | USE, BY, SELECT, REPEAT, SAVE, FPATH, RSEED | Execute immediately; configure interpreter state |
-| Immediate | RUN, SORT, AGGREGATE, TRANSPOSE, NEW, NAMES, SYSTEM, HELP | Execute immediately; not purely declarative |
+| Immediate | RUN, SORT, AGGREGATE, TRANSPOSE, STATS, NEW, NAMES, SYSTEM, HELP | Execute immediately; not purely declarative |
 | Deferred | LET, SET, PRINT, IF, FOR, WHILE, WRITE, DELETE | Queued in statement list; execute once per record via `Run_One_Step` |
 
 **PDV (Program Data Vector):** flat vector mirroring the current table schema.
