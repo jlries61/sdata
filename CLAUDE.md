@@ -114,7 +114,7 @@ their related helpers (`Execute_OUTPUT_Table`, `Execute_Rebuild_Filter`). sdata'
 interpreter delegates to these rather than duplicating the logic. data-vandal
 calls the same procedures. When changing one of these commands' semantics, edit
 sdata-core and confirm both `make check` (sdata, 299 integration tests) and
-`cd ~/Develop/data-vandal && make check` (data-vandal, 44 tests) still pass.
+`cd ~/Develop/data-vandal && make check` (data-vandal, 144 integration tests) still pass.
 
 ## Source Layout
 
