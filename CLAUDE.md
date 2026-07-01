@@ -267,8 +267,9 @@ one lingering. Do not reintroduce a hardcoded sdata-core version in these files.
 
 - Phases 1–4: **complete** (core, control flow, distributions/aggregates, spreadsheet I/O)
 - Phase 5 (Polish): **complete** — disk spillover, interactive improvements, pager, HELP, LIST, ERR/ERL, error messages, performance, documentation
-- Phase 6 (Testing): **ongoing** — 202 integration tests, ~733 unit checks across 5 modules
+- Phase 6 (Testing): **ongoing** — 299 integration tests, ~733 unit checks across 5 modules
 - v0.8.0 milestone (2026-05-21): VANDALIZE extracted into `data-vandal`; sdata-core shared library created (ADRs 039–043)
+- STATS command (2026-07-01): SData's PROC MEANS analogue — per-variable summary statistics, one row per (BY group × variable), reusing the aggregate machinery (sdata v0.12.0, sdata-core v0.1.19; ADR-048)
 
 Full plan: `doc/feasibility_assessment.md`
 
