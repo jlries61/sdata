@@ -70,9 +70,9 @@ of v0.9.7; `make check` output is the source of truth):
 3. `bin/evaluator_unit_test` — expression evaluator (170)
 4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write (89)
 5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT (48)
-6. 202 `.cmd` integration tests in `tests/` (~733 unit checks total)
+6. 299 `.cmd` integration tests in `tests/` (~733 unit checks total)
 
-All 202 integration tests must pass before committing. Never use `--no-verify`.
+All 299 integration tests must pass before committing. Never use `--no-verify`.
 
 **Documentation-only commits** — changes confined to `doc/`, `man/`, and `*.md`
 (README, CONTRIBUTING, CLAUDE.md) and similar non-build prose — do **not** require a
@@ -113,7 +113,7 @@ implement USE, SAVE, FPATH, OUTPUT, SELECT, KEEP, DROP, ARRAY, DIM, RUN, and
 their related helpers (`Execute_OUTPUT_Table`, `Execute_Rebuild_Filter`). sdata's
 interpreter delegates to these rather than duplicating the logic. data-vandal
 calls the same procedures. When changing one of these commands' semantics, edit
-sdata-core and confirm both `make check` (sdata, 202 integration tests) and
+sdata-core and confirm both `make check` (sdata, 299 integration tests) and
 `cd ~/Develop/data-vandal && make check` (data-vandal, 44 tests) still pass.
 
 ## Source Layout
