@@ -18,7 +18,7 @@ package body SData.Help is
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
       Put_Line ("  Arrays:      ARRAY, DIM");
       Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK");
-      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, TRANSPOSE, REPEAT");
+      Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, TRANSPOSE, STATS, REPEAT");
       Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
       Put_Line ("  Files/paths: FPATH");
       Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
@@ -260,6 +260,25 @@ package body SData.Help is
       Put_Line ("Flushes a pending SAVE; clears the active SELECT and BY afterward.");
       Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
    end Help_TRANSPOSE;
+
+   procedure Help_STATS is
+   begin
+      Put_Line ("Command: STATS [var ...] [/STATS=stat ...] [/NOPRINT]");
+      Put_Line ("Computes summary statistics for the chosen variables (default: all");
+      Put_Line ("numeric columns except active BY variables), one row per active BY");
+      Put_Line ("group per variable, with one column per statistic. The result");
+      Put_Line ("replaces the Data Table.");
+      Put_Line ("  var ...   analysis variables; omit for all numeric columns. A whole");
+      Put_Line ("            array name expands to its elements.");
+      Put_Line ("  /STATS=   statistics to compute (default: N MIN MEAN MAX STD).");
+      Put_Line ("            Any registered aggregate: SUM MEAN STD VAR MIN MAX N NMISS");
+      Put_Line ("            GMEAN HMEAN MEDIAN. Only N/NMISS apply to character vars.");
+      Put_Line ("  /NOPRINT  replace the table (and write a pending SAVE) without");
+      Put_Line ("            printing the result.");
+      Put_Line ("Respects the active SELECT filter; flushes a pending SAVE; clears the");
+      Put_Line ("active SELECT and BY afterward.");
+      Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
+   end Help_STATS;
 
    procedure Help_NEW is
    begin
@@ -1235,6 +1254,7 @@ package body SData.Help is
    K_SORT         : aliased constant String := "SORT";
    K_AGGREGATE    : aliased constant String := "AGGREGATE";
    K_TRANSPOSE    : aliased constant String := "TRANSPOSE";
+   K_STATS        : aliased constant String := "STATS";
    K_NEW          : aliased constant String := "NEW";
    K_LIST         : aliased constant String := "LIST";
    K_DISPLAY      : aliased constant String := "DISPLAY";
@@ -1451,6 +1471,7 @@ package body SData.Help is
       (K_SORT'Access,     Help_SORT'Access,     C, N),
       (K_AGGREGATE'Access,  Help_AGGREGATE'Access,  C, N),
       (K_TRANSPOSE'Access,  Help_TRANSPOSE'Access,  C, N),
+      (K_STATS'Access,      Help_STATS'Access,      C, N),
       (K_NEW'Access,      Help_NEW'Access,      C, N),
       (K_LIST'Access,     Help_LIST'Access,     C, N),
       (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),

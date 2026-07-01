@@ -110,7 +110,7 @@ package body SData.Interpreter is
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
          Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE |
-         Stmt_TRANSPOSE | Stmt_PROGRAM_INSERT;
+         Stmt_TRANSPOSE | Stmt_STATS | Stmt_PROGRAM_INSERT;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -764,6 +764,42 @@ package body SData.Interpreter is
    --  IF / WHILE / FOR / LOOP_REPEAT / SELECT — all control flow constructs.
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context) is separate;
 
+   --  Render every column of the current (filtered) table to console, in the
+   --  DISPLAY format (REC# header + one line per logical row).  Shared by the
+   --  bare DISPLAY command (Execute_Metadata) and by STATS' default printout
+   --  (Execute_Stats).  Declared here, before the Execute_Metadata stub, so the
+   --  metadata subunit can call it.
+   procedure Display_All_Columns is
+      V    : Name_Vectors.Vector;
+      Rows : constant Natural := SData_Core.Table.Logical_Row_Count;
+   begin
+      for I in 1 .. Column_Count loop
+         V.Append (To_Unbounded_String (Column_Name (I)));
+      end loop;
+
+      if V.Is_Empty then
+         Put_Line ("(No columns to display)");
+         return;
+      end if;
+
+      Put ("REC# ");
+      for Name of V loop Put (To_String (Name) & " "); end loop;
+      New_Line;
+
+      for R in 1 .. Rows loop
+         declare
+            Phys_R : constant Positive := SData_Core.Table.Logical_To_Physical (R);
+         begin
+            Put (Ada.Strings.Fixed.Trim (R'Image, Ada.Strings.Both) & " ");
+            for Name of V loop
+               Put (To_String_Formatted
+                      (Get_Value_Upper (Phys_R, To_String (Name))) & " ");
+            end loop;
+            New_Line;
+         end;
+      end loop;
+   end Display_All_Columns;
+
    --  KEEP / DROP / HOLD / UNHOLD / UNSET / RENAME / ARRAY / DIM / NAMES.
    procedure Execute_Metadata (Stmt : Statement_Access) is separate;
 
@@ -966,6 +1002,54 @@ package body SData.Interpreter is
       end;
    end Execute_Transpose;
 
+   --  STATS (immediate).  Enforces the pending-deferred guard, converts the
+   --  AST lists into the core Stats_Options, delegates to
+   --  SData_Core.Commands.Execute_STATS, then prints the result table via the
+   --  DISPLAY renderer unless /NOPRINT was given.
+   procedure Execute_Stats (Stmt : Statement_Access) is
+      Opts : SData_Core.Commands.Stats_Options;
+   begin
+      if Pending_Deferred > 0 then
+         raise SData_Core.Script_Error with
+           "STATS: pending program statements exist; issue RUN or NEW first";
+      end if;
+
+      declare
+         Curr : Variable_List := Stmt.Stats_Vars;
+      begin
+         while Curr /= null loop
+            Opts.Var_List.Append
+              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
+            Curr := Curr.Next;
+         end loop;
+      end;
+
+      declare
+         Curr : Variable_List := Stmt.Stats_Stats;
+      begin
+         while Curr /= null loop
+            Opts.Stat_List.Append
+              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
+            Curr := Curr.Next;
+         end loop;
+      end;
+
+      SData_Core.Commands.Execute_STATS (Opts);
+
+      if not Stmt.Stats_No_Print then
+         Display_All_Columns;
+      end if;
+
+      declare
+         RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
+         VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
+      begin
+         Put_Line ("STATS complete. " &
+                   RC (RC'First + 1 .. RC'Last) & " records and " &
+                   VC (VC'First + 1 .. VC'Last) & " variables processed.");
+      end;
+   end Execute_Stats;
+
    procedure Execute_Statement (Stmt : Statement_Access; Ctx : in out Step_Context) is
 
    begin
@@ -1077,6 +1161,8 @@ package body SData.Interpreter is
             Execute_Aggregate (Stmt);
          when Stmt_TRANSPOSE =>
             Execute_Transpose (Stmt);
+         when Stmt_STATS =>
+            Execute_Stats (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
             | Stmt_OPTIONS =>

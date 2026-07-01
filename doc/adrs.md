@@ -57,6 +57,7 @@ that might relitigate a settled question.
 | ADR-045 | Promote the reserved-keyword USE warning to sdata-core; keep keyword lists per-consumer | 2026-06-20 | Accepted |
 | ADR-046 | AGGREGATE command — active-BY grouping, build-and-swap, and an aggregate metadata side-table | 2026-06-23 | Accepted |
 | ADR-047 | TRANSPOSE command — type-uniformity, union-of-IDs, max-K padding, and output-collision rules | 2026-06-25 | Accepted |
+| ADR-048 | STATS command — transposed-AGGREGATE layout, always-replace + print/NOPRINT, shared group-scan helper | 2026-06-30 | Accepted |
 
 ---
 
@@ -618,3 +619,20 @@ SData retains `DIM` but its scope narrows to creating subscripted variables that
 6. **Build mechanism follows AGGREGATE exactly (structural correction C3).** The spec (§3.5) prescribed `Dim_Array` for /ARRAY construction. `Dim_Array` writes the *live* data table and cannot participate in the `Initialize_Output_Table` → `Commit_Output_Table` build sequence. The correct approach (verified against landed `Execute_AGGREGATE`, commands.adb:845-848, 981-984, 1013) is: add individually-named `_X_(1)..(K)` columns via `Add_Output_Column`, then call `Register_Subscripted_Columns` after `Commit_Output_Table`. This auto-detects the `name(n)` pattern and registers the DIM array. For the `/ID` case the value columns are standalone (not `name(n)`), so `Register_Subscripted_Columns` is a harmless no-op — called unconditionally (same as AGGREGATE). A lexer keyword `Token_TRANSPOSE` is required (structural correction C2); the spec said "no lexer change" but `Parse_Statement` dispatches on `Tok.Kind`.
 
 **Consequences:** TRANSPOSE is purely additive to sdata-core's public surface (`Transpose_Options` record type and `Execute_TRANSPOSE` procedure on `Commands`) — a patch bump (sdata-core 0.1.17 → 0.1.18), and the existing `^0.1.16` consumer floor still admits it, so no consumer-constraint change is needed. data-vandal does not use `Execute_TRANSPOSE` but builds and tests clean against the additive API. TRANSPOSE becomes a reserved keyword in sdata's lexer. The `Pending_Deferred` counter established by ADR-046 guards TRANSPOSE too (error #12).
+
+---
+
+### ADR-048: STATS command — transposed-AGGREGATE layout, always-replace + print/NOPRINT, shared group-scan helper
+**Date:** 2026-06-30 | **Status:** Accepted
+
+**Context:** STATS (design spec `doc/specs/2026-06-30-stats-command-design.md`) is SData's PROC MEANS analogue: per-variable summary statistics over the current table, grouped by the active BY. It is functionally a "transposed AGGREGATE" and reuses the same aggregate-function dispatch and build-and-swap machinery.
+
+**Decision:**
+1. **Result layout is row-per-(BY group × variable), columns = statistics.** Schema: BY vars + `_NAME_$` (the analysis-variable name, reusing TRANSPOSE's name-column convention) + one column per requested statistic. This is the transpose of AGGREGATE's row-per-group/column-per-clause layout and matches the PROC MEANS report orientation. `N`/`NMISS` columns are `Col_Integer`; the rest `Col_Numeric`.
+2. **Always replace the in-memory table; print by default, suppress with `/NOPRINT`.** STATS uses the same build-and-swap path as AGGREGATE/TRANSPOSE (always replaces the table, flushes a pending SAVE, clears SELECT/BY). Printing is layered on top in the interpreter via the existing DISPLAY renderer; `/NOPRINT` suppresses only the printout, so the replacement always happens and `/NOPRINT` is never a no-op.
+3. **Shared `Collect_Groups`/`Group_Values` helper (approach A).** The BY-group scan was factored out of `Execute_AGGREGATE` into private helpers in `sdata_core-commands.adb` and is now called by both AGGREGATE and STATS, eliminating scan duplication. AGGREGATE behavior is unchanged (verified by its integration tests).
+4. **Statistics = the registered aggregate allow-list; default `N MIN MEAN MAX STD`.** `/STATS` names are validated with `Evaluator.Is_Aggregate`; the character-input rule reuses `Aggregate_Metadata.Accepts_Character` (only `N`/`NMISS`). No stat-column renaming and no `/NAME=` override in v1 (YAGNI).
+5. **Pending-deferred guard reuses the `Pending_Deferred` counter** established by ADR-046; STATS adds the next error in that lineage ("STATS: pending program statements exist; issue RUN or NEW first").
+6. **Empty or fully-filtered input yields zero output rows**, consistent with AGGREGATE (the transposed-AGGREGATE layout inherits AGGREGATE's group-scan semantics: no groups → no rows). The original spec's aspirational wording about an "N=0 row" was superseded by the as-built behaviour, which the spec's own fallback clause ("match AGGREGATE") blesses.
+
+**Consequences:** STATS is purely additive to sdata-core's public surface (`Stats_Options` + `Execute_STATS` on `Commands`) — a patch bump (sdata-core 0.1.18 → 0.1.19); the `^0.1.16` consumer floor still admits it, so no consumer-constraint change. data-vandal does not use `Execute_STATS` but builds and tests clean against the additive API. STATS becomes a reserved keyword in sdata's lexer. sdata gets a minor bump (0.11.1 → 0.12.0) for the new command.

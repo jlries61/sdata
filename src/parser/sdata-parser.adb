@@ -1994,6 +1994,65 @@ package body SData.Parser is
       end if;
    end Parse_TRANSPOSE;
 
+   -----------------
+   -- Parse_STATS --
+   -----------------
+   --  Parses "STATS [var ...] [/STATS=stat ...] [/NOPRINT]".  The bare list
+   --  (analysis variables) is optional; slash-options follow.  Parse-time
+   --  errors: duplicate /STATS, duplicate /NOPRINT, /STATS without '=' or list.
+   procedure Parse_STATS
+     (Ctx  : in out Parser_Context;
+      Stmt : Statement_Access)
+   is
+      Saw_STATS    : Boolean := False;
+      Saw_NOPRINT  : Boolean := False;
+   begin
+      --  Optional bare variable list (stops at '/' or end of statement).
+      Stmt.Stats_Vars := Parse_Variable_List (Ctx);
+
+      loop
+         exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Slash;
+         declare
+            Discard   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '/'
+            Flag_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Flag_Name : constant String :=
+              To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+            pragma Unreferenced (Discard);
+         begin
+            if Flag_Name = "STATS" then
+               if Saw_STATS then
+                  raise Script_Error with
+                    "STATS: /STATS may be specified at most once";
+               end if;
+               Saw_STATS := True;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "STATS: expected '=' after /STATS";
+               end if;
+               declare
+                  Eat : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '='
+                  pragma Unreferenced (Eat);
+               begin
+                  Stmt.Stats_Stats := Parse_Variable_List (Ctx);
+               end;
+               if Stmt.Stats_Stats = null then
+                  raise Script_Error with
+                    "STATS: /STATS= requires at least one statistic";
+               end if;
+            elsif Flag_Name = "NOPRINT" then
+               if Saw_NOPRINT then
+                  raise Script_Error with
+                    "STATS: /NOPRINT may be specified at most once";
+               end if;
+               Saw_NOPRINT := True;
+               Stmt.Stats_No_Print := True;
+            else
+               raise Script_Error with
+                 "STATS: unknown option '/" & Flag_Name & "'";
+            end if;
+         end;
+      end loop;
+   end Parse_STATS;
+
    ---------------------
    -- Parse_Statement --
    ---------------------
@@ -2614,6 +2673,10 @@ package body SData.Parser is
          when Token_TRANSPOSE =>
             Stmt := new Statement (Stmt_TRANSPOSE);
             Parse_TRANSPOSE (Ctx, Stmt);
+
+         when Token_STATS =>
+            Stmt := new Statement (Stmt_STATS);
+            Parse_STATS (Ctx, Stmt);
 
          when Token_DELETE =>
             declare

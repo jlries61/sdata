@@ -1,3 +1,9 @@
+sdata (0.12.0-1) unstable; urgency=medium
+
+  * Add STATS command (PROC MEANS analogue)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 01 Jul 2026 10:39:33 -0700
+
 sdata (0.11.1-1) unstable; urgency=medium
 
   * INSERT command for interactive program-buffer editing (issue #32).
