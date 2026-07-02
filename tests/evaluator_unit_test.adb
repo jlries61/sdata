@@ -948,6 +948,18 @@ begin
    Check_Kind ("srk_missing",    ".",           Val_Missing);
    Check_Kind ("srk_mixed_add",  "X + A$",      Val_Missing);
 
+   ---------------------------------------------------------------------------
+   --  IKF: Is_Known_Function tests
+   ---------------------------------------------------------------------------
+
+   Put_Line ("");
+   Put_Line ("--- IKF: Is_Known_Function Tests ---");
+
+   Check ("ikf_known",   Is_Known_Function ("SQRT"),   True);
+   Check ("ikf_str_fn",  Is_Known_Function ("UPPER$"), True);
+   Check ("ikf_unknown", Is_Known_Function ("FOOBAR"), False);
+   Check ("ikf_case",    Is_Known_Function ("sqrt"),   True);
+
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
    if Failed > 0 then
