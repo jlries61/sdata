@@ -176,6 +176,33 @@ procedure Evaluator_Unit_Test is
       when others => return True;
    end Raises_Expr;
 
+   --  Parse Text via the full sdata parser (wrapped in PRINT), infer the
+   --  expression kind statically, then free the AST.  The full parser is
+   --  required because Parse_Expression (the SELECT mini-parser) does not
+   --  accept '$' / '%' name suffixes.
+   procedure Check_Kind (Name, Text : String; Expected : Value_Kind) is
+      Ctx  : SData.Parser.Parser_Context;
+      Prog : Statement_Access;
+      K    : Value_Kind;
+   begin
+      SData.Parser.Initialize (Ctx, "PRINT " & Text);
+      Prog := SData.Parser.Parse_Program (Ctx);
+      K := Static_Result_Kind (Prog.Print_Args.Expr);
+      Free_Program (Prog);
+      if K = Expected then
+         Put_Line ("PASS: " & Name); Passed := Passed + 1;
+      else
+         Put_Line ("FAIL: " & Name & "  got=" & K'Image
+                   & "  expected=" & Expected'Image);
+         Failed := Failed + 1;
+      end if;
+   exception
+      when others =>
+         Free_Program (Prog);
+         Put_Line ("FAIL: " & Name & "  exception raised");
+         Failed := Failed + 1;
+   end Check_Kind;
+
    V : Value;
 
 begin
@@ -899,6 +926,27 @@ begin
 
    --  LD-04: bare dot must still be missing (regression guard)
    Check_Missing ("LD-04: bare dot is still missing", Eval ("."));
+
+   ---------------------------------------------------------------------------
+   --  SRK: Static_Result_Kind tests
+   ---------------------------------------------------------------------------
+
+   Put_Line ("");
+   Put_Line ("--- SRK: Static_Result_Kind Tests ---");
+
+   Check_Kind ("srk_str_var",    "NAME$",       Val_String);
+   Check_Kind ("srk_int_var",    "COUNT%",      Val_Integer);
+   Check_Kind ("srk_num_var",    "SALARY",      Val_Numeric);
+   Check_Kind ("srk_str_lit",    """hello""",   Val_String);
+   Check_Kind ("srk_num_lit",    "3.14",        Val_Numeric);
+   Check_Kind ("srk_int_lit",    "42",          Val_Integer);
+   Check_Kind ("srk_num_add",    "X + Y",       Val_Numeric);
+   Check_Kind ("srk_str_concat", "A$ + B$",     Val_String);
+   Check_Kind ("srk_cmp",        "X > 3",       Val_Numeric);
+   Check_Kind ("srk_str_fn",     "UPPER$(A$)",  Val_String);
+   Check_Kind ("srk_num_fn",     "SQRT(X)",     Val_Numeric);
+   Check_Kind ("srk_missing",    ".",           Val_Missing);
+   Check_Kind ("srk_mixed_add",  "X + A$",      Val_Missing);
 
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
