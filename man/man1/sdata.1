@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-07-01" "sdata 0.12.0" "User Commands"
+.TH SDATA 1 "2026-07-02" "sdata 0.12.1" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -470,6 +470,14 @@ Sort the data table on the named variables.
 Create
 .I n
 output records in the next data step (REPEAT mode).
+Also cancels any queued deferred statements
+.RB ( LET ,
+.B SET ,
+etc.); enter setup statements
+.I after
+the
+.B REPEAT
+command, not before it.
 .TP
 .B FPATH \fIpath\fR /\fBUSE\fR|\fBSAVE\fR|\fBSUBMIT\fR|\fBOUTPUT\fR
 Set the default directory for the specified file category.
@@ -886,6 +894,46 @@ Array elements are read and written with parenthesis subscripts; see
 .B LET
 for slice and list assignment forms.
 .RE
+.SS Entry\-time semantic checks
+Before any record is processed, sdata validates queued deferred statements and
+reports hard errors for the following conditions:
+.RS
+.TP
+Assignment type mismatch
+A character value assigned to a numeric name or a numeric value assigned to a
+character
+.RB ( $ )
+name.
+Sound and complete when the right-hand side's type is statically determinable
+(including suffix-typed variables and functions); expressions whose type is not
+statically known defer to runtime.
+.TP
+Unknown function
+A function name not registered in the evaluator.
+These formerly returned a missing value silently; they are now a hard error.
+.TP
+Function arity
+Wrong number of arguments for a known function.
+.TP
+Undefined variable
+A variable reference that cannot be resolved against the table schema, active session
+variables, or names introduced anywhere in the same deferred block.
+Forward references within a single block are legal.
+These formerly returned a missing value silently; they are now a hard error.
+.RE
+.PP
+In
+.I interactive
+mode, checks 1\(en3 run the moment each deferred statement is entered (entry-time
+fast feedback).
+Check 4 (undefined variable) waits until
+.B RUN
+because a name introduced by a later statement not yet entered would otherwise be a
+false positive.
+In
+.I batch
+mode all four checks run as a single whole\-block pass immediately before the data
+step; no records are processed if any check fails.
 .SH FUNCTIONS
 Functions may appear anywhere in an expression.
 Missing\-value propagation is automatic: if any required argument is missing

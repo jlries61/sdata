@@ -1,3 +1,9 @@
+sdata (0.12.1-1) unstable; urgency=medium
+
+  * Entry-time semantic checking of deferred statements (type-mismatch, unknown-function, arity, undefined-variable); USE/REPEAT cancel the deferred program
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 02 Jul 2026 13:27:42 -0700
+
 sdata (0.12.0-1) unstable; urgency=medium
 
   * Add STATS command (PROC MEANS analogue)

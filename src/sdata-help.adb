@@ -170,6 +170,9 @@ package body SData.Help is
    begin
       Put_Line ("Command: RUN");
       Put_Line ("Triggers the execution of the Data Step and any deferred SAVE operations.");
+      Put_Line ("Before the data step runs, queued statements are validated: assignment type");
+      Put_Line ("mismatches, unknown functions, arity errors, and undefined variables are");
+      Put_Line ("all reported as hard errors before any record is processed.");
       Put_Line ("Execution: Immediate -- triggers the data step at once.");
    end Help_RUN;
 
@@ -527,6 +530,8 @@ package body SData.Help is
    procedure Help_REPEAT is
    begin
       Put_Line ("Command (data step): REPEAT n  (creates n records)");
+      Put_Line ("REPEAT n also cancels any queued deferred statements (LET, SET, etc.).");
+      Put_Line ("Enter setup statements AFTER the REPEAT command, not before it.");
       Put_Line ("Execution: Declarative -- the n-record mode is active for the next RUN.");
       New_Line;
       Put_Line ("Command (loop): REPEAT ... UNTIL condition");

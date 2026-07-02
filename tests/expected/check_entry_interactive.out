@@ -1,0 +1,6 @@
+Generating mock data...
+Permanent Variables (Table Columns):
+ID NAME$ SALARY 
+Session Variables (SET):
+(none)
+Error: Type mismatch for variable "FOO": cannot assign string to numeric variable

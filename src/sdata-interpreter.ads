@@ -24,6 +24,13 @@ package SData.Interpreter is
    --  Clears the global active program.
    procedure Clear_Active_Program;
 
+   --  Clears ONLY the deferred program buffer and its pending counter /
+   --  insertion cursor.  Unlike Clear_Active_Program it leaves the SELECT
+   --  filter, index map, and BY-vars intact.  Called by USE and REPEAT so a
+   --  new input source cancels queued DROP/KEEP/LET/REPEAT statements
+   --  (design.md:960) without disturbing unrelated session state.
+   procedure Clear_Deferred_Program;
+
    --  Executes the global active program.
    procedure Run_Active_Program;
 
