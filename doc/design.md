@@ -634,9 +634,11 @@ following checks are performed:
 
 1. **Assignment type mismatch** — assigning a character value to a numeric name or a
    numeric value to a character (*$*) name (e.g., *LET X = "foo"* where *X* is
-   numeric). The check is sound and complete when the right-hand side is a literal;
-   when the right-hand side is a non-literal expression whose type is not statically
-   known, the check defers to runtime.
+   numeric). The check is sound and complete when the right-hand side's type is
+   statically determinable — literals, suffix-typed variables (e.g., *LET X = NAME$*
+   where *NAME$* is a character column), and suffix-typed function calls all qualify.
+   When the right-hand side's type is not statically known (e.g., a polymorphic
+   *IF(...)* or a *.* missing literal), the check defers to runtime.
 
 2. **Unknown function** — a function name not registered in the evaluator (e.g.,
    *LET Y = TYPO(X)*). Unknown functions formerly returned a missing value silently;

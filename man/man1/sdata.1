@@ -904,8 +904,9 @@ A character value assigned to a numeric name or a numeric value assigned to a
 character
 .RB ( $ )
 name.
-Sound and complete for literal right-hand sides; non-literal expressions defer to
-runtime.
+Sound and complete when the right-hand side's type is statically determinable
+(including suffix-typed variables and functions); expressions whose type is not
+statically known defer to runtime.
 .TP
 Unknown function
 A function name not registered in the evaluator.
