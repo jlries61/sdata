@@ -151,19 +151,7 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
                      A : constant Arity_Spec := Function_Arity (FN);
                      N : constant Natural := Arg_Count (E.Arguments);
                   begin
-                     --  Deliberate relaxation for nullary (Max_Args = 0)
-                     --  constant-like functions (PI, MAXLEN, MAXLVL, MAXINT,
-                     --  RECNO, ...): their handlers historically IGNORE any
-                     --  surplus arguments, and a committed test depends on
-                     --  that leniency (new_functions_test: MAXLEN("x") = 0).
-                     --  The registered 0..0 upper bound is therefore unsound;
-                     --  honouring it would reject a valid, accepted call.
-                     --  Functions that actually consume arguments
-                     --  (Max_Args >= 1) keep full checking, so genuine
-                     --  arg-count mistakes like SQRT(x, 2) are still caught.
-                     if A.Max_Args > 0
-                       and then (N < A.Min_Args or else N > A.Max_Args)
-                     then
+                     if N < A.Min_Args or else N > A.Max_Args then
                         raise SData_Core.Script_Error with
                           "function '" & FN & "' expects "
                           & (if A.Min_Args = A.Max_Args
