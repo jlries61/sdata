@@ -1,6 +1,8 @@
 -- Test DIM with variable bounds
-set ndim = 5
+-- (SET ndim placed after REPEAT: a REPEAT cancels deferred statements queued
+--  before it, so the DIM bound variable must be set within the data step.)
 repeat 1
+set ndim = 5
 dim arr1(ndim)
 for i = 1 to ndim
   let arr1(i) = i * 10

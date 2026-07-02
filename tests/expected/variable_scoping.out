@@ -1,6 +1,6 @@
-Record 1 : TEMP = 101.00000 , PERM = 201.00000
-Record 2 : TEMP = 101.00000 , PERM = 201.00000
-Record 3 : TEMP = 101.00000 , PERM = 201.00000
+Record 1 : TEMP = . , PERM = 201.00000
+Record 2 : TEMP = . , PERM = 201.00000
+Record 3 : TEMP = . , PERM = 201.00000
 RUN complete. 3 records and 1 variables processed.
 RUN complete. 1 records and 0 variables processed.
 TV is missing (1): 1

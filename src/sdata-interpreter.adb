@@ -96,8 +96,8 @@ package body SData.Interpreter is
    --  When Append_Mode is True, newly queued deferred statements append
    --  (default).  When False, they are inserted after line Insert_Point
    --  (0 = before line 1) and the cursor advances past each one.  Sticky:
-   --  persists across RUN; reset to append only by NEW (Clear_Active_Program)
-   --  or another INSERT.
+   --  persists across RUN; reset to append only by USE, REPEAT, or NEW
+   --  (Clear_Deferred_Program / Clear_Active_Program) or another INSERT.
    Append_Mode  : Boolean := True;
    Insert_Point : Natural := 0;
 
@@ -1518,6 +1518,14 @@ package body SData.Interpreter is
                Outer_Ctx : Step_Context;
             begin
                Execute_Statement (Current, Outer_Ctx);
+               --  A new input source cancels any deferred statements queued
+               --  before it (design.md:960): advance the deferred-block start
+               --  past this statement and drop the pending count so the next
+               --  RUN's data step excludes them.
+               if Current.Kind = Stmt_USE or else Current.Kind = Stmt_REPEAT then
+                  Step_Start := Current.Next;
+                  Pending_Deferred := 0;
+               end if;
             exception
                when E : Script_Error | SData_Core.Script_Error =>
                   if SData_Core.Config.Continue_On_Error then
