@@ -627,7 +627,54 @@ Mutual Cancellation:
 
 **Note:** This refers to the *REPEAT* command (specify number of records), not *REPEAT*/*UNTIL* loop.
 
-### 5.6 Script Execution
+### 5.6 Entry-Time Semantic Checking
+
+Before any record is processed, sdata validates queued deferred statements. The
+following checks are performed:
+
+1. **Assignment type mismatch** — assigning a character value to a numeric name or a
+   numeric value to a character (*$*) name (e.g., *LET X = "foo"* where *X* is
+   numeric). The check is sound and complete when the right-hand side is a literal;
+   when the right-hand side is a non-literal expression whose type is not statically
+   known, the check defers to runtime.
+
+2. **Unknown function** — a function name not registered in the evaluator (e.g.,
+   *LET Y = TYPO(X)*). Unknown functions formerly returned a missing value silently;
+   they now cause a hard error before the data step begins.
+
+3. **Function arity** — passing the wrong number of arguments to a known function
+   (e.g., *LET Y = ABS(A, B)* when *ABS* takes exactly one argument).
+
+4. **Undefined variable** — a variable reference that cannot be resolved against the
+   current table schema, active session variables, or names introduced anywhere in
+   the same deferred block. Forward references within a single deferred block are
+   legal (the whole block is scanned before any check runs). References to undefined
+   variables formerly returned a missing value silently; they now cause a hard error.
+
+**When checks fire:**
+
+- **Interactive mode:** checks 1–3 run as each deferred statement is entered at the
+  prompt (entry-time fast feedback), preventing the statement from being queued.
+  Check 4 (undefined variable) is deferred to the whole-block pass at *RUN* time
+  because a name introduced by a later, not-yet-entered statement would otherwise
+  be a false positive.
+- **Batch mode:** all four checks run as a whole-block pass immediately before the
+  data step executes. A violation is reported before any record is processed.
+
+**Error severity:** All violations are hard errors; no records are processed when a
+check fails.
+
+**Sound-but-incomplete principle:** Cases whose type or existence cannot be
+determined statically (e.g., a runtime-computed subscript or a variable whose type
+depends on control flow) are not flagged; such cases are left to runtime rather than
+risk false rejections.
+
+**Behavior change note:** Checks 2 (unknown function) and 4 (undefined variable)
+represent a change from earlier versions, where those conditions silently returned a
+missing value. Programs that relied on the silent missing-value behavior for unknown
+names must be updated.
+
+### 5.7 Script Execution
 
 **SUBMIT Statement:** Reads and executes commands from specified file.
 
@@ -867,7 +914,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>REPEAT</em></td>
 <td><em>REPEAT</em> &lt;<em>n</em>&gt;</td>
 <td>Declarative</td>
-<td>Specify the number of records to be written to the internal table or output dataset. This command will cancel any <em>USE</em> statement currently in effect.</td>
+<td>Specify the number of records to be written to the internal table or output dataset. This command will cancel any <em>USE</em> statement currently in effect, and also cancels any queued deferred statements (<em>LET</em>, <em>SET</em>, etc.). Consequently, setup statements that should govern the <em>REPEAT</em> data step must be entered <em>after</em> the <em>REPEAT</em> command (the setup-after-REPEAT idiom).</td>
 </tr>
 <tr>
 <td><em>REPEAT</em>/<em>UNTIL</em></td>

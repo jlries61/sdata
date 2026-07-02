@@ -88,6 +88,9 @@ Execution: Deferred -- executed once per record inside the data step.
 
 Command: RUN
 Triggers the execution of the Data Step and any deferred SAVE operations.
+Before the data step runs, queued statements are validated: assignment type
+mismatches, unknown functions, arity errors, and undefined variables are
+all reported as hard errors before any record is processed.
 Execution: Immediate -- triggers the data step at once.
 
 Command: LET variable = expression
@@ -320,6 +323,8 @@ Example:
 Execution: Deferred -- executed once per record inside the data step.
 
 Command (data step): REPEAT n  (creates n records)
+REPEAT n also cancels any queued deferred statements (LET, SET, etc.).
+Enter setup statements AFTER the REPEAT command, not before it.
 Execution: Declarative -- the n-record mode is active for the next RUN.
 
 Command (loop): REPEAT ... UNTIL condition
