@@ -137,6 +137,8 @@ package body SData.Interpreter is
    procedure Execute_Program_Insert  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
+   --  C5: entry-time single-statement checker (body is a separate subunit).
+   procedure Analyze_One          (Stmt : Statement_Access);
    function  Group_Flags (Logical_I     : Positive;
                           Logical_Count : Natural)
                           return Group_Flags_Result;
@@ -362,6 +364,9 @@ package body SData.Interpreter is
    procedure Add_To_Active_Program (Stmt : Statement_Access; Source : String := "") is
    begin
       if Stmt = null then return; end if;
+      --  C5: run entry-time fast feedback before queuing.  A violation raises
+      --  SData_Core.Script_Error; the statement is never appended.
+      Analyze_One (Stmt);
       if Append_Mode then
          Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
       else
@@ -907,8 +912,16 @@ package body SData.Interpreter is
    --  Static semantic analyzer over a deferred-statement block [Start, Boundary).
    --  Pass 1 collects names introduced by the block; Pass 2 runs semantic checks
    --  (checks added in Tasks C2-C5).  No-op when Start = null or Start = Boundary.
-   --  Not yet called (wired into Execute in a later task); suppress the warning.
    procedure Analyze_Deferred (Start, Boundary : Statement_Access) is separate;
+
+   --  Entry-time fast-feedback checker (Task C5).  Runs the subset of semantic
+   --  checks that are sound at the moment a single deferred statement is entered
+   --  at the REPL: unknown-function + arity (C2) and type-mismatch (C3).  The
+   --  undefined-variable check (C4) is intentionally OMITTED here — forward
+   --  references to names introduced by a later statement are only resolvable
+   --  at the whole-block level in Analyze_Deferred.  Raises
+   --  SData_Core.Script_Error on any detected violation.
+   procedure Analyze_One (Stmt : Statement_Access) is separate;
 
    --  AGGREGATE (immediate).  Enforces error #10 (no pending deferred
    --  statements), converts the AST spec vector into the core spec type, and

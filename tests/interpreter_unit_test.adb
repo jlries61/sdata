@@ -625,21 +625,22 @@ begin
       Reset;
       SData.Interpreter.Clear_Active_Program;
 
-      --  Queue two deferred statements that parse cleanly but fail during the
-      --  data step: the second assigns the string variable S$ to the numeric
-      --  variable N (a NON-literal right-hand side, so the parse-time literal
-      --  check does not pre-empt it), which raises a type mismatch at RUN.
-      --  Two statements are required to trigger the double-free: a single
-      --  queued statement leaves no second vector entry to re-free.
-      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET S$ = ""hi"""));
-      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET N = S$"));
+      --  Queue two deferred statements that pass both entry-time (Analyze_One)
+      --  and pre-RUN (Analyze_Deferred) checks but fail during the data step:
+      --  the second divides by zero, raising Script_Error at RUN.  Two
+      --  statements are required to expose the double-free: a single queued
+      --  statement leaves no second vector entry to re-free.
+      --  Note: "SET N = S$" (string-to-numeric) is no longer usable here
+      --  because C5 (Analyze_One) now catches that at entry time.
+      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET N = 1"));
+      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET N = 1 / 0"));
 
       begin
          SData.Interpreter.Run_Active_Program;
       exception
          when others => Run_Raised := True;
       end;
-      Check ("IC-42: failed RUN propagates the type-mismatch error",
+      Check ("IC-42: failed RUN propagates the runtime error",
              Run_Raised, True);
 
       --  Pre-fix this double-frees the still-chained list and crashes the

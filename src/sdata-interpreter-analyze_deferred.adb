@@ -5,6 +5,13 @@
 separate (SData.Interpreter)
 procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
 
+   --  Companion: Analyze_One (sdata-interpreter-analyze_one.adb) runs the
+   --  ENTRY-TIME subset of these checks (C2 + C3, no C4) on a single
+   --  statement the moment it is entered at the REPL.  The two subunits share
+   --  the same purpose but operate at different granularities: Analyze_Deferred
+   --  works over the whole deferred block (whole-block scope, forward refs),
+   --  while Analyze_One operates on a single statement with no Introduced set.
+
    --  Set of names introduced (LET/SET/FOR/DIM/ARRAY) within the deferred block.
    --  Whole-block scope: collected in Pass 1 so forward references are legal.
    Introduced : Name_Sets.Set;
