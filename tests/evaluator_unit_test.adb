@@ -960,6 +960,60 @@ begin
    Check ("ikf_unknown", Is_Known_Function ("FOOBAR"), False);
    Check ("ikf_case",    Is_Known_Function ("sqrt"),   True);
 
+   ---------------------------------------------------------------------------
+   --  ARITY: Function_Arity tests
+   ---------------------------------------------------------------------------
+
+   Put_Line ("");
+   Put_Line ("--- ARITY: Function_Arity Tests ---");
+
+   declare
+      A : Arity_Spec;
+   begin
+      A := Function_Arity ("SQRT");            -- exactly one argument
+      Check ("arity_sqrt_min", A.Min_Args = 1, True);
+      Check ("arity_sqrt_max", A.Max_Args = 1, True);
+
+      A := Function_Arity ("MID$");            -- MID$(s$, start[, len]) -> 2 or 3
+      Check ("arity_mid_min", A.Min_Args = 2, True);
+      Check ("arity_mid_max", A.Max_Args = 3, True);
+
+      A := Function_Arity ("MOD");             -- MOD(x, y) -> exactly 2
+      Check ("arity_mod_min", A.Min_Args = 2, True);
+      Check ("arity_mod_max", A.Max_Args = 2, True);
+
+      A := Function_Arity ("PI");              -- nullary constant
+      Check ("arity_pi_min", A.Min_Args = 0, True);
+      Check ("arity_pi_max", A.Max_Args = 0, True);
+
+      A := Function_Arity ("SUM");             -- variadic aggregate
+      Check ("arity_sum_min", A.Min_Args = 1, True);
+      Check ("arity_sum_max_variadic", A.Max_Args = Natural'Last, True);
+
+      A := Function_Arity ("N");               -- variadic; zero-arg form valid
+      Check ("arity_n_min", A.Min_Args = 0, True);
+      Check ("arity_n_max_variadic", A.Max_Args = Natural'Last, True);
+
+      A := Function_Arity ("LAG");             -- identifier-ref: LAG(var[,n])
+      Check ("arity_lag_min", A.Min_Args = 1, True);
+      Check ("arity_lag_max", A.Max_Args = 2, True);
+
+      A := Function_Arity ("sqrt");            -- case-insensitive lookup
+      Check ("arity_case_insensitive", A.Min_Args = 1, True);
+   end;
+
+   --  An unregistered function name must raise SData_Core.Script_Error.
+   declare
+      A : Arity_Spec;
+      pragma Unreferenced (A);
+   begin
+      A := Function_Arity ("FOOBAR");
+      Check ("arity_unknown_raises", False, True);  --  unreachable on success
+   exception
+      when SData_Core.Script_Error =>
+         Check ("arity_unknown_raises", True, True);
+   end;
+
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
    if Failed > 0 then
