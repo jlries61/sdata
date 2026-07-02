@@ -11,24 +11,12 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
 
    function U (S : String) return String renames To_Upper;
 
-   --  Reserved bare identifiers: names that are valid WITHOUT parentheses and
-   --  resolve to a value even though they are neither a column, array, nor
-   --  session variable.  This is EXACTLY the zero-argument-function fallback
-   --  set in SData_Core.Evaluator.Evaluate (the Expr_Variable arm): when a bare
-   --  identifier's lookup yields Val_Missing, the evaluator retries it as a
-   --  zero-arg function iff it is one of these names.  Any bare identifier NOT
-   --  in this set (and not a column/array/variable) genuinely evaluates to
-   --  Missing, i.e. is undefined.  Keep this list in step with that evaluator
-   --  arm -- a name added there but not here would be a false positive.
+   --  Reserved bare identifiers: names that evaluate to a value when used
+   --  WITHOUT parentheses.  Delegates to SData_Core.Evaluator.Is_Zero_Arg_Fallback,
+   --  the single source of truth shared with the evaluator's bare-identifier
+   --  fallback arm.  No local list to drift.
    function Is_Reserved_Bare_Name (Name : String) return Boolean is
-     (U (Name) in
-        "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |
-        "DATE$" | "TIME$" | "RAN" | "RANDOM" | "RND" | "LRN" |
-        "ZRN" | "URN" | "PI" | "TIMER" |
-        "ERR" | "ERL" |
-        "MAXLEN" | "MAXLVL" | "MAXINT" | "MAXNUM" |
-        "MININT" | "MINNUM" |
-        "FALSE" | "TRUE");
+     (SData_Core.Evaluator.Is_Zero_Arg_Fallback (Name));
 
    --  BY-group flags FIRST.<byvar> / LAST.<byvar> are created as temporary
    --  variables per record during RUN (see sdata-interpreter-process_one_record),
