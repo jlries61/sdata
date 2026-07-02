@@ -327,13 +327,11 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
       --  truncates freely, so those are NOT rejected here.
       --  Soundness guards — defer to runtime when:
       --    • RHS kind is indeterminate (Val_Missing).
-      --    • Target is an existing table column: the table schema enforces the
-      --      type at write time, so the runtime error fires anyway and we avoid
-      --      producing a pre-RUN error in scripts that historically relied on
-      --      the deferred-error timing (e.g. type_check_test).
       --    • The RHS expression contains an IF call (IF is polymorphic —
       --      Static_Result_Kind returns the wrong kind for it because IF has no
       --      $/%suffix; deferring is the only sound choice).
+      --  The check fires for ALL scalar LET/SET targets, including existing
+      --  table columns — catching a mismatch before any record is processed.
       if (S.Kind = Stmt_LET or else S.Kind = Stmt_SET)
          and then not S.Is_Array and then S.Expr /= null
       then
@@ -343,7 +341,6 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
             RHS      : constant Value_Kind := Static_Result_Kind (S.Expr);
          begin
             if RHS /= Val_Missing
-               and then not SData_Core.Table.Has_Column (U (Target))
                and then not Expr_Contains_Special_Call (S.Expr)
                and then (Expected = Val_String) /= (RHS = Val_String)
             then
