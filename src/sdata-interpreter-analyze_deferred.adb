@@ -77,6 +77,201 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
    --  Is_Defined is used by semantic checks added in Tasks C2-C5; suppress the
    --  unreferenced warning until the first check references it.
 
+   --  Functions the parser turns into Expr_Function_Call nodes but that the
+   --  evaluator dispatches SPECIALLY, outside Dispatch_Table -- so
+   --  Is_Known_Function returns False for them even though they are valid.
+   --  Confirmed by auditing SData_Core.Evaluator.Evaluate_Function: only IF
+   --  is intercepted before the Dispatch_Table lookup (for lazy evaluation).
+   --  Every other special-form name (LAG/NEXT/OBS and their $-variants,
+   --  the identifier-ref functions) IS registered in Dispatch_Table with an
+   --  arity, so it is handled by the normal path.  A whitelisted name is
+   --  neither flagged as unknown nor arity-checked (its arity is not
+   --  registered).
+   function Is_Special_Function (Name : String) return Boolean is
+     (U (Name) = "IF");
+
+   --  Count the arguments in an expression list (each range counts as one).
+   function Arg_Count (L : Expression_List) return Natural is
+      N : Natural := 0;
+      C : Expression_List := L;
+   begin
+      while C /= null loop
+         N := N + 1;
+         C := C.Next;
+      end loop;
+      return N;
+   end Arg_Count;
+
+   --  Recursively validate an expression tree: reject calls to unknown
+   --  functions and calls to known functions with an out-of-range argument
+   --  count.  Recurses into every sub-expression.
+   procedure Check_Expr (E : Expression_Access) is
+   begin
+      if E = null then
+         return;
+      end if;
+      case E.Kind is
+         when Expr_Binary_Op =>
+            Check_Expr (E.Left);
+            Check_Expr (E.Right);
+         when Expr_Unary_Op =>
+            Check_Expr (E.Operand);
+         when Expr_Array_Access =>
+            declare
+               C : Expression_List := E.Arr_Idx;
+            begin
+               while C /= null loop
+                  Check_Expr (C.Expr);
+                  if C.Is_Range then
+                     Check_Expr (C.Expr_End);
+                  end if;
+                  C := C.Next;
+               end loop;
+            end;
+         when Expr_Function_Call =>
+            declare
+               FN : constant String := E.Func_Name (1 .. E.Func_Len);
+            begin
+               --  A name parsed as a function call but registered as an array
+               --  (or introduced as one in this block) is really array access
+               --  -- batch parses X(1) as a call because DIM has not run yet.
+               --  A whitelisted special-form name (IF) is valid but not in
+               --  Dispatch_Table.  Skip the unknown/arity checks for both.
+               if not SData_Core.Variables.Has_Array (U (FN))
+                 and then not Introduced.Contains (U (FN))
+                 and then not Is_Special_Function (FN)
+               then
+                  if not Is_Known_Function (FN) then
+                     raise SData_Core.Script_Error with
+                       "unknown function '" & FN & "'";
+                  end if;
+                  --  Function_Arity raises on an unregistered name, so it is
+                  --  gated behind the Is_Known_Function check above.
+                  declare
+                     A : constant Arity_Spec := Function_Arity (FN);
+                     N : constant Natural := Arg_Count (E.Arguments);
+                  begin
+                     --  Deliberate relaxation for nullary (Max_Args = 0)
+                     --  constant-like functions (PI, MAXLEN, MAXLVL, MAXINT,
+                     --  RECNO, ...): their handlers historically IGNORE any
+                     --  surplus arguments, and a committed test depends on
+                     --  that leniency (new_functions_test: MAXLEN("x") = 0).
+                     --  The registered 0..0 upper bound is therefore unsound;
+                     --  honouring it would reject a valid, accepted call.
+                     --  Functions that actually consume arguments
+                     --  (Max_Args >= 1) keep full checking, so genuine
+                     --  arg-count mistakes like SQRT(x, 2) are still caught.
+                     if A.Max_Args > 0
+                       and then (N < A.Min_Args or else N > A.Max_Args)
+                     then
+                        raise SData_Core.Script_Error with
+                          "function '" & FN & "' expects "
+                          & (if A.Min_Args = A.Max_Args
+                             then A.Min_Args'Image & " argument(s)"
+                             else "between" & A.Min_Args'Image & " and"
+                                  & A.Max_Args'Image & " arguments")
+                          & ", got" & N'Image;
+                     end if;
+                  end;
+               end if;
+               --  Recurse into arguments regardless.  For identifier-ref
+               --  functions (LAG/NEXT/OBS) the first argument is a bare
+               --  Expr_Variable naming a column; Check_Expr does nothing for
+               --  Expr_Variable, so no spurious error results.
+               declare
+                  C : Expression_List := E.Arguments;
+               begin
+                  while C /= null loop
+                     Check_Expr (C.Expr);
+                     if C.Is_Range then
+                        Check_Expr (C.Expr_End);
+                     end if;
+                     C := C.Next;
+                  end loop;
+               end;
+            end;
+         when others =>
+            null;   --  literals, variables, missing: nothing to check here
+      end case;
+   end Check_Expr;
+
+   --  Validate every expression in a list.
+   procedure Check_Expr_List (L : Expression_List) is
+      C : Expression_List := L;
+   begin
+      while C /= null loop
+         Check_Expr (C.Expr);
+         if C.Is_Range then
+            Check_Expr (C.Expr_End);
+         end if;
+         C := C.Next;
+      end loop;
+   end Check_Expr_List;
+
+   --  Forward declaration: Check_Statement and Check_Body are mutually
+   --  recursive (compound statements carry nested statement bodies).
+   procedure Check_Statement (S : Statement_Access);
+
+   --  Validate every statement in a body chain.
+   procedure Check_Body (B : Statement_Access) is
+      S : Statement_Access := B;
+   begin
+      while S /= null loop
+         Check_Statement (S);
+         S := S.Next;
+      end loop;
+   end Check_Body;
+
+   --  Validate every expression field of one statement, then recurse into any
+   --  nested statement bodies.  Mirrors the field layout in sdata-ast.ads.
+   procedure Check_Statement (S : Statement_Access) is
+   begin
+      --  Fields present on every statement (non-variant part).
+      Check_Expr (S.Expr);
+      Check_Expr (S.Arr_Idx);
+      Check_Expr_List (S.Arr_Idx_List);
+
+      case S.Kind is
+         when Stmt_PRINT =>
+            Check_Expr_List (S.Print_Args);
+         when Stmt_IF =>
+            Check_Expr (S.Condition);
+            Check_Body (S.Then_Branch);
+            Check_Body (S.Else_Branch);
+         when Stmt_FOR =>
+            Check_Expr (S.For_Start);
+            Check_Expr (S.For_End);
+            Check_Expr (S.For_Step);
+            Check_Body (S.For_Body);
+         when Stmt_WHILE =>
+            Check_Expr (S.While_Cond);
+            Check_Body (S.While_Body);
+         when Stmt_LOOP_REPEAT =>
+            Check_Body (S.Repeat_Body);
+            Check_Expr (S.Until_Cond);
+         when Stmt_RSEED =>
+            Check_Expr (S.Seed_Expr);
+         when Stmt_SELECT =>
+            Check_Expr (S.Selector);
+            declare
+               Br : Case_Branch := S.Branches;
+            begin
+               while Br /= null loop
+                  Check_Expr_List (Br.Conditions);
+                  Check_Body (Br.Branch_Body);
+                  Br := Br.Next;
+               end loop;
+            end;
+            Check_Body (S.Otherwise_Part);
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET
+            | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
+            Check_Expr (S.Arr_Start_Expr);
+            Check_Expr (S.Arr_End_Expr);
+         when others =>
+            null;
+      end case;
+   end Check_Statement;
+
    Cur : Statement_Access;
 
 begin
@@ -91,10 +286,13 @@ begin
       Cur := Cur.Next;
    end loop;
 
-   --  Pass 2: run semantic checks (added in Tasks C2-C5).
+   --  Pass 2: run semantic checks.  Task C2 adds the unknown-function and
+   --  arity checks (via Check_Statement -> Check_Expr).  A violation raises
+   --  SData_Core.Script_Error, which propagates out of Execute before any
+   --  record is processed.
    Cur := Start;
    while Cur /= null and then Cur /= Boundary loop
-      --  Check hooks inserted here by later tasks.
+      Check_Statement (Cur);
       Cur := Cur.Next;
    end loop;
 end Analyze_Deferred;

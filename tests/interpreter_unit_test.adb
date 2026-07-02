@@ -505,11 +505,13 @@ begin
    Check ("IC-33: division by zero raises error",
           Raises ("LET X = 1 / 0" & L & "RUN"), True);
 
-   --  IC-34: Calling an unknown function returns Val_Missing (no error).
-   --  Evaluate_Function returns Val_Missing for names not in the dispatch table.
-   Run ("LET X = XXXXXXXX()" & L & "RUN");
-   Check ("IC-34: unknown function returns Val_Missing",
-          SData_Core.Variables.Get ("X").Kind = Val_Missing, True);
+   --  IC-34: Calling an unknown function is rejected at entry time (Task C2).
+   --  The pre-RUN analyzer (SData.Interpreter.Analyze_Deferred) raises
+   --  Script_Error for a name that is neither a registered function, a
+   --  whitelisted special form (IF), nor an array element -- superseding the
+   --  former silent Val_Missing behavior, which masked typo'd function names.
+   Check ("IC-34: unknown function rejected at entry time",
+          Raises ("LET X = XXXXXXXX()" & L & "RUN"), True);
 
    -----------------------------------------------------------------------
    --  J.  Array Assignment (safety net for Execute_Assignment refactor)

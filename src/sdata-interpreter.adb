@@ -908,9 +908,7 @@ package body SData.Interpreter is
    --  Pass 1 collects names introduced by the block; Pass 2 runs semantic checks
    --  (checks added in Tasks C2-C5).  No-op when Start = null or Start = Boundary.
    --  Not yet called (wired into Execute in a later task); suppress the warning.
-   pragma Warnings (Off, "Analyze_Deferred");
    procedure Analyze_Deferred (Start, Boundary : Statement_Access) is separate;
-   pragma Warnings (On, "Analyze_Deferred");
 
    --  AGGREGATE (immediate).  Enforces error #10 (no pending deferred
    --  statements), converts the AST spec vector into the core spec type, and
@@ -1496,6 +1494,11 @@ package body SData.Interpreter is
       Current := Prog;
       while Current /= null loop
          if Current.Kind = Stmt_RUN then
+            --  Entry-time semantic checks over the just-completed deferred
+            --  body (both batch and interactive, via Run_Active_Program's
+            --  synthetic RUN cap).  A rejection raises SData_Core.Script_Error
+            --  before any record is processed.
+            Analyze_Deferred (Step_Start, Current);
             Run_One_Step (Step_Start, Current);
             declare
                RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
