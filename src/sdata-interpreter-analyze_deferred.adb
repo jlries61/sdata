@@ -196,6 +196,68 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
       end loop;
    end Check_Expr_List;
 
+   --  Map a Value_Kind to the human-readable type name used in error messages.
+   function Kind_Name (K : Value_Kind) return String is
+     (case K is when Val_String  => "string",
+                when Val_Integer => "integer",
+                when others      => "numeric");
+
+   --  True if the expression tree contains any call to a special (polymorphic)
+   --  function whose return type is NOT determined by its name's suffix — e.g.,
+   --  IF can return any kind depending on its arguments, so
+   --  Static_Result_Kind(IF(...)) wrongly returns Val_Numeric (the default for
+   --  unsuffixed names).  When such a call appears in the RHS, defer the
+   --  type-mismatch check to runtime for soundness.
+   function Expr_Contains_Special_Call
+     (E : Expression_Access) return Boolean
+   is
+      C : Expression_List;
+   begin
+      if E = null then
+         return False;
+      end if;
+      case E.Kind is
+         when Expr_Function_Call =>
+            if Is_Special_Function (E.Func_Name (1 .. E.Func_Len)) then
+               return True;
+            end if;
+            C := E.Arguments;
+            while C /= null loop
+               if Expr_Contains_Special_Call (C.Expr) then
+                  return True;
+               end if;
+               if C.Is_Range
+                  and then Expr_Contains_Special_Call (C.Expr_End)
+               then
+                  return True;
+               end if;
+               C := C.Next;
+            end loop;
+            return False;
+         when Expr_Binary_Op =>
+            return Expr_Contains_Special_Call (E.Left)
+              or else Expr_Contains_Special_Call (E.Right);
+         when Expr_Unary_Op =>
+            return Expr_Contains_Special_Call (E.Operand);
+         when Expr_Array_Access =>
+            C := E.Arr_Idx;
+            while C /= null loop
+               if Expr_Contains_Special_Call (C.Expr) then
+                  return True;
+               end if;
+               if C.Is_Range
+                  and then Expr_Contains_Special_Call (C.Expr_End)
+               then
+                  return True;
+               end if;
+               C := C.Next;
+            end loop;
+            return False;
+         when others =>
+            return False;
+      end case;
+   end Expr_Contains_Special_Call;
+
    --  Forward declaration: Check_Statement and Check_Body are mutually
    --  recursive (compound statements carry nested statement bodies).
    procedure Check_Statement (S : Statement_Access);
@@ -258,6 +320,40 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
          when others =>
             null;
       end case;
+
+      --  Scalar assignment type-mismatch check (Task C3).
+      --  Reject ONLY the string<->numeric boundary; within the numeric family
+      --  (Val_Numeric/Val_Integer) the runtime Coerce_For_Scalar promotes or
+      --  truncates freely, so those are NOT rejected here.
+      --  Soundness guards — defer to runtime when:
+      --    • RHS kind is indeterminate (Val_Missing).
+      --    • Target is an existing table column: the table schema enforces the
+      --      type at write time, so the runtime error fires anyway and we avoid
+      --      producing a pre-RUN error in scripts that historically relied on
+      --      the deferred-error timing (e.g. type_check_test).
+      --    • The RHS expression contains an IF call (IF is polymorphic —
+      --      Static_Result_Kind returns the wrong kind for it because IF has no
+      --      $/%suffix; deferring is the only sound choice).
+      if (S.Kind = Stmt_LET or else S.Kind = Stmt_SET)
+         and then not S.Is_Array and then S.Expr /= null
+      then
+         declare
+            Target   : constant String := S.Var_Name (1 .. S.Var_Len);
+            Expected : constant Value_Kind := Get_Expected_Kind (Target);
+            RHS      : constant Value_Kind := Static_Result_Kind (S.Expr);
+         begin
+            if RHS /= Val_Missing
+               and then not SData_Core.Table.Has_Column (U (Target))
+               and then not Expr_Contains_Special_Call (S.Expr)
+               and then (Expected = Val_String) /= (RHS = Val_String)
+            then
+               raise SData_Core.Script_Error with
+                 "Type mismatch for variable """ & Target
+                 & """: cannot assign " & Kind_Name (RHS)
+                 & " to " & Kind_Name (Expected) & " variable";
+            end if;
+         end;
+      end if;
    end Check_Statement;
 
    Cur : Statement_Access;
