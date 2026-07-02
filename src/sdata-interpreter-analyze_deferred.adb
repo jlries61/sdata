@@ -11,15 +11,69 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
 
    function U (S : String) return String renames To_Upper;
 
-   --  A name is "defined" if it is a table column, a session variable, an
-   --  array, or introduced anywhere in this deferred block (forward references
-   --  are legal because we collect the full environment before any check runs).
+   --  Reserved bare identifiers: names that are valid WITHOUT parentheses and
+   --  resolve to a value even though they are neither a column, array, nor
+   --  session variable.  This is EXACTLY the zero-argument-function fallback
+   --  set in SData_Core.Evaluator.Evaluate (the Expr_Variable arm): when a bare
+   --  identifier's lookup yields Val_Missing, the evaluator retries it as a
+   --  zero-arg function iff it is one of these names.  Any bare identifier NOT
+   --  in this set (and not a column/array/variable) genuinely evaluates to
+   --  Missing, i.e. is undefined.  Keep this list in step with that evaluator
+   --  arm -- a name added there but not here would be a false positive.
+   function Is_Reserved_Bare_Name (Name : String) return Boolean is
+     (U (Name) in
+        "BOF" | "EOF" | "BOG" | "EOG" | "RECNO" | "ORD" |
+        "DATE$" | "TIME$" | "RAN" | "RANDOM" | "RND" | "LRN" |
+        "ZRN" | "URN" | "PI" | "TIMER" |
+        "ERR" | "ERL" |
+        "MAXLEN" | "MAXLVL" | "MAXINT" | "MAXNUM" |
+        "MININT" | "MINNUM" |
+        "FALSE" | "TRUE");
+
+   --  BY-group flags FIRST.<byvar> / LAST.<byvar> are created as temporary
+   --  variables per record during RUN (see sdata-interpreter-process_one_record),
+   --  so they do NOT exist at pre-RUN analyze time.  A reference is legitimate
+   --  exactly when the suffix names a current BY variable (BY has already
+   --  executed -- it is a declarative command -- so the BY set is live here).
+   function Is_Group_Flag (Name : String) return Boolean is
+      Up           : constant String := U (Name);
+      Suffix_First : Natural := 0;
+   begin
+      if Up'Length > 6 and then Up (Up'First .. Up'First + 5) = "FIRST." then
+         Suffix_First := Up'First + 6;
+      elsif Up'Length > 5 and then Up (Up'First .. Up'First + 4) = "LAST." then
+         Suffix_First := Up'First + 5;
+      else
+         return False;
+      end if;
+      declare
+         Suffix : constant String := Up (Suffix_First .. Up'Last);
+      begin
+         for I in 1 .. SData_Core.Table.By_Var_Count loop
+            if U (SData_Core.Table.By_Var_Name (I)) = Suffix then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end;
+   end Is_Group_Flag;
+
+   --  A name is "defined" if it is a table column, a session variable (whether
+   --  or not its current value is missing), an array, a reserved bare
+   --  pseudo-identifier, a live BY-group flag, or introduced anywhere in this
+   --  deferred block (forward references are legal because we collect the full
+   --  environment before any check runs).  Session-variable existence uses
+   --  Variables.Defined rather than Get_Type: a SET variable persists across a
+   --  REPEAT/RUN boundary while holding a missing value, and Get_Type would
+   --  then wrongly report it Val_Missing (i.e. undefined).
    function Is_Defined (Name : String) return Boolean is
       Up : constant String := U (Name);
    begin
       return SData_Core.Table.Has_Column (Up)
         or else SData_Core.Variables.Has_Array (Up)
-        or else SData_Core.Variables.Get_Type (Up) /= Val_Missing
+        or else SData_Core.Variables.Defined (Up)
+        or else Is_Reserved_Bare_Name (Up)
+        or else Is_Group_Flag (Up)
         or else Introduced.Contains (Up);
    end Is_Defined;
 
@@ -52,6 +106,25 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
             if Stmt.Arr_Name_Len > 0 then
                Introduced.Include (U (Stmt.Arr_Name (1 .. Stmt.Arr_Name_Len)));
             end if;
+            --  ARRAY <name> v1 v2 ...  also introduces the constituent element
+            --  variables (ARRAY SCORES S1 S2 S3 makes S1/S2/S3 referenceable as
+            --  bare identifiers).  Record each simple (non-range) constituent so
+            --  a later reference is not flagged undefined.  Range constituents
+            --  (dash/colon) expand to existing columns, already covered by
+            --  Has_Column, so they need no entry here.
+            declare
+               V : Variable_List := Stmt.Arr_Vars;
+            begin
+               while V /= null loop
+                  if not V.Var.Is_Range
+                    and then V.Var.Start_Len in 1 .. Max_Name_Len
+                  then
+                     Introduced.Include
+                       (U (V.Var.Start_Name (1 .. V.Var.Start_Len)));
+                  end if;
+                  V := V.Next;
+               end loop;
+            end;
          when Stmt_IF =>
             Walk_Body (Stmt.Then_Branch);
             Walk_Body (Stmt.Else_Branch);
@@ -72,10 +145,6 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
          when others => null;
       end case;
    end Note_Introduced;
-
-   pragma Unreferenced (Is_Defined);
-   --  Is_Defined is used by semantic checks added in Tasks C2-C5; suppress the
-   --  unreferenced warning until the first check references it.
 
    --  Functions the parser turns into Expr_Function_Call nodes but that the
    --  evaluator dispatches SPECIALLY, outside Dispatch_Table -- so
@@ -164,13 +233,29 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
                end if;
                --  Recurse into arguments regardless.  For identifier-ref
                --  functions (LAG/NEXT/OBS) the first argument is a bare
-               --  Expr_Variable naming a column; Check_Expr does nothing for
-               --  Expr_Variable, so no spurious error results.
+               --  Expr_Variable naming a column; Check_Expr's Expr_Variable arm
+               --  validates it as a defined name, which is correct -- LAG of an
+               --  undefined column is itself an error, and a real column is
+               --  recognised via Has_Column.
+               --
+               --  EXCEPTION: MISSING(<varname>) is documented to test whether a
+               --  referenced variable is missing, and a never-defined name is,
+               --  by definition, missing (MISSING returns 1).  Probing a
+               --  possibly-undefined name is its purpose, so a direct
+               --  Expr_Variable argument to MISSING is NOT subject to the
+               --  undefined-variable check.  Nested/compound arguments are still
+               --  validated normally.
                declare
-                  C : Expression_List := E.Arguments;
+                  C          : Expression_List := E.Arguments;
+                  Is_Missing : constant Boolean := U (FN) = "MISSING";
                begin
                   while C /= null loop
-                     Check_Expr (C.Expr);
+                     if not (Is_Missing
+                             and then C.Expr /= null
+                             and then C.Expr.Kind = Expr_Variable)
+                     then
+                        Check_Expr (C.Expr);
+                     end if;
                      if C.Is_Range then
                         Check_Expr (C.Expr_End);
                      end if;
@@ -178,8 +263,18 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
                   end loop;
                end;
             end;
+         when Expr_Variable =>
+            --  Task C4: a bare identifier must name something defined -- a
+            --  table column, session variable, array, reserved pseudo-name, or
+            --  a name introduced anywhere in this deferred block (forward
+            --  references are legal under whole-block scope).  Otherwise it is
+            --  an undefined variable and the program is rejected before RUN.
+            if not Is_Defined (E.Var_Name (1 .. E.Var_Len)) then
+               raise SData_Core.Script_Error with
+                 "undefined variable """ & E.Var_Name (1 .. E.Var_Len) & """";
+            end if;
          when others =>
-            null;   --  literals, variables, missing: nothing to check here
+            null;   --  literals, missing: nothing to check here
       end case;
    end Check_Expr;
 
