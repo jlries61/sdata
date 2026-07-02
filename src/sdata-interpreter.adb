@@ -376,6 +376,17 @@ package body SData.Interpreter is
       Pending_Deferred := Pending_Deferred + 1;
    end Add_To_Active_Program;
 
+   procedure Clear_Deferred_Program is
+   begin
+      for E of Active_Program_Vec loop
+         SData.AST.Free_Program (E.Stmt);
+      end loop;
+      Active_Program_Vec.Clear;
+      Pending_Deferred := 0;
+      Append_Mode  := True;
+      Insert_Point := 0;
+   end Clear_Deferred_Program;
+
    procedure Clear_Active_Program is
    begin
       SData_Core.Config.Runtime.Clear_Select_Filter;
