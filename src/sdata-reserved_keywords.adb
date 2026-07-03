@@ -69,6 +69,7 @@ package body SData.Reserved_Keywords is
       S.Insert ("STEP");
       S.Insert ("SUBMIT");
       S.Insert ("SYSTEM");
+      S.Insert ("TABLES");
       S.Insert ("THEN");
       S.Insert ("TO");
       S.Insert ("TRANSPOSE");

@@ -35,6 +35,16 @@ package SData.AST is
       Next : Variable_List;
    end record;
 
+   --  Linked list of table crossing requests for the TABLES command.
+   --  Each node represents one A*B*C crossing; Vars holds the ordered
+   --  variable names (one Variable_List_Node per element).
+   type Table_Request_Node;
+   type Table_Request is access Table_Request_Node;
+   type Table_Request_Node is record
+      Vars : Variable_List;   --  ordered vars in this crossing (A*B*C => A,B,C)
+      Next : Table_Request;   --  next request in the statement
+   end record;
+
    --  List for RENAME command pairs.
    type Rename_Pair_Node;
    type Rename_List is access Rename_Pair_Node;
@@ -185,6 +195,7 @@ package SData.AST is
       Stmt_AGGREGATE,      -- Collapse table to one row per BY group (immediate)
       Stmt_TRANSPOSE,      -- Reshape table columns to rows (immediate)
       Stmt_STATS,          -- Compute table statistics (immediate)
+      Stmt_TABLES,         -- Frequency / crosstabulation report (immediate, print-only)
       Stmt_PROGRAM_INSERT  -- Set program-buffer insertion cursor (immediate)
    );
 
@@ -306,6 +317,14 @@ package SData.AST is
             Stats_Vars     : Variable_List;   --  analysis vars (empty = all numeric)
             Stats_Stats    : Variable_List;   --  statistics (empty = N MIN MEAN MAX STD)
             Stats_No_Print : Boolean := False;
+         when Stmt_TABLES =>
+            Requests        : Table_Request;
+            Table_CHISQ     : Boolean := False;
+            Table_MISSING   : Boolean := False;
+            Table_LIST      : Boolean := False;
+            Table_NOCUM     : Boolean := False;
+            Table_NOPERCENT : Boolean := False;
+            Table_Order_Freq : Boolean := False;   --  /ORDER=FREQ
          when Stmt_PROGRAM_INSERT =>
             Insert_At_End : Boolean := True;   --  True = append at end ($/bare)
             Insert_Line   : Natural := 0;      --  cursor after line N (0 = start)

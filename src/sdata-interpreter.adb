@@ -1597,6 +1597,8 @@ package body SData.Interpreter is
             Execute_Transpose (Stmt);
          when Stmt_STATS =>
             Execute_Stats (Stmt);
+         when Stmt_TABLES =>
+            raise SData_Core.Script_Error with "TABLES: not yet implemented";
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
             | Stmt_OPTIONS =>
