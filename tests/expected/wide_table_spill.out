@@ -1,0 +1,1 @@
+Error: dataset "data" has too many columns for SQLite spill (2100 cols, limit ~2000); use -m 0 or fewer columns [SQLite: SQL execution error: too many columns on data (Error code:  1)]
