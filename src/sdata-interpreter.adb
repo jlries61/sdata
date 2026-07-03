@@ -18,6 +18,7 @@ with SData_Core.Config;         use SData_Core.Config;
 with SData_Core.Config.Runtime;
 with SData_Core.IO;        use SData_Core.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
+with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
