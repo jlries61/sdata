@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.12.1
+Version:        0.12.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Jul 02 2026 John L. Ries <john@theyarnbard.com> - 0.12.2-1
+- Fix OUTPUT redirect file being truncated by a subsequent RUN (issue #40)
+
 * Thu Jul 02 2026 John L. Ries <john@theyarnbard.com> - 0.12.1-1
 - Entry-time semantic checking of deferred statements (type-mismatch, unknown-function, arity, undefined-variable); USE/REPEAT cancel the deferred program
 

@@ -70,3 +70,4 @@ tests/data/submit_depth_gen/
 
 # Local working backup of the standards review
 /doc/SOFTWARE_STANDARDS_REVIEW_bak.md
+tests/output40_capture.dat

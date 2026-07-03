@@ -1,3 +1,9 @@
+sdata (0.12.2-1) unstable; urgency=medium
+
+  * Fix OUTPUT redirect file being truncated by a subsequent RUN (issue #40)
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 02 Jul 2026 17:59:12 -0700
+
 sdata (0.12.1-1) unstable; urgency=medium
 
   * Entry-time semantic checking of deferred statements (type-mismatch, unknown-function, arity, undefined-variable); USE/REPEAT cancel the deferred program
