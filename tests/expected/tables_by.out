@@ -1,0 +1,35 @@
+Dataset opened: tests/data/freq_by.csv
+----- BY G$=p -----
+Frequency table for X$
+
+X$ Frequency Percent Cum_Freq Cum_Percent
+a 2 66.67 2 66.67
+b 1 33.33 3 100.00
+Total 3 100.00
+
+----- BY G$=q -----
+Frequency table for X$
+
+X$ Frequency Percent Cum_Freq Cum_Percent
+a 1 33.33 1 33.33
+b 2 66.67 3 100.00
+Total 3 100.00
+
+TABLES complete.
+----- BY G$=p -----
+Frequency table for X$
+
+X$ Frequency Percent Cum_Freq Cum_Percent
+a 2 66.67 2 66.67
+b 1 33.33 3 100.00
+Total 3 100.00
+
+----- BY G$=q -----
+Frequency table for X$
+
+X$ Frequency Percent Cum_Freq Cum_Percent
+a 1 33.33 1 33.33
+b 2 66.67 3 100.00
+Total 3 100.00
+
+TABLES complete.

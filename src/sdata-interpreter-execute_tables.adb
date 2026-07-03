@@ -304,6 +304,21 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       return M;
    end Build_Count_Matrix;
 
+   --  Emit the BY-group header line, e.g. "----- BY G$=p -----", using the
+   --  first physical row of the group to read each BY variable's value.
+   procedure Put_By_Header (First_Phys : Positive) is
+      H : Unbounded_String := To_Unbounded_String ("----- BY");
+   begin
+      for I in 1 .. SData_Core.Table.By_Var_Count loop
+         Append (H, " " & SData_Core.Table.By_Var_Name (I) & "="
+                 & Values.To_String_Formatted
+                     (SData_Core.Table.Get_Value
+                        (First_Phys, SData_Core.Table.By_Var_Name (I))));
+      end loop;
+      Append (H, " -----");
+      IO.Put_Line (To_String (H));
+   end Put_By_Header;
+
    --  ---- group splitting (replicates sdata-core Collect_Groups via public API)
    package Group_Of_Rows is new Ada.Containers.Vectors
      (Positive, Row_Index_Vectors.Vector, Row_Index_Vectors."=");
@@ -605,13 +620,10 @@ begin
       Multi_Group : constant Boolean :=
         SData_Core.Table.By_Var_Count > 0
           and then Natural (Groups.Length) > 1;
-      GI          : Natural := 0;
    begin
       for G of Groups loop
-         GI := GI + 1;
          if Multi_Group then
-            --  BY header (extended/verified in Task 9)
-            IO.Put_Line ("----- BY group" & GI'Image & " -----");
+            Put_By_Header (G.First_Element);
          end if;
          declare
             Req : Table_Request := Stmt.Requests;
