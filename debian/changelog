@@ -1,3 +1,9 @@
+sdata (0.12.3-1) unstable; urgency=medium
+
+  * Clearer error when a wide dataset exceeds the SQLite disk-spill column limit (A/B for the OUTPUT-adjacent spill report)
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 03 Jul 2026 10:41:57 -0700
+
 sdata (0.12.2-1) unstable; urgency=medium
 
   * Fix OUTPUT redirect file being truncated by a subsequent RUN (issue #40)
