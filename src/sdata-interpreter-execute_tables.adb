@@ -375,6 +375,158 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       end if;
    end Render_One_Way;
 
+   --  List-form renderer: one row per observed combination of all K crossing
+   --  variables.  Used for K>=3 (always) and K=2 with /LIST.
+   procedure Render_List (Rows : Row_Index_Vectors.Vector;
+                          Req  : Table_Request) is
+      type Name_Arr is array (Positive range <>) of Unbounded_String;
+      K : Natural := 0;
+      C : Variable_List := Req.Vars;
+      Show_Pct : constant Boolean := not Stmt.Table_NOPERCENT;
+      Show_Cum : constant Boolean := not Stmt.Table_NOCUM;
+   begin
+      while C /= null loop K := K + 1; C := C.Next; end loop;
+      declare
+         Names   : Name_Arr (1 .. K);
+         Levels  : array (1 .. K) of Level_Vectors.Vector;
+         Joint   : Count_Maps.Map;
+         Grand   : Natural := 0;
+         Missing : Natural := 0;
+      begin
+         C := Req.Vars;
+         for I in 1 .. K loop
+            Names (I) := To_Unbounded_String
+              (C.Var.Start_Name (1 .. C.Var.Start_Len));
+            Levels (I) := Build_Levels (Rows, To_String (Names (I)));
+            C := C.Next;
+         end loop;
+         --  Joint counts keyed on "i1|i2|...".
+         for P of Rows loop
+            declare
+               Key : Unbounded_String;
+               OK  : Boolean := True;
+            begin
+               for I in 1 .. K loop
+                  declare
+                     V : constant Values.Value :=
+                       SData_Core.Table.Get_Value (P, To_String (Names (I)));
+                  begin
+                     if not Is_Present (V, Include_Missing) then
+                        OK := False; exit;
+                     end if;
+                     if I > 1 then Append (Key, "|"); end if;
+                     Append (Key,
+                             Trim (Level_Index (Levels (I), Disp_Of (V))'Image,
+                                   Both));
+                  end;
+               end loop;
+               if OK then
+                  if Joint.Contains (To_String (Key)) then
+                     Joint.Replace (To_String (Key),
+                                    Joint (To_String (Key)) + 1);
+                  else
+                     Joint.Insert (To_String (Key), 1);
+                  end if;
+                  Grand := Grand + 1;
+               else
+                  Missing := Missing + 1;
+               end if;
+            end;
+         end loop;
+
+         --  Title.
+         declare
+            T : Unbounded_String :=
+              To_Unbounded_String ("Table of ") & Names (1);
+         begin
+            for I in 2 .. K loop
+               Append (T, " by " & Names (I));
+            end loop;
+            IO.Put_Line (To_String (T));
+         end;
+         IO.New_Line;
+
+         --  Header row.
+         declare
+            H : Unbounded_String;
+         begin
+            for I in 1 .. K loop
+               Append (H, To_String (Names (I)) & " ");
+            end loop;
+            Append (H, "Frequency");
+            if Show_Pct then Append (H, " Percent"); end if;
+            if Show_Cum then Append (H, " Cum_Freq"); end if;
+            if Show_Cum and then Show_Pct then Append (H, " Cum_Percent"); end if;
+            IO.Put_Line (To_String (H));
+         end;
+
+         --  Enumerate tuples in value order via odometer walk over Levels.
+         declare
+            Cum  : Natural := 0;
+            Idx  : array (1 .. K) of Positive := (others => 1);
+            Done : Boolean :=
+              (for some I in 1 .. K => Natural (Levels (I).Length) = 0);
+         begin
+            while not Done loop
+               declare
+                  Key : Unbounded_String;
+               begin
+                  for I in 1 .. K loop
+                     if I > 1 then Append (Key, "|"); end if;
+                     Append (Key, Trim (Idx (I)'Image, Both));
+                  end loop;
+                  if Joint.Contains (To_String (Key)) then
+                     declare
+                        F    : constant Natural := Joint (To_String (Key));
+                        Line : Unbounded_String;
+                        Pct  : constant Float :=
+                          (if Grand = 0 then 0.0
+                           else 100.0 * Float (F) / Float (Grand));
+                     begin
+                        Cum := Cum + F;
+                        for I in 1 .. K loop
+                           Append (Line,
+                                   To_String (Levels (I)(Idx (I)).Disp) & " ");
+                        end loop;
+                        Append (Line, Trim (F'Image, Both));
+                        if Show_Pct then
+                           Append (Line, " " & Fmt2 (Pct));
+                        end if;
+                        if Show_Cum then
+                           Append (Line, " " & Trim (Cum'Image, Both));
+                        end if;
+                        if Show_Cum and then Show_Pct then
+                           Append (Line, " " &
+                             Fmt2 (if Grand = 0 then 0.0
+                                   else 100.0 * Float (Cum) / Float (Grand)));
+                        end if;
+                        IO.Put_Line (To_String (Line));
+                     end;
+                  end if;
+                  --  Increment odometer (last index fastest) to keep value order.
+                  declare
+                     Carry : Integer := K;
+                  begin
+                     loop
+                        if Idx (Carry) < Natural (Levels (Carry).Length) then
+                           Idx (Carry) := Idx (Carry) + 1; exit;
+                        else
+                           Idx (Carry) := 1; Carry := Carry - 1;
+                           if Carry = 0 then Done := True; exit; end if;
+                        end if;
+                     end loop;
+                  end;
+               end;
+            end loop;
+         end;
+
+         if not Include_Missing and then Missing > 0 then
+            IO.New_Line;
+            IO.Put_Line ("Frequency Missing = " & Trim (Missing'Image, Both));
+         end if;
+      end;
+   end Render_List;
+
    --  Dispatch one request within one group (extended in Tasks 6-10).
    procedure Render_Request (Rows : Row_Index_Vectors.Vector; Req : Table_Request)
    is
@@ -398,8 +550,8 @@ procedure Execute_Tables (Stmt : Statement_Access) is
             Render_Two_Way_Grid (Rows, V1, V2);
          end;
       else
-         --  K=2 with /LIST, and K>=3: rendering added in later tasks.
-         IO.Put_Line ("(multiway rendering added in a later task)");
+         --  K=2 with /LIST, or K>=3: list-form rendering.
+         Render_List (Rows, Req);
       end if;
    end Render_Request;
 
