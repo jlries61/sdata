@@ -92,9 +92,14 @@ begin
    begin
       while Iter /= null and then Iter /= Boundary loop
          case Iter.Kind is
+            --  Stmt_OUTPUT is deliberately NOT here: OUTPUT is an immediate
+            --  console-redirect command (executed once by the batch walker /
+            --  at REPL entry).  Re-executing it per record re-opens the target
+            --  with Create, truncating everything written before the data step
+            --  and leaving only the final "RUN complete" line (issue #40).
             when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
                | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT
-               | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE | Stmt_OUTPUT | Stmt_ECHO
+               | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE | Stmt_ECHO
                | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
                | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                begin

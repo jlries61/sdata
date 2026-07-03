@@ -1,0 +1,12 @@
+Generating mock data...
+REC# ID NAME$ SALARY 
+1 1 Alice 50000.00000 
+2 2 Bob 60000.00000 
+3 3 Charlie 70000.00000 
+RUN complete. 3 records and 3 variables processed.
+=== captured file ===
+REC# ID NAME$ SALARY 
+1 1 Alice 50000.00000 
+2 2 Bob 60000.00000 
+3 3 Charlie 70000.00000 
+RUN complete. 3 records and 3 variables processed.
