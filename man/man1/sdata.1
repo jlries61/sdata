@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-07-02" "sdata 0.12.2" "User Commands"
+.TH SDATA 1 "2026-07-03" "sdata 0.12.3" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -33,7 +33,21 @@ Print the version string and exit.
 Print copyright and license information and exit.
 .TP
 .BI \-m " size"
-Set the maximum number of rows the in\-memory data table may hold.
+Set the maximum in\-memory table size in cells (rows \(mu columns).
+A value of 0 disables the limit (all data stays in memory).
+When the table grows beyond this limit its rows are spilled to a
+temporary SQLite database on disk.
+The SQLite backend supports at most approximately 2000 columns per
+spilled table; datasets with more columns than that limit cannot be
+spilled and will produce an error.
+Use
+.B \-m 0
+(or a value large enough to keep the table in memory) for very wide
+datasets, or reduce the column count with
+.B KEEP
+or
+.B DROP
+before the spill threshold is reached.
 .TP
 .BI \-t " count"
 Set the maximum number of temporary variables per data step.

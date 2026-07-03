@@ -12,7 +12,7 @@ package SData.Version is
 
    Version_Major : constant Natural := 0;
    Version_Minor : constant Natural := 12;
-   Version_Patch : constant Natural := 2;
+   Version_Patch : constant Natural := 3;
    Version_Str   : constant String :=
       Natural'Image (Version_Major)
          (2 .. Natural'Image (Version_Major)'Last) & "." &

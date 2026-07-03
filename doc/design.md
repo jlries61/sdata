@@ -31,6 +31,7 @@ Memory Management:
 - External file storage: used when table exceeds maximum in-memory size.
 - Cache size: equal to maximum in-memory size, but never less than the size of a single row.
 - Implementation details: format and properties of external file and cache are implementation-defined.
+- **Disk-spill column limit:** The current SQLite-backed disk-spill implementation maps each data column to a SQLite table column. SQLite imposes a hard limit of approximately 2000 columns per table; attempting to spill a dataset with more columns than that limit produces an error with an actionable message. To keep a wide dataset in memory regardless of size, use *-m 0* (unlimited) or a large *-m* value. Alternatively, reduce the column count with *KEEP* or *DROP* before the spill threshold is reached.
 
 **Column Ordering:** Permanent variables (including arrays) shall appear as columns in the internal table in the order in which they were created.
 
@@ -1977,7 +1978,7 @@ Expression Types:
 
 Memory Management:
 
-- *-m* \<*size*\>: Maximum in-memory table size.
+- *-m* \<*size*\>: Maximum in-memory table size. The unit is cells (rows × columns). 0 means unlimited (all data stays in memory). When the table exceeds this limit the rows are spilled to a temporary SQLite database; the current SQLite backend supports at most approximately 2000 columns per spilled table, so wide datasets should use *-m 0* or a value large enough to prevent spill.
 - *-t* \<*size*\>: Maximum temporary variable/array memory.
 
 Character Variables:
