@@ -136,15 +136,30 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       return 0;
    end Level_Index;
 
-   procedure Render_Two_Way_Grid (Rows : Row_Index_Vectors.Vector;
-                                  V1, V2 : String) is
-      L1      : constant Level_Vectors.Vector := Build_Levels (Rows, V1);
-      L2      : constant Level_Vectors.Vector := Build_Levels (Rows, V2);
-      Joint   : Count_Maps.Map;
+   --  Shared joint-derived levels/marginals/cells for a 2-way crossing.
+   --  Only rows where BOTH V1 and V2 are present (per Include_Missing) are
+   --  counted.  Levels, marginals, and the cell map all derive from these
+   --  jointly-present rows, so orphan levels (values that only ever co-occur
+   --  with a missing partner) are dropped, each row/column total equals the
+   --  sum of its cells, and the grand total equals the jointly-present row
+   --  count.  Both Render_Two_Way_Grid and Build_Count_Matrix consume this so
+   --  they always agree (same levels, marginals, and cell counts).
+   type Joint_Table is record
+      L1, L2  : Level_Vectors.Vector;
+      Cells   : Count_Maps.Map;    --  key "i|j" of 1-based level indices
       Grand   : Natural := 0;
       Missing : Natural := 0;
-      Show_Pct : constant Boolean := not Stmt.Table_NOPERCENT;
+   end record;
+
+   function Build_Joint (Rows   : Row_Index_Vectors.Vector;
+                         V1, V2 : String) return Joint_Table
+   is
+      JT         : Joint_Table;
+      Joint_Rows : Row_Index_Vectors.Vector;
    begin
+      --  Partition rows into jointly-present vs. missing (any crossing var
+      --  missing).  Under /MISSING, Is_Present is always True, so every row
+      --  is jointly present and "." becomes a valid level in both margins.
       for P of Rows loop
          declare
             A : constant Values.Value := SData_Core.Table.Get_Value (P, V1);
@@ -153,25 +168,50 @@ procedure Execute_Tables (Stmt : Statement_Access) is
             if Is_Present (A, Include_Missing)
               and then Is_Present (B, Include_Missing)
             then
-               declare
-                  I   : constant Natural := Level_Index (L1, Disp_Of (A));
-                  J   : constant Natural := Level_Index (L2, Disp_Of (B));
-                  Key : constant String  :=
-                    Trim (I'Image, Both) & "|" & Trim (J'Image, Both);
-               begin
-                  if Joint.Contains (Key) then
-                     Joint.Replace (Key, Joint (Key) + 1);
-                  else
-                     Joint.Insert (Key, 1);
-                  end if;
-                  Grand := Grand + 1;
-               end;
+               Joint_Rows.Append (P);
             else
-               Missing := Missing + 1;
+               JT.Missing := JT.Missing + 1;
             end if;
          end;
       end loop;
+      --  Marginal levels derive from jointly-present rows only (drops orphans);
+      --  Build_Levels also applies the requested value/frequency ordering, so
+      --  under /ORDER=FREQ the margins order by the JOINT marginal.
+      JT.L1 := Build_Levels (Joint_Rows, V1);
+      JT.L2 := Build_Levels (Joint_Rows, V2);
+      --  Cell counts keyed on final (post-sort) level indices.
+      for P of Joint_Rows loop
+         declare
+            I   : constant Natural :=
+              Level_Index (JT.L1,
+                           Disp_Of (SData_Core.Table.Get_Value (P, V1)));
+            J   : constant Natural :=
+              Level_Index (JT.L2,
+                           Disp_Of (SData_Core.Table.Get_Value (P, V2)));
+            Key : constant String :=
+              Trim (I'Image, Both) & "|" & Trim (J'Image, Both);
+         begin
+            if JT.Cells.Contains (Key) then
+               JT.Cells.Replace (Key, JT.Cells (Key) + 1);
+            else
+               JT.Cells.Insert (Key, 1);
+            end if;
+            JT.Grand := JT.Grand + 1;
+         end;
+      end loop;
+      return JT;
+   end Build_Joint;
 
+   procedure Render_Two_Way_Grid (Rows : Row_Index_Vectors.Vector;
+                                  V1, V2 : String) is
+      JT      : constant Joint_Table := Build_Joint (Rows, V1, V2);
+      L1      : Level_Vectors.Vector renames JT.L1;
+      L2      : Level_Vectors.Vector renames JT.L2;
+      Joint   : Count_Maps.Map renames JT.Cells;
+      Grand   : Natural renames JT.Grand;
+      Missing : Natural renames JT.Missing;
+      Show_Pct : constant Boolean := not Stmt.Table_NOPERCENT;
+   begin
       IO.Put_Line ("Table of " & V1 & " by " & V2);
       IO.New_Line;
       IO.Put_Line ("Cell contents: Frequency" &
@@ -237,30 +277,29 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       end if;
    end Render_Two_Way_Grid;
 
-   --  Build an R x C count matrix for /CHISQ (Task 10).
-   function Build_Count_Matrix (Rows       : Row_Index_Vectors.Vector;
-                                V1, V2     : String;
-                                L1, L2     : Level_Vectors.Vector)
+   --  Build an R x C count matrix for /CHISQ (Task 10) directly from a
+   --  Joint_Table so the matrix and the rendered grid are guaranteed to agree
+   --  (same joint-derived levels, marginals, and cell counts; no spurious
+   --  all-zero rows/cols from orphan levels).  Task 10 obtains L1/L2 labels
+   --  from JT.L1/JT.L2 and the grand total from JT.Grand.
+   function Build_Count_Matrix (JT : Joint_Table)
       return SData_Core.Statistics.Count_Matrix
    is
       M : SData_Core.Statistics.Count_Matrix
-            (1 .. Natural (L1.Length), 1 .. Natural (L2.Length)) :=
+            (1 .. Natural (JT.L1.Length), 1 .. Natural (JT.L2.Length)) :=
               (others => (others => 0));
    begin
-      for P of Rows loop
-         declare
-            A : constant Values.Value := SData_Core.Table.Get_Value (P, V1);
-            B : constant Values.Value := SData_Core.Table.Get_Value (P, V2);
-         begin
-            if Is_Present (A, Include_Missing)
-              and then Is_Present (B, Include_Missing)
-            then
-               M (Level_Index (L1, Disp_Of (A)),
-                  Level_Index (L2, Disp_Of (B))) :=
-                 M (Level_Index (L1, Disp_Of (A)),
-                    Level_Index (L2, Disp_Of (B))) + 1;
-            end if;
-         end;
+      for I in JT.L1.First_Index .. JT.L1.Last_Index loop
+         for J in JT.L2.First_Index .. JT.L2.Last_Index loop
+            declare
+               Key : constant String :=
+                 Trim (I'Image, Both) & "|" & Trim (J'Image, Both);
+            begin
+               if JT.Cells.Contains (Key) then
+                  M (I, J) := JT.Cells (Key);
+               end if;
+            end;
+         end loop;
       end loop;
       return M;
    end Build_Count_Matrix;

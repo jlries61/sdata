@@ -1,0 +1,9 @@
+Dataset opened: tests/data/freq.csv
+Frequency table for REGION$
+
+REGION$ Frequency Cum_Freq
+East 3 3
+West 3 6
+Total 6
+
+TABLES complete.

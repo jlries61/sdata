@@ -1,0 +1,10 @@
+Dataset opened: tests/data/freq_miss.csv
+Frequency table for REGION$
+
+REGION$ Frequency Percent Cum_Freq Cum_Percent
+. 1 25.00 1 25.00
+East 2 50.00 3 75.00
+West 1 25.00 4 100.00
+Total 4 100.00
+
+TABLES complete.
