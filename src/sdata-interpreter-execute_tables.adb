@@ -709,6 +709,16 @@ begin
         "TABLES: pending program statements exist; issue RUN or NEW first";
    end if;
 
+   --  Refresh the SELECT logical->physical index map before tabulating so an
+   --  active SELECT filter is honored (Group_Rows walks the logical view via
+   --  Logical_Row_Count / Logical_To_Physical).  This mirrors sdata-core's
+   --  Collect_Groups, whose first statement is Rebuild_Filter_Map; the copied
+   --  Group_Rows dropped that call, which made TABLES silently tabulate the
+   --  whole table.  Execute_Rebuild_Filter is a view refresh only -- it does
+   --  not mutate the table, PDV, SAVE, the SELECT expression, or BY -- so the
+   --  print-only invariant is preserved (AGGREGATE/STATS call it likewise).
+   SData_Core.Commands.Execute_Rebuild_Filter;
+
    declare
       Groups      : constant Group_Of_Rows.Vector := Group_Rows;
       Multi_Group : constant Boolean :=

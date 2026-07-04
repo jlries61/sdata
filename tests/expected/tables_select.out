@@ -1,0 +1,9 @@
+Dataset opened: tests/data/freq_select.csv
+Frequency table for PRODUCT$
+
+PRODUCT$ Frequency Percent Cum_Freq Cum_Percent
+A 2 66.67 2 66.67
+B 1 33.33 3 100.00
+Total 3 100.00
+
+TABLES complete.
