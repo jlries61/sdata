@@ -15,6 +15,15 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       return Trim (Buf, Both);
    end Fmt2;
 
+   --  Four-decimal float formatter (e.g. 0.6667) for /CHISQ statistics.
+   function Fmt4 (X : Float) return String is
+      package F_IO is new Ada.Text_IO.Float_IO (Float);
+      Buf : String (1 .. 32);
+   begin
+      F_IO.Put (Buf, X, Aft => 4, Exp => 0);
+      return Trim (Buf, Both);
+   end Fmt4;
+
    --  ---- counting-engine types (reused by Tasks 6-10) ----
    type Level is record
       Val   : Values.Value;
@@ -136,6 +145,10 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       return 0;
    end Level_Index;
 
+   --  Canonical cell-map key for 1-based level indices (row I, column J).
+   function Cell_Key (I, J : Positive) return String is
+     (Trim (I'Image, Both) & "|" & Trim (J'Image, Both));
+
    --  Shared joint-derived levels/marginals/cells for a 2-way crossing.
    --  Only rows where BOTH V1 and V2 are present (per Include_Missing) are
    --  counted.  Levels, marginals, and the cell map all derive from these
@@ -188,8 +201,7 @@ procedure Execute_Tables (Stmt : Statement_Access) is
             J   : constant Natural :=
               Level_Index (JT.L2,
                            Disp_Of (SData_Core.Table.Get_Value (P, V2)));
-            Key : constant String :=
-              Trim (I'Image, Both) & "|" & Trim (J'Image, Both);
+            Key : constant String := Cell_Key (I, J);
          begin
             if JT.Cells.Contains (Key) then
                JT.Cells.Replace (Key, JT.Cells (Key) + 1);
@@ -236,8 +248,7 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          begin
             for J in L2.First_Index .. L2.Last_Index loop
                declare
-                  Key : constant String :=
-                    Trim (I'Image, Both) & "|" & Trim (J'Image, Both);
+                  Key : constant String := Cell_Key (I, J);
                   F   : constant Natural :=
                     (if Joint.Contains (Key) then Joint (Key) else 0);
                   Pct : constant Float :=
@@ -292,8 +303,7 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       for I in JT.L1.First_Index .. JT.L1.Last_Index loop
          for J in JT.L2.First_Index .. JT.L2.Last_Index loop
             declare
-               Key : constant String :=
-                 Trim (I'Image, Both) & "|" & Trim (J'Image, Both);
+               Key : constant String := Cell_Key (I, J);
             begin
                if JT.Cells.Contains (Key) then
                   M (I, J) := JT.Cells (Key);
@@ -303,6 +313,71 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       end loop;
       return M;
    end Build_Count_Matrix;
+
+   --  Emit the 2-way chi-square family for V1 x V2 over Rows.  The tests are
+   --  computed from the SAME joint-derived cells the grid/list renders (any
+   --  partial-missing row already excluded by Build_Joint), so the statistics
+   --  and the displayed table always agree on levels, marginals, and N.
+   procedure Put_Chisq_2Way (Rows : Row_Index_Vectors.Vector; V1, V2 : String)
+   is
+      JT : constant Joint_Table := Build_Joint (Rows, V1, V2);
+      M  : constant SData_Core.Statistics.Count_Matrix :=
+        Build_Count_Matrix (JT);
+      R  : constant SData_Core.Statistics.Chi_Square_Result :=
+        SData_Core.Statistics.Chi_Square_Tests (M);
+   begin
+      IO.New_Line;
+      IO.Put_Line ("Statistic DF Value Prob");
+      if not R.Valid then
+         IO.Put_Line
+           ("(chi-square not computed: a row or column total is zero)");
+         return;
+      end if;
+      IO.Put_Line ("Chi-Square " & Trim (R.DF'Image, Both) & " "
+                   & Fmt4 (R.Pearson_Stat) & " " & Fmt4 (R.Pearson_P));
+      IO.Put_Line ("Likelihood-Ratio_Chi-Square " & Trim (R.DF'Image, Both)
+                   & " " & Fmt4 (R.LR_Stat) & " " & Fmt4 (R.LR_P));
+      if R.Has_Yates then
+         IO.Put_Line ("Continuity-Adj._Chi-Square 1 "
+                      & Fmt4 (R.Yates_Stat) & " " & Fmt4 (R.Yates_P));
+      end if;
+      IO.Put_Line ("Mantel-Haenszel_Chi-Square 1 "
+                   & Fmt4 (R.MH_Stat) & " " & Fmt4 (R.MH_P));
+      IO.Put_Line ("Phi_Coefficient " & Fmt4 (R.Phi));
+      IO.Put_Line ("Contingency_Coefficient " & Fmt4 (R.Contingency));
+      IO.Put_Line ("Cramers_V " & Fmt4 (R.Cramers_V));
+      IO.New_Line;
+      IO.Put_Line ("Sample_Size = " & Trim (R.N'Image, Both));
+      if R.Pct_Expected_Lt_5 > 20.0 then
+         IO.Put_Line ("WARNING: over 20% of cells have expected count < 5; "
+                      & "chi-square may be invalid.");
+      end if;
+   end Put_Chisq_2Way;
+
+   --  Emit the one-way equal-proportions goodness-of-fit chi-square for Col.
+   procedure Put_Chisq_1Way (Rows : Row_Index_Vectors.Vector; Col : String) is
+      L   : constant Level_Vectors.Vector := Build_Levels (Rows, Col);
+      V   : SData_Core.Statistics.Count_Vector (1 .. Natural (L.Length));
+      Idx : Positive := 1;
+   begin
+      for Lv of L loop
+         V (Idx) := Lv.Count;
+         Idx := Idx + 1;
+      end loop;
+      declare
+         R : constant SData_Core.Statistics.GOF_Result :=
+           SData_Core.Statistics.Goodness_Of_Fit (V);
+      begin
+         IO.New_Line;
+         IO.Put_Line ("Chi-Square Goodness-of-Fit (equal proportions)");
+         if R.Valid then
+            IO.Put_Line ("Chi-Square " & Trim (R.DF'Image, Both) & " "
+                         & Fmt4 (R.Stat) & " " & Fmt4 (R.P));
+         else
+            IO.Put_Line ("(not computed: fewer than two categories)");
+         end if;
+      end;
+   end Put_Chisq_1Way;
 
    --  Emit the BY-group header line, e.g. "----- BY G$=p -----", using the
    --  first physical row of the group to read each BY variable's value.
@@ -592,20 +667,39 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          Cur := Cur.Next;
       end loop;
       if K = 1 then
-         Render_One_Way
-           (Rows, Req.Vars.Var.Start_Name (1 .. Req.Vars.Var.Start_Len));
-      elsif K = 2 and then not Stmt.Table_LIST then
+         declare
+            Col : constant String :=
+              Req.Vars.Var.Start_Name (1 .. Req.Vars.Var.Start_Len);
+         begin
+            Render_One_Way (Rows, Col);
+            if Stmt.Table_CHISQ then
+               Put_Chisq_1Way (Rows, Col);
+            end if;
+         end;
+      elsif K = 2 then
          declare
             V1 : constant String :=
               Req.Vars.Var.Start_Name (1 .. Req.Vars.Var.Start_Len);
             V2 : constant String :=
               Req.Vars.Next.Var.Start_Name (1 .. Req.Vars.Next.Var.Start_Len);
          begin
-            Render_Two_Way_Grid (Rows, V1, V2);
+            --  Display (grid or /LIST) is independent of the statistics.
+            if Stmt.Table_LIST then
+               Render_List (Rows, Req);
+            else
+               Render_Two_Way_Grid (Rows, V1, V2);
+            end if;
+            if Stmt.Table_CHISQ then
+               Put_Chisq_2Way (Rows, V1, V2);
+            end if;
          end;
       else
-         --  K=2 with /LIST, or K>=3: list-form rendering.
+         --  K >= 3: list-form rendering only.
          Render_List (Rows, Req);
+         if Stmt.Table_CHISQ then
+            IO.Put_Line ("TABLES: /CHISQ is not computed for tables of "
+                         & "three or more variables");
+         end if;
       end if;
    end Render_Request;
 
