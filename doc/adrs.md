@@ -58,6 +58,7 @@ that might relitigate a settled question.
 | ADR-046 | AGGREGATE command — active-BY grouping, build-and-swap, and an aggregate metadata side-table | 2026-06-23 | Accepted |
 | ADR-047 | TRANSPOSE command — type-uniformity, union-of-IDs, max-K padding, and output-collision rules | 2026-06-25 | Accepted |
 | ADR-048 | STATS command — transposed-AGGREGATE layout, always-replace + print/NOPRINT, shared group-scan helper | 2026-06-30 | Accepted |
+| ADR-049 | TABLES command — print-only frequency/crosstabulation reporting | 2026-07-03 | Accepted |
 
 ---
 
@@ -636,3 +637,22 @@ SData retains `DIM` but its scope narrows to creating subscripted variables that
 6. **Empty or fully-filtered input yields zero output rows**, consistent with AGGREGATE (the transposed-AGGREGATE layout inherits AGGREGATE's group-scan semantics: no groups → no rows). The original spec's aspirational wording about an "N=0 row" was superseded by the as-built behaviour, which the spec's own fallback clause ("match AGGREGATE") blesses.
 
 **Consequences:** STATS is purely additive to sdata-core's public surface (`Stats_Options` + `Execute_STATS` on `Commands`) — a patch bump (sdata-core 0.1.18 → 0.1.19); the `^0.1.16` consumer floor still admits it, so no consumer-constraint change. data-vandal does not use `Execute_STATS` but builds and tests clean against the additive API. STATS becomes a reserved keyword in sdata's lexer. sdata gets a minor bump (0.11.1 → 0.12.0) for the new command.
+
+---
+
+### ADR-049: TABLES command — print-only frequency/crosstabulation reporting
+**Date:** 2026-07-03 | **Status:** Accepted
+
+**Context:** TABLES (design spec `doc/specs/2026-07-03-tables-command-design.md`) is SData's PROC FREQ analogue: one-way, two-way, and multiway frequency tables with optional chi-square statistics. Unlike STATS, AGGREGATE, and TRANSPOSE — which all build-and-swap the in-memory table — TABLES produces a printed report and leaves all interpreter state unchanged.
+
+**Decision:**
+1. **Print-only reporting model.** TABLES renders a frequency/crosstabulation report and never mutates the table, PDV, pending SAVE, SELECT, or BY. This diverges deliberately from the build-and-swap model of STATS/AGGREGATE/TRANSPOSE: a crosstab is inherently two-dimensional and has no downstream consumer that would benefit from a table replacement. Leaving SELECT and BY intact also means TABLES can be re-run with different requests without re-issuing USE, BY, or SELECT.
+2. **Multiway (3+ variables) always renders in list form.** A request of three or more crossing variables is always presented as one row per observed combination (the same list form as `/LIST` for two-way), never as stacked two-way grids. This avoids unreadable nested tables. `/LIST` extends list form to two-way tables on demand; for one-way tables it is a no-op; for three-or-more-way it is redundant-but-harmless (already list). List form changes presentation only and never affects whether statistics are computed.
+3. **Statistics scope is Tier 2.5: the chi-square family plus Cramér's V.** Included: Pearson chi-square, Likelihood-Ratio (G²), Continuity-Adjusted (2×2 only, Yates), and Mantel-Haenszel chi-squares; Phi coefficient, Contingency Coefficient, and Cramér's V. All p-values use the existing `Chi_Square_CDF` function in `SData_Core.Statistics`. Deferred to a later feature: Fisher's exact test, ordinal/nominal measures of association with asymptotic standard errors (Gamma, Kendall's tau-b, etc.), and odds ratio/relative risk. The tier boundary is drawn at the chi-square family because it feeds already-existing statistical primitives at low incremental cost; the deferred items require separate multi-week effort.
+4. **One-way `/CHISQ` = equal-proportions goodness-of-fit.** For a one-way table, `/CHISQ` tests whether observed frequencies are consistent with a uniform distribution across the k observed levels: statistic Σ(obs−exp)²/exp with exp = N/k, DF = k−1.
+5. **Three-or-more-way `/CHISQ` is skipped with a warning.** When `/CHISQ` accompanies a 3+-variable request, a warning is emitted and no statistics are produced. Per-stratum chi-squares across multiway tables are deferred.
+6. **SAS-faithful partial-missing exclusion (a decision refined during implementation).** For crossings, an observation is excluded from all counts if *any* crossing variable is missing, and the excluded count is reported as a `Frequency Missing = N` line beneath the table. Marginals and level sets are derived from jointly-present rows only (not from all rows unconditionally). This matches SAS PROC FREQ behavior. `/MISSING` promotes missing to an ordinary category, appearing as its own level in all counts; no separate `Frequency Missing` line is printed in that mode.
+7. **Placement: pure contingency-table kernels additive in `SData_Core.Statistics`; counting and rendering sdata-only.** The `Chi_Square_Tests` and `Goodness_Of_Fit` functions are pure (no I/O, no table access) and belong with the other statistical routines in sdata-core where they can be unit-tested in the core harness against known references. TABLES counting, level enumeration, and report rendering are implemented in the sdata-only `Execute_Tables` subunit, since TABLES shares nothing with data-vandal.
+8. **Pending-deferred guard.** TABLES raises before doing any work if deferred program statements are queued (the same `Pending_Deferred > 0` check used by STATS/AGGREGATE/TRANSPOSE), consistent with those commands' requirement that the report reflects fully-processed data.
+
+**Consequences:** TABLES becomes a new reserved word in sdata's lexer. sdata-core 0.1.22 (additive — `Chi_Square_Tests` and `Goodness_Of_Fit` added to `SData_Core.Statistics`); the sdata floor is bumped from `^0.1.20` to `^0.1.22`. data-vandal does not use any TABLES API and builds clean against the additive sdata-core surface. The print-only model means TABLES can be invoked repeatedly within a session without disturbing SELECT, BY, or the table — a different usage pattern from STATS/AGGREGATE/TRANSPOSE, which consume and transform the table on each call.

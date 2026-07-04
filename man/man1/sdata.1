@@ -667,6 +667,80 @@ first).
 See also
 .BR AGGREGATE .
 .TP
+.B TABLES\fR \fIrequest\fR [\fIrequest\fB ...]\fR [\fB/CHISQ\fR] [\fB/MISSING\fR] [\fB/ORDER=FREQ\fR] [\fB/LIST\fR] [\fB/NOCUM\fR] [\fB/NOPERCENT\fR]
+Print frequency and crosstabulation reports (SAS PROC FREQ analogue).
+A
+.I request
+is a single variable name for a one\-way table, or two or more variable names
+joined by
+.B *
+for a crossing
+.RB ( A*B
+two\-way;
+.B A*B*C
+multiway).
+Multiple requests may appear in one statement; all options apply to every request.
+.B TABLES
+is print\-only: the data table,
+.BR SELECT ,
+and
+.B BY
+are left unchanged after the command completes.
+.RS
+.TP
+.B /CHISQ
+Chi\-square family (Pearson, likelihood\-ratio, Mantel\-Haenszel; continuity\-adjusted
+for 2x2) plus phi, contingency coefficient, and Cramer's V.
+One\-way: equal\-proportions goodness\-of\-fit.
+Not computed for tables of three or more variables (skipped with a warning).
+.TP
+.B /MISSING
+Treat missing values as an ordinary category (default: excluded; a
+.I "Frequency Missing = N"
+line is printed beneath the table when values are excluded).
+.TP
+.B /ORDER=FREQ
+Order levels by descending frequency (default: by value).
+.TP
+.B /LIST
+Render a two\-way table in list form (one row per observed combination)
+instead of the default grid.
+No\-op for one\-way tables; always active for three\-or\-more\-way tables.
+.TP
+.B /NOCUM
+Suppress cumulative frequency and cumulative percent columns
+(one\-way and list forms).
+.TP
+.B /NOPERCENT
+Suppress the overall cell percent figure.
+.RE
+.PP
+One\-way output: level, Frequency, Percent, Cum Freq, Cum Percent, and a Total row.
+Two\-way output: a contingency grid with stacked cell Frequency/Percent/Row%/Col%
+plus row, column, and grand totals.
+Multiway output (and two\-way with
+.BR /LIST ):
+list form with one row per observed combination and columns Frequency, Percent,
+Cum Freq, Cum Percent.
+For crossings, an observation is excluded if any crossing variable is missing
+(unless
+.BR /MISSING );
+the excluded count is reported as a
+.I "Frequency Missing = N"
+line.
+The active
+.B SELECT
+filter is respected; one table set is produced per active
+.B BY
+group.
+The deferred program buffer must be empty (issue
+.B RUN
+or
+.B NEW
+first).
+See also
+.BR STATS .
+.TP
 .B NAMES
 List all permanent and temporary variables currently defined.
 .TP
