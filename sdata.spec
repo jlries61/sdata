@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.12.3
+Version:        0.13.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Fri Jul 03 2026 John L. Ries <john@theyarnbard.com> - 0.13.0-1
+- Add TABLES command (PROC FREQ analogue): one-way, two-way, and multiway frequency/crosstabulation reports with optional chi-square-family statistics
+
 * Fri Jul 03 2026 John L. Ries <john@theyarnbard.com> - 0.12.3-1
 - Clearer error when a wide dataset exceeds the SQLite disk-spill column limit (A/B for the OUTPUT-adjacent spill report)
 

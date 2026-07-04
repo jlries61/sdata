@@ -1,6 +1,6 @@
 name = "sdata"
 description = "A data command interpreter for tabular data processing."
-version = "0.12.3"
+version = "0.13.0"
 
 authors = ["John L. Ries"]
 maintainers = ["John L. Ries <john@theyarnbard.com>"]
@@ -23,7 +23,7 @@ mathpaqs = "^20260205.0.0"
 ada_sqlite3 = "^0.1.1"
 
 [[depends-on]]
-sdata_core = "^0.1.20"
+sdata_core = "^0.1.22"
 
 [[pins]]
 sdata_core = { path = "../sdata-core" }

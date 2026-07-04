@@ -1,0 +1,9 @@
+Dataset opened: tests/data/freq_ord.csv
+Frequency table for G$
+
+G$ Frequency Percent Cum_Freq Cum_Percent
+b 4 57.14 4 57.14
+a 3 42.86 7 100.00
+Total 7 100.00
+
+TABLES complete.

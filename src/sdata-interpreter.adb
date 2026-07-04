@@ -18,6 +18,7 @@ with SData_Core.Config;         use SData_Core.Config;
 with SData_Core.Config.Runtime;
 with SData_Core.IO;        use SData_Core.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
+with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
@@ -81,6 +82,10 @@ package body SData.Interpreter is
    package Program_Vectors is new Ada.Containers.Vectors (Positive, Program_Entry);
    Active_Program_Vec : Program_Vectors.Vector;
 
+   --  Vector of physical row indices — used by the TABLES counting engine
+   --  (Execute_Tables subunit) for group splitting and level building.
+   package Row_Index_Vectors is new Ada.Containers.Vectors (Positive, Positive);
+
    --  Count of deferred statements queued since the most recent RUN (or NEW).
    --  These are "pending / un-run": their per-record effect has not yet been
    --  committed to the table.  AGGREGATE refuses to run while any are pending
@@ -137,6 +142,7 @@ package body SData.Interpreter is
    procedure Execute_Program_Insert  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
+   procedure Execute_Tables          (Stmt : Statement_Access);
    --  C5: entry-time single-statement checker (body is a separate subunit).
    procedure Analyze_One          (Stmt : Statement_Access);
    function  Group_Flags (Logical_I     : Positive;
@@ -915,6 +921,9 @@ package body SData.Interpreter is
    --  SUBMIT / SYSTEM / OUTPUT / FPATH — external interaction and I/O routing.
    procedure Execute_IO (Stmt : Statement_Access) is separate;
 
+   --  TABLES — frequency / crosstabulation report (counting engine + rendering).
+   procedure Execute_Tables (Stmt : Statement_Access) is separate;
+
    --  -----------------------------------------------------------------------
    --  Shared semantic-checker helpers
    --
@@ -1597,6 +1606,8 @@ package body SData.Interpreter is
             Execute_Transpose (Stmt);
          when Stmt_STATS =>
             Execute_Stats (Stmt);
+         when Stmt_TABLES =>
+            Execute_Tables (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
             | Stmt_OPTIONS =>

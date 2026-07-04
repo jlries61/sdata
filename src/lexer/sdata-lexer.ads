@@ -31,6 +31,7 @@ package SData.Lexer is
       Token_AGGREGATE,
       Token_TRANSPOSE,
       Token_STATS,
+      Token_TABLES,
       Token_INSERT,
       Token_TO, Token_STEP, Token_BREAK, Token_INTO,
       Token_AS, Token_IN, Token_INTERLEAVE, Token_JOIN, Token_APPEND,

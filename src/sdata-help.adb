@@ -283,6 +283,30 @@ package body SData.Help is
       Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
    end Help_STATS;
 
+   procedure Help_TABLES is
+   begin
+      Put_Line ("Command: TABLES request [request ...] [/CHISQ] [/MISSING] [/LIST]");
+      Put_Line ("                [/ORDER=FREQ] [/NOCUM] [/NOPERCENT]");
+      Put_Line ("Print frequency and crosstabulation reports (SAS PROC FREQ analogue).");
+      Put_Line ("A request is one variable (one-way table) or variables joined by '*'");
+      Put_Line ("(A*B two-way; A*B*C multiway). Multiple requests per statement are");
+      Put_Line ("allowed; options apply to all requests. Print-only: the data table,");
+      Put_Line ("SELECT, and BY are left unchanged.");
+      Put_Line ("  /CHISQ      chi-square family (Pearson, likelihood-ratio, Mantel-");
+      Put_Line ("              Haenszel, continuity-adjusted for 2x2) plus phi,");
+      Put_Line ("              contingency coefficient, Cramer's V. One-way: equal-");
+      Put_Line ("              proportions goodness-of-fit. Not computed for 3+ way.");
+      Put_Line ("  /MISSING    treat missing as a valid category (default: excluded,");
+      Put_Line ("              reported as 'Frequency Missing = N').");
+      Put_Line ("  /ORDER=FREQ order levels by descending frequency (default: by value).");
+      Put_Line ("  /LIST       render a two-way table in list form (default for 3+ way).");
+      Put_Line ("  /NOCUM      suppress cumulative columns (one-way / list).");
+      Put_Line ("  /NOPERCENT  suppress the overall cell percent.");
+      Put_Line ("Honors the active SELECT filter and produces one table set per active");
+      Put_Line ("BY group. Refuses to run while un-run deferred statements are pending.");
+      Put_Line ("Execution: Immediate (print-only). See man page sdata(1).");
+   end Help_TABLES;
+
    procedure Help_NEW is
    begin
       Put_Line ("Command: NEW");
@@ -1260,6 +1284,7 @@ package body SData.Help is
    K_AGGREGATE    : aliased constant String := "AGGREGATE";
    K_TRANSPOSE    : aliased constant String := "TRANSPOSE";
    K_STATS        : aliased constant String := "STATS";
+   K_TABLES       : aliased constant String := "TABLES";
    K_NEW          : aliased constant String := "NEW";
    K_LIST         : aliased constant String := "LIST";
    K_DISPLAY      : aliased constant String := "DISPLAY";
@@ -1477,6 +1502,7 @@ package body SData.Help is
       (K_AGGREGATE'Access,  Help_AGGREGATE'Access,  C, N),
       (K_TRANSPOSE'Access,  Help_TRANSPOSE'Access,  C, N),
       (K_STATS'Access,      Help_STATS'Access,      C, N),
+      (K_TABLES'Access,     Help_TABLES'Access,     C, N),
       (K_NEW'Access,      Help_NEW'Access,      C, N),
       (K_LIST'Access,     Help_LIST'Access,     C, N),
       (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),
