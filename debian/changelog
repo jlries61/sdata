@@ -1,3 +1,9 @@
+sdata (0.13.0-1) unstable; urgency=medium
+
+  * Add TABLES command (PROC FREQ analogue): one-way, two-way, and multiway frequency/crosstabulation reports with optional chi-square-family statistics
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 03 Jul 2026 17:31:36 -0700
+
 sdata (0.12.3-1) unstable; urgency=medium
 
   * Clearer error when a wide dataset exceeds the SQLite disk-spill column limit (A/B for the OUTPUT-adjacent spill report)
