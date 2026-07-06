@@ -14,6 +14,13 @@ project SData is
 
    package Compiler is
       for Default_Switches ("Ada") use ("-gnat2012", "-gnatwa", "-gnatwl", "-gnatwu", "-g", "-O2");
+      --  sdata_unit_test.adb is a single ~2500-line procedure; at -O2 -g, GCC's
+      --  variable-tracking-at-assignments exceeds --param max-vartrack-size and
+      --  auto-retries the function without it (emitting a "retrying without" note).
+      --  Disable VTA for this one file to do that explicitly and silence the note;
+      --  object output is unchanged.
+      for Switches ("sdata_unit_test.adb") use
+         Compiler'Default_Switches ("Ada") & ("-fno-var-tracking-assignments");
    end Compiler;
 
    package Builder is
