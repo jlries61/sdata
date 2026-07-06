@@ -88,6 +88,9 @@ Execution: Deferred -- executed once per record inside the data step.
 
 Command: RUN
 Triggers the execution of the Data Step and any deferred SAVE operations.
+Before the data step runs, queued statements are validated: assignment type
+mismatches, unknown functions, arity errors, and undefined variables are
+all reported as hard errors before any record is processed.
 Execution: Immediate -- triggers the data step at once.
 
 Command: LET variable = expression
@@ -149,6 +152,43 @@ Reshapes the Data Table so that each transposed column becomes a row.
 Respects the active SELECT filter; transposes each BY block separately.
 Flushes a pending SAVE; clears the active SELECT and BY afterward.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
+
+Command: STATS [var ...] [/STATS=stat ...] [/NOPRINT]
+Computes summary statistics for the chosen variables (default: all
+numeric columns except active BY variables), one row per active BY
+group per variable, with one column per statistic. The result
+replaces the Data Table.
+  var ...   analysis variables; omit for all numeric columns. A whole
+            array name expands to its elements.
+  /STATS=   statistics to compute (default: N MIN MEAN MAX STD).
+            Any registered aggregate: SUM MEAN STD VAR MIN MAX N NMISS
+            GMEAN HMEAN MEDIAN. Only N/NMISS apply to character vars.
+  /NOPRINT  replace the table (and write a pending SAVE) without
+            printing the result.
+Respects the active SELECT filter; flushes a pending SAVE; clears the
+active SELECT and BY afterward.
+Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
+
+Command: TABLES request [request ...] [/CHISQ] [/MISSING] [/LIST]
+                [/ORDER=FREQ] [/NOCUM] [/NOPERCENT]
+Print frequency and crosstabulation reports (SAS PROC FREQ analogue).
+A request is one variable (one-way table) or variables joined by '*'
+(A*B two-way; A*B*C multiway). Multiple requests per statement are
+allowed; options apply to all requests. Print-only: the data table,
+SELECT, and BY are left unchanged.
+  /CHISQ      chi-square family (Pearson, likelihood-ratio, Mantel-
+              Haenszel, continuity-adjusted for 2x2) plus phi,
+              contingency coefficient, Cramer's V. One-way: equal-
+              proportions goodness-of-fit. Not computed for 3+ way.
+  /MISSING    treat missing as a valid category (default: excluded,
+              reported as 'Frequency Missing = N').
+  /ORDER=FREQ order levels by descending frequency (default: by value).
+  /LIST       render a two-way table in list form (default for 3+ way).
+  /NOCUM      suppress cumulative columns (one-way / list).
+  /NOPERCENT  suppress the overall cell percent.
+Honors the active SELECT filter and produces one table set per active
+BY group. Refuses to run while un-run deferred statements are pending.
+Execution: Immediate (print-only). See man page sdata(1).
 
 Command: NEW
 Clears the Data Table, all variables, and the queued program.
@@ -304,6 +344,8 @@ Example:
 Execution: Deferred -- executed once per record inside the data step.
 
 Command (data step): REPEAT n  (creates n records)
+REPEAT n also cancels any queued deferred statements (LET, SET, etc.).
+Enter setup statements AFTER the REPEAT command, not before it.
 Execution: Declarative -- the n-record mode is active for the next RUN.
 
 Command (loop): REPEAT ... UNTIL condition

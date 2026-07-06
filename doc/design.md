@@ -31,6 +31,7 @@ Memory Management:
 - External file storage: used when table exceeds maximum in-memory size.
 - Cache size: equal to maximum in-memory size, but never less than the size of a single row.
 - Implementation details: format and properties of external file and cache are implementation-defined.
+- **Disk-spill column limit:** The current SQLite-backed disk-spill implementation maps each data column to a SQLite table column. SQLite imposes a hard limit of approximately 2000 columns per table; attempting to spill a dataset with more columns than that limit produces an error with an actionable message. To keep a wide dataset in memory regardless of size, use *-m 0* (unlimited) or a large *-m* value. Alternatively, reduce the column count with *KEEP* or *DROP* before the spill threshold is reached.
 
 **Column Ordering:** Permanent variables (including arrays) shall appear as columns in the internal table in the order in which they were created.
 
@@ -627,7 +628,56 @@ Mutual Cancellation:
 
 **Note:** This refers to the *REPEAT* command (specify number of records), not *REPEAT*/*UNTIL* loop.
 
-### 5.6 Script Execution
+### 5.6 Entry-Time Semantic Checking
+
+Before any record is processed, sdata validates queued deferred statements. The
+following checks are performed:
+
+1. **Assignment type mismatch** — assigning a character value to a numeric name or a
+   numeric value to a character (*$*) name (e.g., *LET X = "foo"* where *X* is
+   numeric). The check is sound and complete when the right-hand side's type is
+   statically determinable — literals, suffix-typed variables (e.g., *LET X = NAME$*
+   where *NAME$* is a character column), and suffix-typed function calls all qualify.
+   When the right-hand side's type is not statically known (e.g., a polymorphic
+   *IF(...)* or a *.* missing literal), the check defers to runtime.
+
+2. **Unknown function** — a function name not registered in the evaluator (e.g.,
+   *LET Y = TYPO(X)*). Unknown functions formerly returned a missing value silently;
+   they now cause a hard error before the data step begins.
+
+3. **Function arity** — passing the wrong number of arguments to a known function
+   (e.g., *LET Y = ABS(A, B)* when *ABS* takes exactly one argument).
+
+4. **Undefined variable** — a variable reference that cannot be resolved against the
+   current table schema, active session variables, or names introduced anywhere in
+   the same deferred block. Forward references within a single deferred block are
+   legal (the whole block is scanned before any check runs). References to undefined
+   variables formerly returned a missing value silently; they now cause a hard error.
+
+**When checks fire:**
+
+- **Interactive mode:** checks 1–3 run as each deferred statement is entered at the
+  prompt (entry-time fast feedback), preventing the statement from being queued.
+  Check 4 (undefined variable) is deferred to the whole-block pass at *RUN* time
+  because a name introduced by a later, not-yet-entered statement would otherwise
+  be a false positive.
+- **Batch mode:** all four checks run as a whole-block pass immediately before the
+  data step executes. A violation is reported before any record is processed.
+
+**Error severity:** All violations are hard errors; no records are processed when a
+check fails.
+
+**Sound-but-incomplete principle:** Cases whose type or existence cannot be
+determined statically (e.g., a runtime-computed subscript or a variable whose type
+depends on control flow) are not flagged; such cases are left to runtime rather than
+risk false rejections.
+
+**Behavior change note:** Checks 2 (unknown function) and 4 (undefined variable)
+represent a change from earlier versions, where those conditions silently returned a
+missing value. Programs that relied on the silent missing-value behavior for unknown
+names must be updated.
+
+### 5.7 Script Execution
 
 **SUBMIT Statement:** Reads and executes commands from specified file.
 
@@ -867,7 +917,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>REPEAT</em></td>
 <td><em>REPEAT</em> &lt;<em>n</em>&gt;</td>
 <td>Declarative</td>
-<td>Specify the number of records to be written to the internal table or output dataset. This command will cancel any <em>USE</em> statement currently in effect.</td>
+<td>Specify the number of records to be written to the internal table or output dataset. This command will cancel any <em>USE</em> statement currently in effect, and also cancels any queued deferred statements (<em>LET</em>, <em>SET</em>, etc.). Consequently, setup statements that should govern the <em>REPEAT</em> data step must be entered <em>after</em> the <em>REPEAT</em> command (the setup-after-REPEAT idiom).</td>
 </tr>
 <tr>
 <td><em>REPEAT</em>/<em>UNTIL</em></td>
@@ -928,6 +978,18 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>TRANSPOSE</em> [/<em>KEEP</em>=<em>varlist</em>] [/<em>DROP</em>=<em>varlist</em>] [/<em>NAME</em>=<em>var$</em>] [/<em>ID</em>=<em>var</em>] [/<em>ARRAY</em>=<em>var</em>]</td>
 <td>Immediate Execution</td>
 <td>Reshape the data table: each column in the <em>transposed set</em> becomes one output row; each input row becomes one value column. With an active <em>BY</em>, each BY block is transposed separately into the same output table. The <em>transposed set</em> is determined by <em>/KEEP</em> and <em>/DROP</em> (combined as KEEP∖DROP; default: all non-BY columns). All columns in the transposed set must share a single type (all numeric or all character); a mixed set is an error. The output schema is: BY variables (one value per output row for that block), a name column (default <em>_NAME_$</em>, overridden by <em>/NAME=var$</em>) whose value is the original column name, and then the transposed value columns. <em>/ARRAY</em> and <em>/ID</em> are mutually exclusive; if neither is given, <em>/ARRAY=_X_</em> is implied. <em>/ARRAY=var</em> produces a long-form output: <em>var(1)..var(K)</em> where K is the maximum block row count across all blocks; shorter blocks are padded with missing values. The <em>/ARRAY</em> name's <em>$</em>-suffix must match the transposed-set type. <em>/ID=var</em> produces a wide-form output: the values of <em>var</em> become output column names (in first-encounter order across all blocks), and <em>var</em> is auto-excluded from the transposed set; sparse blocks (missing an ID value) leave that cell missing. The active <em>SELECT</em> filter is respected during the scan; a pending <em>SAVE</em> is written; then the active <em>SELECT</em> and <em>BY</em> are cleared. TRANSPOSE refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). See also <em>AGGREGATE</em>.</td>
+</tr>
+<tr>
+<td><em>STATS</em></td>
+<td><em>STATS</em> [<em>var</em> ...] [/<em>STATS</em>=<em>stat</em> ...] [/<em>NOPRINT</em>]</td>
+<td>Immediate Execution</td>
+<td>Compute summary statistics for the chosen <em>var</em> list (default: all numeric columns of the table, excluding the active <em>BY</em> variables), producing one output row per active <em>BY</em> group per variable. With no active <em>BY</em>, the whole (<em>SELECT</em>-filtered) table is one group. The output schema is: the active BY variables, then a name column <em>_NAME_$</em> holding each analysis variable's name, then one column per requested statistic. <em>/STATS=</em> lists the statistics (default <em>N MIN MEAN MAX STD</em>); any registered aggregate function is allowed (<em>SUM</em>, <em>MEAN</em>, <em>STD</em>, <em>VAR</em>, <em>MIN</em>, <em>MAX</em>, <em>N</em>, <em>NMISS</em>, <em>GMEAN</em>, <em>HMEAN</em>, <em>MEDIAN</em>); a non-aggregate name is rejected. A character variable is permitted only when every requested statistic accepts character input (currently only <em>N</em> and <em>NMISS</em>). A whole-array name expands to one row per element. <em>N</em> and <em>NMISS</em> columns are integer; the rest are float. The result replaces the in-memory table via build-and-swap; the table is printed (via DISPLAY) unless <em>/NOPRINT</em> is given. The active <em>SELECT</em> filter is respected during the scan; if a <em>SAVE</em> is pending the result is written to it; then the active <em>SELECT</em> and <em>BY</em> are cleared. STATS refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). See also <em>AGGREGATE</em>.</td>
+</tr>
+<tr>
+<td><em>TABLES</em></td>
+<td><em>TABLES</em> <em>request</em> [<em>request</em> ...] [/<em>CHISQ</em>] [/<em>MISSING</em>] [/<em>ORDER</em>=<em>FREQ</em>] [/<em>LIST</em>] [/<em>NOCUM</em>] [/<em>NOPERCENT</em>]</td>
+<td>Immediate Execution</td>
+<td>Print frequency and crosstabulation reports (SAS PROC FREQ analogue). A <em>request</em> is a single variable name (one-way table) or two or more variable names joined by <em>*</em> (crossing: <em>A*B</em> two-way; <em>A*B*C</em> multiway). Multiple requests per statement are allowed; all options apply to every request. <em>TABLES</em> is <strong>print-only</strong>: it never replaces the table, alters the PDV, flushes a pending <em>SAVE</em>, or clears <em>SELECT</em>/<em>BY</em>. The active <em>SELECT</em> filter is honored; one table set is produced per active <em>BY</em> group (with no active BY the whole table is one implicit group); <em>BY</em> and <em>SELECT</em> are left intact afterward. Options: <em>/CHISQ</em> requests chi-square-family statistics (see below); <em>/MISSING</em> treats missing as a valid category (default: excluded, reported as <em>Frequency Missing = N</em>); <em>/ORDER=FREQ</em> orders levels by descending frequency (default: by value); <em>/LIST</em> forces list format for two-way tables (presentation-only; no effect on statistics); <em>/NOCUM</em> suppresses cumulative columns (one-way and list forms); <em>/NOPERCENT</em> suppresses the overall cell percent. For crossings, an observation is excluded if <em>any</em> crossing variable is missing (SAS behavior), unless <em>/MISSING</em>. Output: one-way — level, Frequency, Percent, Cum Freq, Cum Percent, and a Total row; two-way (grid, default) — stacked cell Frequency/Percent/Row%/Col% plus row, column, and grand totals; multiway or two-way <em>/LIST</em> — list form (one row per observed combination, columns: crossing variables, Frequency, Percent, Cum Freq, Cum Percent). <em>/CHISQ</em> behavior by table dimension: one-way = equal-proportions goodness-of-fit (&#967;&#178; with DF = k&#8722;1); two-way = Pearson, Likelihood-Ratio, Continuity-Adjusted (2&#215;2 only, Yates), and Mantel-Haenszel chi-squares plus Phi, Contingency Coefficient, and Cram&#233;r&#8217;s V (a low-expected-count warning is printed when more than 20% of expected cell counts fall below 5); three-or-more-way = not computed (skipped with a warning). TABLES refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). See also <em>STATS</em>, <em>AGGREGATE</em>.</td>
 </tr>
 <tr>
 <td><em>SUBMIT</em></td>
@@ -1922,7 +1984,7 @@ Expression Types:
 
 Memory Management:
 
-- *-m* \<*size*\>: Maximum in-memory table size.
+- *-m* \<*size*\>: Maximum in-memory table size. The unit is cells (rows × columns). 0 means unlimited (all data stays in memory). When the table exceeds this limit the rows are spilled to a temporary SQLite database; the current SQLite backend supports at most approximately 2000 columns per spilled table, so wide datasets should use *-m 0* or a value large enough to prevent spill.
 - *-t* \<*size*\>: Maximum temporary variable/array memory.
 
 Character Variables:

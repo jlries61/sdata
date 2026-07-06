@@ -1994,6 +1994,177 @@ package body SData.Parser is
       end if;
    end Parse_TRANSPOSE;
 
+   -----------------
+   -- Parse_STATS --
+   -----------------
+   --  Parses "STATS [var ...] [/STATS=stat ...] [/NOPRINT]".  The bare list
+   --  (analysis variables) is optional; slash-options follow.  Parse-time
+   --  errors: duplicate /STATS, duplicate /NOPRINT, /STATS without '=' or list.
+   procedure Parse_STATS
+     (Ctx  : in out Parser_Context;
+      Stmt : Statement_Access)
+   is
+      Saw_STATS    : Boolean := False;
+      Saw_NOPRINT  : Boolean := False;
+   begin
+      --  Optional bare variable list (stops at '/' or end of statement).
+      Stmt.Stats_Vars := Parse_Variable_List (Ctx);
+
+      loop
+         exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Slash;
+         declare
+            Discard   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '/'
+            Flag_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Flag_Name : constant String :=
+              To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+            pragma Unreferenced (Discard);
+         begin
+            if Flag_Name = "STATS" then
+               if Saw_STATS then
+                  raise Script_Error with
+                    "STATS: /STATS may be specified at most once";
+               end if;
+               Saw_STATS := True;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "STATS: expected '=' after /STATS";
+               end if;
+               declare
+                  Eat : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '='
+                  pragma Unreferenced (Eat);
+               begin
+                  Stmt.Stats_Stats := Parse_Variable_List (Ctx);
+               end;
+               if Stmt.Stats_Stats = null then
+                  raise Script_Error with
+                    "STATS: /STATS= requires at least one statistic";
+               end if;
+            elsif Flag_Name = "NOPRINT" then
+               if Saw_NOPRINT then
+                  raise Script_Error with
+                    "STATS: /NOPRINT may be specified at most once";
+               end if;
+               Saw_NOPRINT := True;
+               Stmt.Stats_No_Print := True;
+            else
+               raise Script_Error with
+                 "STATS: unknown option '/" & Flag_Name & "'";
+            end if;
+         end;
+      end loop;
+   end Parse_STATS;
+
+   ------------------
+   -- Parse_TABLES --
+   ------------------
+   --  Parses "TABLES request [request ...] [/option ...]".
+   --  A request is: ident (* ident)*.  Requests repeat until '/' or end of
+   --  statement.  Then the slash-option loop handles /CHISQ /MISSING /LIST
+   --  /NOCUM /NOPERCENT /ORDER=FREQ|INTERNAL.
+   --  Parse-time errors:
+   --    #1  no request before first '/' or end of statement
+   --    #2  '*' not followed by an identifier
+   --    #3  duplicate option flag
+   --    #4  /ORDER missing '=' or bad value
+   --    #5  unknown slash-option
+   procedure Parse_TABLES
+     (Ctx  : in out Parser_Context;
+      Stmt : Statement_Access)
+   is
+      First_Req  : Table_Request := null;
+      Last_Req   : Table_Request := null;
+      Saw_ORDER  : Boolean := False;
+   begin
+      --  One or more requests, each: ident (* ident)*
+      loop
+         exit when not Is_Identifier_Token (Peek_Next_Token (Ctx.Lex_Ctx));
+         declare
+            Req  : constant Table_Request := new Table_Request_Node;
+            V1   : Variable_List := null;
+            VL   : Variable_List := null;
+            function New_Var (T : Token) return Variable_List is
+               N : constant Variable_List := new Variable_List_Node;
+            begin
+               N.Var.Start_Name (1 .. T.Length) := Identifier_Text (T);
+               N.Var.Start_Len := T.Length;
+               return N;
+            end New_Var;
+         begin
+            declare T : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin V1 := New_Var (T); VL := V1; end;
+            --  crossing: * ident ...
+            while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Star loop
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       T2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       pragma Unreferenced (Discard);
+               begin
+                  if not Is_Identifier_Token (T2) then
+                     raise Script_Error with
+                       "TABLES: expected a variable name after '*'";
+                  end if;
+                  VL.Next := New_Var (T2);
+                  VL := VL.Next;
+               end;
+            end loop;
+            Req.Vars := V1;
+            if First_Req = null then First_Req := Req; else Last_Req.Next := Req; end if;
+            Last_Req := Req;
+         end;
+      end loop;
+
+      if First_Req = null then
+         raise Script_Error with "TABLES: expected a variable name";
+      end if;
+      Stmt.Requests := First_Req;
+
+      --  Options: /CHISQ /MISSING /LIST /NOCUM /NOPERCENT /ORDER=FREQ|INTERNAL
+      loop
+         exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Slash;
+         declare
+            Discard  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '/'
+            Flag_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Flag     : constant String := To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+            pragma Unreferenced (Discard);
+         begin
+            if Flag = "CHISQ" then
+               if Stmt.Table_CHISQ then raise Script_Error with "TABLES: /CHISQ may be specified at most once"; end if;
+               Stmt.Table_CHISQ := True;
+            elsif Flag = "MISSING" then
+               if Stmt.Table_MISSING then raise Script_Error with "TABLES: /MISSING may be specified at most once"; end if;
+               Stmt.Table_MISSING := True;
+            elsif Flag = "LIST" then
+               if Stmt.Table_LIST then raise Script_Error with "TABLES: /LIST may be specified at most once"; end if;
+               Stmt.Table_LIST := True;
+            elsif Flag = "NOCUM" then
+               if Stmt.Table_NOCUM then raise Script_Error with "TABLES: /NOCUM may be specified at most once"; end if;
+               Stmt.Table_NOCUM := True;
+            elsif Flag = "NOPERCENT" then
+               if Stmt.Table_NOPERCENT then raise Script_Error with "TABLES: /NOPERCENT may be specified at most once"; end if;
+               Stmt.Table_NOPERCENT := True;
+            elsif Flag = "ORDER" then
+               if Saw_ORDER then raise Script_Error with "TABLES: /ORDER may be specified at most once"; end if;
+               Saw_ORDER := True;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "TABLES: expected '=' after /ORDER";
+               end if;
+               declare Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx); pragma Unreferenced (Eq);
+                       Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       Val : constant String := To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+               begin
+                  if Val = "FREQ" then
+                     Stmt.Table_Order_Freq := True;
+                  elsif Val = "INTERNAL" then
+                     Stmt.Table_Order_Freq := False;   --  default
+                  else
+                     raise Script_Error with "TABLES: /ORDER= must be FREQ or INTERNAL";
+                  end if;
+               end;
+            else
+               raise Script_Error with "TABLES: unknown option '/" & Flag & "'";
+            end if;
+         end;
+      end loop;
+   end Parse_TABLES;
+
    ---------------------
    -- Parse_Statement --
    ---------------------
@@ -2614,6 +2785,14 @@ package body SData.Parser is
          when Token_TRANSPOSE =>
             Stmt := new Statement (Stmt_TRANSPOSE);
             Parse_TRANSPOSE (Ctx, Stmt);
+
+         when Token_STATS =>
+            Stmt := new Statement (Stmt_STATS);
+            Parse_STATS (Ctx, Stmt);
+
+         when Token_TABLES =>
+            Stmt := new Statement (Stmt_TABLES);
+            Parse_TABLES (Ctx, Stmt);
 
          when Token_DELETE =>
             declare

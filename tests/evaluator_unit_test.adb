@@ -176,6 +176,33 @@ procedure Evaluator_Unit_Test is
       when others => return True;
    end Raises_Expr;
 
+   --  Parse Text via the full sdata parser (wrapped in PRINT), infer the
+   --  expression kind statically, then free the AST.  The full parser is
+   --  required because Parse_Expression (the SELECT mini-parser) does not
+   --  accept '$' / '%' name suffixes.
+   procedure Check_Kind (Name, Text : String; Expected : Value_Kind) is
+      Ctx  : SData.Parser.Parser_Context;
+      Prog : Statement_Access;
+      K    : Value_Kind;
+   begin
+      SData.Parser.Initialize (Ctx, "PRINT " & Text);
+      Prog := SData.Parser.Parse_Program (Ctx);
+      K := Static_Result_Kind (Prog.Print_Args.Expr);
+      Free_Program (Prog);
+      if K = Expected then
+         Put_Line ("PASS: " & Name); Passed := Passed + 1;
+      else
+         Put_Line ("FAIL: " & Name & "  got=" & K'Image
+                   & "  expected=" & Expected'Image);
+         Failed := Failed + 1;
+      end if;
+   exception
+      when others =>
+         Free_Program (Prog);
+         Put_Line ("FAIL: " & Name & "  exception raised");
+         Failed := Failed + 1;
+   end Check_Kind;
+
    V : Value;
 
 begin
@@ -899,6 +926,93 @@ begin
 
    --  LD-04: bare dot must still be missing (regression guard)
    Check_Missing ("LD-04: bare dot is still missing", Eval ("."));
+
+   ---------------------------------------------------------------------------
+   --  SRK: Static_Result_Kind tests
+   ---------------------------------------------------------------------------
+
+   Put_Line ("");
+   Put_Line ("--- SRK: Static_Result_Kind Tests ---");
+
+   Check_Kind ("srk_str_var",    "NAME$",       Val_String);
+   Check_Kind ("srk_int_var",    "COUNT%",      Val_Integer);
+   Check_Kind ("srk_num_var",    "SALARY",      Val_Numeric);
+   Check_Kind ("srk_str_lit",    """hello""",   Val_String);
+   Check_Kind ("srk_num_lit",    "3.14",        Val_Numeric);
+   Check_Kind ("srk_int_lit",    "42",          Val_Integer);
+   Check_Kind ("srk_num_add",    "X + Y",       Val_Numeric);
+   Check_Kind ("srk_str_concat", "A$ + B$",     Val_String);
+   Check_Kind ("srk_cmp",        "X > 3",       Val_Numeric);
+   Check_Kind ("srk_str_fn",     "UPPER$(A$)",  Val_String);
+   Check_Kind ("srk_num_fn",     "SQRT(X)",     Val_Numeric);
+   Check_Kind ("srk_missing",    ".",           Val_Missing);
+   Check_Kind ("srk_mixed_add",  "X + A$",      Val_Missing);
+
+   ---------------------------------------------------------------------------
+   --  IKF: Is_Known_Function tests
+   ---------------------------------------------------------------------------
+
+   Put_Line ("");
+   Put_Line ("--- IKF: Is_Known_Function Tests ---");
+
+   Check ("ikf_known",   Is_Known_Function ("SQRT"),   True);
+   Check ("ikf_str_fn",  Is_Known_Function ("UPPER$"), True);
+   Check ("ikf_unknown", Is_Known_Function ("FOOBAR"), False);
+   Check ("ikf_case",    Is_Known_Function ("sqrt"),   True);
+
+   ---------------------------------------------------------------------------
+   --  ARITY: Function_Arity tests
+   ---------------------------------------------------------------------------
+
+   Put_Line ("");
+   Put_Line ("--- ARITY: Function_Arity Tests ---");
+
+   declare
+      A : Arity_Spec;
+   begin
+      A := Function_Arity ("SQRT");            -- exactly one argument
+      Check ("arity_sqrt_min", A.Min_Args = 1, True);
+      Check ("arity_sqrt_max", A.Max_Args = 1, True);
+
+      A := Function_Arity ("MID$");            -- MID$(s$, start[, len]) -> 2 or 3
+      Check ("arity_mid_min", A.Min_Args = 2, True);
+      Check ("arity_mid_max", A.Max_Args = 3, True);
+
+      A := Function_Arity ("MOD");             -- MOD(x, y) -> exactly 2
+      Check ("arity_mod_min", A.Min_Args = 2, True);
+      Check ("arity_mod_max", A.Max_Args = 2, True);
+
+      A := Function_Arity ("PI");              -- nullary constant
+      Check ("arity_pi_min", A.Min_Args = 0, True);
+      Check ("arity_pi_max", A.Max_Args = 0, True);
+
+      A := Function_Arity ("SUM");             -- variadic aggregate
+      Check ("arity_sum_min", A.Min_Args = 1, True);
+      Check ("arity_sum_max_variadic", A.Max_Args = Natural'Last, True);
+
+      A := Function_Arity ("N");               -- variadic; zero-arg form valid
+      Check ("arity_n_min", A.Min_Args = 0, True);
+      Check ("arity_n_max_variadic", A.Max_Args = Natural'Last, True);
+
+      A := Function_Arity ("LAG");             -- identifier-ref: LAG(var[,n])
+      Check ("arity_lag_min", A.Min_Args = 1, True);
+      Check ("arity_lag_max", A.Max_Args = 2, True);
+
+      A := Function_Arity ("sqrt");            -- case-insensitive lookup
+      Check ("arity_case_insensitive", A.Min_Args = 1, True);
+   end;
+
+   --  An unregistered function name must raise SData_Core.Script_Error.
+   declare
+      A : Arity_Spec;
+      pragma Unreferenced (A);
+   begin
+      A := Function_Arity ("FOOBAR");
+      Check ("arity_unknown_raises", False, True);  --  unreachable on success
+   exception
+      when SData_Core.Script_Error =>
+         Check ("arity_unknown_raises", True, True);
+   end;
 
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");

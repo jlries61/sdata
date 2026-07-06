@@ -37,6 +37,7 @@ tests/data/small.csv
 tests/data/qid_if_big.csv
 tests/data/qid_if_small.csv
 tests/data/qid_alias.csv
+tests/data/wide_table.csv
 sdata_opt_*.csv
 
 # Packaging artifacts
@@ -70,3 +71,4 @@ tests/data/submit_depth_gen/
 
 # Local working backup of the standards review
 /doc/SOFTWARE_STANDARDS_REVIEW_bak.md
+tests/output40_capture.dat

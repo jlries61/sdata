@@ -204,16 +204,16 @@ begin
          end if;
 
       when Stmt_DISPLAY =>
+         if Stmt.Vars = null then
+            --  Bare DISPLAY: render every column (shared with STATS).
+            Display_All_Columns;
+            return;
+         end if;
          declare
             V    : Name_Vectors.Vector;
             Rows : constant Natural := SData_Core.Table.Logical_Row_Count;
          begin
-            if Stmt.Vars = null then
-               for I in 1 .. Column_Count loop
-                  V.Append (To_Unbounded_String (Column_Name (I)));
-               end loop;
-            else
-               declare
+            declare
                   Curr : Variable_List := Stmt.Vars;
                   procedure Resolve (R : Variable_Range) is
                      U_Start : constant String := To_Upper (R.Start_Name (1 .. R.Start_Len));
@@ -252,7 +252,6 @@ begin
                      Curr := Curr.Next;
                   end loop;
                end;
-            end if;
 
             if V.Is_Empty then
                Put_Line ("(No columns to display)");

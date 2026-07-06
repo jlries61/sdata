@@ -505,11 +505,13 @@ begin
    Check ("IC-33: division by zero raises error",
           Raises ("LET X = 1 / 0" & L & "RUN"), True);
 
-   --  IC-34: Calling an unknown function returns Val_Missing (no error).
-   --  Evaluate_Function returns Val_Missing for names not in the dispatch table.
-   Run ("LET X = XXXXXXXX()" & L & "RUN");
-   Check ("IC-34: unknown function returns Val_Missing",
-          SData_Core.Variables.Get ("X").Kind = Val_Missing, True);
+   --  IC-34: Calling an unknown function is rejected at entry time (Task C2).
+   --  The pre-RUN analyzer (SData.Interpreter.Analyze_Deferred) raises
+   --  Script_Error for a name that is neither a registered function, a
+   --  whitelisted special form (IF), nor an array element -- superseding the
+   --  former silent Val_Missing behavior, which masked typo'd function names.
+   Check ("IC-34: unknown function rejected at entry time",
+          Raises ("LET X = XXXXXXXX()" & L & "RUN"), True);
 
    -----------------------------------------------------------------------
    --  J.  Array Assignment (safety net for Execute_Assignment refactor)
@@ -623,21 +625,22 @@ begin
       Reset;
       SData.Interpreter.Clear_Active_Program;
 
-      --  Queue two deferred statements that parse cleanly but fail during the
-      --  data step: the second assigns the string variable S$ to the numeric
-      --  variable N (a NON-literal right-hand side, so the parse-time literal
-      --  check does not pre-empt it), which raises a type mismatch at RUN.
-      --  Two statements are required to trigger the double-free: a single
-      --  queued statement leaves no second vector entry to re-free.
-      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET S$ = ""hi"""));
-      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET N = S$"));
+      --  Queue two deferred statements that pass both entry-time (Analyze_One)
+      --  and pre-RUN (Analyze_Deferred) checks but fail during the data step:
+      --  the second divides by zero, raising Script_Error at RUN.  Two
+      --  statements are required to expose the double-free: a single queued
+      --  statement leaves no second vector entry to re-free.
+      --  Note: "SET N = S$" (string-to-numeric) is no longer usable here
+      --  because C5 (Analyze_One) now catches that at entry time.
+      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET N = 1"));
+      SData.Interpreter.Add_To_Active_Program (Parse_One ("SET N = 1 / 0"));
 
       begin
          SData.Interpreter.Run_Active_Program;
       exception
          when others => Run_Raised := True;
       end;
-      Check ("IC-42: failed RUN propagates the type-mismatch error",
+      Check ("IC-42: failed RUN propagates the runtime error",
              Run_Raised, True);
 
       --  Pre-fix this double-frees the still-chained list and crashes the

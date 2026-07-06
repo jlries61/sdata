@@ -13,6 +13,7 @@ package body SData.AST is
    procedure Free_Dataset_Spec  is new Ada.Unchecked_Deallocation (Dataset_Spec,         Dataset_Spec_Access);
    procedure Free_Save_Spec     is new Ada.Unchecked_Deallocation (Save_Spec,            Save_Spec_Access);
    procedure Free_Aggregate_Spec is new Ada.Unchecked_Deallocation (Aggregate_Spec,      Aggregate_Spec_Access);
+   procedure Free_Request       is new Ada.Unchecked_Deallocation (Table_Request_Node,   Table_Request);
 
    --  Forward declarations to resolve mutual recursion:
    --    Free(Statement_Access) <-> Free_Program
@@ -188,6 +189,21 @@ package body SData.AST is
          when Stmt_TRANSPOSE =>
             Free (Stmt.Keep_Vars);
             Free (Stmt.Drop_Vars);
+         when Stmt_STATS =>
+            Free (Stmt.Stats_Vars);
+            Free (Stmt.Stats_Stats);
+         when Stmt_TABLES =>
+            declare
+               Req : Table_Request := Stmt.Requests;
+               Nxt : Table_Request;
+            begin
+               while Req /= null loop
+                  Nxt := Req.Next;
+                  Free (Req.Vars);        --  existing Variable_List Free
+                  Free_Request (Req);     --  Unchecked_Deallocation for Table_Request
+                  Req := Nxt;
+               end loop;
+            end;
          when others =>
             null;
       end case;

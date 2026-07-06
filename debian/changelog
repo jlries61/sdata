@@ -1,3 +1,33 @@
+sdata (0.13.0-1) unstable; urgency=medium
+
+  * Add TABLES command (PROC FREQ analogue): one-way, two-way, and multiway frequency/crosstabulation reports with optional chi-square-family statistics
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 03 Jul 2026 17:31:36 -0700
+
+sdata (0.12.3-1) unstable; urgency=medium
+
+  * Clearer error when a wide dataset exceeds the SQLite disk-spill column limit (A/B for the OUTPUT-adjacent spill report)
+
+ -- John L. Ries <john@theyarnbard.com>  Fri, 03 Jul 2026 10:41:57 -0700
+
+sdata (0.12.2-1) unstable; urgency=medium
+
+  * Fix OUTPUT redirect file being truncated by a subsequent RUN (issue #40)
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 02 Jul 2026 17:59:12 -0700
+
+sdata (0.12.1-1) unstable; urgency=medium
+
+  * Entry-time semantic checking of deferred statements (type-mismatch, unknown-function, arity, undefined-variable); USE/REPEAT cancel the deferred program
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 02 Jul 2026 13:27:42 -0700
+
+sdata (0.12.0-1) unstable; urgency=medium
+
+  * Add STATS command (PROC MEANS analogue)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 01 Jul 2026 10:39:33 -0700
+
 sdata (0.11.1-1) unstable; urgency=medium
 
   * INSERT command for interactive program-buffer editing (issue #32).

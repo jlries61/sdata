@@ -544,6 +544,7 @@ begin
             else
                Execute_USE_Multi;
             end if;
+            Clear_Deferred_Program;
          end;
       when Stmt_SAVE =>
          declare
@@ -765,6 +766,7 @@ begin
             end if;
          end;
       when Stmt_REPEAT =>
+         Clear_Deferred_Program;
          SData_Core.Table.Clear;
          SData_Core.Commands.Execute_REPEAT (Stmt.Count);
          Input_File_Columns.Clear;

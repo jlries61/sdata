@@ -1,0 +1,12 @@
+Dataset opened: tests/data/freq.csv
+Frequency table for REGION$
+
+REGION$ Frequency Percent Cum_Freq Cum_Percent
+East 3 50.00 3 50.00
+West 3 50.00 6 100.00
+Total 6 100.00
+
+Chi-Square Goodness-of-Fit (equal proportions)
+Chi-Square 1 0.0000 1.0000
+
+TABLES complete.

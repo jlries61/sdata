@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-06-26" "sdata 0.11.1" "User Commands"
+.TH SDATA 1 "2026-07-03" "sdata 0.13.0" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -33,7 +33,21 @@ Print the version string and exit.
 Print copyright and license information and exit.
 .TP
 .BI \-m " size"
-Set the maximum number of rows the in\-memory data table may hold.
+Set the maximum in\-memory table size in cells (rows \(mu columns).
+A value of 0 disables the limit (all data stays in memory).
+When the table grows beyond this limit its rows are spilled to a
+temporary SQLite database on disk.
+The SQLite backend supports at most approximately 2000 columns per
+spilled table; datasets with more columns than that limit cannot be
+spilled and will produce an error.
+Use
+.B \-m 0
+(or a value large enough to keep the table in memory) for very wide
+datasets, or reduce the column count with
+.B KEEP
+or
+.B DROP
+before the spill threshold is reached.
 .TP
 .BI \-t " count"
 Set the maximum number of temporary variables per data step.
@@ -470,6 +484,14 @@ Sort the data table on the named variables.
 Create
 .I n
 output records in the next data step (REPEAT mode).
+Also cancels any queued deferred statements
+.RB ( LET ,
+.B SET ,
+etc.); enter setup statements
+.I after
+the
+.B REPEAT
+command, not before it.
 .TP
 .B FPATH \fIpath\fR /\fBUSE\fR|\fBSAVE\fR|\fBSUBMIT\fR|\fBOUTPUT\fR
 Set the default directory for the specified file category.
@@ -597,6 +619,128 @@ or
 first).
 See also
 .BR AGGREGATE .
+.TP
+.B STATS\fR [\fIvar\fB ...]\fR [\fB/STATS=\fIstat\fB ...]\fR [\fB/NOPRINT\fR]
+Compute summary statistics for the chosen
+.I var
+list (default: all numeric columns excluding active BY variables), producing one output row per active
+.B BY
+group per variable, with one column per statistic.
+The result replaces the data table.
+.RS
+.TP
+.B /STATS=\fIstat ...
+Statistics to compute; default
+.BR "N MIN MEAN MAX STD" .
+Any registered aggregate
+.RB ( SUM ", " MEAN ", " STD ", " VAR ", " MIN ", " MAX ", " N ", " NMISS ", " GMEAN ", " HMEAN ", " MEDIAN ).
+Only
+.B N
+and
+.B NMISS
+may be applied to a character variable.
+.TP
+.B /NOPRINT
+Replace the table (and write a pending
+.BR SAVE )
+without printing the result.
+.RE
+.PP
+A whole-array name in
+.I var
+expands to one row per element
+.RI ( name (1).. name (K)).
+The active
+.B SELECT
+filter is respected; a pending
+.B SAVE
+is written; then the active
+.B SELECT
+and
+.B BY
+are cleared.
+The deferred program buffer must hold no un\-run statements (issue
+.B RUN
+or
+.B NEW
+first).
+See also
+.BR AGGREGATE .
+.TP
+.B TABLES\fR \fIrequest\fR [\fIrequest\fR ...] [\fB/CHISQ\fR] [\fB/MISSING\fR] [\fB/ORDER=FREQ\fR] [\fB/LIST\fR] [\fB/NOCUM\fR] [\fB/NOPERCENT\fR]
+Print frequency and crosstabulation reports (SAS PROC FREQ analogue).
+A
+.I request
+is a single variable name for a one\-way table, or two or more variable names
+joined by
+.B *
+for a crossing
+.RB ( A*B
+two\-way;
+.B A*B*C
+multiway).
+Multiple requests may appear in one statement; all options apply to every request.
+.B TABLES
+is print\-only: the data table,
+.BR SELECT ,
+and
+.B BY
+are left unchanged after the command completes.
+.RS
+.TP
+.B /CHISQ
+Chi\-square family (Pearson, likelihood\-ratio, Mantel\-Haenszel; continuity\-adjusted
+for 2x2) plus phi, contingency coefficient, and Cramer's V.
+A warning is printed when more than 20% of expected cell counts fall below 5 (two\-way tables).
+One\-way: equal\-proportions goodness\-of\-fit.
+Not computed for tables of three or more variables (skipped with a warning).
+.TP
+.B /MISSING
+Treat missing values as an ordinary category (default: excluded; a
+.I "Frequency Missing = N"
+line is printed beneath the table when values are excluded).
+.TP
+.B /ORDER=FREQ
+Order levels by descending frequency (default: by value).
+.TP
+.B /LIST
+Render a two\-way table in list form (one row per observed combination)
+instead of the default grid.
+No\-op for one\-way tables; always active for three\-or\-more\-way tables.
+.TP
+.B /NOCUM
+Suppress cumulative frequency and cumulative percent columns
+(one\-way and list forms).
+.TP
+.B /NOPERCENT
+Suppress the overall cell percent figure.
+.RE
+.PP
+One\-way output: level, Frequency, Percent, Cum Freq, Cum Percent, and a Total row.
+Two\-way output: a contingency grid with stacked cell Frequency/Percent/Row%/Col%
+plus row, column, and grand totals.
+Multiway output (and two\-way with
+.BR /LIST ):
+list form with one row per observed combination and columns: the crossing variables, Frequency, Percent,
+Cum Freq, Cum Percent.
+For crossings, an observation is excluded if any crossing variable is missing
+(unless
+.BR /MISSING );
+the excluded count is reported as a
+.I "Frequency Missing = N"
+line.
+The active
+.B SELECT
+filter is respected; one table set is produced per active
+.B BY
+group.
+The deferred program buffer must be empty (issue
+.B RUN
+or
+.B NEW
+first).
+See also
+.BR STATS .
 .TP
 .B NAMES
 List all permanent and temporary variables currently defined.
@@ -839,6 +983,46 @@ Array elements are read and written with parenthesis subscripts; see
 .B LET
 for slice and list assignment forms.
 .RE
+.SS Entry\-time semantic checks
+Before any record is processed, sdata validates queued deferred statements and
+reports hard errors for the following conditions:
+.RS
+.TP
+Assignment type mismatch
+A character value assigned to a numeric name or a numeric value assigned to a
+character
+.RB ( $ )
+name.
+Sound and complete when the right-hand side's type is statically determinable
+(including suffix-typed variables and functions); expressions whose type is not
+statically known defer to runtime.
+.TP
+Unknown function
+A function name not registered in the evaluator.
+These formerly returned a missing value silently; they are now a hard error.
+.TP
+Function arity
+Wrong number of arguments for a known function.
+.TP
+Undefined variable
+A variable reference that cannot be resolved against the table schema, active session
+variables, or names introduced anywhere in the same deferred block.
+Forward references within a single block are legal.
+These formerly returned a missing value silently; they are now a hard error.
+.RE
+.PP
+In
+.I interactive
+mode, checks 1\(en3 run the moment each deferred statement is entered (entry-time
+fast feedback).
+Check 4 (undefined variable) waits until
+.B RUN
+because a name introduced by a later statement not yet entered would otherwise be a
+false positive.
+In
+.I batch
+mode all four checks run as a single whole\-block pass immediately before the data
+step; no records are processed if any check fails.
 .SH FUNCTIONS
 Functions may appear anywhere in an expression.
 Missing\-value propagation is automatic: if any required argument is missing

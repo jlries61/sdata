@@ -18,6 +18,7 @@ with SData_Core.Config;         use SData_Core.Config;
 with SData_Core.Config.Runtime;
 with SData_Core.IO;        use SData_Core.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
+with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Containers.Indefinite_Hashed_Sets;
 with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
@@ -81,6 +82,10 @@ package body SData.Interpreter is
    package Program_Vectors is new Ada.Containers.Vectors (Positive, Program_Entry);
    Active_Program_Vec : Program_Vectors.Vector;
 
+   --  Vector of physical row indices — used by the TABLES counting engine
+   --  (Execute_Tables subunit) for group splitting and level building.
+   package Row_Index_Vectors is new Ada.Containers.Vectors (Positive, Positive);
+
    --  Count of deferred statements queued since the most recent RUN (or NEW).
    --  These are "pending / un-run": their per-record effect has not yet been
    --  committed to the table.  AGGREGATE refuses to run while any are pending
@@ -96,8 +101,8 @@ package body SData.Interpreter is
    --  When Append_Mode is True, newly queued deferred statements append
    --  (default).  When False, they are inserted after line Insert_Point
    --  (0 = before line 1) and the cursor advances past each one.  Sticky:
-   --  persists across RUN; reset to append only by NEW (Clear_Active_Program)
-   --  or another INSERT.
+   --  persists across RUN; reset to append only by USE, REPEAT, or NEW
+   --  (Clear_Deferred_Program / Clear_Active_Program) or another INSERT.
    Append_Mode  : Boolean := True;
    Insert_Point : Natural := 0;
 
@@ -110,7 +115,7 @@ package body SData.Interpreter is
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
          Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE |
-         Stmt_TRANSPOSE | Stmt_PROGRAM_INSERT;
+         Stmt_TRANSPOSE | Stmt_STATS | Stmt_PROGRAM_INSERT;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -137,6 +142,9 @@ package body SData.Interpreter is
    procedure Execute_Program_Insert  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
+   procedure Execute_Tables          (Stmt : Statement_Access);
+   --  C5: entry-time single-statement checker (body is a separate subunit).
+   procedure Analyze_One          (Stmt : Statement_Access);
    function  Group_Flags (Logical_I     : Positive;
                           Logical_Count : Natural)
                           return Group_Flags_Result;
@@ -162,6 +170,12 @@ package body SData.Interpreter is
 
    --  Set of script files currently in the SUBMIT execution chain (for cycle detection).
    Submit_Chain : Name_Sets.Set;
+
+   --  Shared semantic-checker state — populated by Analyze_Deferred (Pass 1)
+   --  and left empty by Analyze_One.  Visible to both separate subunits so
+   --  the shared Check_Statement / Check_Expr helpers (defined below, before the
+   --  "is separate" stubs) can access it without duplication.
+   Introduced : Name_Sets.Set;
 
    --  Maximum SUBMIT nesting depth.  Cycle detection (Submit_Chain) catches a
    --  file re-entering itself; this bounds a chain of *distinct* files so deep
@@ -362,6 +376,9 @@ package body SData.Interpreter is
    procedure Add_To_Active_Program (Stmt : Statement_Access; Source : String := "") is
    begin
       if Stmt = null then return; end if;
+      --  C5: run entry-time fast feedback before queuing.  A violation raises
+      --  SData_Core.Script_Error; the statement is never appended.
+      Analyze_One (Stmt);
       if Append_Mode then
          Active_Program_Vec.Append ((Stmt => Stmt, Source => To_Unbounded_String (Source)));
       else
@@ -375,6 +392,17 @@ package body SData.Interpreter is
       --  A newly queued deferred statement is pending until the next RUN.
       Pending_Deferred := Pending_Deferred + 1;
    end Add_To_Active_Program;
+
+   procedure Clear_Deferred_Program is
+   begin
+      for E of Active_Program_Vec loop
+         SData.AST.Free_Program (E.Stmt);
+      end loop;
+      Active_Program_Vec.Clear;
+      Pending_Deferred := 0;
+      Append_Mode  := True;
+      Insert_Point := 0;
+   end Clear_Deferred_Program;
 
    procedure Clear_Active_Program is
    begin
@@ -764,6 +792,42 @@ package body SData.Interpreter is
    --  IF / WHILE / FOR / LOOP_REPEAT / SELECT — all control flow constructs.
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context) is separate;
 
+   --  Render every column of the current (filtered) table to console, in the
+   --  DISPLAY format (REC# header + one line per logical row).  Shared by the
+   --  bare DISPLAY command (Execute_Metadata) and by STATS' default printout
+   --  (Execute_Stats).  Declared here, before the Execute_Metadata stub, so the
+   --  metadata subunit can call it.
+   procedure Display_All_Columns is
+      V    : Name_Vectors.Vector;
+      Rows : constant Natural := SData_Core.Table.Logical_Row_Count;
+   begin
+      for I in 1 .. Column_Count loop
+         V.Append (To_Unbounded_String (Column_Name (I)));
+      end loop;
+
+      if V.Is_Empty then
+         Put_Line ("(No columns to display)");
+         return;
+      end if;
+
+      Put ("REC# ");
+      for Name of V loop Put (To_String (Name) & " "); end loop;
+      New_Line;
+
+      for R in 1 .. Rows loop
+         declare
+            Phys_R : constant Positive := SData_Core.Table.Logical_To_Physical (R);
+         begin
+            Put (Ada.Strings.Fixed.Trim (R'Image, Ada.Strings.Both) & " ");
+            for Name of V loop
+               Put (To_String_Formatted
+                      (Get_Value_Upper (Phys_R, To_String (Name))) & " ");
+            end loop;
+            New_Line;
+         end;
+      end loop;
+   end Display_All_Columns;
+
    --  KEEP / DROP / HOLD / UNHOLD / UNSET / RENAME / ARRAY / DIM / NAMES.
    procedure Execute_Metadata (Stmt : Statement_Access) is separate;
 
@@ -856,6 +920,421 @@ package body SData.Interpreter is
 
    --  SUBMIT / SYSTEM / OUTPUT / FPATH — external interaction and I/O routing.
    procedure Execute_IO (Stmt : Statement_Access) is separate;
+
+   --  TABLES — frequency / crosstabulation report (counting engine + rendering).
+   procedure Execute_Tables (Stmt : Statement_Access) is separate;
+
+   --  -----------------------------------------------------------------------
+   --  Shared semantic-checker helpers
+   --
+   --  Declared at package-body scope so both separate subunits — Analyze_Deferred
+   --  (whole-block pre-RUN pass) and Analyze_One (entry-time single-statement
+   --  pass) — see the same single copy.  This replaces ~240 duplicate lines
+   --  that the two subunits previously carried independently.
+   --
+   --  The ONLY behavioural difference between the two passes is the undefined-
+   --  variable check in Check_Expr's Expr_Variable arm:
+   --    • Analyze_Deferred: raises on an undefined name (C4 check).
+   --    • Analyze_One: no-op (forward references to names introduced by a later,
+   --      not-yet-entered statement would be false positives).
+   --  This is factored through the Check_Undefined Boolean parameter, threaded
+   --  from Check_Statement into Check_Expr.
+   --
+   --  A second difference — the Expr_Function_Call guard "Introduced.Contains(FN)"
+   --  (needed in the batch path because a DIM later in the block makes what the
+   --  parser sees as a function call into array access) — falls out naturally:
+   --  Analyze_One clears the package-level Introduced set before calling
+   --  Check_Statement, so Contains is always False there, identical to omitting
+   --  the check.  Has_Array still guards live arrays on the entry path.
+   --  -----------------------------------------------------------------------
+
+   function U (S : String) return String renames To_Upper;
+
+   --  Reserved bare identifiers: names that evaluate to a value when used
+   --  WITHOUT parentheses.  Delegates to SData_Core.Evaluator.Is_Zero_Arg_Fallback,
+   --  the single source of truth shared with the evaluator's bare-identifier
+   --  fallback arm.  No local list to drift.
+   function Is_Reserved_Bare_Name (Name : String) return Boolean is
+     (SData_Core.Evaluator.Is_Zero_Arg_Fallback (Name));
+
+   --  BY-group flags FIRST.<byvar> / LAST.<byvar> are created as temporary
+   --  variables per record during RUN (see sdata-interpreter-process_one_record),
+   --  so they do NOT exist at pre-RUN analyze time.  A reference is legitimate
+   --  exactly when the suffix names a current BY variable (BY has already
+   --  executed -- it is a declarative command -- so the BY set is live here).
+   function Is_Group_Flag (Name : String) return Boolean is
+      Up           : constant String := U (Name);
+      Suffix_First : Natural := 0;
+   begin
+      if Up'Length > 6 and then Up (Up'First .. Up'First + 5) = "FIRST." then
+         Suffix_First := Up'First + 6;
+      elsif Up'Length > 5 and then Up (Up'First .. Up'First + 4) = "LAST." then
+         Suffix_First := Up'First + 5;
+      else
+         return False;
+      end if;
+      declare
+         Suffix : constant String := Up (Suffix_First .. Up'Last);
+      begin
+         for I in 1 .. SData_Core.Table.By_Var_Count loop
+            if U (SData_Core.Table.By_Var_Name (I)) = Suffix then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end;
+   end Is_Group_Flag;
+
+   --  A name is "defined" if it is a table column, a session variable (whether
+   --  or not its current value is missing), an array, a reserved bare
+   --  pseudo-identifier, a live BY-group flag, or introduced anywhere in this
+   --  deferred block (forward references are legal because we collect the full
+   --  environment before any check runs).  Session-variable existence uses
+   --  Variables.Defined rather than Get_Type: a SET variable persists across a
+   --  REPEAT/RUN boundary while holding a missing value, and Get_Type would
+   --  then wrongly report it Val_Missing (i.e. undefined).
+   function Is_Defined (Name : String) return Boolean is
+      Up : constant String := U (Name);
+   begin
+      return SData_Core.Table.Has_Column (Up)
+        or else SData_Core.Variables.Has_Array (Up)
+        or else SData_Core.Variables.Defined (Up)
+        or else Is_Reserved_Bare_Name (Up)
+        or else Is_Group_Flag (Up)
+        or else Introduced.Contains (Up);
+   end Is_Defined;
+
+   --  Functions the parser turns into Expr_Function_Call nodes but that the
+   --  evaluator dispatches SPECIALLY, outside Dispatch_Table -- so
+   --  Is_Known_Function returns False for them even though they are valid.
+   --  Confirmed by auditing SData_Core.Evaluator.Evaluate_Function: only IF
+   --  is intercepted before the Dispatch_Table lookup (for lazy evaluation).
+   --  Every other special-form name (LAG/NEXT/OBS and their $-variants,
+   --  the identifier-ref functions) IS registered in Dispatch_Table with an
+   --  arity, so it is handled by the normal path.  A whitelisted name is
+   --  neither flagged as unknown nor arity-checked (its arity is not
+   --  registered).
+   function Is_Special_Function (Name : String) return Boolean is
+     (U (Name) = "IF");
+
+   --  Count the arguments in an expression list (each range counts as one).
+   function Arg_Count (L : Expression_List) return Natural is
+      N : Natural := 0;
+      C : Expression_List := L;
+   begin
+      while C /= null loop
+         N := N + 1;
+         C := C.Next;
+      end loop;
+      return N;
+   end Arg_Count;
+
+   --  True if the expression tree contains any call to a special (polymorphic)
+   --  function whose return type is NOT determined by its name's suffix — e.g.,
+   --  IF can return any kind depending on its arguments, so
+   --  Static_Result_Kind(IF(...)) wrongly returns Val_Numeric (the default for
+   --  unsuffixed names).  When such a call appears in the RHS, defer the
+   --  type-mismatch check to runtime for soundness.
+   function Expr_Contains_Special_Call
+     (E : Expression_Access) return Boolean
+   is
+      C : Expression_List;
+   begin
+      if E = null then
+         return False;
+      end if;
+      case E.Kind is
+         when Expr_Function_Call =>
+            if Is_Special_Function (E.Func_Name (1 .. E.Func_Len)) then
+               return True;
+            end if;
+            C := E.Arguments;
+            while C /= null loop
+               if Expr_Contains_Special_Call (C.Expr) then
+                  return True;
+               end if;
+               if C.Is_Range
+                  and then Expr_Contains_Special_Call (C.Expr_End)
+               then
+                  return True;
+               end if;
+               C := C.Next;
+            end loop;
+            return False;
+         when Expr_Binary_Op =>
+            return Expr_Contains_Special_Call (E.Left)
+              or else Expr_Contains_Special_Call (E.Right);
+         when Expr_Unary_Op =>
+            return Expr_Contains_Special_Call (E.Operand);
+         when Expr_Array_Access =>
+            C := E.Arr_Idx;
+            while C /= null loop
+               if Expr_Contains_Special_Call (C.Expr) then
+                  return True;
+               end if;
+               if C.Is_Range
+                  and then Expr_Contains_Special_Call (C.Expr_End)
+               then
+                  return True;
+               end if;
+               C := C.Next;
+            end loop;
+            return False;
+         when others =>
+            return False;
+      end case;
+   end Expr_Contains_Special_Call;
+
+   --  Map a Value_Kind to the human-readable type name used in error messages.
+   function Kind_Name (K : Value_Kind) return String is
+     (case K is when Val_String  => "string",
+                when Val_Integer => "integer",
+                when others      => "numeric");
+
+   --  Forward declaration: Check_Statement and Check_Body are mutually
+   --  recursive (compound statements carry nested statement bodies).
+   procedure Check_Statement (S : Statement_Access; Check_Undefined : Boolean);
+
+   --  Validate every statement in a body chain.
+   procedure Check_Body (B : Statement_Access; Check_Undefined : Boolean) is
+      S : Statement_Access := B;
+   begin
+      while S /= null loop
+         Check_Statement (S, Check_Undefined);
+         S := S.Next;
+      end loop;
+   end Check_Body;
+
+   --  Recursively validate an expression tree: reject calls to unknown
+   --  functions and calls to known functions with an out-of-range argument
+   --  count.  Recurses into every sub-expression.
+   --  When Check_Undefined is True, the Expr_Variable arm also rejects bare
+   --  identifiers that are not defined (column, variable, array, reserved name,
+   --  BY-group flag, or a name in the current Introduced set).  When False the
+   --  arm is a no-op, reproducing Analyze_One's behaviour (forward references
+   --  are resolved only at the whole-block level in Analyze_Deferred).
+   procedure Check_Expr (E : Expression_Access; Check_Undefined : Boolean) is
+   begin
+      if E = null then
+         return;
+      end if;
+      case E.Kind is
+         when Expr_Binary_Op =>
+            Check_Expr (E.Left,    Check_Undefined);
+            Check_Expr (E.Right,   Check_Undefined);
+         when Expr_Unary_Op =>
+            Check_Expr (E.Operand, Check_Undefined);
+         when Expr_Array_Access =>
+            declare
+               C : Expression_List := E.Arr_Idx;
+            begin
+               while C /= null loop
+                  Check_Expr (C.Expr, Check_Undefined);
+                  if C.Is_Range then
+                     Check_Expr (C.Expr_End, Check_Undefined);
+                  end if;
+                  C := C.Next;
+               end loop;
+            end;
+         when Expr_Function_Call =>
+            declare
+               FN : constant String := E.Func_Name (1 .. E.Func_Len);
+            begin
+               --  A name parsed as a function call but registered as a live
+               --  array (Has_Array) OR introduced as one in the current block
+               --  (Introduced.Contains) is really array access — batch parses
+               --  X(1) as a call because DIM has not run yet, so the forward-
+               --  reference set catches it.  On the entry path (Analyze_One),
+               --  DIM is an immediate command so any declared array is already
+               --  in Has_Array; Introduced is empty there, making
+               --  Introduced.Contains always False — naturally equivalent to
+               --  omitting it, while Has_Array still guards live arrays.
+               --  A whitelisted special-form name (IF) is also excluded.
+               if not SData_Core.Variables.Has_Array (U (FN))
+                 and then not Introduced.Contains (U (FN))
+                 and then not Is_Special_Function (FN)
+               then
+                  if not Is_Known_Function (FN) then
+                     raise SData_Core.Script_Error with
+                       "unknown function '" & FN & "'";
+                  end if;
+                  --  Function_Arity raises on an unregistered name, so it is
+                  --  gated behind the Is_Known_Function check above.
+                  declare
+                     A : constant Arity_Spec := Function_Arity (FN);
+                     N : constant Natural := Arg_Count (E.Arguments);
+                  begin
+                     if N < A.Min_Args or else N > A.Max_Args then
+                        raise SData_Core.Script_Error with
+                          "function '" & FN & "' expects "
+                          & (if A.Min_Args = A.Max_Args
+                             then A.Min_Args'Image & " argument(s)"
+                             else "between" & A.Min_Args'Image & " and"
+                                  & A.Max_Args'Image & " arguments")
+                          & ", got" & N'Image;
+                     end if;
+                  end;
+               end if;
+               --  Recurse into arguments regardless.  For identifier-ref
+               --  functions (LAG/NEXT/OBS) the first argument is a bare
+               --  Expr_Variable naming a column; Check_Expr's Expr_Variable arm
+               --  validates it as a defined name, which is correct -- LAG of an
+               --  undefined column is itself an error, and a real column is
+               --  recognised via Has_Column.
+               --
+               --  EXCEPTION: MISSING(<varname>) is documented to test whether a
+               --  referenced variable is missing, and a never-defined name is,
+               --  by definition, missing (MISSING returns 1).  Probing a
+               --  possibly-undefined name is its purpose, so a direct
+               --  Expr_Variable argument to MISSING is NOT subject to the
+               --  undefined-variable check.  Nested/compound arguments are still
+               --  validated normally.
+               declare
+                  C          : Expression_List := E.Arguments;
+                  Is_Missing : constant Boolean := U (FN) = "MISSING";
+               begin
+                  while C /= null loop
+                     if not (Is_Missing
+                             and then C.Expr /= null
+                             and then C.Expr.Kind = Expr_Variable)
+                     then
+                        Check_Expr (C.Expr, Check_Undefined);
+                     end if;
+                     if C.Is_Range then
+                        Check_Expr (C.Expr_End, Check_Undefined);
+                     end if;
+                     C := C.Next;
+                  end loop;
+               end;
+            end;
+         when Expr_Variable =>
+            --  Task C4: a bare identifier must name something defined — a
+            --  table column, session variable, array, reserved pseudo-name, a
+            --  live BY-group flag, or a name introduced anywhere in this
+            --  deferred block (forward references are legal under whole-block
+            --  scope).  The check fires only when Check_Undefined is True
+            --  (Analyze_Deferred path); on the entry path (Analyze_One,
+            --  Check_Undefined => False) this arm is a no-op because a name
+            --  introduced by a LATER, not-yet-entered statement would be a
+            --  false positive.
+            if Check_Undefined
+              and then not Is_Defined (E.Var_Name (1 .. E.Var_Len))
+            then
+               raise SData_Core.Script_Error with
+                 "undefined variable """ & E.Var_Name (1 .. E.Var_Len) & """";
+            end if;
+         when others =>
+            null;   --  literals, missing: nothing to check here
+      end case;
+   end Check_Expr;
+
+   --  Validate every expression in a list.
+   procedure Check_Expr_List (L : Expression_List; Check_Undefined : Boolean) is
+      C : Expression_List := L;
+   begin
+      while C /= null loop
+         Check_Expr (C.Expr, Check_Undefined);
+         if C.Is_Range then
+            Check_Expr (C.Expr_End, Check_Undefined);
+         end if;
+         C := C.Next;
+      end loop;
+   end Check_Expr_List;
+
+   --  Validate every expression field of one statement, then recurse into any
+   --  nested statement bodies.  Mirrors the field layout in sdata-ast.ads.
+   procedure Check_Statement (S : Statement_Access; Check_Undefined : Boolean) is
+   begin
+      --  Fields present on every statement (non-variant part).
+      Check_Expr (S.Expr,          Check_Undefined);
+      Check_Expr (S.Arr_Idx,       Check_Undefined);
+      Check_Expr_List (S.Arr_Idx_List, Check_Undefined);
+
+      case S.Kind is
+         when Stmt_PRINT =>
+            Check_Expr_List (S.Print_Args, Check_Undefined);
+         when Stmt_IF =>
+            Check_Expr (S.Condition, Check_Undefined);
+            Check_Body (S.Then_Branch, Check_Undefined);
+            Check_Body (S.Else_Branch, Check_Undefined);
+         when Stmt_FOR =>
+            Check_Expr (S.For_Start, Check_Undefined);
+            Check_Expr (S.For_End,   Check_Undefined);
+            Check_Expr (S.For_Step,  Check_Undefined);
+            Check_Body (S.For_Body,  Check_Undefined);
+         when Stmt_WHILE =>
+            Check_Expr (S.While_Cond, Check_Undefined);
+            Check_Body (S.While_Body, Check_Undefined);
+         when Stmt_LOOP_REPEAT =>
+            Check_Body (S.Repeat_Body, Check_Undefined);
+            Check_Expr (S.Until_Cond,  Check_Undefined);
+         when Stmt_RSEED =>
+            Check_Expr (S.Seed_Expr, Check_Undefined);
+         when Stmt_SELECT =>
+            Check_Expr (S.Selector, Check_Undefined);
+            declare
+               Br : Case_Branch := S.Branches;
+            begin
+               while Br /= null loop
+                  Check_Expr_List (Br.Conditions, Check_Undefined);
+                  Check_Body (Br.Branch_Body, Check_Undefined);
+                  Br := Br.Next;
+               end loop;
+            end;
+            Check_Body (S.Otherwise_Part, Check_Undefined);
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET
+            | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
+            Check_Expr (S.Arr_Start_Expr, Check_Undefined);
+            Check_Expr (S.Arr_End_Expr,   Check_Undefined);
+         when others =>
+            null;
+      end case;
+
+      --  Scalar assignment type-mismatch check (Task C3).
+      --  Reject ONLY the string<->numeric boundary; within the numeric family
+      --  (Val_Numeric/Val_Integer) the runtime Coerce_For_Scalar promotes or
+      --  truncates freely, so those are NOT rejected here.
+      --  Soundness guards — defer to runtime when:
+      --    • RHS kind is indeterminate (Val_Missing).
+      --    • The RHS expression contains an IF call (IF is polymorphic —
+      --      Static_Result_Kind returns the wrong kind for it because IF has no
+      --      $/%suffix; deferring is the only sound choice).
+      --  The check fires for ALL scalar LET/SET targets, including existing
+      --  table columns — catching a mismatch before any record is processed.
+      if (S.Kind = Stmt_LET or else S.Kind = Stmt_SET)
+         and then not S.Is_Array and then S.Expr /= null
+      then
+         declare
+            Target   : constant String := S.Var_Name (1 .. S.Var_Len);
+            Expected : constant Value_Kind := Get_Expected_Kind (Target);
+            RHS      : constant Value_Kind := Static_Result_Kind (S.Expr);
+         begin
+            if RHS /= Val_Missing
+               and then not Expr_Contains_Special_Call (S.Expr)
+               and then (Expected = Val_String) /= (RHS = Val_String)
+            then
+               raise SData_Core.Script_Error with
+                 "Type mismatch for variable """ & Target
+                 & """: cannot assign " & Kind_Name (RHS)
+                 & " to " & Kind_Name (Expected) & " variable";
+            end if;
+         end;
+      end if;
+   end Check_Statement;
+
+   --  Static semantic analyzer over a deferred-statement block [Start, Boundary).
+   --  Pass 1 collects names introduced by the block; Pass 2 runs semantic checks
+   --  (checks added in Tasks C2-C5).  No-op when Start = null or Start = Boundary.
+   procedure Analyze_Deferred (Start, Boundary : Statement_Access) is separate;
+
+   --  Entry-time fast-feedback checker (Task C5).  Runs the subset of semantic
+   --  checks that are sound at the moment a single deferred statement is entered
+   --  at the REPL: unknown-function + arity (C2) and type-mismatch (C3).  The
+   --  undefined-variable check (C4) is intentionally OMITTED here — forward
+   --  references to names introduced by a later statement are only resolvable
+   --  at the whole-block level in Analyze_Deferred.  Raises
+   --  SData_Core.Script_Error on any detected violation.
+   procedure Analyze_One (Stmt : Statement_Access) is separate;
 
    --  AGGREGATE (immediate).  Enforces error #10 (no pending deferred
    --  statements), converts the AST spec vector into the core spec type, and
@@ -965,6 +1444,54 @@ package body SData.Interpreter is
                    VC (VC'First + 1 .. VC'Last) & " variables processed.");
       end;
    end Execute_Transpose;
+
+   --  STATS (immediate).  Enforces the pending-deferred guard, converts the
+   --  AST lists into the core Stats_Options, delegates to
+   --  SData_Core.Commands.Execute_STATS, then prints the result table via the
+   --  DISPLAY renderer unless /NOPRINT was given.
+   procedure Execute_Stats (Stmt : Statement_Access) is
+      Opts : SData_Core.Commands.Stats_Options;
+   begin
+      if Pending_Deferred > 0 then
+         raise SData_Core.Script_Error with
+           "STATS: pending program statements exist; issue RUN or NEW first";
+      end if;
+
+      declare
+         Curr : Variable_List := Stmt.Stats_Vars;
+      begin
+         while Curr /= null loop
+            Opts.Var_List.Append
+              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
+            Curr := Curr.Next;
+         end loop;
+      end;
+
+      declare
+         Curr : Variable_List := Stmt.Stats_Stats;
+      begin
+         while Curr /= null loop
+            Opts.Stat_List.Append
+              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
+            Curr := Curr.Next;
+         end loop;
+      end;
+
+      SData_Core.Commands.Execute_STATS (Opts);
+
+      if not Stmt.Stats_No_Print then
+         Display_All_Columns;
+      end if;
+
+      declare
+         RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
+         VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
+      begin
+         Put_Line ("STATS complete. " &
+                   RC (RC'First + 1 .. RC'Last) & " records and " &
+                   VC (VC'First + 1 .. VC'Last) & " variables processed.");
+      end;
+   end Execute_Stats;
 
    procedure Execute_Statement (Stmt : Statement_Access; Ctx : in out Step_Context) is
 
@@ -1077,6 +1604,10 @@ package body SData.Interpreter is
             Execute_Aggregate (Stmt);
          when Stmt_TRANSPOSE =>
             Execute_Transpose (Stmt);
+         when Stmt_STATS =>
+            Execute_Stats (Stmt);
+         when Stmt_TABLES =>
+            Execute_Tables (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
             | Stmt_OPTIONS =>
@@ -1391,6 +1922,11 @@ package body SData.Interpreter is
       Current := Prog;
       while Current /= null loop
          if Current.Kind = Stmt_RUN then
+            --  Entry-time semantic checks over the just-completed deferred
+            --  body (both batch and interactive, via Run_Active_Program's
+            --  synthetic RUN cap).  A rejection raises SData_Core.Script_Error
+            --  before any record is processed.
+            Analyze_Deferred (Step_Start, Current);
             Run_One_Step (Step_Start, Current);
             declare
                RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
@@ -1421,6 +1957,14 @@ package body SData.Interpreter is
                Outer_Ctx : Step_Context;
             begin
                Execute_Statement (Current, Outer_Ctx);
+               --  A new input source cancels any deferred statements queued
+               --  before it (design.md:960): advance the deferred-block start
+               --  past this statement and drop the pending count so the next
+               --  RUN's data step excludes them.
+               if Current.Kind = Stmt_USE or else Current.Kind = Stmt_REPEAT then
+                  Step_Start := Current.Next;
+                  Pending_Deferred := 0;
+               end if;
             exception
                when E : Script_Error | SData_Core.Script_Error =>
                   if SData_Core.Config.Continue_On_Error then

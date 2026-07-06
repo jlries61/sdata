@@ -1,13 +1,13 @@
 Dataset opened: tests/data/merge_a_big.csv
 Dataset opened: tests/data/merge_b_big.csv
 warning: /JOIN BY-group product ( 9 ) exceeds OPTIONS JOIN_WARN_THRESHOLD at BY-key=(ID= 1.00000E+00)
-1.00000 . 10.00000
-1.00000 . 20.00000
-1.00000 . 30.00000
-1.00000 . 10.00000
-1.00000 . 20.00000
-1.00000 . 30.00000
-1.00000 . 10.00000
-1.00000 . 20.00000
-1.00000 . 30.00000
+1.00000 a 10.00000
+1.00000 a 20.00000
+1.00000 a 30.00000
+1.00000 b 10.00000
+1.00000 b 20.00000
+1.00000 b 30.00000
+1.00000 c 10.00000
+1.00000 c 20.00000
+1.00000 c 30.00000
 RUN complete. 9 records and 3 variables processed.

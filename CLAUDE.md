@@ -20,7 +20,7 @@ evaluator, and shared command-execution code lives there now — **when touching
 table / variables / evaluator / file I/O, modify `~/Develop/sdata-core/src/`,
 not this crate**. This crate owns the sdata lexer, AST, parser, and the
 sdata-only command implementations (LET, SET, PRINT, IF, FOR, WHILE, SORT,
-AGGREGATE, TRANSPOSE, SUBMIT, BREAK, etc.). Build sdata-core too if you touch it: `cd ~/Develop/sdata-core && alr build`.
+AGGREGATE, TRANSPOSE, STATS, SUBMIT, BREAK, etc.). Build sdata-core too if you touch it: `cd ~/Develop/sdata-core && alr build`.
 
 See ADR-039 through ADR-043 in `doc/adrs.md` for the split rationale.
 
@@ -64,15 +64,15 @@ make check           # build + run all tests (unit + integration)
 ```
 
 `make check` runs five unit-test binaries plus the integration suite (counts as
-of v0.9.7; `make check` output is the source of truth):
+of v0.12.0; `make check` output is the source of truth):
 1. `bin/csv_unit_test` — `SData_Core.CSV` functions (71)
 2. `bin/sdata_unit_test` — `SData_Core.Table` / `Variables` / transient-table / merge / PDV (355)
 3. `bin/evaluator_unit_test` — expression evaluator (170)
-4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write (89)
-5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT (48)
-6. 202 `.cmd` integration tests in `tests/` (~733 unit checks total)
+4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write (100)
+5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT (97)
+6. 299 `.cmd` integration tests in `tests/` (~793 unit checks total)
 
-All 202 integration tests must pass before committing. Never use `--no-verify`.
+All 299 integration tests must pass before committing. Never use `--no-verify`.
 
 **Documentation-only commits** — changes confined to `doc/`, `man/`, and `*.md`
 (README, CONTRIBUTING, CLAUDE.md) and similar non-build prose — do **not** require a
@@ -92,7 +92,7 @@ first, then `cd ~/Develop/sdata && make check` to catch regressions in both laye
 | Tier | Examples | Behaviour |
 |---|---|---|
 | Declarative | USE, BY, SELECT, REPEAT, SAVE, FPATH, RSEED | Execute immediately; configure interpreter state |
-| Immediate | RUN, SORT, AGGREGATE, TRANSPOSE, NEW, NAMES, SYSTEM, HELP | Execute immediately; not purely declarative |
+| Immediate | RUN, SORT, AGGREGATE, TRANSPOSE, STATS, NEW, NAMES, SYSTEM, HELP | Execute immediately; not purely declarative |
 | Deferred | LET, SET, PRINT, IF, FOR, WHILE, WRITE, DELETE | Queued in statement list; execute once per record via `Run_One_Step` |
 
 **PDV (Program Data Vector):** flat vector mirroring the current table schema.
@@ -113,8 +113,8 @@ implement USE, SAVE, FPATH, OUTPUT, SELECT, KEEP, DROP, ARRAY, DIM, RUN, and
 their related helpers (`Execute_OUTPUT_Table`, `Execute_Rebuild_Filter`). sdata's
 interpreter delegates to these rather than duplicating the logic. data-vandal
 calls the same procedures. When changing one of these commands' semantics, edit
-sdata-core and confirm both `make check` (sdata, 202 integration tests) and
-`cd ~/Develop/data-vandal && make check` (data-vandal, 44 tests) still pass.
+sdata-core and confirm both `make check` (sdata, 299 integration tests) and
+`cd ~/Develop/data-vandal && make check` (data-vandal, 144 integration tests) still pass.
 
 ## Source Layout
 
@@ -267,8 +267,9 @@ one lingering. Do not reintroduce a hardcoded sdata-core version in these files.
 
 - Phases 1–4: **complete** (core, control flow, distributions/aggregates, spreadsheet I/O)
 - Phase 5 (Polish): **complete** — disk spillover, interactive improvements, pager, HELP, LIST, ERR/ERL, error messages, performance, documentation
-- Phase 6 (Testing): **ongoing** — 202 integration tests, ~733 unit checks across 5 modules
+- Phase 6 (Testing): **ongoing** — 299 integration tests, ~733 unit checks across 5 modules
 - v0.8.0 milestone (2026-05-21): VANDALIZE extracted into `data-vandal`; sdata-core shared library created (ADRs 039–043)
+- STATS command (2026-07-01): SData's PROC MEANS analogue — per-variable summary statistics, one row per (BY group × variable), reusing the aggregate machinery (sdata v0.12.0, sdata-core v0.1.19; ADR-048)
 
 Full plan: `doc/feasibility_assessment.md`
 

@@ -1,0 +1,6 @@
+Dataset opened: tests/data/sample.csv
+REC# CATEGORY$ _NAME_$ N MIN MEAN MAX STD 
+1 A VAL1 2 1.00000 2.50000 4.00000 2.12132 
+2 B VAL1 3 7.00000 10.00000 13.00000 3.00000 
+3 C VAL1 1 16.00000 16.00000 16.00000 . 
+STATS complete. 3 records and 7 variables processed.
