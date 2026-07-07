@@ -1,6 +1,6 @@
 # Software Standards Audit: `SData` Statistical Data Interpreter
 
-**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§7/§8 revised 2026-06-10; §5 revised 2026-06-11 — Error Handling 75→76, sdata-core #24 root-cause fix; §2/§6 revised 2026-06-16 — SAST-in-CI closed via gnatmetric complexity gate, Code Quality 81→82, Security 77→78) | **Re-audited:** 2026-06-10 (full adversarial re-pass; snapshot sdata `cbfd8f8` + sdata-core `2ecaa4d` / 0.1.8; standalone report at `.ssd/audits/2026-06-10-sdata-reaudit/`) | **Version:** 0.9.6 → reflects sdata `cbfd8f8` | **Auditor:** /software-standards v1.1.1
+**Date:** 2026-06-08 (§3 revised 2026-06-09; §1/§2/§5/§6/§7/§8 revised 2026-06-10; §5 revised 2026-06-11 — Error Handling 75→76, sdata-core #24 root-cause fix; §2/§6 revised 2026-06-16 — SAST-in-CI closed via gnatmetric complexity gate, Code Quality 81→82, Security 77→78; §2/§4 revised 2026-07-07 — milestone 2026-07-06-post-tables reshape-family de-duplication, Code Quality 82→83, Maintainability 82→83) | **Re-audited:** 2026-06-10 (full adversarial re-pass; snapshot sdata `cbfd8f8` + sdata-core `2ecaa4d` / 0.1.8; standalone report at `.ssd/audits/2026-06-10-sdata-reaudit/`) | **Version:** 0.9.6 → reflects sdata `cbfd8f8` | **Auditor:** /software-standards v1.1.1
 **Repository:** `/home/jries/Develop/sdata` (+ path-pinned `~/Develop/sdata-core`)
 **Stack:** Ada 2012, GNAT/GPRbuild, Alire, SQLite3, Zip-Ada, XML-Ada, MathPaqs
 **Domain:** Single-process batch/interactive interpreter — tabular statistical data processing
@@ -75,7 +75,7 @@ costs not offset within this dimension.
 
 ---
 
-## 2. Code Quality & Craftsmanship — **82/100** (2026-06-16)
+## 2. Code Quality & Craftsmanship — **83/100** (2026-07-07)
 
 ### 2.1 Language Use
 
@@ -91,6 +91,22 @@ The float→integer truncation rule, previously inlined in two places, is now
 centralized in `SData_Core.Values.Convert_Value` (`sdata_core-values.adb:23–48`);
 `Table.Coerce_Value` delegates to it (`sdata_core-table.adb:267,272`). This is a
 concrete craftsmanship gain (ADR-044).
+
+**Further DRY — milestone 2026-07-06-post-tables (R1–R4, merged 2026-07-07).** The
+four immediate commands (AGGREGATE/TRANSPOSE/STATS/TABLES) had accumulated three
+copy-paste axes: the 7-step reshape-finalize epilogue was triplicated byte-for-byte,
+the SELECT-filtered BY-group walk was cloned four times (incl. one cross-crate copy
+in sdata's TABLES that had shipped a real bug — a dropped `Rebuild_Filter_Map`,
+`0d1ab04`), and the BY-column prologue was copied across TRANSPOSE/STATS. Each now
+lives in one place: `Commit_Reshaped_Table` (body-local), the **public**
+`SData_Core.Commands.Group_Boundaries` (which rebuilds the filter map internally, so
+the SELECT-honoring invariant is compiler-guarded to a single site), and
+`Add_By_Output_Columns`/`Set_By_Output_Values`. Net −144 lines in
+`sdata_core-commands.adb`; behavior-preserving (verified by trace + a live
+SELECT-regression run; three-way suite green). A milestone `/ssd` audit → refactor →
+verify (PASS) drove it; artifacts in `.ssd/milestones/2026-07-06-post-tables/`. This
+is the same class of gain as remediation #6 (extracting literal duplication into named
+seams), applied to the reshape-command family.
 
 ### 2.3 Naming, Comments, TODOs
 
@@ -122,10 +138,13 @@ deferral (`sdata_core-table.adb:96`, a bounded SQLite-handle leak gated on an
   manual/optional tool. CodePeer unused. Pragma-`Annotate` exemptions for the bounded
   evaluator recursion are justified.
 
-**Δ from v0.6.14 (82):** 0 → **82** (2026-06-16). The DRY win and clean naming include
-the decomposed declarative dispatch (remediation #6); the prior residual debit — absent
-enforced SAST — is cleared by the CI `gnatmetric` complexity gate (remediation #7, SAST
-half), restoring the v0.6.14 mark.
+**Δ from v0.6.14 (82):** +1 → **83** (2026-07-07). Through 2026-06-16 the mark sat at
+82: the DRY win and clean naming (incl. the decomposed declarative dispatch,
+remediation #6) plus the CI `gnatmetric` complexity gate clearing the absent-SAST debit
+(remediation #7). The 2026-07-07 milestone de-duplication (§2.2 — three copy-paste axes
+across the reshape-command family collapsed to shared primitives, one of them a public
+sdata-core API guarding the SELECT invariant) is a further, verified craftsmanship gain
+that moves the mark one point above the v0.6.14 baseline.
 
 ---
 
@@ -188,7 +207,7 @@ is itself a finding (see Hard Truth).
 
 ---
 
-## 4. Maintainability & Evolvability — **82/100**
+## 4. Maintainability & Evolvability — **83/100** (2026-07-07)
 
 ### 4.1 Test Coverage
 
@@ -221,16 +240,29 @@ its version + the consumer constraint, rebuild sdata. ADR-044 is a real example
 (touched both crates + `alire.toml`s). The path pin and CI sibling-checkout make
 this manageable, but the friction is real and worth acknowledging in process docs.
 
+**Improved 2026-07-06-post-tables (R1–R4).** Evolvability of the *reshape-command
+family* specifically improved: a fifth build-and-swap command now reuses
+`Group_Boundaries` + `Commit_Reshaped_Table` + the BY-output helpers rather than
+transcribing ~350 lines, and the finalize sequence / SELECT-filter invariant have a
+single edit site each (a change ships as one edit, not three-to-four). Because the
+BY-group walk is now **public** sdata-core API, the third consumer (data-vandal) will
+reuse it instead of re-copying — pre-empting exactly the cross-crate clone-drift that
+had already produced a shipped bug (`0d1ab04`). The two-crate coordination burden for
+shared commands is unchanged, so this is an evolvability gain within the existing
+structure, not a removal of the split friction.
+
 ### 4.3 Decision Records — excellent
 
 44 ADRs (ADR-001…044), 22 design specs, 28 implementation plans. ADRs 039–043
 document the split rationale/boundary/consequences in depth; ADR-044 covers the
 RENAME suffix-type rule. `scripts/bump-version.sh` updates 9 files atomically.
 
-**Δ from v0.6.14 (84):** −2 → **82** (2026-06-09). The untested-statistics gap is
-now closed (remediation #3); the remaining debit is the two-crate change burden
-for shared commands — real but well-managed by the path pin and CI sibling
-checkout.
+**Δ from v0.6.14 (84):** −1 → **83** (2026-07-07). The untested-statistics gap closed
+2026-06-09 (remediation #3) recovered the mark to 82; the 2026-07-06-post-tables
+refactor (§4.2 — reshape-family primitives extracted, the walk made public and
+reused across consumers) adds one point for improved change resilience. The residual
+−1 vs the v0.6.14 mark is the two-crate change burden for shared commands — real but
+well-managed by the path pin and CI sibling checkout, and unchanged by this milestone.
 
 ---
 
@@ -438,22 +470,25 @@ coercion-exception defense-in-depth guard + SUBMIT depth limit, §5; →76 on
 (→86, design doc converted to committed Markdown, §8), and **Operational
 Readiness** (→73, `--progress` reporting, §7). From 2026-06-16: **Code Quality**
 (→82) and **Security** (→78), the CI `gnatmetric` cyclomatic-complexity gate closing
-the toolchain-blocked SAST-in-CI (remediation #7, §2/§6). The total now exceeds the
-v0.6.14 mark, with a different composition:
-Efficiency and Operational Readiness up most; the split-coordination dimensions
-remain the principal debits.
+the toolchain-blocked SAST-in-CI (remediation #7, §2/§6). From 2026-07-07: **Code
+Quality** (→83) and **Maintainability** (→83), the milestone `2026-07-06-post-tables`
+de-duplication of the reshape-command family (§2.2/§4.2 — three copy-paste axes
+collapsed to shared primitives incl. the public `Group_Boundaries`; verified,
+behavior-preserving). The total now exceeds the v0.6.14 mark, with a different
+composition: Efficiency and Operational Readiness up most; the split-coordination
+dimensions remain the principal debits.
 
 | Category | v0.6.14 | current | Δ |
 |---|---|---|---|
 | Architectural Integrity | 78 | **77** (2026-06-10) | −1 |
-| Code Quality & Craftsmanship | 82 | **82** (2026-06-16) | 0 |
+| Code Quality & Craftsmanship | 82 | **83** (2026-07-07) | +1 |
 | Efficiency & Performance | 78 | **83** (v0.9.7) | +5 |
-| Maintainability & Evolvability | 84 | **82** (2026-06-09) | −2 |
+| Maintainability & Evolvability | 84 | **83** (2026-07-07) | −1 |
 | Error Handling & Resilience | 73 | **76** (2026-06-11) | +3 |
 | Security Posture | 77 | **78** (2026-06-16) | +1 |
 | Operational Readiness | 66 | **73** (2026-06-10) | +7 |
 | Documentation | 87 | **86** (2026-06-10) | −1 |
-| **TOTAL** | **625/800 (78.1%)** | **637/800 (79.6%)** | **+12** |
+| **TOTAL** | **625/800 (78.1%)** | **639/800 (79.9%)** | **+14** |
 
 ---
 
@@ -488,8 +523,11 @@ I called the #4 coercion guard "defense-in-depth over an unreachable path" — i
 guarding a *real* reachable path (sdata-core issue #24, since fixed), which is a better
 justification, not a worse one — and that reachable path is now root-cause fixed in
 sdata-core 0.1.9 (Error Handling +1 → 76, 2026-06-11), and SAST-in-CI was closed by the
-gnatmetric complexity gate (Code Quality +1, Security +1, 2026-06-16). The score —
-**637/800** — moved for real reasons.
+gnatmetric complexity gate (Code Quality +1, Security +1, 2026-06-16). The
+2026-07-06-post-tables milestone then collapsed three literal copy-paste axes in the
+reshape-command family into shared primitives (Code Quality +1, Maintainability +1,
+2026-07-07) — verified behavior-preserving against a live SELECT regression, not asserted.
+The score — **639/800** — moved for real reasons.
 
 The uncomfortable part is what the number *hides* — though less than an earlier draft of this
 section claimed. SData-the-codebase is in good shape, and contrary to my first telling, each crate
