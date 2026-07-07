@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.13.0
+Version:        0.13.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Jul 07 2026 John L. Ries <john@theyarnbard.com> - 0.13.1-1
+- Milestone refactor: TABLES consumes sdata-core Group_Boundaries (R3)
+
 * Fri Jul 03 2026 John L. Ries <john@theyarnbard.com> - 0.13.0-1
 - Add TABLES command (PROC FREQ analogue): one-way, two-way, and multiway frequency/crosstabulation reports with optional chi-square-family statistics
 

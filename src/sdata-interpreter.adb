@@ -83,8 +83,10 @@ package body SData.Interpreter is
    Active_Program_Vec : Program_Vectors.Vector;
 
    --  Vector of physical row indices — used by the TABLES counting engine
-   --  (Execute_Tables subunit) for group splitting and level building.
-   package Row_Index_Vectors is new Ada.Containers.Vectors (Positive, Positive);
+   --  (Execute_Tables subunit) for level building.  Renamed onto sdata-core's
+   --  public instantiation so Group_Boundaries results feed the renderers
+   --  directly, with no per-group type conversion (milestone refactor R3).
+   package Row_Index_Vectors renames SData_Core.Commands.Row_Index_Vectors;
 
    --  Count of deferred statements queued since the most recent RUN (or NEW).
    --  These are "pending / un-run": their per-record effect has not yet been

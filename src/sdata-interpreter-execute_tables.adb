@@ -394,39 +394,6 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       IO.Put_Line (To_String (H));
    end Put_By_Header;
 
-   --  ---- group splitting (replicates sdata-core Collect_Groups via public API)
-   package Group_Of_Rows is new Ada.Containers.Vectors
-     (Positive, Row_Index_Vectors.Vector, Row_Index_Vectors."=");
-
-   function Group_Rows return Group_Of_Rows.Vector is
-      Groups : Group_Of_Rows.Vector;
-      Group  : Row_Index_Vectors.Vector;
-      Prev_P : Positive := 1;
-   begin
-      for L in 1 .. SData_Core.Table.Logical_Row_Count loop
-         declare
-            P : constant Positive := SData_Core.Table.Logical_To_Physical (L);
-         begin
-            if L = 1 then
-               Group.Append (P);
-            elsif SData_Core.Table.By_Var_Count = 0
-              or else SData_Core.Table.In_Same_Group (P, Prev_P)
-            then
-               Group.Append (P);
-            else
-               Groups.Append (Group);
-               Group.Clear;
-               Group.Append (P);
-            end if;
-            Prev_P := P;
-         end;
-      end loop;
-      if not Group.Is_Empty then
-         Groups.Append (Group);
-      end if;
-      return Groups;
-   end Group_Rows;
-
    --  ---- one-way renderer ----
    procedure Render_One_Way (Rows : Row_Index_Vectors.Vector; Col : String) is
       Levels   : constant Level_Vectors.Vector := Build_Levels (Rows, Col);
@@ -709,18 +676,13 @@ begin
         "TABLES: pending program statements exist; issue RUN or NEW first";
    end if;
 
-   --  Refresh the SELECT logical->physical index map before tabulating so an
-   --  active SELECT filter is honored (Group_Rows walks the logical view via
-   --  Logical_Row_Count / Logical_To_Physical).  This mirrors sdata-core's
-   --  Collect_Groups, whose first statement is Rebuild_Filter_Map; the copied
-   --  Group_Rows dropped that call, which made TABLES silently tabulate the
-   --  whole table.  Execute_Rebuild_Filter is a view refresh only -- it does
-   --  not mutate the table, PDV, SAVE, the SELECT expression, or BY -- so the
-   --  print-only invariant is preserved (AGGREGATE/STATS call it likewise).
-   SData_Core.Commands.Execute_Rebuild_Filter;
-
+   --  Group_Boundaries rebuilds the SELECT filter map internally, so an active
+   --  SELECT filter is honored with no separate Execute_Rebuild_Filter call.
+   --  It is a read-only view/grouping query -- it does not mutate the table,
+   --  PDV, SAVE, the SELECT expression, or BY -- so TABLES stays print-only.
    declare
-      Groups      : constant Group_Of_Rows.Vector := Group_Rows;
+      Groups      : constant SData_Core.Commands.Row_Group_Vectors.Vector :=
+        SData_Core.Commands.Group_Boundaries;
       Multi_Group : constant Boolean :=
         SData_Core.Table.By_Var_Count > 0
           and then Natural (Groups.Length) > 1;
