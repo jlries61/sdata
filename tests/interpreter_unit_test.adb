@@ -191,8 +191,15 @@ procedure Interpreter_Unit_Test is
       end case;
    end TGI;
 
-   --  Scratch directory for temporary test output files.
-   Scratch : constant String := "/tmp/";
+   --  Scratch directory for temporary test output files.  This is a
+   --  repo-relative path (the driver runs with the repo root as CWD, as the
+   --  "tests/data/..." reads elsewhere in this file rely on), matching the
+   --  convention used by every other file-capturing test in the suite.  A
+   --  hardcoded absolute "/tmp/" is not portable: in sandboxed environments
+   --  where that path is unusable, Open_Output's underlying Create fails and
+   --  is surfaced as a SCRIPT_ERROR ("OUTPUT: invalid file name").  The
+   --  capture files below are gitignored.
+   Scratch : constant String := "tests/";
 
    --  Read an array element as integer.
    function GI_Arr (Name : String; Idx : Integer) return Integer is
