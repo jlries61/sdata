@@ -2,7 +2,6 @@ separate (SData.Interpreter)
 procedure Execute_Tables (Stmt : Statement_Access) is
    package Values renames SData_Core.Values;
    package IO     renames SData_Core.IO;
-   use type Values.Value_Kind;
    use Ada.Strings;
    use Ada.Strings.Fixed;
 
