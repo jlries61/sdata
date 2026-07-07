@@ -1,0 +1,15 @@
+Dataset opened: tests/data/sample.csv
+REC# CATEGORY$ _NAME_$ N 
+1 A VAL1 2 
+2 B VAL1 3 
+3 C VAL1 1 
+STATS complete. 3 records and 3 variables processed.
+REC# CATEGORY$ _NAME_$ N 
+1 A VAL1 2 
+2 B VAL1 3 
+3 C VAL1 1 
+REC# _NAME_$ SUM 
+1 N 6.00000 
+STATS complete. 1 records and 2 variables processed.
+REC# _NAME_$ SUM 
+1 N 6.00000 
