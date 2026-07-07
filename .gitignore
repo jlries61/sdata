@@ -11,6 +11,11 @@
 *.diff
 *.actual
 tests/output_test_capture.dat
+# interpreter_unit_test OUTPUT-capture scratch files (INSERT/LIST cases)
+tests/insert_confirm.txt
+tests/list_mid.txt
+tests/list_end.txt
+tests/list_top.txt
 tests/data/output.csv
 tests/data/output_pipe.csv
 tests/data/test1_output.csv
