@@ -2,7 +2,7 @@
 -- RUN (no SAVE) must not re-save, proving the pending SAVE was consumed.
 USE "tests/data/sample.csv"
 BY CATEGORY$
-SAVE "/tmp/aggregate_save_flush_out.csv"
+SAVE "tests/data/aggregate_save_flush_out.csv"
 AGGREGATE TOTAL=SUM(VAL1) NREC=N()
 DISPLAY
 QUIT

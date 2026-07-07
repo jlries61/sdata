@@ -17,6 +17,10 @@ tests/list_mid.txt
 tests/list_end.txt
 tests/list_top.txt
 tests/data/output.csv
+# SAVE-flush test outputs (aggregate_save_flush / stats_save / transpose_save_flush)
+tests/data/aggregate_save_flush_out.csv
+tests/data/stats_save_test.csv
+tests/data/transpose_save_flush_out.csv
 tests/data/output_pipe.csv
 tests/data/test1_output.csv
 tests/data/inf_output.csv

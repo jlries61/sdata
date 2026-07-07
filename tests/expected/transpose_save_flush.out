@@ -1,5 +1,5 @@
 Dataset opened: tests/data/transpose_simple.csv
-Dataset saved: /tmp/transpose_save_flush_out.csv
+Dataset saved: tests/data/transpose_save_flush_out.csv
 TRANSPOSE complete. 2 records and 4 variables processed.
 REC# _NAME_$ A B C 
 1 SCORE 95.00000 87.00000 92.00000 
