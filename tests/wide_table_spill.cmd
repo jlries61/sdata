@@ -7,7 +7,10 @@
 -- exceeds the 100-cell in-memory budget), triggering the SQLite cap.
 --
 -- The generated file is gitignored; it is regenerated on every test run.
-SYSTEM "seq -s, 1 2100 | sed 's/[0-9][0-9]*/c&/g' > tests/data/wide_table.csv && seq -s, 1 2100 >> tests/data/wide_table.csv && seq -s, 1 2100 >> tests/data/wide_table.csv"
+-- NOTE: BSD/macOS `seq -s` differs from GNU seq (trailing separator, no final
+-- newline), which mangled the generated CSV. `seq | paste -sd,` is portable
+-- across both: it joins with a comma and appends a trailing newline.
+SYSTEM "seq 1 2100 | sed 's/^/c/' | paste -sd, - > tests/data/wide_table.csv && seq 1 2100 | paste -sd, - >> tests/data/wide_table.csv && seq 1 2100 | paste -sd, - >> tests/data/wide_table.csv"
 USE "tests/data/wide_table.csv"
 RUN
 QUIT
