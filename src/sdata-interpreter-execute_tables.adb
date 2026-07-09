@@ -82,20 +82,25 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    Order_Freq      : constant Boolean := Stmt.Table_Order_Freq;
    Include_Missing : constant Boolean := Stmt.Table_MISSING;
 
+   --  Display-text -> Natural map, used both for O(1) level-membership during
+   --  accumulation (Build_Levels) and O(1) value->index lookup on a sorted
+   --  level vector (Index_Map), plus the two-way cell counts.
+   package Count_Maps is new Ada.Containers.Indefinite_Hashed_Maps
+     (Key_Type        => String,
+      Element_Type    => Natural,
+      Hash            => Ada.Strings.Hash,
+      Equivalent_Keys => "=");
+
    --  Build the distinct, ordered levels of Col across the given physical rows.
+   --  Membership uses a Disp-text -> index map (Pos) so accumulation is
+   --  O(rows), not O(rows * distinct-levels) as the old linear scan was.  Pos
+   --  is discarded on return; callers needing index lookups on the SORTED
+   --  result build a fresh map with Index_Map.
    function Build_Levels (Rows : Row_Index_Vectors.Vector; Col : String)
       return Level_Vectors.Vector
    is
       Levels : Level_Vectors.Vector;
-      function Find (D : Unbounded_String) return Natural is
-      begin
-         for I in Levels.First_Index .. Levels.Last_Index loop
-            if Levels (I).Disp = D then
-               return I;
-            end if;
-         end loop;
-         return 0;
-      end Find;
+      Pos    : Count_Maps.Map;   --  Disp text -> 1-based index in Levels
    begin
       for P of Rows loop
          declare
@@ -103,18 +108,20 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          begin
             if Is_Present (V, Include_Missing) then
                declare
-                  D   : constant Unbounded_String := Disp_Of (V);
-                  Idx : constant Natural := Find (D);
+                  D  : constant Unbounded_String := Disp_Of (V);
+                  Ds : constant String := To_String (D);
                begin
-                  if Idx = 0 then
-                     Levels.Append ((Val => V, Disp => D, Count => 1));
-                  else
+                  if Pos.Contains (Ds) then
                      declare
-                        L : Level := Levels (Idx);
+                        Idx : constant Positive := Pos (Ds);
+                        L   : Level := Levels (Idx);
                      begin
                         L.Count := L.Count + 1;
                         Levels.Replace_Element (Idx, L);
                      end;
+                  else
+                     Levels.Append ((Val => V, Disp => D, Count => 1));
+                     Pos.Insert (Ds, Levels.Last_Index);
                   end if;
                end;
             end if;
@@ -129,20 +136,18 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    end Build_Levels;
 
    --  ---- two-way helpers ----
-   package Count_Maps is new Ada.Containers.Indefinite_Hashed_Maps
-     (Key_Type        => String,
-      Element_Type    => Natural,
-      Hash            => Ada.Strings.Hash,
-      Equivalent_Keys => "=");
 
-   function Level_Index (Levels : Level_Vectors.Vector;
-                         D      : Unbounded_String) return Natural is
+   --  Disp-text -> 1-based index over an (already sorted) level vector, so a
+   --  value's level index becomes an O(1) lookup rather than a linear scan.
+   --  Keys are distinct (Build_Levels dedups by Disp).
+   function Index_Map (Levels : Level_Vectors.Vector) return Count_Maps.Map is
+      M : Count_Maps.Map;
    begin
       for I in Levels.First_Index .. Levels.Last_Index loop
-         if Levels (I).Disp = D then return I; end if;
+         M.Insert (To_String (Levels (I).Disp), I);
       end loop;
-      return 0;
-   end Level_Index;
+      return M;
+   end Index_Map;
 
    --  Canonical cell-map key for 1-based level indices (row I, column J).
    function Cell_Key (I, J : Positive) return String is
@@ -191,25 +196,29 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       --  under /ORDER=FREQ the margins order by the JOINT marginal.
       JT.L1 := Build_Levels (Joint_Rows, V1);
       JT.L2 := Build_Levels (Joint_Rows, V2);
-      --  Cell counts keyed on final (post-sort) level indices.
-      for P of Joint_Rows loop
-         declare
-            I   : constant Natural :=
-              Level_Index (JT.L1,
-                           Disp_Of (SData_Core.Table.Get_Value (P, V1)));
-            J   : constant Natural :=
-              Level_Index (JT.L2,
-                           Disp_Of (SData_Core.Table.Get_Value (P, V2)));
-            Key : constant String := Cell_Key (I, J);
-         begin
-            if JT.Cells.Contains (Key) then
-               JT.Cells.Replace (Key, JT.Cells (Key) + 1);
-            else
-               JT.Cells.Insert (Key, 1);
-            end if;
-            JT.Grand := JT.Grand + 1;
-         end;
-      end loop;
+      --  Cell counts keyed on final (post-sort) level indices; index lookups
+      --  go through Disp-text maps (O(1)) rather than a per-row linear scan.
+      declare
+         P1 : constant Count_Maps.Map := Index_Map (JT.L1);
+         P2 : constant Count_Maps.Map := Index_Map (JT.L2);
+      begin
+         for P of Joint_Rows loop
+            declare
+               I   : constant Positive :=
+                 P1 (To_String (Disp_Of (SData_Core.Table.Get_Value (P, V1))));
+               J   : constant Positive :=
+                 P2 (To_String (Disp_Of (SData_Core.Table.Get_Value (P, V2))));
+               Key : constant String := Cell_Key (I, J);
+            begin
+               if JT.Cells.Contains (Key) then
+                  JT.Cells.Replace (Key, JT.Cells (Key) + 1);
+               else
+                  JT.Cells.Insert (Key, 1);
+               end if;
+               JT.Grand := JT.Grand + 1;
+            end;
+         end loop;
+      end;
       return JT;
    end Build_Joint;
 
@@ -484,6 +493,7 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       declare
          Names   : Name_Arr (1 .. K);
          Levels  : array (1 .. K) of Level_Vectors.Vector;
+         Pos     : array (1 .. K) of Count_Maps.Map;   --  Disp -> level index
          Joint   : Count_Maps.Map;
          Grand   : Natural := 0;
          Missing : Natural := 0;
@@ -493,6 +503,7 @@ procedure Execute_Tables (Stmt : Statement_Access) is
             Names (I) := To_Unbounded_String
               (C.Var.Start_Name (1 .. C.Var.Start_Len));
             Levels (I) := Build_Levels (Rows, To_String (Names (I)));
+            Pos (I)    := Index_Map (Levels (I));
             C := C.Next;
          end loop;
          --  Joint counts keyed on "i1|i2|...".
@@ -505,14 +516,14 @@ procedure Execute_Tables (Stmt : Statement_Access) is
                   declare
                      V : constant Values.Value :=
                        SData_Core.Table.Get_Value (P, To_String (Names (I)));
+                     Ix : Natural;
                   begin
                      if not Is_Present (V, Include_Missing) then
                         OK := False; exit;
                      end if;
+                     Ix := Pos (I)(To_String (Disp_Of (V)));
                      if I > 1 then Append (Key, "|"); end if;
-                     Append (Key,
-                             Trim (Level_Index (Levels (I), Disp_Of (V))'Image,
-                                   Both));
+                     Append (Key, Trim (Ix'Image, Both));
                   end;
                end loop;
                if OK then

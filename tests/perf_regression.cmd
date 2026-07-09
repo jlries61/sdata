@@ -35,4 +35,18 @@ RUN
 REPEAT 1
 PRINT "A rows=", na
 RUN
+
+-- ---- audit remediation #3: reshape-command efficiency guards ----
+-- TABLES on a high-cardinality column (20000 distinct X over 80000 rows) guards
+-- Build_Levels / cell-index lookups against the O(rows*levels) linear-scan
+-- regression; STATS with six statistics guards the per-statistic column
+-- re-copy.  Wrapped in ECHO OFF so the timed work runs but produces no console
+-- output -- the 10s timeout is the guard; TABLES/STATS output correctness is
+-- covered by their own functional tests.
+NEW
+ECHO OFF
+USE "tests/data/perf_regression_b.csv", "tests/data/perf_regression_b.csv" /APPEND
+TABLES X
+STATS X /STATS=N MIN MEAN MAX STD SUM /NOPRINT
+ECHO ON
 END
