@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.13.2
+Version:        0.13.3
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Jul 08 2026 John L. Ries <john@theyarnbard.com> - 0.13.3-1
+- Complete audit remediation #3: Render_List enumerates observed tuples instead of the full Cartesian product of level cardinalities (O(rows) not O(product), byte-identical output).
+
 * Wed Jul 08 2026 John L. Ries <john@theyarnbard.com> - 0.13.2-1
 - Audit remediations #3 (TABLES/STATS efficiency: O(1) hashed level lookups, STATS per-statistic re-copy hoist) and #4 (actionable $/%-in-SELECT diagnostic, issue #73). Requires sdata-core 0.1.26.
 
