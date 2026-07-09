@@ -24,8 +24,11 @@ guard (sdata 0.13.2 `execute_tables.adb` + sdata-core 0.1.26 `Execute_STATS`,
 PR #79); **#4** the `$`/`%`-in-SELECT error is now actionable (issue #73). The
 consumer-test pin — the prior Hard Truth's top open item — is current at v0.13.2
 (sdata-core PR #80). With #1/#3 closed, Error Handling holds at 76 and Efficiency
-at 83 on genuine grounds; the bounded `Render_List` K≥3 odometer remains a
-documented residual.
+at 83 on genuine grounds. The one remaining residual — the `Render_List` K≥3
+combinatorial odometer — was **also closed** (sdata 0.13.3, commit `f4858b8`):
+`Render_List` now enumerates only the observed tuples, sorted into the odometer's
+order, so cost is O(rows) not O(Π level cardinalities), byte-identical output.
+**No open efficiency debits remain from this audit.**
 
 ---
 
