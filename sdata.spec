@@ -4,8 +4,11 @@ Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
 # Bundled sdata-core version (path-pin sibling during development).
-# Keep in sync with SDATA_CORE_VERSION in the Makefile.
-%global sdata_core_version 0.1.4
+# Fallback only: `make srpm` overwrites this in rpmbuild/SPECS/sdata.spec with
+# the value derived from ../sdata-core/alire.toml, so it cannot drift for a
+# packaged build. Kept current here so a direct build from the committed spec
+# still resolves Source5.
+%global sdata_core_version 0.1.26
 
 License:        GPLv3
 URL:            https://github.com/jlries61/sdata
