@@ -213,21 +213,24 @@ is itself a finding (see Hard Truth).
 
 | Suite | Count |
 |---|---|
-| Integration `.cmd` | **196** |
+| Integration `.cmd` | **333** |
 | `csv_unit_test` | 71 |
 | `sdata_unit_test` (Table/Variables/PDV/transient/merge) | 355 |
-| `evaluator_unit_test` | 170 |
-| `file_io_unit_test` | 89 |
-| `interpreter_unit_test` | 48 |
-| **Unit total** | **733** |
+| `evaluator_unit_test` | 203 |
+| `file_io_unit_test` | 100 |
+| `interpreter_unit_test` | 97 |
+| **Unit total** | **826** |
 
-CI runs all unit suites + 196 integration tests + a fuzz-corpus regression on push
-and PR. data-vandal carries its own 44 integration tests (run manually / its own CI).
+Counts synced 2026-07-08 from `make check` (the source of truth); see the fresh
+re-audit at `.ssd/audits/2026-07-08-sdata-ecosystem/standards-report.md`.
+CI runs all unit suites + 333 integration tests + a fuzz-corpus regression on push
+and PR. data-vandal carries its own 143 integration tests (run manually / its own CI);
+sdata-core carries 279 in-crate assertions across seven drivers.
 
 **Gap — RESOLVED 2026-06-09 (remediation #3, sdata-core PR #31).**
 `sdata_core-statistics.adb` (775 lines, ~54 distribution/IDF/RNG functions) had
-no dedicated unit tests. Now covered by `tests/statistics_tests.adb`, an
-88-assertion property-based in-crate driver: canonical reference values, CDF
+no dedicated unit tests. Now covered by `tests/statistics_tests.adb`, a
+111-assertion property-based in-crate driver: canonical reference values, CDF
 boundaries + monotonicity, IDF∘CDF round-trips (incl. Weibull's reversed
 `Scale`/`Shape` order), symmetry, PDF non-negativity, and seeded-RNG support.
 
@@ -253,9 +256,10 @@ structure, not a removal of the split friction.
 
 ### 4.3 Decision Records — excellent
 
-44 ADRs (ADR-001…044), 22 design specs, 28 implementation plans. ADRs 039–043
-document the split rationale/boundary/consequences in depth; ADR-044 covers the
-RENAME suffix-type rule. `scripts/bump-version.sh` updates 9 files atomically.
+49 ADRs (ADR-001…049), 27 design specs, 36 implementation plans. ADRs 039–043
+document the split rationale/boundary/consequences in depth; ADRs 046–049 cover
+the AGGREGATE/TRANSPOSE/STATS/TABLES commands. `scripts/bump-version.sh` updates
+9 files atomically.
 
 **Δ from v0.6.14 (84):** −1 → **83** (2026-07-07). The untested-statistics gap closed
 2026-06-09 (remediation #3) recovered the mark to 82; the 2026-07-06-post-tables
@@ -430,8 +434,8 @@ local-discipline gate, not an operational defect.
 - **Man page** (`man/man1/sdata.1`, 1,098 lines, stamped v0.9.6 / 2026-06-06):
   covers merge modes, multi-target SAVE with `IF=`, and RENAME type-suffix
   conversion.
-- **ADRs** (44), **specs** (22), **plans** (28) — a thorough, current design trail
-  including ADR-044 and the rename spec/plan dated this cycle.
+- **ADRs** (49), **specs** (27), **plans** (36) — a thorough, current design trail
+  including ADRs 046–049 for the AGGREGATE/TRANSPOSE/STATS/TABLES commands.
 - **`doc/architecture.md`** updated for the three-crate package map.
 - README/CONTRIBUTING cover the path-pin model and multi-platform packaging.
 
@@ -564,13 +568,13 @@ let SData 1.0 put a stability promise on top of it.
 | O(n²) #2 transient copy-per-cell **[RESOLVED v0.9.7, `396048a`]** | `src/sdata-transient_table.adb` (`Add_Row`/`Set_Value`) | whole-column copy per call; `/append` 49k: 791s→9s |
 | O(n²) #3 BY re-sort per record **[RESOLVED v0.9.7, `396048a`]** | `src/sdata-interpreter-execute_declarative.adb` (Stmt_BY) | sorted whole table every record; pass-2 2k: 19s→0.17s |
 | Perf headline | full adult train/test script | >13 min → ~11s after the three fixes; output identical |
-| Statistics tested **[RESOLVED 2026-06-09, sdata-core PR #31]** | `sdata-core/tests/statistics_tests.adb` | 88 property-based assertions; all 14 distributions |
-| Test counts | `make check`; `ls tests/*.cmd` | 196 integration; 733 unit (71/355/170/89/48) |
+| Statistics tested **[RESOLVED 2026-06-09, sdata-core PR #31]** | `sdata-core/tests/statistics_tests.adb` | 111 property-based assertions; all 14 distributions |
+| Test counts (synced 2026-07-08) | `make check`; `ls tests/*.cmd` | 333 integration; 826 unit (71/355/203/100/97); +279 sdata-core in-crate; 143 data-vandal |
 | `when others` inventory | grep both `src/` trees | 44 total (20 sdata, 24 core); ~10 silent-null, justified |
 | Uncaught new exceptions | `sdata_core-values.adb:33,40,43`; `sdata_core-table.adb:269,274,276` | no handler; reach top-level only |
 | Threat model stale | `doc/threat_model.md:3` | v0.6.13 / 2026-05-14 / "Current" |
-| Stale doc test counts | `CLAUDE.md:38,40,73` | claims 140; actual 196 |
+| Stale doc test counts **[RE-SYNCED 2026-07-08]** | `CLAUDE.md`, this doc §4.1 | had drifted again (299/201 int, 793/733 unit); corrected to 333 int / 826 unit from `make check` |
 | design doc binary-only **[RESOLVED 2026-06-10, remediation #8]** | `doc/design.md` (pandoc-converted) | ODF removed; Markdown spec now authoritative + committed |
-| Man page current | `man/man1/sdata.1:1` | v0.9.6 / 2026-06-06; 1,098 lines |
+| Man page current | `man/man1/sdata.1:1` | v0.13.1 / 2026-07-07 |
 | Packaging version derived | `Makefile`, `debian/rules`, `slackware/sdata.SlackBuild` | sdata-core version globbed/injected, not hardcoded |
-| ADR / spec / plan counts | `doc/adrs.md`, `doc/specs/`, `doc/plans/` | 44 / 22 / 28 |
+| ADR / spec / plan counts (synced 2026-07-08) | `doc/adrs.md`, `doc/specs/`, `doc/plans/` | 49 / 27 / 36 |
