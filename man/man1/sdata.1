@@ -495,6 +495,13 @@ command, not before it.
 .TP
 .B FPATH \fIpath\fR /\fBUSE\fR|\fBSAVE\fR|\fBSUBMIT\fR|\fBOUTPUT\fR
 Set the default directory for the specified file category.
+.TP
+.B DIGITS \fIn\fR
+Set the maximum number of decimal places used when printing floating\-point
+values (default 5).
+Takes effect immediately and persists until the next
+.B DIGITS
+command.
 .RE
 .SS Immediate commands
 Execute immediately; not part of the data step body.

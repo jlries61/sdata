@@ -795,7 +795,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>DIGITS n</em></td>
 <td>Declarative</td>
 <td><p>As specified in the BW BASIC documentation.</p>
-<p>This sets the maximum number of decimal places to display (default = 3).</p></td>
+<p>This sets the maximum number of decimal places to display (default = 5).</p></td>
 </tr>
 <tr>
 <td><em>DIM</em></td>
