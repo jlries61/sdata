@@ -675,6 +675,35 @@ begin
         "TABLES: pending program statements exist; issue RUN or NEW first";
    end if;
 
+   --  Validate every crossing variable up front -- before any output -- so a
+   --  mistyped name raises a clean error instead of silently rendering an empty
+   --  table (audit 2026-07-08 remediation #1). Mirrors the STATS/AGGREGATE
+   --  Phase-1 unknown-variable check; the render path only ever uses Start_Name,
+   --  so that is what we verify.
+   declare
+      Req : Table_Request := Stmt.Requests;
+   begin
+      while Req /= null loop
+         declare
+            V : Variable_List := Req.Vars;
+         begin
+            while V /= null loop
+               declare
+                  Col : constant String :=
+                    V.Var.Start_Name (1 .. V.Var.Start_Len);
+               begin
+                  if not SData_Core.Table.Has_Column (Col) then
+                     raise SData_Core.Script_Error with
+                       "TABLES: unknown variable '" & Col & "'";
+                  end if;
+               end;
+               V := V.Next;
+            end loop;
+         end;
+         Req := Req.Next;
+      end loop;
+   end;
+
    --  Group_Boundaries rebuilds the SELECT filter map internally, so an active
    --  SELECT filter is honored with no separate Execute_Rebuild_Filter call.
    --  It is a read-only view/grouping query -- it does not mutate the table,
