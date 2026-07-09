@@ -28,7 +28,11 @@ at 83 on genuine grounds. The one remaining residual — the `Render_List` K≥3
 combinatorial odometer — was **also closed** (sdata 0.13.3, commit `f4858b8`):
 `Render_List` now enumerates only the observed tuples, sorted into the odometer's
 order, so cost is O(rows) not O(Π level cardinalities), byte-identical output.
-**No open efficiency debits remain from this audit.**
+**No open efficiency debits remain from this audit.** Post-remediation the
+ecosystem stands at **640/800 (80.0%)** — the three at-audit debits recovered to
+baseline (Efficiency 83, Error Handling 76, Documentation 86) and Operational
+holds its +1 (consumer-pin currency); see the Overall Scores table. First crossing
+of 80%, and every point is anchored to verified code, not a docs edit.
 
 ---
 
@@ -509,9 +513,16 @@ dimensions remain the principal debits.
 | Maintainability & Evolvability | 84 | **83** (2026-07-07) | −1 |
 | Error Handling & Resilience | 73 | **76** (2026-06-11) | +3 |
 | Security Posture | 77 | **78** (2026-06-16) | +1 |
-| Operational Readiness | 66 | **73** (2026-06-10) | +7 |
+| Operational Readiness | 66 | **74** (2026-07-08) | +8 |
 | Documentation | 87 | **86** (2026-06-10) | −1 |
-| **TOTAL** | **625/800 (78.1%)** | **639/800 (79.9%)** | **+14** |
+| **TOTAL** | **625/800 (78.1%)** | **640/800 (80.0%)** | **+15** |
+
+*Operational 73→74 on 2026-07-08 for consumer-test-pin currency (the prior Hard Truth's top open item;
+sdata-core `consumer-tests.yml` ref now tracks each sdata release). The 2026-07-08 re-audit temporarily
+scored Efficiency 82 / Error Handling 75 / Documentation 84 on newly-surfaced debits (O(n²) recurrence in
+the reshape commands, the TABLES unknown-var MAJOR, and regressed count drift); all were remediated on
+verified changes (sdata 0.13.2/0.13.3 + sdata-core 0.1.26), so those three hold at 83/76/86 here. Total
+**640/800 (80.0%)** — first crossing of 80%, every point anchored to code.*
 
 ---
 
