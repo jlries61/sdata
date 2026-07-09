@@ -48,5 +48,21 @@ ECHO OFF
 USE "tests/data/perf_regression_b.csv", "tests/data/perf_regression_b.csv" /APPEND
 TABLES X
 STATS X /STATS=N MIN MEAN MAX STD SUM /NOPRINT
+
+-- K>=3 crossing guards Render_List against the Cartesian-product odometer.
+-- Four columns of 200 levels each give a 200^4 (~1.6e9) product: the old walk
+-- enumerated all of it (blowing the 10s timeout) though only ~200 tuples are
+-- ever observed.  The observed-and-sorted walk stays proportional to the rows.
+NEW
+REPEAT 5000
+LET A = MOD(RECNO, 200)
+LET B = MOD(RECNO, 200)
+LET C = MOD(RECNO, 200)
+LET D = MOD(RECNO, 200)
+SAVE "tests/data/perf_regression_c.csv"
+RUN
+NEW
+USE "tests/data/perf_regression_c.csv"
+TABLES A*B*C*D
 ECHO ON
 END

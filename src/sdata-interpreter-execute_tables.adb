@@ -494,9 +494,36 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          Names   : Name_Arr (1 .. K);
          Levels  : array (1 .. K) of Level_Vectors.Vector;
          Pos     : array (1 .. K) of Count_Maps.Map;   --  Disp -> level index
-         Joint   : Count_Maps.Map;
+         Seen    : Count_Maps.Map;   --  "i1|..|iK" -> 1-based position in Present
          Grand   : Natural := 0;
          Missing : Natural := 0;
+
+         --  One OBSERVED K-tuple of level indices with its frequency.  We
+         --  enumerate only observed combinations (<= Grand of them), never the
+         --  full Cartesian product of level cardinalities.
+         type Idx_Array is array (1 .. K) of Positive;
+         type Tuple_Rec is record
+            Idx   : Idx_Array;
+            Count : Natural;
+         end record;
+         package Tuple_Vectors is new
+           Ada.Containers.Vectors (Positive, Tuple_Rec);
+         Present : Tuple_Vectors.Vector;
+
+         --  The old odometer walked tuples in lexicographic order of the
+         --  level-index vector (position 1 most significant).  Sorting the
+         --  observed tuples the same way reproduces that output exactly.
+         function Tuple_Less (A, B : Tuple_Rec) return Boolean is
+         begin
+            for I in 1 .. K loop
+               if A.Idx (I) /= B.Idx (I) then
+                  return A.Idx (I) < B.Idx (I);
+               end if;
+            end loop;
+            return False;
+         end Tuple_Less;
+         package Tuple_Sorting is new
+           Tuple_Vectors.Generic_Sorting ("<" => Tuple_Less);
       begin
          C := Req.Vars;
          for I in 1 .. K loop
@@ -506,33 +533,43 @@ procedure Execute_Tables (Stmt : Statement_Access) is
             Pos (I)    := Index_Map (Levels (I));
             C := C.Next;
          end loop;
-         --  Joint counts keyed on "i1|i2|...".
+         --  Accumulate one entry per DISTINCT observed tuple, keyed on the
+         --  "i1|i2|..." level-index string (Seen -> position in Present).
          for P of Rows loop
             declare
                Key : Unbounded_String;
+               Tup : Idx_Array;
                OK  : Boolean := True;
             begin
                for I in 1 .. K loop
                   declare
                      V : constant Values.Value :=
                        SData_Core.Table.Get_Value (P, To_String (Names (I)));
-                     Ix : Natural;
                   begin
                      if not Is_Present (V, Include_Missing) then
                         OK := False; exit;
                      end if;
-                     Ix := Pos (I)(To_String (Disp_Of (V)));
+                     Tup (I) := Pos (I)(To_String (Disp_Of (V)));
                      if I > 1 then Append (Key, "|"); end if;
-                     Append (Key, Trim (Ix'Image, Both));
+                     Append (Key, Trim (Tup (I)'Image, Both));
                   end;
                end loop;
                if OK then
-                  if Joint.Contains (To_String (Key)) then
-                     Joint.Replace (To_String (Key),
-                                    Joint (To_String (Key)) + 1);
-                  else
-                     Joint.Insert (To_String (Key), 1);
-                  end if;
+                  declare
+                     Ks : constant String := To_String (Key);
+                  begin
+                     if Seen.Contains (Ks) then
+                        declare
+                           R : Tuple_Rec := Present (Seen (Ks));
+                        begin
+                           R.Count := R.Count + 1;
+                           Present.Replace_Element (Seen (Ks), R);
+                        end;
+                     else
+                        Present.Append ((Idx => Tup, Count => 1));
+                        Seen.Insert (Ks, Present.Last_Index);
+                     end if;
+                  end;
                   Grand := Grand + 1;
                else
                   Missing := Missing + 1;
@@ -566,62 +603,39 @@ procedure Execute_Tables (Stmt : Statement_Access) is
             IO.Put_Line (To_String (H));
          end;
 
-         --  Enumerate tuples in value order via odometer walk over Levels.
+         --  Emit observed tuples in value order (Tuple_Less == the old odometer
+         --  order).  Cost is O(Present * log Present), never the Cartesian
+         --  product of level cardinalities.
+         Tuple_Sorting.Sort (Present);
          declare
-            Cum  : Natural := 0;
-            Idx  : array (1 .. K) of Positive := (others => 1);
-            Done : Boolean :=
-              (for some I in 1 .. K => Natural (Levels (I).Length) = 0);
+            Cum : Natural := 0;
          begin
-            while not Done loop
+            for R of Present loop
                declare
-                  Key : Unbounded_String;
+                  F    : constant Natural := R.Count;
+                  Line : Unbounded_String;
+                  Pct  : constant Float :=
+                    (if Grand = 0 then 0.0
+                     else 100.0 * Float (F) / Float (Grand));
                begin
+                  Cum := Cum + F;
                   for I in 1 .. K loop
-                     if I > 1 then Append (Key, "|"); end if;
-                     Append (Key, Trim (Idx (I)'Image, Both));
+                     Append (Line,
+                             To_String (Levels (I)(R.Idx (I)).Disp) & " ");
                   end loop;
-                  if Joint.Contains (To_String (Key)) then
-                     declare
-                        F    : constant Natural := Joint (To_String (Key));
-                        Line : Unbounded_String;
-                        Pct  : constant Float :=
-                          (if Grand = 0 then 0.0
-                           else 100.0 * Float (F) / Float (Grand));
-                     begin
-                        Cum := Cum + F;
-                        for I in 1 .. K loop
-                           Append (Line,
-                                   To_String (Levels (I)(Idx (I)).Disp) & " ");
-                        end loop;
-                        Append (Line, Trim (F'Image, Both));
-                        if Show_Pct then
-                           Append (Line, " " & Fmt2 (Pct));
-                        end if;
-                        if Show_Cum then
-                           Append (Line, " " & Trim (Cum'Image, Both));
-                        end if;
-                        if Show_Cum and then Show_Pct then
-                           Append (Line, " " &
-                             Fmt2 (if Grand = 0 then 0.0
-                                   else 100.0 * Float (Cum) / Float (Grand)));
-                        end if;
-                        IO.Put_Line (To_String (Line));
-                     end;
+                  Append (Line, Trim (F'Image, Both));
+                  if Show_Pct then
+                     Append (Line, " " & Fmt2 (Pct));
                   end if;
-                  --  Increment odometer (last index fastest) to keep value order.
-                  declare
-                     Carry : Integer := K;
-                  begin
-                     loop
-                        if Idx (Carry) < Natural (Levels (Carry).Length) then
-                           Idx (Carry) := Idx (Carry) + 1; exit;
-                        else
-                           Idx (Carry) := 1; Carry := Carry - 1;
-                           if Carry = 0 then Done := True; exit; end if;
-                        end if;
-                     end loop;
-                  end;
+                  if Show_Cum then
+                     Append (Line, " " & Trim (Cum'Image, Both));
+                  end if;
+                  if Show_Cum and then Show_Pct then
+                     Append (Line, " " &
+                       Fmt2 (if Grand = 0 then 0.0
+                             else 100.0 * Float (Cum) / Float (Grand)));
+                  end if;
+                  IO.Put_Line (To_String (Line));
                end;
             end loop;
          end;
