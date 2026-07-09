@@ -265,7 +265,8 @@ sdata-core-tarball:
 	   echo 'with "mathpaqs.gpr";'; \
 	   echo ''; \
 	   echo 'abstract project Sdata_Core_Config is'; \
-	   echo '   Build_Profile        := "release";'; \
+	   echo '   type Build_Profile_Kind is ("release", "validation", "development");'; \
+	   echo '   Build_Profile : Build_Profile_Kind := "release";'; \
 	   echo '   Ada_Compiler_Switches := ();'; \
 	   echo 'end Sdata_Core_Config;'; \
 	 } > "$$TEMP/$$BASE/config/sdata_core_config.gpr"; \
