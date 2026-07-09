@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.13.1
+Version:        0.13.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -68,6 +68,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Jul 08 2026 John L. Ries <john@theyarnbard.com> - 0.13.2-1
+- Audit remediations #3 (TABLES/STATS efficiency: O(1) hashed level lookups, STATS per-statistic re-copy hoist) and #4 (actionable $/%-in-SELECT diagnostic, issue #73). Requires sdata-core 0.1.26.
+
 * Tue Jul 07 2026 John L. Ries <john@theyarnbard.com> - 0.13.1-1
 - Milestone refactor: TABLES consumes sdata-core Group_Boundaries (R3)
 
