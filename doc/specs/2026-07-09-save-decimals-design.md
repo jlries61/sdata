@@ -48,10 +48,19 @@ significant digits.
 - **Spreadsheets** show fixed `N` decimals (columns align): `0.50`, `100.00`.
 
 This means the same data saved as `.csv` vs `.xlsx` with `/DECIMALS=2` will *look*
-different (`0.5` vs `0.50`). This asymmetry is **intended**, not a defect: CSV is text
-where trimming reads naturally, while spreadsheets use a fixed display format that is
-the native idiom and keeps decimal points aligned. The spec, HELP, man page, and
-design.md must state this explicitly so it is never "fixed" by mistake.
+different (`0.5` vs `0.50`). This asymmetry is **intended**, not a defect, and the two
+cases are driven by **different rationales**:
+
+- **CSV — information/space.** The CSV cell text *is* the data, and trailing zeros carry
+  no additional information while consuming unnecessary space. Trimming them removes
+  pure redundancy from the file.
+- **Spreadsheet — presentation consistency.** The full-precision value is retained in
+  the stored `office:value` / `<v>` regardless, so no information is at stake. The only
+  goal of the display format is **consistent, aligned presentation**, which fixed
+  N-decimal formatting provides.
+
+The spec, HELP, man page, and design.md must state this explicitly so it is never
+"fixed" by mistake.
 
 ### 3.3 Cells that are never affected
 
