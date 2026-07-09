@@ -11,6 +11,22 @@
 clean rewrite (v0.6.14, 2026-05-14) is preserved in git history. Where the split
 materially changed a dimension, the delta and its driver are called out.*
 
+**2026-07-08 re-audit + remediation (sdata 0.13.2 / sdata-core 0.1.26).** A fresh
+adversarial pass (artifact: `.ssd/audits/2026-07-08-sdata-ecosystem/standards-report.md`)
+scored the ecosystem 636/800 at audit time and surfaced four items, **all since
+resolved on real changes**: **#1** TABLES silently returned an empty table for an
+unknown crossing variable — now raises a clean error (commit `4a66c4d`, test
+`tables_unknown_var`); **#2** regressed test/ADR-count drift — resynced to
+`make check` (commit `2b5f10d`); **#3** the O(n²) class *recurred* in the new
+summary commands (STATS per-statistic column re-copy; TABLES linear level/index
+scans) — hoisted + hashed to O(rows), with a high-cardinality `perf_regression.cmd`
+guard (sdata 0.13.2 `execute_tables.adb` + sdata-core 0.1.26 `Execute_STATS`,
+PR #79); **#4** the `$`/`%`-in-SELECT error is now actionable (issue #73). The
+consumer-test pin — the prior Hard Truth's top open item — is current at v0.13.2
+(sdata-core PR #80). With #1/#3 closed, Error Handling holds at 76 and Efficiency
+at 83 on genuine grounds; the bounded `Render_List` K≥3 odometer remains a
+documented residual.
+
 ---
 
 ## 1. Architectural Integrity — **77/100** (2026-06-10)
