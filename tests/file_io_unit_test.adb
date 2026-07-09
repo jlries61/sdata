@@ -409,6 +409,27 @@ begin
    Check ("NSC-XLSX-03 row1 LABEL$ value", To_String (V), "77516");
 
    ---------------------------------------------------------------------------
+   --  RT-* : CSV writer round-trip precision (SAVE /DECIMALS design).
+   ---------------------------------------------------------------------------
+
+   --  Round-trip default: a value 6-digit Float'Image would corrupt survives.
+   --  Observe the read-back Float value directly (the writer stored it at
+   --  round-trip precision), not via To_String.
+   Parse_CSV ("tests/data/precision_src.csv");
+   SData_Core.File_IO.Open_Output ("tests/data/rt_out.csv", SData_Core.Config.CSV);
+   Parse_CSV ("tests/data/rt_out.csv");
+   V := Get_Value (1, "X");
+   Check ("CSV round-trip preserves X", V.Num_Val = Float'(123456.789), True);
+
+   --  /DECIMALS=2 rounds the stored CSV text; the read-back Float is 3.14.
+   Parse_CSV ("tests/data/precision_src.csv");
+   SData_Core.File_IO.Open_Output ("tests/data/dec_out.csv", SData_Core.Config.CSV,
+                                   Decimals => 2);
+   Parse_CSV ("tests/data/dec_out.csv");
+   V := Get_Value (2, "X");   --  row 2 X = 3.14159 -> DECIMALS=2 -> 3.14
+   Check ("CSV DECIMALS=2 rounds X to 3.14", V.Num_Val = Float'(3.14), True);
+
+   ---------------------------------------------------------------------------
    --  Summary
    ---------------------------------------------------------------------------
    New_Line;

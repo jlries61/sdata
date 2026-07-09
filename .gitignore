@@ -41,12 +41,21 @@ tests/data/save_rename.csv
 tests/data/rename_retype_out.csv
 tests/data/perf_regression_a.csv
 tests/data/perf_regression_b.csv
+tests/data/perf_regression_c.csv
 tests/data/big.csv
 tests/data/small.csv
 tests/data/qid_if_big.csv
 tests/data/qid_if_small.csv
 tests/data/qid_alias.csv
 tests/data/wide_table.csv
+# txtfmt_test line-ending SAVE outputs (self-generated, read back in-test)
+tests/data/txtfmt_crlf.csv
+tests/data/txtfmt_lf.csv
+# file_io_unit_test round-trip / DECIMALS scratch outputs (Task 2-4)
+tests/data/rt_out.csv
+tests/data/dec_out.csv
+tests/data/dec_out.ods
+tests/data/dec_out.xlsx
 sdata_opt_*.csv
 
 # Packaging artifacts
