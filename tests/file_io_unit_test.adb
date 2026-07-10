@@ -429,6 +429,15 @@ begin
    V := Get_Value (2, "X");   --  row 2 X = 3.14159 -> DECIMALS=2 -> 3.14
    Check ("CSV DECIMALS=2 rounds X to 3.14", V.Num_Val = Float'(3.14), True);
 
+   --  ODF keeps full precision in office:value regardless of /DECIMALS.
+   Parse_CSV ("tests/data/precision_src.csv");
+   SData_Core.File_IO.Open_Output ("tests/data/dec_out.ods", SData_Core.Config.ODF,
+                                   Decimals => 2);
+   Parse_ODF ("tests/data/dec_out.ods");
+   V := Get_Value (1, "X");
+   Check ("ODF stored value stays full precision",
+          V.Num_Val = Float'(123456.789), True);
+
    ---------------------------------------------------------------------------
    --  Summary
    ---------------------------------------------------------------------------

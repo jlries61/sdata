@@ -38,6 +38,7 @@ tests/data/out_b.csv
 tests/data/save_drop.csv
 tests/data/save_keep.csv
 tests/data/save_rename.csv
+tests/data/save_bracket_out.ods
 tests/data/rename_retype_out.csv
 tests/data/perf_regression_a.csv
 tests/data/perf_regression_b.csv
