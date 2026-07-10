@@ -438,6 +438,15 @@ begin
    Check ("ODF stored value stays full precision",
           V.Num_Val = Float'(123456.789), True);
 
+   --  OOXML keeps full precision in <v> regardless of /DECIMALS.
+   Parse_CSV ("tests/data/precision_src.csv");
+   SData_Core.File_IO.Open_Output ("tests/data/dec_out.xlsx", SData_Core.Config.OOXML,
+                                   Decimals => 2);
+   Parse_OOXML ("tests/data/dec_out.xlsx");
+   V := Get_Value (1, "X");
+   Check ("OOXML stored value stays full precision",
+          V.Num_Val = Float'(123456.789), True);
+
    ---------------------------------------------------------------------------
    --  Summary
    ---------------------------------------------------------------------------
