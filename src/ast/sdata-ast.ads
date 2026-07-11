@@ -68,6 +68,8 @@ package SData.AST is
       Charset_Len      : Natural := 0;
       DLM_Val          : String (1 .. Max_Delimiter_Len) := (others => ' ');
       DLM_Len          : Natural := 0;
+      Decimals_Specified : Boolean := False;   --  SAVE only
+      Decimals_Val       : Natural := 0;
       NSCAN_Val        : Natural := 0;   --  USE only
       Skip_Val         : Natural := 0;   --  USE only
       Maxrows_Val      : Natural := 0;   --  USE only
@@ -230,6 +232,8 @@ package SData.AST is
             Header_Val       : Boolean := True;
             DLM_Path         : String (1 .. Max_Delimiter_Len)  := (others => ' ');
             DLM_Len          : Natural := 0;
+            Decimals_Specified : Boolean := False;
+            Decimals_Val       : Natural := 0;
             Sheet_Name         : String (1 .. Max_Sheet_Name_Len) := (others => ' ');
             Sheet_Name_Len     : Natural := 0;
             Output_FMT_Val     : String (1 .. Max_Delimiter_Len)  := (others => ' ');
