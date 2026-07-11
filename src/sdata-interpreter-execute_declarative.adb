@@ -568,6 +568,8 @@ begin
                Eff_Fmt : constant SData_Core.Config.Format_Type :=
                   (if Stmt.Format_Specified then Stmt.Fmt_Override
                    else SData_Core.Config.Output_Format);
+               Eff_Decimals : constant Integer :=
+                  (if Stmt.Decimals_Specified then Stmt.Decimals_Val else -1);
             begin
                SData_Core.Commands.Execute_SAVE
                  (File_Name    => File_Name,
@@ -575,7 +577,8 @@ begin
                   Sheet_Name   => Stmt.Sheet_Name (1 .. Stmt.Sheet_Name_Len),
                   Delimiter    => Eff_DLM,
                   Write_Header => Eff_Header,
-                  Charset      => Eff_Charset);
+                  Charset      => Eff_Charset,
+                  Decimals     => Eff_Decimals);
             end Legacy_Execute_SAVE;
          begin
             --  Empty SAVE: clear everything (both legacy and multi-target).
