@@ -1,3 +1,9 @@
+sdata (0.14.0-1) unstable; urgency=medium
+
+  * SAVE /DECIMALS=N option and round-trip float output in CSV/ODF/OOXML writers
+
+ -- John L. Ries <john@theyarnbard.com>  Sat, 11 Jul 2026 15:04:04 -0700
+
 sdata (0.13.3-1) unstable; urgency=medium
 
   * Complete audit remediation #3: Render_List enumerates observed tuples instead of the full Cartesian product of level cardinalities (O(rows) not O(product), byte-identical output).
