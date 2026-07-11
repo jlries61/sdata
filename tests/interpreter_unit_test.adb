@@ -990,6 +990,21 @@ begin
    end;
 
    -----------------------------------------------------------------------
+   --  O.  SAVE /DECIMALS=N: parser unit tests
+   -----------------------------------------------------------------------
+   Put_Line ("");
+   Put_Line ("--- O: SAVE /DECIMALS=N ---");
+
+   --  DEC-01: SAVE .../DECIMALS=3 parses to the flat Stmt fields.
+   declare
+      P : Statement_Access := Parse_One ("SAVE ""x.csv"" / DECIMALS=3");
+   begin
+      Check ("DEC-01: DECIMALS specified", P.Decimals_Specified, True);
+      Check ("DEC-01: DECIMALS value", Integer (P.Decimals_Val), 3);
+      SData.AST.Free_Program (P);
+   end;
+
+   -----------------------------------------------------------------------
    --  Summary
    -----------------------------------------------------------------------
    Put_Line ("");

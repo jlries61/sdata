@@ -917,6 +917,34 @@ package body SData.Parser is
                         end if;
                      end;
 
+                  elsif Key_Up = "DECIMALS" then
+                     declare
+                        Peek : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                     begin
+                        if Peek.Kind = Token_Minus then
+                           Put_Line_Error
+                             ("Error: /DECIMALS= requires a non-negative integer");
+                           declare
+                              D1 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              D2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              pragma Unreferenced (D1, D2);
+                           begin null; end;
+                        else
+                           declare
+                              Val_Tok : constant Token :=
+                                 Get_Next_Token (Ctx.Lex_Ctx);
+                           begin
+                              Opts.Decimals_Val :=
+                                 Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                              Opts.Decimals_Specified := True;
+                           exception
+                              when Constraint_Error =>
+                                 Put_Line_Error
+                                   ("Error: /DECIMALS= requires a non-negative integer");
+                           end;
+                        end if;
+                     end;
+
                   else
                      Put_Line_Error
                        ("Error: Unknown spec option """ & Key_Up & """");
@@ -1051,6 +1079,26 @@ package body SData.Parser is
                   Opts.DLM_Val (1 .. VLen) := Val_Tok.Text (1 .. VLen);
                   Opts.DLM_Len := VLen;
                end;
+
+            elsif Flag_Name = "DECIMALS" then
+               if Val_Tok.Kind = Token_Minus then
+                  Put_Line_Error
+                    ("Error: /DECIMALS= requires a non-negative integer");
+                  declare
+                     D : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     pragma Unreferenced (D);
+                  begin null; end;
+               else
+                  begin
+                     Opts.Decimals_Val :=
+                        Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                     Opts.Decimals_Specified := True;
+                  exception
+                     when Constraint_Error =>
+                        Put_Line_Error
+                          ("Error: /DECIMALS= requires a non-negative integer");
+                  end;
+               end if;
 
             elsif Flag_Name = "SHEET" then
                declare
@@ -1653,6 +1701,9 @@ package body SData.Parser is
                Stmt.DLM_Len := Spec.Opts.DLM_Len;
                Stmt.DLM_Path (1 .. Spec.Opts.DLM_Len) :=
                   Spec.Opts.DLM_Val (1 .. Spec.Opts.DLM_Len);
+
+               Stmt.Decimals_Specified := Spec.Opts.Decimals_Specified;
+               Stmt.Decimals_Val       := Spec.Opts.Decimals_Val;
 
                Stmt.Output_CHARSET_Len := Spec.Opts.Charset_Len;
                Stmt.Output_CHARSET_Val (1 .. Spec.Opts.Charset_Len) :=
