@@ -439,6 +439,38 @@ Whether to write a header row (default YES).
 .TP
 .BI CHARSET= enc
 Character encoding for this target (e.g.\& UTF\-8).
+.TP
+.BI DECIMALS= N
+Control floating-point output precision for this target.
+.I N
+is a non\-negative integer literal; a negative or non\-integer value is a
+parse error.
+.B CSV
+rounds the stored value to
+.I N
+decimal places and strips trailing zeros (variable width; genuine
+precision reduction).
+.B ODF
+and
+.B OOXML
+keep the full round\-trip\-precise stored value and instead attach a
+fixed
+.IR N \-decimal
+display format, so cells always show exactly
+.I N
+decimals (e.g.\&
+.BR 0.50 ).
+This asymmetry is intentional: CSV text
+.I is
+the data, so trailing zeros are pure redundancy; a spreadsheet's
+stored value is unaffected, so the format's only job is consistent
+presentation.
+With no
+.BR DECIMALS= ,
+all three formats render finite floating\-point values at
+round\-trip precision (integer, string, and missing cells are never
+affected by
+.BR DECIMALS= ).
 .RE
 .PP
 The
