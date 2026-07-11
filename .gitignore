@@ -91,3 +91,12 @@ tests/data/submit_depth_gen/
 # Local working backup of the standards review
 /doc/SOFTWARE_STANDARDS_REVIEW_bak.md
 tests/output40_capture.dat
+
+# SAVE /DECIMALS integration test scratch outputs (Task 10)
+tests/data/dc_default.csv
+tests/data/dc_2.csv
+tests/data/dc_0.csv
+tests/data/pt_a.csv
+tests/data/pt_b.csv
+tests/data/neg.csv
+tests/data/style.xlsx

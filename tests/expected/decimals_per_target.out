@@ -1,0 +1,14 @@
+Dataset opened: tests/data/precision_src.csv
+Dataset saved: tests/data/pt_a.csv
+Dataset saved: tests/data/pt_b.csv
+RUN complete. 3 records and 2 variables processed.
+=== a: 1dp ===
+X,LABEL$
+123456.8,a
+3.1,b
+0.5,c
+=== b: 3dp ===
+X,LABEL$
+123456.789,a
+3.142,b
+0.5,c

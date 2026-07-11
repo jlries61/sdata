@@ -1,0 +1,24 @@
+Dataset opened: tests/data/precision_src.csv
+Dataset saved: tests/data/dc_default.csv
+RUN complete. 3 records and 2 variables processed.
+=== default ===
+X,LABEL$
+123456.79,a
+3.14159,b
+0.5,c
+Dataset opened: tests/data/precision_src.csv
+Dataset saved: tests/data/dc_2.csv
+RUN complete. 3 records and 2 variables processed.
+=== decimals=2 ===
+X,LABEL$
+123456.79,a
+3.14,b
+0.5,c
+Dataset opened: tests/data/precision_src.csv
+Dataset saved: tests/data/dc_0.csv
+RUN complete. 3 records and 2 variables processed.
+=== decimals=0 ===
+X,LABEL$
+123457,a
+3,b
+1,c

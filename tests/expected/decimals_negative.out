@@ -1,0 +1,4 @@
+Error: /DECIMALS= requires a non-negative integer
+Dataset opened: tests/data/precision_src.csv
+Dataset saved: tests/data/neg.csv
+RUN complete. 3 records and 2 variables processed.
