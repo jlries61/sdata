@@ -241,9 +241,10 @@ double-precision widening is deferred — see [ADR-050](adrs.md) §5 and design.
 equivalent). The `MISSING()` function tests for this state.
 
 `SData_Core.Values` also hosts the shared finite-float rendering used by all three
-`SAVE` writers (CSV/ODF/OOXML): `Image_Round_Trip` (default, digit count derived from
-the numeric type's model mantissa) and `Image_Fixed_Decimals` (the `/DECIMALS=N`
-path). CSV calls the latter directly to round and trim the stored cell text; the ODF
+`SAVE` writers (CSV/ODF/OOXML): `Image_Round_Trip` (default; a fixed digit count sized
+for the current 32-bit `Float` — not derived from the numeric type — to be revisited by
+the widening audit per [ADR-050](adrs.md) §5) and `Image_Fixed_Decimals` (the
+`/DECIMALS=N` path). CSV calls the latter directly to round and trim the stored cell text; the ODF
 and OOXML writers always store `Image_Round_Trip`'s full-precision value and instead
 emit a fixed-`N`-decimal spreadsheet number-format (`<number:number-style>` in ODF,
 a `styles.xml` `numFmt`/`cellXfs` entry referenced via `s=` in OOXML) so the *display*

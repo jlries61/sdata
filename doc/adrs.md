@@ -694,12 +694,13 @@ mechanics that deliberately differ between CSV and the two spreadsheet formats.
    gated behind any option — so every existing `.csv`/`.ods`/`.xlsx` fixture containing a saved
    float shifted and had to be regenerated and manually reviewed (not blindly accepted) as part
    of implementation.
-3. **Shared renderers, digit count derived from the type.** `Image_Round_Trip` and
-   `Image_Fixed_Decimals` (`SData_Core.Values`) replace three independent `Float'Image` call
-   sites with one implementation each writer calls. The round-trip significant-digit count is
-   computed once from the float type's model mantissa rather than hardcoded, so it will emit
-   full double precision automatically if/when the underlying type is later widened (see
-   decision 5), with no renderer change required.
+3. **Shared renderers, digit count fixed for the current 32-bit `Float`.** `Image_Round_Trip`
+   and `Image_Fixed_Decimals` (`SData_Core.Values`) replace three independent `Float'Image`
+   call sites with one implementation each writer calls. The round-trip search loop (`Aft` 1
+   .. 17) and the exponential fallback (`Aft => 8, Exp => 2`, i.e. 9 significant digits) are
+   fixed literal constants sized for 32-bit `Float`, which is what round-trips binary32; both
+   renderers are also typed to `Float` throughout. Nothing here auto-derives from
+   `Float'Digits`/`Float'Model_Mantissa` — see decision 5.
 4. **Additive, defaulted-parameter plumbing for contract safety.** `Execute_SAVE` and
    `Open_Output` are public sdata-core API shared with data-vandal. `Decimals` is added as a
    single new **defaulted** trailing parameter (`Integer := -1`, meaning "no `/DECIMALS=`
@@ -713,10 +714,12 @@ mechanics that deliberately differ between CSV and the two spreadsheet formats.
    architecture-dependent precision (64-bit → IEEE 754 double), but the implementation uses a
    plain 32-bit `Float` throughout. This feature targets round-trip fidelity of the *current*
    `Float` only; it does not attempt to close that pre-existing design/code conformance gap.
-   Because the digit count in decision 3 is derived from the type rather than hardcoded, and
-   neither ODF nor OOXML constrains stored values to 32-bit precision, the eventual widening
-   (whenever the deferred audit addresses it) will not require touching this feature's
-   renderers again.
+   Per decision 3, the renderers' digit counts are fixed constants and both renderers are typed
+   to `Float`, not derived from the numeric type — so the deferred widening audit **must**
+   revisit `Image_Round_Trip`/`Image_Fixed_Decimals` (both the significant-digit constants and
+   the `Float` parameter type) when it widens the underlying numeric type to `Long_Float`;
+   neither ODF nor OOXML constrains the stored value to 32-bit precision, so only the renderers
+   (not the file formats) stand in the way.
 
 **Consequences:** sdata-core gains an additive API surface (`Execute_SAVE`/`Open_Output`
 `Decimals` parameter, `Runtime.Set_Save_Decimals`/`Save_Decimals`, `Image_Round_Trip`/

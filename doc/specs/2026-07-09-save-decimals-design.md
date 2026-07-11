@@ -47,9 +47,11 @@ Every finite `Val_Numeric` cell in **all three** writers is rendered at **round-
 precision for the current numeric type**, with trailing zeros and any bare trailing `.`
 trimmed. For the current 32-bit `Float` that is **9 significant digits**.
 
-- The digit count is **derived from the type**, not hardcoded — computed from the float
-  type's model mantissa (single `Float` → 9; if the type is later widened to `Long_Float`
-  per §9, the same code yields 17 automatically).
+- The digit count is a **fixed literal constant sized for the current 32-bit `Float`**
+  (an `Aft` 1 .. 17 round-trip search, exponential fallback at `Aft => 8, Exp => 2` = 9
+  significant digits), not computed from `Float'Digits`/`Float'Model_Mantissa`. If the
+  type is later widened to `Long_Float` per §9, these renderers must be revisited by
+  hand — see §5.3 and §5.6.
 - **Notation:** human-friendly general form — fixed notation where the magnitude permits
   without precision loss, exponential otherwise; trailing zeros trimmed. *(Exact
   notation-selection rule is an implementation detail; flagged for review — see §10.)*
@@ -172,8 +174,9 @@ older sdata still builds against the new sdata-core.
 Two rendering needs, both new:
 
 - **Round-trip renderer** `Image_Round_Trip (X : Float) return String` — §3.1: render at
-  round-trip significant digits derived from the type, human-friendly notation, trailing
-  zeros + bare `.` trimmed. Used by all three writers for finite floats whenever
+  a fixed round-trip significant-digit count sized for 32-bit `Float`, human-friendly
+  notation, trailing zeros + bare `.` trimmed. Used by all three writers for finite floats
+  whenever
   `Decimals < 0`, **and** for the round-trip-precise stored value in spreadsheets even
   when `Decimals >= 0`.
 - **Fixed-decimals renderer** `Image_Fixed_Decimals (X : Float; Decimals : Natural)
@@ -184,8 +187,10 @@ Two rendering needs, both new:
 
 Placement: a small shared helper (e.g. in `sdata_core-values` or a `file_io` helper unit)
 so all three writers call the same code rather than re-inlining, replacing the three
-independent `Float'Image` sites. The round-trip digit count is computed once from the
-float type's model mantissa.
+independent `Float'Image` sites. The round-trip digit count is a fixed literal constant
+sized for 32-bit `Float`, not computed from the type; both renderers are typed to
+`Float`. The deferred widening audit (§3.1, ADR-050 §5) must revisit both when the
+underlying numeric type is widened.
 
 **CSV cell site** (`file_io-csv.adb:688-699`): finite `Val_Numeric` →
 `Image_Fixed_Decimals` when `Decimals >= 0`, else `Image_Round_Trip`. `Inf`/`-Inf`,
@@ -220,8 +225,9 @@ integers, strings, missing untouched.
 
 From `N`, build each writer's dialect: ODF `number:decimal-places="N"`
 (= `min-decimal-places="N"`); OOXML `formatCode` = `"0"` (N=0) or `"0."` + `N` zeros. The
-round-trip significant-digit count (§3.1) is computed from the float type's model mantissa
-so it tracks any future type widening.
+round-trip significant-digit count (§3.1) is a fixed constant, not derived from the
+float type — it does **not** auto-track a future type widening; the deferred widening
+audit must update it by hand (§5.3, ADR-050 §5).
 
 ## 6. Cross-crate release
 
@@ -290,11 +296,12 @@ are the correct round-trip renderings.
   §"Floating Point Numeric" (lines 42–49) mandates precision by machine architecture
   (64-bit → IEEE 754 double), but the code uses plain 32-bit `Float`. This
   design-vs-code conformance gap is **deferred to the planned codebase-vs-design audit**.
-  This feature targets round-trip of the *current* single-precision `Float`; because the
-  §3.1 renderer derives its digit count from the type, it will emit full double precision
-  automatically once that audit widens the type. Neither ODF nor OOXML constrains stored
-  values to 32-bit (both are decimal text read as binary64), so the file formats already
-  accommodate the eventual widening.
+  This feature targets round-trip of the *current* single-precision `Float`; the §3.1/§5.3
+  renderers use fixed constants sized for 32-bit `Float` and are typed to `Float`, so they
+  will **not** auto-scale when that audit widens the type — the audit must update them by
+  hand (ADR-050 §5). Neither ODF nor OOXML constrains stored values to 32-bit (both are
+  decimal text read as binary64), so the file formats themselves already accommodate the
+  eventual widening; only the renderers need the audit's attention.
 - Per-column precision (a single `N` per SAVE target only).
 - Significant-digits mode; user-configurable scientific-notation control.
 - Applying a display format to integer or string columns.
