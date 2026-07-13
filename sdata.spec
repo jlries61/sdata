@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.14.0
+Version:        0.14.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Jul 13 2026 John L. Ries <john@theyarnbard.com> - 0.14.1-1
+- SORT/BY reject undefined variables instead of silently leaving data unsorted (#50)
+
 * Sat Jul 11 2026 John L. Ries <john@theyarnbard.com> - 0.14.0-1
 - SAVE /DECIMALS=N option and round-trip float output in CSV/ODF/OOXML writers
 
