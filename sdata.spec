@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.13.3
+Version:        0.14.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Sat Jul 11 2026 John L. Ries <john@theyarnbard.com> - 0.14.0-1
+- SAVE /DECIMALS=N option and round-trip float output in CSV/ODF/OOXML writers
+
 * Wed Jul 08 2026 John L. Ries <john@theyarnbard.com> - 0.13.3-1
 - Complete audit remediation #3: Render_List enumerates observed tuples instead of the full Cartesian product of level cardinalities (O(rows) not O(product), byte-identical output).
 

@@ -656,3 +656,80 @@ SData retains `DIM` but its scope narrows to creating subscripted variables that
 8. **Pending-deferred guard.** TABLES raises before doing any work if deferred program statements are queued (the same `Pending_Deferred > 0` check used by STATS/AGGREGATE/TRANSPOSE), consistent with those commands' requirement that the report reflects fully-processed data.
 
 **Consequences:** TABLES becomes a new reserved word in sdata's lexer. sdata-core 0.1.22 (additive — `Chi_Square_Tests` and `Goodness_Of_Fit` added to `SData_Core.Statistics`); the sdata floor is bumped from `^0.1.20` to `^0.1.22`. data-vandal does not use any TABLES API and builds clean against the additive sdata-core surface. The print-only model means TABLES can be invoked repeatedly within a session without disturbing SELECT, BY, or the table — a different usage pattern from STATS/AGGREGATE/TRANSPOSE, which consume and transform the table on each call.
+
+---
+
+### ADR-050: SAVE /DECIMALS and round-trip float output
+**Date:** 2026-07-09 | **Status:** Accepted
+
+**Context:** Design spec `doc/specs/2026-07-09-save-decimals-design.md` addresses two coupled
+problems in how `SAVE` writes floating-point cells. First, a latent precision bug: all three
+writers (CSV, ODF, OOXML) rendered finite floats with plain `Float'Image`, which GNAT limits
+to 6 significant digits — already lossy for a 32-bit `Float`, which needs 9 significant digits
+to round-trip (e.g. `123456.789` was silently stored as `123457`, even in spreadsheets, where
+no space pressure justifies the loss). Second, there was no way to control saved precision at
+`SAVE` time; `OPTIONS DIGITS` only affects console/PRINT output and is consulted by no writer.
+The spec fixes both together: every writer always renders at round-trip precision by default,
+and a new `/DECIMALS=N` option lets a user additionally request a specific decimal count, with
+mechanics that deliberately differ between CSV and the two spreadsheet formats.
+
+**Decision:**
+1. **Per-format `/DECIMALS=N` semantics are deliberately asymmetric, not a shared code path.**
+   `N` is a non-negative-integer count of decimal places (parse error otherwise: `/DECIMALS=
+   requires a non-negative integer`). **CSV** rounds the stored text value to `N` places and
+   strips trailing zeros (and a bare trailing `.`) — a genuine, variable-width data reduction,
+   because the CSV cell text *is* the data and trailing zeros are pure redundancy. **ODF/OOXML**
+   instead keep the full round-trip-precise value in the cell (`office:value` / `<v>`) and
+   attach a *fixed* `N`-decimal display number-format (`<number:number-style>` /
+   `styles.xml` `numFmt` + `cellXfs`, referenced via `s=` on each numeric cell), so cells
+   always *show* exactly `N` decimals with no information at stake — the format's only job is
+   aligned, consistent presentation. Only finite `Val_Numeric` cells are affected in any
+   format; integer, character, missing, and `Inf`/`-Inf` cells are untouched. HELP, the man
+   page, and design.md all state this asymmetry explicitly so a future change does not "fix"
+   it into false symmetry.
+2. **Round-trip-precision default is a bugfix that changes existing output bytes.** With no
+   `/DECIMALS=`, all three writers now render finite floats at round-trip precision for the
+   current numeric type (9 significant digits for 32-bit `Float`), trailing zeros trimmed,
+   superseding the previous 6-digit `Float'Image` rendering. This is unconditional — it is not
+   gated behind any option — so every existing `.csv`/`.ods`/`.xlsx` fixture containing a saved
+   float shifted and had to be regenerated and manually reviewed (not blindly accepted) as part
+   of implementation.
+3. **Shared renderers, digit count fixed for the current 32-bit `Float`.** `Image_Round_Trip`
+   and `Image_Fixed_Decimals` (`SData_Core.Values`) replace three independent `Float'Image`
+   call sites with one implementation each writer calls. The round-trip search loop (`Aft` 1
+   .. 17) and the exponential fallback (`Aft => 8, Exp => 2`, i.e. 9 significant digits) are
+   fixed literal constants sized for 32-bit `Float`, which is what round-trips binary32; both
+   renderers are also typed to `Float` throughout. Nothing here auto-derives from
+   `Float'Digits`/`Float'Model_Mantissa` — see decision 5.
+4. **Additive, defaulted-parameter plumbing for contract safety.** `Execute_SAVE` and
+   `Open_Output` are public sdata-core API shared with data-vandal. `Decimals` is added as a
+   single new **defaulted** trailing parameter (`Integer := -1`, meaning "no `/DECIMALS=`
+   given"), stashed via a new `SData_Core.Config.Runtime` setter/getter alongside the existing
+   `Save_DLM`/`Header`/`Charset` state. This keeps data-vandal source-compatible without any
+   code change on its part, and keeps the older sdata tag pinned by sdata-core's
+   `consumer-tests.yml` building against the new sdata-core unmodified — the same additive
+   pattern established for AGGREGATE/TRANSPOSE/STATS/TABLES in prior ADRs.
+5. **Platform-native (double) precision widening is out of scope, deferred to the planned
+   design-vs-code audit.** design.md's Floating Point Numeric section prescribes
+   architecture-dependent precision (64-bit → IEEE 754 double), but the implementation uses a
+   plain 32-bit `Float` throughout. This feature targets round-trip fidelity of the *current*
+   `Float` only; it does not attempt to close that pre-existing design/code conformance gap.
+   Per decision 3, the renderers' digit counts are fixed constants and both renderers are typed
+   to `Float`, not derived from the numeric type — so the deferred widening audit **must**
+   revisit `Image_Round_Trip`/`Image_Fixed_Decimals` (both the significant-digit constants and
+   the `Float` parameter type) when it widens the underlying numeric type to `Long_Float`;
+   neither ODF nor OOXML constrains the stored value to 32-bit precision, so only the renderers
+   (not the file formats) stand in the way.
+
+**Consequences:** sdata-core gains an additive API surface (`Execute_SAVE`/`Open_Output`
+`Decimals` parameter, `Runtime.Set_Save_Decimals`/`Save_Decimals`, `Image_Round_Trip`/
+`Image_Fixed_Decimals` on `SData_Core.Values`) — patch bump 0.1.26 → 0.1.27. sdata gains the
+`DECIMALS=` parser/AST plumbing (`sdata-parser.adb`, `Spec_Options`/`Stmt_SAVE` on
+`sdata-ast.ads`) and the interpreter call-site wiring at both the single-target and
+multi-target `SAVE` paths; the corresponding sdata minor bump (0.13.3 → 0.14.0) and
+`sdata_core = "^0.1.27"` floor raise land with the release task that follows this docs change,
+per the standard cross-crate release sequence (sdata-core first, then sdata, then data-vandal).
+data-vandal's code is unaffected by the additive API, but because the round-trip-precision
+default changes saved-float bytes unconditionally, its own expected-output fixtures containing
+saved floats must be regenerated once it advances its `sdata-core` floor, and its `make check`
+re-run before push, per the standing two-consumer local gate.

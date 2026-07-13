@@ -37,7 +37,7 @@ Formula cells (ODF/OOXML):
   for volatile functions (TODAY, NOW, RAND) or manual-recalc files.
 Execution: Immediate -- loads the dataset at once.
 
-Command: SAVE "filename[sheet]" [/FMT=format] [/HEADER=YES|NO]
+Command: SAVE "filename[sheet]" [/FMT=format] [/HEADER=YES|NO] [/DECIMALS=N]
 Queues the current Data Table to be saved after the next RUN command.
 Sheet selection (ODF/OOXML only):
   Append the sheet name in brackets inside the filename string.
@@ -47,6 +47,10 @@ Options:
   /FMT=format  Specifies the output format (CSV, ODF, OOXML).
                Default is auto-detected from file extension.
   /HEADER=val  Whether to write a header row (YES or NO). Default: YES.
+  /DECIMALS=N  Round floating-point output to N decimal places
+               (N >= 0).  CSV: rounds the stored value and trims
+               trailing zeros.  ODF/OOXML: keeps full precision and
+               applies a fixed N-decimal display format.
 Multiple targets (comma-separated) with per-target options:
   SAVE "a" (KEEP=ID), "b" (DROP=ID), "c" (RENAME=(X=Y))
   (KEEP=name ...)          Keep only the named columns in this target.

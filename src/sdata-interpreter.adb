@@ -1787,6 +1787,9 @@ package body SData.Interpreter is
                               (1 .. SData_Core.Config.Runtime.Options_CHARSET_Len));
                   Sheet      : constant String :=
                      T.Opts.Sheet_Name (1 .. T.Opts.Sheet_Name_Len);
+                  Eff_Decimals : constant Integer :=
+                     (if T.Opts.Decimals_Specified then T.Opts.Decimals_Val
+                      else -1);
                   --  Use the per-target accumulator buffer as the output
                   --  source.  Fall back to Empty_Schema (header-only) when
                   --  the buffer was never initialized (no records routed).
@@ -1841,7 +1844,8 @@ package body SData.Interpreter is
                         Delimiter       => Eff_DLM,
                         Write_Header    => Eff_Header,
                         Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
-                        Charset         => Eff_Charset);
+                        Charset         => Eff_Charset,
+                        Decimals        => Eff_Decimals);
                      if not SData_Core.Config.Quiet_Mode then
                         Put_Line ("Dataset saved: " & Full);
                      end if;

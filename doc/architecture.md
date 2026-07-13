@@ -235,8 +235,20 @@ Variables live in one of two namespaces managed by `SData.Variables`:
   table at step commit).
 
 The `Value` type (`SData.Values`) is a variant record with four states: `Numeric`
-(64-bit float), `Integer`, `String` (unbounded), and `Missing` (SQL NULL equivalent).
-The `MISSING()` function tests for this state.
+(a 32-bit single-precision `Float` in the current implementation; platform-native
+double-precision widening is deferred — see [ADR-050](adrs.md) §5 and design.md §2.2
+"Floating Point Numeric"), `Integer`, `String` (unbounded), and `Missing` (SQL NULL
+equivalent). The `MISSING()` function tests for this state.
+
+`SData_Core.Values` also hosts the shared finite-float rendering used by all three
+`SAVE` writers (CSV/ODF/OOXML): `Image_Round_Trip` (default; a fixed digit count sized
+for the current 32-bit `Float` — not derived from the numeric type — to be revisited by
+the widening audit per [ADR-050](adrs.md) §5) and `Image_Fixed_Decimals` (the
+`/DECIMALS=N` path). CSV calls the latter directly to round and trim the stored cell text; the ODF
+and OOXML writers always store `Image_Round_Trip`'s full-precision value and instead
+emit a fixed-`N`-decimal spreadsheet number-format (`<number:number-style>` in ODF,
+a `styles.xml` `numFmt`/`cellXfs` entry referenced via `s=` in OOXML) so the *display*
+—not the stored value— carries the requested precision. See [ADR-050](adrs.md).
 
 ---
 

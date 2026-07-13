@@ -104,7 +104,7 @@ package body SData.Help is
 
    procedure Help_SAVE is
    begin
-      Put_Line ("Command: SAVE ""filename[sheet]"" [/FMT=format] [/HEADER=YES|NO]");
+      Put_Line ("Command: SAVE ""filename[sheet]"" [/FMT=format] [/HEADER=YES|NO] [/DECIMALS=N]");
       Put_Line ("Queues the current Data Table to be saved after the next RUN command.");
       Put_Line ("Sheet selection (ODF/OOXML only):");
       Put_Line ("  Append the sheet name in brackets inside the filename string.");
@@ -114,6 +114,10 @@ package body SData.Help is
       Put_Line ("  /FMT=format  Specifies the output format (CSV, ODF, OOXML).");
       Put_Line ("               Default is auto-detected from file extension.");
       Put_Line ("  /HEADER=val  Whether to write a header row (YES or NO). Default: YES.");
+      Put_Line ("  /DECIMALS=N  Round floating-point output to N decimal places");
+      Put_Line ("               (N >= 0).  CSV: rounds the stored value and trims");
+      Put_Line ("               trailing zeros.  ODF/OOXML: keeps full precision and");
+      Put_Line ("               applies a fixed N-decimal display format.");
       Put_Line ("Multiple targets (comma-separated) with per-target options:");
       Put_Line ("  SAVE ""a"" (KEEP=ID), ""b"" (DROP=ID), ""c"" (RENAME=(X=Y))");
       Put_Line ("  (KEEP=name ...)          Keep only the named columns in this target.");

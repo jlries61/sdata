@@ -38,15 +38,25 @@ tests/data/out_b.csv
 tests/data/save_drop.csv
 tests/data/save_keep.csv
 tests/data/save_rename.csv
+tests/data/save_bracket_out.ods
 tests/data/rename_retype_out.csv
 tests/data/perf_regression_a.csv
 tests/data/perf_regression_b.csv
+tests/data/perf_regression_c.csv
 tests/data/big.csv
 tests/data/small.csv
 tests/data/qid_if_big.csv
 tests/data/qid_if_small.csv
 tests/data/qid_alias.csv
 tests/data/wide_table.csv
+# txtfmt_test line-ending SAVE outputs (self-generated, read back in-test)
+tests/data/txtfmt_crlf.csv
+tests/data/txtfmt_lf.csv
+# file_io_unit_test round-trip / DECIMALS scratch outputs (Task 2-4)
+tests/data/rt_out.csv
+tests/data/dec_out.csv
+tests/data/dec_out.ods
+tests/data/dec_out.xlsx
 sdata_opt_*.csv
 
 # Packaging artifacts
@@ -81,3 +91,12 @@ tests/data/submit_depth_gen/
 # Local working backup of the standards review
 /doc/SOFTWARE_STANDARDS_REVIEW_bak.md
 tests/output40_capture.dat
+
+# SAVE /DECIMALS integration test scratch outputs (Task 10)
+tests/data/dc_default.csv
+tests/data/dc_2.csv
+tests/data/dc_0.csv
+tests/data/pt_a.csv
+tests/data/pt_b.csv
+tests/data/neg.csv
+tests/data/style.xlsx
