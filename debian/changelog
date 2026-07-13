@@ -1,3 +1,9 @@
+sdata (0.14.2-1) unstable; urgency=medium
+
+  * Allow assigning a missing value to an existing typed column (#51)
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 13 Jul 2026 16:20:08 -0700
+
 sdata (0.14.1-1) unstable; urgency=medium
 
   * SORT/BY reject undefined variables instead of silently leaving data unsorted (#50)
