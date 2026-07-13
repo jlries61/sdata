@@ -98,7 +98,14 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
       Existing_Kind : constant Value_Kind := Get_Type (Var_Name);
       Result        : Value := Raw;
    begin
-      if Existing_Kind /= Val_Missing then
+      --  A missing RHS is assignable to a column of any type: it represents the
+      --  absence of a value, not a value of a conflicting type.  Assigning
+      --  missing to an EXISTING typed column (e.g. recoding a sentinel to
+      --  missing in place) must therefore succeed, exactly as it does for a
+      --  new column (issue #51).  The coercion block below already skips a
+      --  missing Result; this guard makes the type-compatibility check skip it
+      --  too, instead of rejecting missing as "not the expected kind".
+      if Existing_Kind /= Val_Missing and then Result.Kind /= Val_Missing then
          if Expected /= Result.Kind and not (Expected = Val_Numeric and Result.Kind = Val_Integer) then
             raise SData_Core.Table.Type_Mismatch_Error with
               "Cannot assign " & Result.Kind'Image & " to " & Expected'Image;

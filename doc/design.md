@@ -88,6 +88,7 @@ Propagation Rules:
 - Null strings (*""*) in string operations shall be taken literally.
 - If no non-missing arguments are passed to an aggregate function, a missing value shall be returned.
 - Aggregate functions shalfunctionl ignore missing values when making computations.
+- A missing value may be assigned to a variable or column of any type. Missing represents the absence of a value rather than a value of a conflicting type, so recoding an existing numeric column to missing in place (e.g. a sentinel such as *999* → *.*) succeeds, exactly as assigning missing to a new column does. This is distinct from a type mismatch: assigning a string to a numeric column (or vice versa) is still rejected.
 
 Error Conditions (not missing values):
 
