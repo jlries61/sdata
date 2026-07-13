@@ -126,10 +126,14 @@ Groups data by the named variables for the next RUN.
 Sets BOG/EOG indicators and makes BY-group boundaries visible to
 LAG, NEXT, and BOG/EOG functions.
 Bare BY (no variables) cancels the active grouping.
+When the table has columns, each named variable must be one of them;
+an undefined name (e.g. a dropped type suffix) is rejected.
 Execution: Declarative -- grouping is active for all subsequent RUNs.
 
 Command: SORT variable(s)
 Reorders the Data Table based on the specified variables.
+When the table has columns, each named variable must be an existing
+column; an undefined name (e.g. a dropped type suffix) is rejected.
 Execution: Immediate -- re-orders the table at once.
 
 Command: AGGREGATE outvar=fn(invar) [outvar=fn(invar) ...]

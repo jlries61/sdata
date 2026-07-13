@@ -770,7 +770,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>BY</em></td>
 <td><em>BY</em> [&lt;<em>varname</em>&gt;...]</td>
 <td>Declarative</td>
-<td>Divide the input into blocks defined by the combination of variable values. An empty <em>BY</em> statement cancels any <em>BY</em> statement currently in effect. A new <em>BY</em> statement overrides any <em>BY</em> statement currently in effect. Blocks are defined by consecutive records with the same combination of <em>BY</em> variable values. A new block begins whenever any <em>BY </em>variable value changes, even if a previous block had the same combination of values. The blocks need not be in sorted order. Missing values in the named variables shall be treated as distinct values for grouping purposes. If no <em>USE</em> statement is in effect then a <em>BY</em> statement shall fail with an error message.</td>
+<td>Divide the input into blocks defined by the combination of variable values. An empty <em>BY</em> statement cancels any <em>BY</em> statement currently in effect. A new <em>BY</em> statement overrides any <em>BY</em> statement currently in effect. Blocks are defined by consecutive records with the same combination of <em>BY</em> variable values. A new block begins whenever any <em>BY </em>variable value changes, even if a previous block had the same combination of values. The blocks need not be in sorted order. Missing values in the named variables shall be treated as distinct values for grouping purposes. When the table has columns, each named variable must be an existing column; an undefined name (for example, a dropped type suffix) is rejected with an <em>undefined variable</em> error rather than establishing a spurious single group. If no <em>USE</em> statement is in effect then a <em>BY</em> statement shall fail with an error message.</td>
 </tr>
 <tr>
 <td><em>DELETE</em></td>
@@ -965,7 +965,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>SORT</em></td>
 <td><em>SORT</em> &lt; <em>varname</em>&gt;...</td>
 <td>Immediate Execution</td>
-<td>Sort the output dataset by the variables named.</td>
+<td>Sort the output dataset by the variables named. When the table has columns, each named variable must be an existing column; naming one that does not exist (for example, a dropped type suffix such as <em>SORT N</em> for column <em>N%</em>) is rejected with an <em>undefined variable</em> error rather than silently leaving the data unsorted.</td>
 </tr>
 <tr>
 <td><em>AGGREGATE</em></td>

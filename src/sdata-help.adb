@@ -226,6 +226,8 @@ package body SData.Help is
       Put_Line ("Sets BOG/EOG indicators and makes BY-group boundaries visible to");
       Put_Line ("LAG, NEXT, and BOG/EOG functions.");
       Put_Line ("Bare BY (no variables) cancels the active grouping.");
+      Put_Line ("When the table has columns, each named variable must be one of them;");
+      Put_Line ("an undefined name (e.g. a dropped type suffix) is rejected.");
       Put_Line ("Execution: Declarative -- grouping is active for all subsequent RUNs.");
    end Help_BY;
 
@@ -233,6 +235,8 @@ package body SData.Help is
    begin
       Put_Line ("Command: SORT variable(s)");
       Put_Line ("Reorders the Data Table based on the specified variables.");
+      Put_Line ("When the table has columns, each named variable must be an existing");
+      Put_Line ("column; an undefined name (e.g. a dropped type suffix) is rejected.");
       Put_Line ("Execution: Immediate -- re-orders the table at once.");
    end Help_SORT;
 

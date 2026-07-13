@@ -495,6 +495,10 @@ flags are set accordingly for each record.
 Bare
 .B BY
 (no variables) cancels an active grouping.
+When the data table already has columns, each named variable must be one of
+them; an undefined name (for example, a dropped type suffix) is rejected with an
+.RI \(dq undefined\ variable \(dq
+error rather than establishing a spurious single group.
 .TP
 .B SELECT \fIexpr\fR
 Activate a row filter: only records for which
@@ -511,6 +515,10 @@ Cancel the active row filter; all records become visible again.
 .TP
 .B SORT \fIvar\fR [\fIvar\fR ...]
 Sort the data table on the named variables.
+Each named variable must be an existing table column; naming one that does not
+exist (for example, dropping a type suffix) is rejected with an
+.RI \(dq undefined\ variable \(dq
+error rather than silently leaving the data unsorted.
 .TP
 .B REPEAT \fIn\fR
 Create
