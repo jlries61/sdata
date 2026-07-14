@@ -340,30 +340,28 @@ package body SData.Lexer is
          elsif C = '"' then
             T.Kind := Token_String_Literal;
             Advance (Ctx); -- skip opening quote
-            while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= '"' loop
-               T.Length := T.Length + 1;
-               T.Text (T.Length) := Current_Char (Ctx);
-               Advance (Ctx);
-               -- Handle escaped quotes (double-double quotes).
-               if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '"' then
-                  declare
-                     Saved_Pos : constant Positive := Ctx.Pos;
-                  begin
-                     Advance (Ctx);
-                     if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '"' then
-                        -- Embedded quote found: ""
-                        null;
-                     else
-                        -- End of string reached, backtrack to the closing quote.
-                        Ctx.Pos := Saved_Pos;
-                        exit;
-                     end if;
-                  end;
+            --  Scan to the closing quote.  A doubled quote ("") is an escaped
+            --  literal " (design.md, Quote Handling): emit one " and keep
+            --  scanning; a lone " terminates the string.  This handles a
+            --  doubled quote at ANY position -- middle ("a""b"), start
+            --  ("""x"), end ("y"""), and a string that is only an escaped
+            --  quote ("""") -- and leaves the empty string ("") intact
+            --  (issue #52).  The closing quote is consumed inside the loop.
+            while not Is_End_Of_Source (Ctx) loop
+               if Current_Char (Ctx) = '"' then
+                  Advance (Ctx); -- consume the quote
+                  exit when Is_End_Of_Source (Ctx)
+                     or else Current_Char (Ctx) /= '"';
+                  --  Second consecutive quote: an escaped literal ".
+                  T.Length := T.Length + 1;
+                  T.Text (T.Length) := '"';
+                  Advance (Ctx); -- consume it and continue within the string
+               else
+                  T.Length := T.Length + 1;
+                  T.Text (T.Length) := Current_Char (Ctx);
+                  Advance (Ctx);
                end if;
             end loop;
-            if not Is_End_Of_Source (Ctx) then
-               Advance (Ctx); -- skip closing quote
-            end if;
 
          --  Single-quoted string literals.
          elsif C = ''' then
