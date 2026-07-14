@@ -83,10 +83,17 @@ reach.
 - `Value.Int_Val : Int;` (was `Integer`).
 - `Evaluator.Value_Info.Int_Value : Int` (the parsed integer-literal field; was
   `Integer`).
-- Internal helpers keep their names but change types: `Convert_To_Float` returns
-  `Real` (name retained to bound the diff; a rename to `Convert_To_Real` is
-  optional and out of scope), `Num_Result`, `Is_Inf (F : Real)`,
-  `Pos_Inf`/`Neg_Inf : Real`.
+- Internal helpers keep their names *during the type migration* but change types:
+  `Convert_To_Float` returns `Real`, `Num_Result`, `Is_Inf (F : Real)`,
+  `Pos_Inf`/`Neg_Inf : Real`. Keeping the names bounds the type-change diff so it
+  reviews cleanly.
+- **Name-carrying identifiers are renamed in a dedicated follow-up commit** on the
+  same branch, *after* the type change is green: `Convert_To_Float` →
+  `Convert_To_Real` (202 sites: 194 sdata-core, 8 sdata, 0 data-vandal) and
+  `As_Float` → `As_Real` (3 sites). This is a mechanical, compiler-checked
+  rename; keeping it separate leaves the precision change reviewable on its own
+  and the history legible. (`Try_Fast_Float`, a CSV fast-parse helper, keeps its
+  name — it is about parse speed, not the value type.)
 - Every `Float`/`Integer` used as an sdata *value* (~344 sites across 17
   sdata-core files, plus sdata) routes through `Real`/`Int`. Loop indices, string
   lengths, and other genuinely-machine quantities stay `Integer`/`Natural` — only
@@ -215,7 +222,9 @@ existing widths removes a narrowing that happened on spill/reload; no migration.
 4. `MAXINT` → `Int'Last`; audit overflow constants.
 5. Update design.md §2.2/§2.4/§2.3.
 6. Regenerate fixtures; add the new tests; run the full cross-crate gate.
-7. Version bumps + release dance.
+7. **Dedicated rename commit:** `Convert_To_Float` → `Convert_To_Real`,
+   `As_Float` → `As_Real` (mechanical, compiler-checked), after step 6 is green.
+8. Version bumps + release dance.
 
 ## 9. Cross-crate Coordination
 
