@@ -1,3 +1,9 @@
+sdata (0.14.3-1) unstable; urgency=medium
+
+  * Fix doubled-quote string escape dropping characters in the lexer (#52)
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 13 Jul 2026 17:21:55 -0700
+
 sdata (0.14.2-1) unstable; urgency=medium
 
   * Allow assigning a missing value to an existing typed column (#51)
