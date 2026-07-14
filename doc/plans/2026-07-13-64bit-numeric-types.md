@@ -158,11 +158,11 @@ Run `cd ~/Develop/sdata && make check`. For each failing fixture, regenerate:
 `./bin/sdata tests/<name>.cmd > tests/expected/<name>.out 2>&1`
 **Verify every diff by eye:** more digits of the *same* number (e.g. `0.1` now `0.10000000000000001`, or an intermediate stat carrying extra places) is expected; a *different* number is a bug — stop and investigate. Regenerate `tests/expected/double_precision_roundtrip.out` here; it must now show the full value.
 
-- [ ] **Step 7: Full cross-crate gate**
+- [ ] **Step 7: Migrate data-vandal's value-interaction sites, then full cross-crate gate**
 
-Run the three-crate gate (Global Constraints). All green.
+At the flip, data-vandal won't compile until its sdata-core *value* accesses move off `Float`. Migrate only where it reads/writes `Value.Num_Val` (12 sites) — retype those locals/params to `SData_Core.Values.Real`. Leave data-vandal's own probability `Float`s (`V_*_Prob`, `SD_Frac`, etc.) as `Float`. Build via PR branch. Then run the three-crate gate (Global Constraints). All green.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Commit (sdata-core + sdata; data-vandal on its own PR branch)**
 
 ```bash
 cd ~/Develop/sdata-core && git add -A && git commit -m "feat: numeric values are IEEE 754 double precision (#54)
@@ -292,9 +292,9 @@ Expected: an overflow/parse error or wrapped value — the literal `5000000000` 
 
 Run the three-crate build/gate. Run each new test; paste actual overflow text into `tests/expected/integer_overflow_64bit.out`; confirm `large_integer_roundtrip` prints `5000000000` twice.
 
-- [ ] **Step 6: Regenerate any integer-format fixtures**
+- [ ] **Step 6: Regenerate any integer-format fixtures; migrate data-vandal `Int_Val` sites**
 
-`Int'Image` output should match `Integer'Image` for in-range values, so diffs should be nil; if any appear, verify they are correct and regenerate.
+`Int'Image` output should match `Integer'Image` for in-range values, so diffs should be nil; if any appear, verify they are correct and regenerate. At this flip, retype data-vandal's 6 `Int_Val` interaction sites to `SData_Core.Values.Int` (PR branch).
 
 - [ ] **Step 7: Full cross-crate gate → all green. Commit**
 
