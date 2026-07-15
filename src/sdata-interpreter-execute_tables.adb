@@ -6,8 +6,8 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    use Ada.Strings.Fixed;
 
    --  Two-decimal float formatter (e.g. 50.00).
-   function Fmt2 (X : Float) return String is
-      package F_IO is new Ada.Text_IO.Float_IO (Float);
+   function Fmt2 (X : Real) return String is
+      package F_IO is new Ada.Text_IO.Float_IO (Real);
       Buf : String (1 .. 32);
    begin
       F_IO.Put (Buf, X, Aft => 2, Exp => 0);
@@ -15,8 +15,8 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    end Fmt2;
 
    --  Four-decimal float formatter (e.g. 0.6667) for /CHISQ statistics.
-   function Fmt4 (X : Float) return String is
-      package F_IO is new Ada.Text_IO.Float_IO (Float);
+   function Fmt4 (X : Real) return String is
+      package F_IO is new Ada.Text_IO.Float_IO (Real);
       Buf : String (1 .. 32);
    begin
       F_IO.Put (Buf, X, Aft => 4, Exp => 0);
@@ -59,8 +59,8 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    function Numeric (V : Values.Value) return Boolean is
      (V.Kind = Values.Val_Numeric or else V.Kind = Values.Val_Integer);
 
-   function As_Float (V : Values.Value) return Float is
-     (if V.Kind = Values.Val_Integer then Float (V.Int_Val) else V.Num_Val);
+   function As_Float (V : Values.Value) return Real is
+     (if V.Kind = Values.Val_Integer then Real (V.Int_Val) else V.Num_Val);
 
    --  Value-order comparison for two levels.
    function Level_Less (A, B : Level) return Boolean is
@@ -259,15 +259,15 @@ procedure Execute_Tables (Stmt : Statement_Access) is
                   Key : constant String := Cell_Key (I, J);
                   F   : constant Natural :=
                     (if Joint.Contains (Key) then Joint (Key) else 0);
-                  Pct : constant Float :=
+                  Pct : constant Real :=
                     (if Grand = 0 then 0.0
-                     else 100.0 * Float (F) / Float (Grand));
-                  RP  : constant Float :=
+                     else 100.0 * Real (F) / Real (Grand));
+                  RP  : constant Real :=
                     (if L1 (I).Count = 0 then 0.0
-                     else 100.0 * Float (F) / Float (L1 (I).Count));
-                  CP  : constant Float :=
+                     else 100.0 * Real (F) / Real (L1 (I).Count));
+                  CP  : constant Real :=
                     (if L2 (J).Count = 0 then 0.0
-                     else 100.0 * Float (F) / Float (L2 (J).Count));
+                     else 100.0 * Real (F) / Real (L2 (J).Count));
                begin
                   Append (Line, " " & Trim (F'Image, Both));
                   if Show_Pct then
@@ -445,12 +445,12 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          declare
             Line : Unbounded_String :=
               L.Disp & " " & Trim (L.Count'Image, Both);
-            Pct  : constant Float :=
+            Pct  : constant Real :=
               (if Total = 0 then 0.0
-               else 100.0 * Float (L.Count) / Float (Total));
-            CPct : constant Float :=
+               else 100.0 * Real (L.Count) / Real (Total));
+            CPct : constant Real :=
               (if Total = 0 then 0.0
-               else 100.0 * Float (Cum) / Float (Total));
+               else 100.0 * Real (Cum) / Real (Total));
          begin
             if Show_Pct then
                Append (Line, " " & Fmt2 (Pct));
@@ -614,9 +614,9 @@ procedure Execute_Tables (Stmt : Statement_Access) is
                declare
                   F    : constant Natural := R.Count;
                   Line : Unbounded_String;
-                  Pct  : constant Float :=
+                  Pct  : constant Real :=
                     (if Grand = 0 then 0.0
-                     else 100.0 * Float (F) / Float (Grand));
+                     else 100.0 * Real (F) / Real (Grand));
                begin
                   Cum := Cum + F;
                   for I in 1 .. K loop
@@ -633,7 +633,7 @@ procedure Execute_Tables (Stmt : Statement_Access) is
                   if Show_Cum and then Show_Pct then
                      Append (Line, " " &
                        Fmt2 (if Grand = 0 then 0.0
-                             else 100.0 * Float (Cum) / Float (Grand)));
+                             else 100.0 * Real (Cum) / Real (Grand)));
                   end if;
                   IO.Put_Line (To_String (Line));
                end;

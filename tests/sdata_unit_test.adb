@@ -68,8 +68,8 @@ procedure SData_Unit_Test is
       end if;
    end Check_Kind;
 
-   procedure Check_Float (Name : String; Got, Expected : Float;
-                          Tol : Float := 0.001) is
+   procedure Check_Float (Name : String; Got, Expected : Real;
+                          Tol : Real := 0.001) is
    begin
       if abs (Got - Expected) <= Tol then
          Put_Line ("PASS: " & Name);
@@ -203,7 +203,7 @@ begin
    Add_Column ("Y", Col_Numeric);
    for I in 1 .. 5 loop
       Add_Row;
-      Set_Value (I, "Y", (Kind => Val_Numeric, Num_Val => Float (I)));
+      Set_Value (I, "Y", (Kind => Val_Numeric, Num_Val => Real (I)));
    end loop;
 
    Check ("T-27 unfiltered Is_Filtered",          Is_Filtered,       False);
@@ -249,7 +249,7 @@ begin
          Set_Value (I, "GROUP$",
                     (Kind => Val_String, Str_Val => To_Unbounded_String (G)));
          Set_Value (I, "VAL",
-                    (Kind => Val_Numeric, Num_Val => Float (I)));
+                    (Kind => Val_Numeric, Num_Val => Real (I)));
       end;
    end loop;
 
@@ -398,7 +398,7 @@ begin
                 Convert_To_Float ((Kind => Val_Integer, Int_Val => 7)), 7.0);
 
    declare
-      Dummy  : Float;
+      Dummy  : Real;
       Raised : Boolean := False;
       pragma Unreferenced (Raised);
       pragma Unreferenced (Dummy);

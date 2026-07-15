@@ -406,13 +406,13 @@ package body SData.Parser is
                         for Ch of S loop
                            if Ch = '.' then Has_Dot := True; exit; end if;
                         end loop;
-                        Node.Value := Float'Value (S);
+                        Node.Value := Real'Value (S);
                         if not Has_Dot then
                            begin
                               Node.Int_Value  := Integer'Value (S);
                               Node.Is_Integer := True;
                            exception
-                              when Constraint_Error => null;  --  Exceeds Integer'Last; stay Float.
+                              when Constraint_Error => null;  --  Exceeds Integer'Last; stay Real.
                            end;
                         end if;
                      end;
@@ -2855,7 +2855,7 @@ package body SData.Parser is
                      Num_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      From_Num : Positive;
                   begin
-                     From_Num := Positive (Float'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
+                     From_Num := Positive (Real'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
                      Stmt := new Statement (Stmt_PROGRAM_DELETE);
                      Stmt.Delete_From := From_Num;
                      Stmt.Delete_To   := From_Num;
@@ -2868,7 +2868,7 @@ package body SData.Parser is
                               To_Tok   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                               pragma Unreferenced (Ignored);
                            begin
-                              Stmt.Delete_To := Positive (Float'Value (To_Tok.Text (1 .. To_Tok.Length)));
+                              Stmt.Delete_To := Positive (Real'Value (To_Tok.Text (1 .. To_Tok.Length)));
                            end;
                         end if;
                      end;
@@ -2892,7 +2892,7 @@ package body SData.Parser is
                   begin
                      Stmt.Insert_At_End := False;
                      Stmt.Insert_Line   :=
-                        Natural (Float'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
+                        Natural (Real'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
                   end;
                elsif Next_Tok.Kind = Token_Minus then
                   --  Negative argument (e.g. INSERT -3): consume the '-' and the

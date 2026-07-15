@@ -19,6 +19,7 @@
 with Ada.Text_IO;           use Ada.Text_IO;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData_Core.CSV;             use SData_Core.CSV;
+with SData_Core.Values;          use SData_Core.Values;
 
 procedure CSV_Fuzz_Driver is
 
@@ -40,7 +41,7 @@ procedure CSV_Fuzz_Driver is
    procedure Exercise (S : String; Delim : String) is
       Fields  : Field_Vectors.Vector;
       Dummy_B : Boolean;
-      Dummy_F : Float;
+      Dummy_F : Real;
       pragma Unreferenced (Dummy_B);
    begin
       if S'Length = 0 then return; end if;

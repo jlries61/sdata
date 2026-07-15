@@ -194,7 +194,10 @@ package body SData.Merge is
          begin
             case Vv.Kind is
                when SData_Core.Values.Val_Numeric =>
-                  R := R & Vv.Num_Val'Image;
+                  --  Round-trip render (not 'Image) so a whole-number key shows
+                  --  as e.g. "1" rather than "1.00000000000000E+00" now that
+                  --  Num_Val is double precision (#54).
+                  R := R & SData_Core.Values.Image_Round_Trip (Vv.Num_Val);
                when SData_Core.Values.Val_Integer =>
                   R := R & Vv.Int_Val'Image;
                when SData_Core.Values.Val_String =>
@@ -860,7 +863,7 @@ package body SData.Merge is
                            and then V.Kind = SData_Core.Values.Val_Integer
                         then
                            V := (Kind    => SData_Core.Values.Val_Numeric,
-                                 Num_Val => Float (V.Int_Val));
+                                 Num_Val => SData_Core.Values.Real (V.Int_Val));
                         end if;
                         Result.Set_Value (R_Out, Dest, V);
                      end;

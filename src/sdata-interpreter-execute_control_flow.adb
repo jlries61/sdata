@@ -29,13 +29,13 @@ begin
          declare Start_Val : constant Value := Evaluate (Stmt.For_Start);
                  End_Val   : constant Value := Evaluate (Stmt.For_End);
                  Step_Val  : Value := (Kind => Val_Numeric, Num_Val => 1.0);
-                 Current_I : Float;
+                 Current_I : Real;
          begin
             if Stmt.For_Step /= null then Step_Val := Evaluate (Stmt.For_Step); end if;
             declare
-               S  : constant Float := Convert_To_Float (Start_Val);
-               E  : constant Float := Convert_To_Float (End_Val);
-               ST : constant Float := Convert_To_Float (Step_Val);
+               S  : constant Real := Convert_To_Float (Start_Val);
+               E  : constant Real := Convert_To_Float (End_Val);
+               ST : constant Real := Convert_To_Float (Step_Val);
             begin
                Current_I := S;
                while (ST > 0.0 and then Current_I <= E) or else (ST < 0.0 and then Current_I >= E) loop

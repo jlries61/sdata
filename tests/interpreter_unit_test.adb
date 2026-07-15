@@ -67,8 +67,8 @@ procedure Interpreter_Unit_Test is
       end if;
    end Check;
 
-   procedure Check_Float (Name : String; Got, Expected : Float;
-                          Tol : Float := 0.001) is
+   procedure Check_Float (Name : String; Got, Expected : Real;
+                          Tol : Real := 0.001) is
    begin
       if abs (Got - Expected) <= Tol then
          Put_Line ("PASS: " & Name);
@@ -161,12 +161,12 @@ procedure Interpreter_Unit_Test is
    end GI;
 
    --  Read a variable as float from the PDV.
-   function GF (Name : String) return Float is
+   function GF (Name : String) return Real is
       V : constant Value := SData_Core.Variables.Get (Name);
    begin
       case V.Kind is
          when Val_Numeric => return V.Num_Val;
-         when Val_Integer => return Float (V.Int_Val);
+         when Val_Integer => return Real (V.Int_Val);
          when others      => return -99_999.0;
       end case;
    end GF;
