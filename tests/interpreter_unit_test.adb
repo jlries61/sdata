@@ -154,7 +154,7 @@ procedure Interpreter_Unit_Test is
       V : constant Value := SData_Core.Variables.Get (Name);
    begin
       case V.Kind is
-         when Val_Integer => return V.Int_Val;
+         when Val_Integer => return Integer (V.Int_Val);
          when Val_Numeric => return Integer (V.Num_Val);
          when others      => return -99_999;
       end case;
@@ -185,7 +185,7 @@ procedure Interpreter_Unit_Test is
       V : constant Value := SData_Core.Table.Get_Value (Row, Name);
    begin
       case V.Kind is
-         when Val_Integer => return V.Int_Val;
+         when Val_Integer => return Integer (V.Int_Val);
          when Val_Numeric => return Integer (V.Num_Val);
          when others      => return -99_999;
       end case;
@@ -206,7 +206,7 @@ procedure Interpreter_Unit_Test is
       V : constant Value := SData_Core.Variables.Get_Array_Element (Name, Idx);
    begin
       case V.Kind is
-         when Val_Integer => return V.Int_Val;
+         when Val_Integer => return Integer (V.Int_Val);
          when Val_Numeric => return Integer (V.Num_Val);
          when others      => return -99_999;
       end case;

@@ -409,10 +409,10 @@ package body SData.Parser is
                         Node.Value := Real'Value (S);
                         if not Has_Dot then
                            begin
-                              Node.Int_Value  := Integer'Value (S);
+                              Node.Int_Value  := Int'Value (S);
                               Node.Is_Integer := True;
                            exception
-                              when Constraint_Error => null;  --  Exceeds Integer'Last; stay Real.
+                              when Constraint_Error => null;  --  Exceeds Int'Last; stay Real.
                            end;
                         end if;
                      end;

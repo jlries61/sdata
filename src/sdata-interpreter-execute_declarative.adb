@@ -834,7 +834,7 @@ begin
          declare
             V : constant Value := Evaluate (Stmt.Seed_Expr);
             S : constant Integer :=
-               (if V.Kind = Val_Integer then V.Int_Val
+               (if V.Kind = Val_Integer then Integer (V.Int_Val)
                 else Integer (Convert_To_Float (V)));
          begin
             SData_Core.Statistics.Set_Seed (S);

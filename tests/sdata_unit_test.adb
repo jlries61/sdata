@@ -135,7 +135,7 @@ begin
    Set_Value (1, "N%", (Kind => Val_Integer, Int_Val => 42));
    V := Get_Value (1, "N%");
    Check ("T-16 integer kind",  V.Kind = Val_Integer, True);
-   Check ("T-17 integer value", V.Int_Val, 42);
+   Check ("T-17 integer value", Integer (V.Int_Val), 42);
 
    --  Upper-case variant accessor returns the same value.
    V := Get_Value_Upper (1, "X");
@@ -349,7 +349,7 @@ begin
    Check_Float ("T-60 Get_Value_By_Col(1,1) value = 7.5",    V.Num_Val, 7.5);
    V := Get_Value_By_Col (1, 2);
    Check ("T-61 Get_Value_By_Col(1,2) kind = Integer",       V.Kind = Val_Integer, True);
-   Check ("T-62 Get_Value_By_Col(1,2) value = 99",           V.Int_Val, 99);
+   Check ("T-62 Get_Value_By_Col(1,2) value = 99",           Integer (V.Int_Val), 99);
 
    ---------------------------------------------------------------------------
    --  ── SData_Core.Table: direct output table pipeline ───────────────────────────
@@ -384,7 +384,7 @@ begin
    Check_Float ("T-69 P row 1 value = 3.14",                 V.Num_Val, 3.14);
    V := Get_Value (1, "Q%");
    Check ("T-70 Q% row 1 kind = Integer",                    V.Kind = Val_Integer, True);
-   Check ("T-71 Q% row 1 value set by position = 7",         V.Int_Val, 7);
+   Check ("T-71 Q% row 1 value set by position = 7",         Integer (V.Int_Val), 7);
    V := Get_Value (2, "P");
    Check_Float ("T-72 P row 2 value set by position = 2.72", V.Num_Val, 2.72);
 
@@ -518,7 +518,7 @@ begin
    Check_Float ("V-19 Get A after load value", V.Num_Val, 3.14);
    V := Get ("B%");
    Check ("V-20 Get B% after load kind",  V.Kind = Val_Integer, True);
-   Check ("V-21 Get B% after load value", V.Int_Val, 7);
+   Check ("V-21 Get B% after load value", Integer (V.Int_Val), 7);
 
    --  PDV_Resolve requires upper-case name (matches how names are stored).
    if PDV_Resolve ("A") > 0 then
@@ -639,7 +639,7 @@ begin
       T.Set_Value (1, "INT%",
                    (Kind => SData_Core.Values.Val_Integer, Int_Val => 7));
       VV := T.Get_Value (1, "INT%");
-      Check ("TT-11 Integer value preserved", VV.Int_Val, 7);
+      Check ("TT-11 Integer value preserved", Integer (VV.Int_Val), 7);
       --  String round-trip.
       T.Set_Value (1, "STR$",
                    (Kind    => SData_Core.Values.Val_String,
@@ -668,7 +668,7 @@ begin
       V := T.Get_Value (1, "A");
       Check_Float ("TT-15 Snapshot numeric value", V.Num_Val, 1.5);
       V := T.Get_Value (1, "B%");
-      Check ("TT-16 Snapshot integer value", V.Int_Val, 9);
+      Check ("TT-16 Snapshot integer value", Integer (V.Int_Val), 9);
    end;
 
    --  TT-17..20: Install_To_Current replaces the current table
@@ -692,7 +692,7 @@ begin
       V := SData_Core.Table.Get_Value (1, "P");
       Check_Float ("TT-19 Install numeric value", V.Num_Val, 3.14);
       V := SData_Core.Table.Get_Value (1, "Q%");
-      Check ("TT-20 Install integer value", V.Int_Val, 42);
+      Check ("TT-20 Install integer value", Integer (V.Int_Val), 42);
    end;
 
    ---------------------------------------------------------------------------
@@ -873,11 +873,11 @@ begin
       Keys.Append (To_Unbounded_String ("K"));
       SData.Transient_Table.Sort_By (TT, Keys);
       VV := TT.Get_Value (1, "K");
-      Check ("TT-27a Sort_By row 1 = 1", VV.Int_Val, 1);
+      Check ("TT-27a Sort_By row 1 = 1", Integer (VV.Int_Val), 1);
       VV := TT.Get_Value (2, "K");
-      Check ("TT-27b Sort_By row 2 = 2", VV.Int_Val, 2);
+      Check ("TT-27b Sort_By row 2 = 2", Integer (VV.Int_Val), 2);
       VV := TT.Get_Value (3, "K");
-      Check ("TT-27c Sort_By row 3 = 3", VV.Int_Val, 3);
+      Check ("TT-27c Sort_By row 3 = 3", Integer (VV.Int_Val), 3);
    end;
 
    ---------------------------------------------------------------------------
@@ -967,7 +967,7 @@ begin
 
       Check ("CP-07 Result row count = 3", Result.Row_Count, 3);
       VV := Result.Get_Value (1, "Y%");
-      Check ("CP-08 Y% row 1 = 100", VV.Int_Val, 100);
+      Check ("CP-08 Y% row 1 = 100", Integer (VV.Int_Val), 100);
       VV := Result.Get_Value (2, "Y%");
       Check ("CP-09 Y% row 2 is missing (padded)",
              VV.Kind = SData_Core.Values.Val_Missing, True);
@@ -975,7 +975,7 @@ begin
       Check ("CP-10 Y% row 3 is missing (padded)",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       VV := Result.Get_Value (3, "X%");
-      Check ("CP-11 X% row 3 = 30", VV.Int_Val, 30);
+      Check ("CP-11 X% row 3 = 30", Integer (VV.Int_Val), 30);
    end;
 
    --  CP-12..14: column-name collision — rightmost wins, one warning
@@ -1009,7 +1009,7 @@ begin
       Check ("CP-13 Collision: exactly 1 warning",
              Natural (Warnings.Length), 1);
       VV := Result.Get_Value (1, "Z%");
-      Check ("CP-14 Collision: Z% = 99 (rightmost wins)", VV.Int_Val, 99);
+      Check ("CP-14 Collision: Z% = 99 (rightmost wins)", Integer (VV.Int_Val), 99);
    end;
 
    ---------------------------------------------------------------------------
@@ -1085,12 +1085,12 @@ begin
       Check ("CM-01c Row 1 LX$ = a",
              To_String (VV.Str_Val), "a");
       VV := Result.Get_Value (1, "RY%");
-      Check ("CM-01d Row 1 RY% = 10", VV.Int_Val, 10);
+      Check ("CM-01d Row 1 RY% = 10", Integer (VV.Int_Val), 10);
       VV := Result.Get_Value (3, "LX$");
       Check ("CM-01e Row 3 LX$ = c",
              To_String (VV.Str_Val), "c");
       VV := Result.Get_Value (3, "RY%");
-      Check ("CM-01f Row 3 RY% = 30", VV.Int_Val, 30);
+      Check ("CM-01f Row 3 RY% = 30", Integer (VV.Int_Val), 30);
    end;
 
    --  CM-02: 1:M match merge — one side has multiple rows per group.
@@ -1166,12 +1166,12 @@ begin
       Check ("CM-02c Row 1 LX$ = a (first row)",
              To_String (VV.Str_Val), "a");
       VV := Result.Get_Value (1, "RY%");
-      Check ("CM-02d Row 1 RY% = 10", VV.Int_Val, 10);
+      Check ("CM-02d Row 1 RY% = 10", Integer (VV.Int_Val), 10);
       VV := Result.Get_Value (2, "LX$");
       Check ("CM-02e Row 2 LX$ = a (recycled)",
              To_String (VV.Str_Val), "a");
       VV := Result.Get_Value (2, "RY%");
-      Check ("CM-02f Row 2 RY% = 11", VV.Int_Val, 11);
+      Check ("CM-02f Row 2 RY% = 11", Integer (VV.Int_Val), 11);
       --  ID=2 group: rows 3 and 4
       VV := Result.Get_Value (3, "LX$");
       Check ("CM-02g Row 3 LX$ = b",
@@ -1180,7 +1180,7 @@ begin
       Check ("CM-02h Row 4 LX$ = b (recycled)",
              To_String (VV.Str_Val), "b");
       VV := Result.Get_Value (4, "RY%");
-      Check ("CM-02i Row 4 RY% = 21", VV.Int_Val, 21);
+      Check ("CM-02i Row 4 RY% = 21", Integer (VV.Int_Val), 21);
    end;
 
    --  CM-03: N:M match merge with warning.
@@ -1241,12 +1241,12 @@ begin
       Check ("CM-03c Row 1 LX$ = a",
              To_String (VV.Str_Val), "a");
       VV := Result.Get_Value (1, "RY%");
-      Check ("CM-03d Row 1 RY% = 10", VV.Int_Val, 10);
+      Check ("CM-03d Row 1 RY% = 10", Integer (VV.Int_Val), 10);
       VV := Result.Get_Value (2, "LX$");
       Check ("CM-03e Row 2 LX$ = b",
              To_String (VV.Str_Val), "b");
       VV := Result.Get_Value (2, "RY%");
-      Check ("CM-03f Row 2 RY% = 20", VV.Int_Val, 20);
+      Check ("CM-03f Row 2 RY% = 20", Integer (VV.Int_Val), 20);
    end;
 
    --  CM-04: Unmatched keys on each side.
@@ -1317,13 +1317,13 @@ begin
       Check ("CM-04e Row 2 LX$ = y",
              To_String (VV.Str_Val), "y");
       VV := Result.Get_Value (2, "RY%");
-      Check ("CM-04f Row 2 RY% = 200", VV.Int_Val, 200);
+      Check ("CM-04f Row 2 RY% = 200", Integer (VV.Int_Val), 200);
       --  Row 3: ID=3, LX$ missing, RY%=300
       VV := Result.Get_Value (3, "LX$");
       Check ("CM-04g Row 3 LX$ is missing (ID=3 not in A)",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       VV := Result.Get_Value (3, "RY%");
-      Check ("CM-04h Row 3 RY% = 300", VV.Int_Val, 300);
+      Check ("CM-04h Row 3 RY% = 300", Integer (VV.Int_Val), 300);
    end;
 
    --  CM-05: Three-way merge.
@@ -1484,7 +1484,7 @@ begin
              Natural (Warnings.Length), 0);
       --  Row 1: ID=1 from A
       VV := Result.Get_Value (1, "ID%");
-      Check ("CI-01c Row 1 ID% = 1", VV.Int_Val, 1);
+      Check ("CI-01c Row 1 ID% = 1", Integer (VV.Int_Val), 1);
       VV := Result.Get_Value (1, "LX$");
       Check ("CI-01d Row 1 LX$ = a", To_String (VV.Str_Val), "a");
       VV := Result.Get_Value (1, "RY%");
@@ -1492,15 +1492,15 @@ begin
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 2: ID=2 from B
       VV := Result.Get_Value (2, "ID%");
-      Check ("CI-01f Row 2 ID% = 2", VV.Int_Val, 2);
+      Check ("CI-01f Row 2 ID% = 2", Integer (VV.Int_Val), 2);
       VV := Result.Get_Value (2, "LX$");
       Check ("CI-01g Row 2 LX$ is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       VV := Result.Get_Value (2, "RY%");
-      Check ("CI-01h Row 2 RY% = 10", VV.Int_Val, 10);
+      Check ("CI-01h Row 2 RY% = 10", Integer (VV.Int_Val), 10);
       --  Row 3: ID=3 from A
       VV := Result.Get_Value (3, "ID%");
-      Check ("CI-01i Row 3 ID% = 3", VV.Int_Val, 3);
+      Check ("CI-01i Row 3 ID% = 3", Integer (VV.Int_Val), 3);
       VV := Result.Get_Value (3, "LX$");
       Check ("CI-01j Row 3 LX$ = b", To_String (VV.Str_Val), "b");
       VV := Result.Get_Value (3, "RY%");
@@ -1508,12 +1508,12 @@ begin
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 4: ID=4 from B
       VV := Result.Get_Value (4, "ID%");
-      Check ("CI-01l Row 4 ID% = 4", VV.Int_Val, 4);
+      Check ("CI-01l Row 4 ID% = 4", Integer (VV.Int_Val), 4);
       VV := Result.Get_Value (4, "LX$");
       Check ("CI-01m Row 4 LX$ is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       VV := Result.Get_Value (4, "RY%");
-      Check ("CI-01n Row 4 RY% = 20", VV.Int_Val, 20);
+      Check ("CI-01n Row 4 RY% = 20", Integer (VV.Int_Val), 20);
    end;
 
    --  CI-02: Two inputs, overlapping BY keys.
@@ -1588,7 +1588,7 @@ begin
              Natural (Warnings.Length), 0);
       --  Row 1: ID=1 from A
       VV := Result.Get_Value (1, "ID%");
-      Check ("CI-02c Row 1 ID% = 1", VV.Int_Val, 1);
+      Check ("CI-02c Row 1 ID% = 1", Integer (VV.Int_Val), 1);
       VV := Result.Get_Value (1, "LX$");
       Check ("CI-02d Row 1 LX$ = a", To_String (VV.Str_Val), "a");
       VV := Result.Get_Value (1, "RY%");
@@ -1596,7 +1596,7 @@ begin
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 2: ID=2 from A (tie-break: leftmost = A wins)
       VV := Result.Get_Value (2, "ID%");
-      Check ("CI-02f Row 2 ID% = 2", VV.Int_Val, 2);
+      Check ("CI-02f Row 2 ID% = 2", Integer (VV.Int_Val), 2);
       VV := Result.Get_Value (2, "LX$");
       Check ("CI-02g Row 2 LX$ = b", To_String (VV.Str_Val), "b");
       VV := Result.Get_Value (2, "RY%");
@@ -1604,15 +1604,15 @@ begin
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 3: ID=2 from B
       VV := Result.Get_Value (3, "ID%");
-      Check ("CI-02i Row 3 ID% = 2", VV.Int_Val, 2);
+      Check ("CI-02i Row 3 ID% = 2", Integer (VV.Int_Val), 2);
       VV := Result.Get_Value (3, "LX$");
       Check ("CI-02j Row 3 LX$ is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       VV := Result.Get_Value (3, "RY%");
-      Check ("CI-02k Row 3 RY% = 10", VV.Int_Val, 10);
+      Check ("CI-02k Row 3 RY% = 10", Integer (VV.Int_Val), 10);
       --  Row 4: ID=3 from A (tie-break: A wins again)
       VV := Result.Get_Value (4, "ID%");
-      Check ("CI-02l Row 4 ID% = 3", VV.Int_Val, 3);
+      Check ("CI-02l Row 4 ID% = 3", Integer (VV.Int_Val), 3);
       VV := Result.Get_Value (4, "LX$");
       Check ("CI-02m Row 4 LX$ = c", To_String (VV.Str_Val), "c");
       VV := Result.Get_Value (4, "RY%");
@@ -1620,20 +1620,20 @@ begin
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 5: ID=3 from B
       VV := Result.Get_Value (5, "ID%");
-      Check ("CI-02o Row 5 ID% = 3", VV.Int_Val, 3);
+      Check ("CI-02o Row 5 ID% = 3", Integer (VV.Int_Val), 3);
       VV := Result.Get_Value (5, "LX$");
       Check ("CI-02p Row 5 LX$ is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       VV := Result.Get_Value (5, "RY%");
-      Check ("CI-02q Row 5 RY% = 11", VV.Int_Val, 11);
+      Check ("CI-02q Row 5 RY% = 11", Integer (VV.Int_Val), 11);
       --  Row 6: ID=4 from B
       VV := Result.Get_Value (6, "ID%");
-      Check ("CI-02r Row 6 ID% = 4", VV.Int_Val, 4);
+      Check ("CI-02r Row 6 ID% = 4", Integer (VV.Int_Val), 4);
       VV := Result.Get_Value (6, "LX$");
       Check ("CI-02s Row 6 LX$ is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       VV := Result.Get_Value (6, "RY%");
-      Check ("CI-02t Row 6 RY% = 12", VV.Int_Val, 12);
+      Check ("CI-02t Row 6 RY% = 12", Integer (VV.Int_Val), 12);
    end;
 
    --  CI-03: Three-way interleave with disjoint keys.
@@ -1705,9 +1705,9 @@ begin
              Natural (Warnings.Length), 0);
       --  Row 1: ID=1 from A
       VV := Result.Get_Value (1, "ID%");
-      Check ("CI-03c Row 1 ID% = 1", VV.Int_Val, 1);
+      Check ("CI-03c Row 1 ID% = 1", Integer (VV.Int_Val), 1);
       VV := Result.Get_Value (1, "LA%");
-      Check ("CI-03d Row 1 LA% = 100", VV.Int_Val, 100);
+      Check ("CI-03d Row 1 LA% = 100", Integer (VV.Int_Val), 100);
       VV := Result.Get_Value (1, "LB%");
       Check ("CI-03e Row 1 LB% is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
@@ -1716,41 +1716,41 @@ begin
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 2: ID=2 from B
       VV := Result.Get_Value (2, "ID%");
-      Check ("CI-03g Row 2 ID% = 2", VV.Int_Val, 2);
+      Check ("CI-03g Row 2 ID% = 2", Integer (VV.Int_Val), 2);
       VV := Result.Get_Value (2, "LB%");
-      Check ("CI-03h Row 2 LB% = 200", VV.Int_Val, 200);
+      Check ("CI-03h Row 2 LB% = 200", Integer (VV.Int_Val), 200);
       VV := Result.Get_Value (2, "LA%");
       Check ("CI-03i Row 2 LA% is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 3: ID=3 from C
       VV := Result.Get_Value (3, "ID%");
-      Check ("CI-03j Row 3 ID% = 3", VV.Int_Val, 3);
+      Check ("CI-03j Row 3 ID% = 3", Integer (VV.Int_Val), 3);
       VV := Result.Get_Value (3, "LC%");
-      Check ("CI-03k Row 3 LC% = 300", VV.Int_Val, 300);
+      Check ("CI-03k Row 3 LC% = 300", Integer (VV.Int_Val), 300);
       VV := Result.Get_Value (3, "LA%");
       Check ("CI-03l Row 3 LA% is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 4: ID=4 from A
       VV := Result.Get_Value (4, "ID%");
-      Check ("CI-03m Row 4 ID% = 4", VV.Int_Val, 4);
+      Check ("CI-03m Row 4 ID% = 4", Integer (VV.Int_Val), 4);
       VV := Result.Get_Value (4, "LA%");
-      Check ("CI-03n Row 4 LA% = 400", VV.Int_Val, 400);
+      Check ("CI-03n Row 4 LA% = 400", Integer (VV.Int_Val), 400);
       VV := Result.Get_Value (4, "LB%");
       Check ("CI-03o Row 4 LB% is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 5: ID=5 from B
       VV := Result.Get_Value (5, "ID%");
-      Check ("CI-03p Row 5 ID% = 5", VV.Int_Val, 5);
+      Check ("CI-03p Row 5 ID% = 5", Integer (VV.Int_Val), 5);
       VV := Result.Get_Value (5, "LB%");
-      Check ("CI-03q Row 5 LB% = 500", VV.Int_Val, 500);
+      Check ("CI-03q Row 5 LB% = 500", Integer (VV.Int_Val), 500);
       VV := Result.Get_Value (5, "LA%");
       Check ("CI-03r Row 5 LA% is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
       --  Row 6: ID=6 from C
       VV := Result.Get_Value (6, "ID%");
-      Check ("CI-03s Row 6 ID% = 6", VV.Int_Val, 6);
+      Check ("CI-03s Row 6 ID% = 6", Integer (VV.Int_Val), 6);
       VV := Result.Get_Value (6, "LC%");
-      Check ("CI-03t Row 6 LC% = 600", VV.Int_Val, 600);
+      Check ("CI-03t Row 6 LC% = 600", Integer (VV.Int_Val), 600);
       VV := Result.Get_Value (6, "LA%");
       Check ("CI-03u Row 6 LA% is missing",
              VV.Kind = SData_Core.Values.Val_Missing, True);
@@ -1817,17 +1817,17 @@ begin
       Check ("CJ-01b No warnings",
              Natural (Warnings.Length), 0);
       VV := Result.Get_Value (1, "ID%");
-      Check ("CJ-01c Row 1 ID% = 1", VV.Int_Val, 1);
+      Check ("CJ-01c Row 1 ID% = 1", Integer (VV.Int_Val), 1);
       VV := Result.Get_Value (1, "LX$");
       Check ("CJ-01d Row 1 LX$ = a", To_String (VV.Str_Val), "a");
       VV := Result.Get_Value (1, "RY%");
-      Check ("CJ-01e Row 1 RY% = 10", VV.Int_Val, 10);
+      Check ("CJ-01e Row 1 RY% = 10", Integer (VV.Int_Val), 10);
       VV := Result.Get_Value (2, "ID%");
-      Check ("CJ-01f Row 2 ID% = 2", VV.Int_Val, 2);
+      Check ("CJ-01f Row 2 ID% = 2", Integer (VV.Int_Val), 2);
       VV := Result.Get_Value (2, "LX$");
       Check ("CJ-01g Row 2 LX$ = b", To_String (VV.Str_Val), "b");
       VV := Result.Get_Value (2, "RY%");
-      Check ("CJ-01h Row 2 RY% = 20", VV.Int_Val, 20);
+      Check ("CJ-01h Row 2 RY% = 20", Integer (VV.Int_Val), 20);
    end;
 
    --  CJ-02: N:M join.
@@ -1898,30 +1898,30 @@ begin
              Natural (Warnings.Length), 0);
       --  ID=1 group: (a,10) then (b,10)
       VV := Result.Get_Value (1, "ID%");
-      Check ("CJ-02c Row 1 ID% = 1", VV.Int_Val, 1);
+      Check ("CJ-02c Row 1 ID% = 1", Integer (VV.Int_Val), 1);
       VV := Result.Get_Value (1, "LX$");
       Check ("CJ-02d Row 1 LX$ = a", To_String (VV.Str_Val), "a");
       VV := Result.Get_Value (1, "RY%");
-      Check ("CJ-02e Row 1 RY% = 10", VV.Int_Val, 10);
+      Check ("CJ-02e Row 1 RY% = 10", Integer (VV.Int_Val), 10);
       VV := Result.Get_Value (2, "ID%");
-      Check ("CJ-02f Row 2 ID% = 1", VV.Int_Val, 1);
+      Check ("CJ-02f Row 2 ID% = 1", Integer (VV.Int_Val), 1);
       VV := Result.Get_Value (2, "LX$");
       Check ("CJ-02g Row 2 LX$ = b", To_String (VV.Str_Val), "b");
       VV := Result.Get_Value (2, "RY%");
-      Check ("CJ-02h Row 2 RY% = 10", VV.Int_Val, 10);
+      Check ("CJ-02h Row 2 RY% = 10", Integer (VV.Int_Val), 10);
       --  ID=2 group: (c,20) then (c,21)
       VV := Result.Get_Value (3, "ID%");
-      Check ("CJ-02i Row 3 ID% = 2", VV.Int_Val, 2);
+      Check ("CJ-02i Row 3 ID% = 2", Integer (VV.Int_Val), 2);
       VV := Result.Get_Value (3, "LX$");
       Check ("CJ-02j Row 3 LX$ = c", To_String (VV.Str_Val), "c");
       VV := Result.Get_Value (3, "RY%");
-      Check ("CJ-02k Row 3 RY% = 20", VV.Int_Val, 20);
+      Check ("CJ-02k Row 3 RY% = 20", Integer (VV.Int_Val), 20);
       VV := Result.Get_Value (4, "ID%");
-      Check ("CJ-02l Row 4 ID% = 2", VV.Int_Val, 2);
+      Check ("CJ-02l Row 4 ID% = 2", Integer (VV.Int_Val), 2);
       VV := Result.Get_Value (4, "LX$");
       Check ("CJ-02m Row 4 LX$ = c", To_String (VV.Str_Val), "c");
       VV := Result.Get_Value (4, "RY%");
-      Check ("CJ-02n Row 4 RY% = 21", VV.Int_Val, 21);
+      Check ("CJ-02n Row 4 RY% = 21", Integer (VV.Int_Val), 21);
    end;
 
    --  CJ-03: Unmatched keys dropped (inner join semantics).
@@ -1988,18 +1988,18 @@ begin
              Natural (Warnings.Length), 0);
       --  Row 1: ID=2 (first matched key)
       VV := Result.Get_Value (1, "ID%");
-      Check ("CJ-03c Row 1 ID% = 2", VV.Int_Val, 2);
+      Check ("CJ-03c Row 1 ID% = 2", Integer (VV.Int_Val), 2);
       VV := Result.Get_Value (1, "LA%");
-      Check ("CJ-03d Row 1 LA% = 200", VV.Int_Val, 200);
+      Check ("CJ-03d Row 1 LA% = 200", Integer (VV.Int_Val), 200);
       VV := Result.Get_Value (1, "LB%");
-      Check ("CJ-03e Row 1 LB% = 20", VV.Int_Val, 20);
+      Check ("CJ-03e Row 1 LB% = 20", Integer (VV.Int_Val), 20);
       --  Row 2: ID=3
       VV := Result.Get_Value (2, "ID%");
-      Check ("CJ-03f Row 2 ID% = 3", VV.Int_Val, 3);
+      Check ("CJ-03f Row 2 ID% = 3", Integer (VV.Int_Val), 3);
       VV := Result.Get_Value (2, "LA%");
-      Check ("CJ-03g Row 2 LA% = 300", VV.Int_Val, 300);
+      Check ("CJ-03g Row 2 LA% = 300", Integer (VV.Int_Val), 300);
       VV := Result.Get_Value (2, "LB%");
-      Check ("CJ-03h Row 2 LB% = 30", VV.Int_Val, 30);
+      Check ("CJ-03h Row 2 LB% = 30", Integer (VV.Int_Val), 30);
    end;
 
    --  CJ-04: JOIN_WARN_THRESHOLD trip.
@@ -2133,21 +2133,21 @@ begin
       Check ("CJ-05b No warnings",
              Natural (Warnings.Length), 0);
       VV := Result.Get_Value (1, "ID%");
-      Check ("CJ-05c Row 1 ID% = 1", VV.Int_Val, 1);
+      Check ("CJ-05c Row 1 ID% = 1", Integer (VV.Int_Val), 1);
       VV := Result.Get_Value (1, "LA%");
-      Check ("CJ-05d Row 1 LA% = 10", VV.Int_Val, 10);
+      Check ("CJ-05d Row 1 LA% = 10", Integer (VV.Int_Val), 10);
       VV := Result.Get_Value (1, "LB%");
-      Check ("CJ-05e Row 1 LB% = 100", VV.Int_Val, 100);
+      Check ("CJ-05e Row 1 LB% = 100", Integer (VV.Int_Val), 100);
       VV := Result.Get_Value (1, "LC%");
-      Check ("CJ-05f Row 1 LC% = 1000", VV.Int_Val, 1000);
+      Check ("CJ-05f Row 1 LC% = 1000", Integer (VV.Int_Val), 1000);
       VV := Result.Get_Value (2, "ID%");
-      Check ("CJ-05g Row 2 ID% = 2", VV.Int_Val, 2);
+      Check ("CJ-05g Row 2 ID% = 2", Integer (VV.Int_Val), 2);
       VV := Result.Get_Value (2, "LA%");
-      Check ("CJ-05h Row 2 LA% = 20", VV.Int_Val, 20);
+      Check ("CJ-05h Row 2 LA% = 20", Integer (VV.Int_Val), 20);
       VV := Result.Get_Value (2, "LB%");
-      Check ("CJ-05i Row 2 LB% = 200", VV.Int_Val, 200);
+      Check ("CJ-05i Row 2 LB% = 200", Integer (VV.Int_Val), 200);
       VV := Result.Get_Value (2, "LC%");
-      Check ("CJ-05j Row 2 LC% = 2000", VV.Int_Val, 2000);
+      Check ("CJ-05j Row 2 LC% = 2000", Integer (VV.Int_Val), 2000);
    end;
 
    ---------------------------------------------------------------------------
@@ -2483,15 +2483,15 @@ begin
       Raised : Boolean := False;
    begin
       Check ("CV-01 numeric->integer truncates toward zero",
-             Convert_Value (Fv, Val_Integer).Int_Val, 3);
+             Integer (Convert_Value (Fv, Val_Integer).Int_Val), 3);
       Check ("CV-02 negative numeric->integer truncates toward zero",
-             Convert_Value (Fn, Val_Integer).Int_Val, -3);
+             Integer (Convert_Value (Fn, Val_Integer).Int_Val), -3);
       Check ("CV-03 integer->numeric promotes",
              Convert_Value (Iv, Val_Numeric).Num_Val = 3.0, True);
       Check ("CV-04 missing passes through",
              Convert_Value (Mv, Val_Integer).Kind = Val_Missing, True);
       Check ("CV-05 same-kind is a no-op",
-             Convert_Value (Iv, Val_Integer).Int_Val, 3);
+             Integer (Convert_Value (Iv, Val_Integer).Int_Val), 3);
       begin
          Sink := Convert_Value (Sv, Val_Integer);
       exception

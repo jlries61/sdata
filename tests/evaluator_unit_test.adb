@@ -52,7 +52,7 @@ procedure Evaluator_Unit_Test is
       end if;
    end Check_Num;
 
-   procedure Check_Int (Name : String; V : Value; Expected : Integer) is
+   procedure Check_Int (Name : String; V : Value; Expected : Int) is
    begin
       if V.Kind /= Val_Integer then
          Put_Line ("FAIL: " & Name & "  got kind=" & V.Kind'Image
@@ -510,11 +510,11 @@ begin
    Check ("MF-21: LTW(-1.0) raises domain error",
           Raises ("LTW", (1 => (Kind => Val_Numeric, Num_Val => -1.0))), True);
 
-   --  MF-22: MAXINT() = Integer'Last
-   Check_Int ("MF-22: MAXINT() = Integer'Last", F0 ("MAXINT"), Integer'Last);
+   --  MF-22: MAXINT() = Int'Last
+   Check_Int ("MF-22: MAXINT() = Int'Last", F0 ("MAXINT"), Int'Last);
 
-   --  MF-23: MININT() = Integer'First
-   Check_Int ("MF-23: MININT() = Integer'First", F0 ("MININT"), Integer'First);
+   --  MF-23: MININT() = Int'First
+   Check_Int ("MF-23: MININT() = Int'First", F0 ("MININT"), Int'First);
 
    --  MF-24: MINNUM() > 0.0 (smallest positive float)
    V := F0 ("MINNUM");

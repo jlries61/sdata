@@ -63,9 +63,9 @@ begin
                               Hi_Val : constant Value := Evaluate (Sub_List.Expr_End);
                               Lo, Hi : Integer;
                            begin
-                              if Lo_Val.Kind = Val_Integer then Lo := Lo_Val.Int_Val;
+                              if Lo_Val.Kind = Val_Integer then Lo := Integer (Lo_Val.Int_Val);
                               else Lo := Integer (Real'Floor (Convert_To_Float (Lo_Val))); end if;
-                              if Hi_Val.Kind = Val_Integer then Hi := Hi_Val.Int_Val;
+                              if Hi_Val.Kind = Val_Integer then Hi := Integer (Hi_Val.Int_Val);
                               else Hi := Integer (Real'Floor (Convert_To_Float (Hi_Val))); end if;
                               for I in Lo .. Hi loop
                                  Put (To_String_Formatted (Get_Array_Element (AName, I)));
@@ -77,7 +77,7 @@ begin
                               Idx_Val : constant Value := Evaluate (Sub_List.Expr);
                               Idx     : Integer;
                            begin
-                              if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
+                              if Idx_Val.Kind = Val_Integer then Idx := Integer (Idx_Val.Int_Val);
                               else Idx := Integer (Real'Floor (Convert_To_Float (Idx_Val))); end if;
                               Put (To_String_Formatted (Get_Array_Element (AName, Idx)));
                            end;

@@ -114,7 +114,7 @@ procedure Merge_Fuzz_Driver is
                              Num_Val => SData_Core.Values.Real (Byte));
                   when SData_Core.Table.Col_Integer =>
                      Val := (Kind    => SData_Core.Values.Val_Integer,
-                             Int_Val => Byte);
+                             Int_Val => SData_Core.Values.Int (Byte));
                   when SData_Core.Table.Col_String =>
                      Val := (Kind    => SData_Core.Values.Val_String,
                              Str_Val => To_Unbounded_String
