@@ -34,8 +34,8 @@ procedure Evaluator_Unit_Test is
       end if;
    end Check;
 
-   procedure Check_Num (Name : String; V : Value; Expected : Float;
-                        Tol : Float := 0.001) is
+   procedure Check_Num (Name : String; V : Value; Expected : Real;
+                        Tol : Real := 0.001) is
    begin
       if V.Kind /= Val_Numeric then
          Put_Line ("FAIL: " & Name & "  got kind=" & V.Kind'Image
@@ -52,7 +52,7 @@ procedure Evaluator_Unit_Test is
       end if;
    end Check_Num;
 
-   procedure Check_Int (Name : String; V : Value; Expected : Integer) is
+   procedure Check_Int (Name : String; V : Value; Expected : Int) is
    begin
       if V.Kind /= Val_Integer then
          Put_Line ("FAIL: " & Name & "  got kind=" & V.Kind'Image
@@ -112,20 +112,20 @@ procedure Evaluator_Unit_Test is
       return Call_Function (Name, (1 .. 0 => (Kind => Val_Missing)));
    end F0;
 
-   function F1 (Name : String; A : Float) return Value is
+   function F1 (Name : String; A : Real) return Value is
    begin
       return Call_Function (Name,
          (1 => (Kind => Val_Numeric, Num_Val => A)));
    end F1;
 
-   function F2 (Name : String; A, B : Float) return Value is
+   function F2 (Name : String; A, B : Real) return Value is
    begin
       return Call_Function (Name,
          (1 => (Kind => Val_Numeric, Num_Val => A),
           2 => (Kind => Val_Numeric, Num_Val => B)));
    end F2;
 
-   function F3 (Name : String; A, B, C : Float) return Value is
+   function F3 (Name : String; A, B, C : Real) return Value is
    begin
       return Call_Function (Name,
          (1 => (Kind => Val_Numeric, Num_Val => A),
@@ -304,19 +304,19 @@ begin
 
    --  NF-28: ATN(1.0) = π/4
    Check_Num ("NF-28: ATN(1.0) = pi/4",
-              F1 ("ATN", 1.0), Float (Ada.Numerics.Pi) / 4.0);
+              F1 ("ATN", 1.0), Real (Ada.Numerics.Pi) / 4.0);
 
    --  NF-29: ARCTAN is an alias for ATN
    Check_Num ("NF-29: ARCTAN(1.0) = pi/4",
-              F1 ("ARCTAN", 1.0), Float (Ada.Numerics.Pi) / 4.0);
+              F1 ("ARCTAN", 1.0), Real (Ada.Numerics.Pi) / 4.0);
 
    --  NF-30: ATAN2(1.0, 1.0) = π/4
    Check_Num ("NF-30: ATAN2(1.0, 1.0) = pi/4",
-              F2 ("ATAN2", 1.0, 1.0), Float (Ada.Numerics.Pi) / 4.0);
+              F2 ("ATAN2", 1.0, 1.0), Real (Ada.Numerics.Pi) / 4.0);
 
    --  NF-31: ARCSIN(1.0) = π/2
    Check_Num ("NF-31: ARCSIN(1.0) = pi/2",
-              F1 ("ARCSIN", 1.0), Float (Ada.Numerics.Pi) / 2.0);
+              F1 ("ARCSIN", 1.0), Real (Ada.Numerics.Pi) / 2.0);
 
    --  NF-32: ARCSIN domain error (|x| > 1)
    Check ("NF-32: ARCSIN(2.0) raises domain error",
@@ -324,7 +324,7 @@ begin
 
    --  NF-33: ARCCOS(0.0) = π/2
    Check_Num ("NF-33: ARCCOS(0.0) = pi/2",
-              F1 ("ARCCOS", 0.0), Float (Ada.Numerics.Pi) / 2.0);
+              F1 ("ARCCOS", 0.0), Real (Ada.Numerics.Pi) / 2.0);
 
    --  NF-34: ARCCOS domain error (|x| > 1)
    Check ("NF-34: ARCCOS(2.0) raises domain error",
@@ -332,11 +332,11 @@ begin
 
    --  NF-35: DEG(π) = 180.0
    Check_Num ("NF-35: DEG(pi) = 180.0",
-              F1 ("DEG", Float (Ada.Numerics.Pi)), 180.0, 0.001);
+              F1 ("DEG", Real (Ada.Numerics.Pi)), 180.0, 0.001);
 
    --  NF-36: RAD(180.0) = π
    Check_Num ("NF-36: RAD(180.0) = pi",
-              F1 ("RAD", 180.0), Float (Ada.Numerics.Pi), 0.0001);
+              F1 ("RAD", 180.0), Real (Ada.Numerics.Pi), 0.0001);
 
    --  NF-37: SIND(90.0) = 1.0
    Check_Num ("NF-37: SIND(90.0) = 1.0", F1 ("SIND", 90.0), 1.0);
@@ -458,7 +458,7 @@ begin
 
    --  MF-09: PI() = Ada.Numerics.Pi (exact)
    Check_Num ("MF-09: PI() = pi",
-              F0 ("PI"), Float (Ada.Numerics.Pi), 0.000001);
+              F0 ("PI"), Real (Ada.Numerics.Pi), 0.000001);
 
    --  MF-10: NUM("3.14") → 3.14
    Check_Num ("MF-10: NUM('3.14') = 3.14",
@@ -510,11 +510,11 @@ begin
    Check ("MF-21: LTW(-1.0) raises domain error",
           Raises ("LTW", (1 => (Kind => Val_Numeric, Num_Val => -1.0))), True);
 
-   --  MF-22: MAXINT() = Integer'Last
-   Check_Int ("MF-22: MAXINT() = Integer'Last", F0 ("MAXINT"), Integer'Last);
+   --  MF-22: MAXINT() = Int'Last
+   Check_Int ("MF-22: MAXINT() = Int'Last", F0 ("MAXINT"), Int'Last);
 
-   --  MF-23: MININT() = Integer'First
-   Check_Int ("MF-23: MININT() = Integer'First", F0 ("MININT"), Integer'First);
+   --  MF-23: MININT() = Int'First
+   Check_Int ("MF-23: MININT() = Int'First", F0 ("MININT"), Int'First);
 
    --  MF-24: MINNUM() > 0.0 (smallest positive float)
    V := F0 ("MINNUM");
@@ -683,7 +683,7 @@ begin
    --  EV-01: Integer literal
    Check_Int ("EV-01: integer literal 1", Eval ("1"), 1);
 
-   --  EV-02: Float literal
+   --  EV-02: Real literal
    Check_Num ("EV-02: float literal 1.5", Eval ("1.5"), 1.5);
 
    --  EV-03: String literal
@@ -704,7 +704,7 @@ begin
    --  EV-08: Integer ^ integer always yields Val_Numeric
    Check_Num ("EV-08: 2 ^ 3 = 8.0 (Val_Numeric)", Eval ("2 ^ 3"), 8.0);
 
-   --  EV-09: Float operand promotes result to Val_Numeric
+   --  EV-09: Real operand promotes result to Val_Numeric
    Check_Num ("EV-09: 1.5 + 0.5 = 2.0 (Val_Numeric)", Eval ("1.5 + 0.5"), 2.0);
 
    --  EV-10: Operator precedence: * binds tighter than +
@@ -834,26 +834,26 @@ begin
    --  EV-45: NOT TRUE -> Val_Integer 0
    Check_Int ("EV-45: NOT TRUE -> 0", Eval ("NOT TRUE"), 0);
 
-   --  EV-46 .. EV-52: Float comparison operators
+   --  EV-46 .. EV-52: Real comparison operators
    --  EV-17..EV-23 only exercise the integer operand path; these exercise the
    --  float path (at least one Val_Numeric operand) for every operator.
 
-   --  EV-46: Float < — true
+   --  EV-46: Real < — true
    Check_Int ("EV-46: 1.5 < 2.5 -> 1", Eval ("1.5 < 2.5"), 1);
 
-   --  EV-47: Float < — false
+   --  EV-47: Real < — false
    Check_Int ("EV-47: 2.5 < 1.5 -> 0", Eval ("2.5 < 1.5"), 0);
 
-   --  EV-48: Float <= — equal case
+   --  EV-48: Real <= — equal case
    Check_Int ("EV-48: 1.5 <= 1.5 -> 1", Eval ("1.5 <= 1.5"), 1);
 
-   --  EV-49: Float > — true
+   --  EV-49: Real > — true
    Check_Int ("EV-49: 2.5 > 1.5 -> 1", Eval ("2.5 > 1.5"), 1);
 
-   --  EV-50: Float >= — equal case
+   --  EV-50: Real >= — equal case
    Check_Int ("EV-50: 1.5 >= 1.5 -> 1", Eval ("1.5 >= 1.5"), 1);
 
-   --  EV-51: Float = — true (Val_Numeric path, separate from EV-17)
+   --  EV-51: Real = — true (Val_Numeric path, separate from EV-17)
    Check_Int ("EV-51: 1.5 = 1.5 -> 1", Eval ("1.5 = 1.5"), 1);
 
    --  EV-52: Mixed int/float — integer promoted to float for comparison

@@ -1,13 +1,13 @@
 -- Test for Integer Overflow
-LET A% = 2000000000
-LET B% = 2000000000
+LET A% = 5000000000000000000
+LET B% = 5000000000000000000
 PRINT "Attempting overflow addition..."
 LET C% = A% + B%
 PRINT "Result:" C%
 RUN
 
 NEW
-LET A% = 2000000000
+LET A% = 5000000000000000000
 PRINT "Attempting overflow multiplication..."
 LET D% = A% * 2
 PRINT "Result:" D%

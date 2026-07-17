@@ -48,9 +48,9 @@ procedure CSV_Unit_Test is
    end Check;
 
    procedure Check_Float (Name    : String;
-                           Got_Ok  : Boolean; Got_Val  : Float;
-                           Exp_Ok  : Boolean; Exp_Val  : Float;
-                           Tol     : Float := 0.001) is
+                           Got_Ok  : Boolean; Got_Val  : Real;
+                           Exp_Ok  : Boolean; Exp_Val  : Real;
+                           Tol     : Real := 0.001) is
    begin
       if Got_Ok = Exp_Ok
          and then (not Exp_Ok or else abs (Got_Val - Exp_Val) <= Tol)
@@ -64,8 +64,8 @@ procedure CSV_Unit_Test is
       end if;
    end Check_Float;
 
-   procedure Check_Inf (Name : String; Got_Ok : Boolean; Got_Val : Float;
-                        Expected_Inf : Float) is
+   procedure Check_Inf (Name : String; Got_Ok : Boolean; Got_Val : Real;
+                        Expected_Inf : Real) is
    begin
       if Got_Ok and then Got_Val = Expected_Inf then
          Put_Line ("PASS: " & Name);
@@ -77,7 +77,7 @@ procedure CSV_Unit_Test is
       end if;
    end Check_Inf;
 
-   R  : Float;
+   R  : Real;
    FV : Field_Vectors.Vector;
 
 begin

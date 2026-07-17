@@ -41,16 +41,12 @@ Three data types shall be supported:
 
 #### Floating Point Numeric
 
-Platform-dependent precision:
-
-- 128-bit architectures: IEEE 754 quadruple precision (128-bit).
-- 64-bit architectures: IEEE 754 double precision (64-bit).
-- 32-bit architectures: IEEE 754 single precision (32-bit).
-- Architectures with word size \< 32 bits: unsupported.
+IEEE 754 double precision (64-bit) on all platforms.
 
 #### Integer
 
-32-bit signed integer.
+64-bit signed integer (range -9,223,372,036,854,775,808 to
+9,223,372,036,854,775,807).
 
 #### Character
 
@@ -62,14 +58,14 @@ Platform-dependent precision:
 
 Conversion Rules:
 
-- If an operation uses both floating point and integer values, integer values shall first be converted to their floating point equivalents.
+- If an operation uses both floating point and integer values, integer values shall first be converted to their floating point equivalents. This conversion is exact for integers up to 2^53 in magnitude; integers of larger magnitude may lose low-order digits when combined with floating-point values.
 - If an integer value is written to a floating point variable, it shall be converted to its floating point equivalent.
 - If a floating point value is written to an integer variable, the fractional part shall be truncated (rounded toward zero).
 - Arithmetic operations involving character values shall be unsupported.
 
 ### 2.4 Overflow Handling
 
-**Integer Overflow:** Operations producing values outside the range -2,147,483,648 to 2,147,483,647 shall fail with an error message.
+**Integer Overflow:** Operations producing values outside the range -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807 shall fail with an error message.
 
 **Floating Point Overflow:** Floating point operations that would produce values exceeding the representable range shall likewise fail with an error message.
 
@@ -942,7 +938,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>SAVE</em></td>
 <td><em>SAVE</em> [ &lt;<em>filename</em>&gt;] [<em>/</em> [<em>FMT =</em> &lt;<em>CSV</em> | <em>ODF</em>|<em> OOXML</em> | <em>MSEXCEL</em>&gt;] | [<em> CHARSET =</em> &lt;<em>ASCII </em>| <em>UTF-8</em> | <em>UTF-16</em> | &lt; <em>csname</em> &gt;&gt; ] | [ <em>HEADER = </em>&lt;<em>YES</em> | <em>NO</em>&gt;] [<em>DLM = </em>&lt;<em>dlmstr</em>&gt;] [<em>DECIMALS = </em>&lt;<em>N</em>&gt;]...]</td>
 <td>Declarative</td>
-<td>Specify the file to which the table produced by the <em>RUN</em> command will be written. The file name shall be interpreted in the same way as by the <em>USE</em> command. The column names shall be as stored in the internal table. If no file name is specified, then any <em>SAVE</em> statement in effect shall be canceled. The <em>FMT</em> option governs the output file format (<em>OOXML</em> and <em>MSEXCEL</em> are equivalent). The <em>HEADER</em> option determines whether a header is written to the output file or spreadsheet. The <em>DLM</em> option sets the field delimiter on CSV files (string must be quoted). The <em>DECIMALS=N</em> option (<em>N</em> a non-negative integer; a negative or non-integer value is a parse error, <code>/DECIMALS= requires a non-negative integer</code>) controls floating-point output precision, with deliberately different mechanics per format: in <em>CSV</em>, the stored value is rounded to <em>N</em> decimal places and trailing zeros (and a bare trailing <code>.</code>) are stripped, so width varies and the file genuinely loses precision beyond <em>N</em> places; in <em>ODF</em>/<em>OOXML</em>, the full round-trip-precise value is retained in the cell (<code>office:value</code> / <code>&lt;v&gt;</code>) and a fixed <em>N</em>-decimal display number-format is attached instead, so cells always <em>show</em> exactly <em>N</em> decimals (e.g. <code>0.50</code>) with no data loss. This CSV-trims-vs-spreadsheet-fixed asymmetry is intentional: the CSV cell text <em>is</em> the data (trailing zeros are pure redundancy worth trimming), whereas a spreadsheet's stored value is untouched, so the display format's only goal is consistent, aligned presentation. <em>DECIMALS=</em> affects only finite floating-point cells; integer, character, missing, and <em>Inf</em>/<em>-Inf</em> cells are unaffected in all three formats. When <em>DECIMALS=</em> is omitted, all three writers render finite floating-point values at round-trip precision for the current numeric type (still single-precision <em>Float</em> per the current data model — see &sect;2.2 — 9 significant digits, trailing zeros trimmed), superseding the previous 6-significant-digit <em>Float'Image</em> rendering; this is a byte-level change to default <em>SAVE</em> output. Variables shall be written in the order in which they appear in the internal table.</td>
+<td>Specify the file to which the table produced by the <em>RUN</em> command will be written. The file name shall be interpreted in the same way as by the <em>USE</em> command. The column names shall be as stored in the internal table. If no file name is specified, then any <em>SAVE</em> statement in effect shall be canceled. The <em>FMT</em> option governs the output file format (<em>OOXML</em> and <em>MSEXCEL</em> are equivalent). The <em>HEADER</em> option determines whether a header is written to the output file or spreadsheet. The <em>DLM</em> option sets the field delimiter on CSV files (string must be quoted). The <em>DECIMALS=N</em> option (<em>N</em> a non-negative integer; a negative or non-integer value is a parse error, <code>/DECIMALS= requires a non-negative integer</code>) controls floating-point output precision, with deliberately different mechanics per format: in <em>CSV</em>, the stored value is rounded to <em>N</em> decimal places and trailing zeros (and a bare trailing <code>.</code>) are stripped, so width varies and the file genuinely loses precision beyond <em>N</em> places; in <em>ODF</em>/<em>OOXML</em>, the full round-trip-precise value is retained in the cell (<code>office:value</code> / <code>&lt;v&gt;</code>) and a fixed <em>N</em>-decimal display number-format is attached instead, so cells always <em>show</em> exactly <em>N</em> decimals (e.g. <code>0.50</code>) with no data loss. This CSV-trims-vs-spreadsheet-fixed asymmetry is intentional: the CSV cell text <em>is</em> the data (trailing zeros are pure redundancy worth trimming), whereas a spreadsheet's stored value is untouched, so the display format's only goal is consistent, aligned presentation. <em>DECIMALS=</em> affects only finite floating-point cells; integer, character, missing, and <em>Inf</em>/<em>-Inf</em> cells are unaffected in all three formats. When <em>DECIMALS=</em> is omitted, all three writers render finite floating-point values at round-trip precision for the current numeric type (double precision per the current data model — see &sect;2.2 — up to 17 significant digits, trailing zeros trimmed); this supersedes the earlier single-precision (9-significant-digit) rendering, itself a change from the original 6-significant-digit <em>Float'Image</em> output. Variables shall be written in the order in which they appear in the internal table.</td>
 </tr>
 <tr>
 <td><em>SELECT</em></td>

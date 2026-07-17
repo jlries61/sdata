@@ -3,7 +3,7 @@ Dataset saved: tests/data/dc_default.csv
 RUN complete. 3 records and 2 variables processed.
 === default ===
 X,LABEL$
-123456.79,a
+123456.789,a
 3.14159,b
 0.5,c
 Dataset opened: tests/data/precision_src.csv

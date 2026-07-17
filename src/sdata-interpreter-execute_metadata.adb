@@ -145,8 +145,8 @@ begin
             function Eval_Bound (Expr : Expression_Access; Label : String) return Integer is
                V : constant Value := Evaluate (Expr);
             begin
-               if V.Kind = Val_Integer then return V.Int_Val;
-               elsif V.Kind = Val_Numeric then return Integer (Float'Floor (V.Num_Val));
+               if V.Kind = Val_Integer then return Integer (V.Int_Val);
+               elsif V.Kind = Val_Numeric then return Integer (Real'Floor (V.Num_Val));
                elsif V.Kind = Val_String then raise Script_Error with Label & " bound must be numeric, not character";
                else raise Script_Error with Label & " bound is missing";
                end if;

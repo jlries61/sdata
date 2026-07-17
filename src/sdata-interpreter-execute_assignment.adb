@@ -33,12 +33,12 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
                Hi_Val : constant Value := Evaluate (Stmt.Arr_Idx_List.Next.Expr);
                Lo, Hi : Integer;
             begin
-               if Lo_Val.Kind = Val_Integer then Lo := Lo_Val.Int_Val;
-               elsif Lo_Val.Kind = Val_Numeric then Lo := Integer (Float'Floor (Lo_Val.Num_Val));
+               if Lo_Val.Kind = Val_Integer then Lo := Integer (Lo_Val.Int_Val);
+               elsif Lo_Val.Kind = Val_Numeric then Lo := Integer (Real'Floor (Lo_Val.Num_Val));
                else raise Script_Error with "Array slice lower bound for """ & Var_Name & """ must be numeric";
                end if;
-               if Hi_Val.Kind = Val_Integer then Hi := Hi_Val.Int_Val;
-               elsif Hi_Val.Kind = Val_Numeric then Hi := Integer (Float'Floor (Hi_Val.Num_Val));
+               if Hi_Val.Kind = Val_Integer then Hi := Integer (Hi_Val.Int_Val);
+               elsif Hi_Val.Kind = Val_Numeric then Hi := Integer (Real'Floor (Hi_Val.Num_Val));
                else raise Script_Error with "Array slice upper bound for """ & Var_Name & """ must be numeric";
                end if;
                for I in Lo .. Hi loop
@@ -59,8 +59,8 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
             begin
                while Node /= null loop
                   Idx_Val := Evaluate (Node.Expr);
-                  if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
-                  elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
+                  if Idx_Val.Kind = Val_Integer then Idx := Integer (Idx_Val.Int_Val);
+                  elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Real'Floor (Idx_Val.Num_Val));
                   else raise Script_Error with "Array index for """ & Var_Name & """ must be numeric";
                   end if;
                   Set_Array_Element (Var_Name, Idx, Result);
@@ -75,8 +75,8 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
             Idx_Val : constant Value := Evaluate (Stmt.Arr_Idx);
             Idx     : Integer;
          begin
-            if Idx_Val.Kind = Val_Integer then Idx := Idx_Val.Int_Val;
-            elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Float'Floor (Idx_Val.Num_Val));
+            if Idx_Val.Kind = Val_Integer then Idx := Integer (Idx_Val.Int_Val);
+            elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Real'Floor (Idx_Val.Num_Val));
             else
                raise Script_Error with "Array index for """ & Var_Name
                   & """ must be numeric, not "
@@ -131,9 +131,9 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
       if Result.Kind /= Val_Missing then
          if Expected = Val_Integer and Result.Kind /= Val_Integer then
             Result := (Kind    => Val_Integer,
-                       Int_Val => Integer (Float'Truncation (Convert_To_Float (Result))));
+                       Int_Val => Int (Real'Truncation (Convert_To_Real (Result))));
          elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
-            Result := (Kind => Val_Numeric, Num_Val => Float (Result.Int_Val));
+            Result := (Kind => Val_Numeric, Num_Val => Real (Result.Int_Val));
          elsif Expected /= Result.Kind
             and not (Expected = Val_Numeric and Result.Kind = Val_Integer)
          then

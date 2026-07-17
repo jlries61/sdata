@@ -1,3 +1,9 @@
+sdata (0.15.0-1) unstable; urgency=medium
+
+  * 64-bit numeric types: IEEE double floats and 64-bit signed integers (#54)
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 16 Jul 2026 17:12:38 -0700
+
 sdata (0.14.3-1) unstable; urgency=medium
 
   * Fix doubled-quote string escape dropping characters in the lexer (#52)
