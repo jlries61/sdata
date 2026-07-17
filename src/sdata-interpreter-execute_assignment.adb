@@ -131,7 +131,7 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
       if Result.Kind /= Val_Missing then
          if Expected = Val_Integer and Result.Kind /= Val_Integer then
             Result := (Kind    => Val_Integer,
-                       Int_Val => Int (Real'Truncation (Convert_To_Float (Result))));
+                       Int_Val => Int (Real'Truncation (Convert_To_Real (Result))));
          elsif Expected = Val_Numeric and Result.Kind = Val_Integer then
             Result := (Kind => Val_Numeric, Num_Val => Real (Result.Int_Val));
          elsif Expected /= Result.Kind

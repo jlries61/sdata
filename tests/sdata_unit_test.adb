@@ -389,13 +389,13 @@ begin
    Check_Float ("T-72 P row 2 value set by position = 2.72", V.Num_Val, 2.72);
 
    ---------------------------------------------------------------------------
-   --  ── SData_Core.Evaluator: Convert_To_Float ───────────────────────────────────
+   --  ── SData_Core.Evaluator: Convert_To_Real ───────────────────────────────────
    ---------------------------------------------------------------------------
 
-   Check_Float ("E-01 Convert_To_Float numeric",
-                Convert_To_Float ((Kind => Val_Numeric, Num_Val => 2.5)), 2.5);
-   Check_Float ("E-02 Convert_To_Float integer",
-                Convert_To_Float ((Kind => Val_Integer, Int_Val => 7)), 7.0);
+   Check_Float ("E-01 Convert_To_Real numeric",
+                Convert_To_Real ((Kind => Val_Numeric, Num_Val => 2.5)), 2.5);
+   Check_Float ("E-02 Convert_To_Real integer",
+                Convert_To_Real ((Kind => Val_Integer, Int_Val => 7)), 7.0);
 
    declare
       Dummy  : Real;
@@ -403,7 +403,7 @@ begin
       pragma Unreferenced (Raised);
       pragma Unreferenced (Dummy);
    begin
-      Dummy := Convert_To_Float ((Kind => Val_Missing));
+      Dummy := Convert_To_Real ((Kind => Val_Missing));
    exception
       when Constraint_Error => Raised := True;
       when others           => Raised := True;
@@ -411,7 +411,7 @@ begin
    --  Whether Missing raises or returns a sentinel, the key guarantee is
    --  that Numeric and Integer conversions above are correct.
    --  This block documents the current contract (raises Constraint_Error).
-   Check ("E-03 Convert_To_Float missing contract documented", True, True);
+   Check ("E-03 Convert_To_Real missing contract documented", True, True);
 
    ---------------------------------------------------------------------------
    --  ── SData_Core.Evaluator: Get_Expected_Kind ──────────────────────────────────

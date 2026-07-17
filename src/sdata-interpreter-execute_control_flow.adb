@@ -33,9 +33,9 @@ begin
          begin
             if Stmt.For_Step /= null then Step_Val := Evaluate (Stmt.For_Step); end if;
             declare
-               S  : constant Real := Convert_To_Float (Start_Val);
-               E  : constant Real := Convert_To_Float (End_Val);
-               ST : constant Real := Convert_To_Float (Step_Val);
+               S  : constant Real := Convert_To_Real (Start_Val);
+               E  : constant Real := Convert_To_Real (End_Val);
+               ST : constant Real := Convert_To_Real (Step_Val);
             begin
                Current_I := S;
                while (ST > 0.0 and then Current_I <= E) or else (ST < 0.0 and then Current_I >= E) loop

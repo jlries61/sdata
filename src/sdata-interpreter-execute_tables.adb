@@ -59,14 +59,14 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    function Numeric (V : Values.Value) return Boolean is
      (V.Kind = Values.Val_Numeric or else V.Kind = Values.Val_Integer);
 
-   function As_Float (V : Values.Value) return Real is
+   function As_Real (V : Values.Value) return Real is
      (if V.Kind = Values.Val_Integer then Real (V.Int_Val) else V.Num_Val);
 
    --  Value-order comparison for two levels.
    function Level_Less (A, B : Level) return Boolean is
    begin
       if Numeric (A.Val) and then Numeric (B.Val) then
-         return As_Float (A.Val) < As_Float (B.Val);
+         return As_Real (A.Val) < As_Real (B.Val);
       end if;
       return A.Disp < B.Disp;
    end Level_Less;
