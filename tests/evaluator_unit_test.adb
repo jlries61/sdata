@@ -1023,10 +1023,41 @@ begin
       --  each embedded quote.  """""" is the sdata literal "" (empty string);
       --  "LEN("""")" is LEN(""); "TRIM$("""")" is TRIM$("").
       E_Empty : constant Expression_Access := Parse_Expression ("""""");
+      E_Len   : constant Expression_Access := Parse_Expression ("LEN("""")");
       E_Cat   : constant Expression_Access := Parse_Expression ("""a"" + """"");
    begin
       Check_Missing ("55-eval empty literal is missing", Evaluate (E_Empty));
+      Check_Missing ("55-eval LEN(empty) is missing",    Evaluate (E_Len));
       Check_Missing ("55-eval a + empty is missing",     Evaluate (E_Cat));
+   end;
+
+   ---------------------------------------------------------------------------
+   --  Issue #55: every string-input built-in propagates a missing argument
+   --  instead of dereferencing .Str_Val on a Val_Missing (which would crash).
+   ---------------------------------------------------------------------------
+
+   declare
+      M  : constant Value := (Kind => Val_Missing);
+      S  : constant Value := (Kind => Val_String, Str_Val => To_Unbounded_String ("abc"));
+   begin
+      Check_Missing ("55-arg LEN",    Call_Function ("LEN",    (1 => M)));
+      Check_Missing ("55-arg LEFT$",  Call_Function ("LEFT$",  (M, (Kind => Val_Integer, Int_Val => 1))));
+      Check_Missing ("55-arg RIGHT$", Call_Function ("RIGHT$", (M, (Kind => Val_Integer, Int_Val => 1))));
+      Check_Missing ("55-arg MID$",   Call_Function ("MID$",   (M, (Kind => Val_Integer, Int_Val => 1), (Kind => Val_Integer, Int_Val => 1))));
+      Check_Missing ("55-arg SEG$",   Call_Function ("SEG$",   (M, (Kind => Val_Integer, Int_Val => 1), (Kind => Val_Integer, Int_Val => 1))));
+      Check_Missing ("55-arg TRIM$",  Call_Function ("TRIM$",  (1 => M)));
+      Check_Missing ("55-arg LTRIM$", Call_Function ("LTRIM$", (1 => M)));
+      Check_Missing ("55-arg RTRIM$", Call_Function ("RTRIM$", (1 => M)));
+      Check_Missing ("55-arg ASCII",  Call_Function ("ASCII",  (1 => M)));
+      Check_Missing ("55-arg UPPER$", Call_Function ("UPPER$", (1 => M)));
+      Check_Missing ("55-arg LOWER$", Call_Function ("LOWER$", (1 => M)));
+      Check_Missing ("55-arg POS",    Call_Function ("POS",    (S, M)));
+      Check_Missing ("55-arg POS2",   Call_Function ("POS",    (M, S)));
+      Check_Missing ("55-arg INSTR",  Call_Function ("INSTR",  (S, M)));
+      Check_Missing ("55-arg VAL",    Call_Function ("VAL",    (1 => M)));
+      Check_Missing ("55-arg NUM",    Call_Function ("NUM",    (1 => M)));
+      Check_Missing ("55-arg INDEX",  Call_Function ("INDEX",  (S, M)));
+      Check_Missing ("55-arg MATCH",  Call_Function ("MATCH",  (S, M)));
    end;
 
    Put_Line ("");
