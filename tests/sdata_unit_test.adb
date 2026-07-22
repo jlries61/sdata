@@ -131,6 +131,14 @@ begin
    Check ("T-14 string kind",  V.Kind = Val_String, True);
    Check ("T-15 string value", To_String (V.Str_Val), "Alice");
 
+   --  Issue #55: an empty character value is stored as missing, not "".
+   Set_Value (1, "NAME$", (Kind => Val_String, Str_Val => To_Unbounded_String ("")));
+   V := Get_Value (1, "NAME$");
+   Check_Kind ("T-55a empty string stored as missing", V.Kind, Val_Missing);
+   --  Restore "Alice" so downstream tests (T-20) that assume NAME$ still
+   --  holds its original value are unaffected by this probe.
+   Set_Value (1, "NAME$", (Kind => Val_String, Str_Val => To_Unbounded_String ("Alice")));
+
    --  Integer column.
    Set_Value (1, "N%", (Kind => Val_Integer, Int_Val => 42));
    V := Get_Value (1, "N%");
