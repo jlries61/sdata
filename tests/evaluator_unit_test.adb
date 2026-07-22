@@ -1014,6 +1014,21 @@ begin
          Check ("arity_unknown_raises", True, True);
    end;
 
+   ---------------------------------------------------------------------------
+   --  Issue #55: an empty character value is missing at expression level.
+   ---------------------------------------------------------------------------
+
+   declare
+      --  Parse_Expression argument is the sdata source text; Ada doubles
+      --  each embedded quote.  """""" is the sdata literal "" (empty string);
+      --  "LEN("""")" is LEN(""); "TRIM$("""")" is TRIM$("").
+      E_Empty : constant Expression_Access := Parse_Expression ("""""");
+      E_Cat   : constant Expression_Access := Parse_Expression ("""a"" + """"");
+   begin
+      Check_Missing ("55-eval empty literal is missing", Evaluate (E_Empty));
+      Check_Missing ("55-eval a + empty is missing",     Evaluate (E_Cat));
+   end;
+
    Put_Line ("");
    Put_Line (Passed'Image & " passed," & Failed'Image & " failed.");
    if Failed > 0 then
