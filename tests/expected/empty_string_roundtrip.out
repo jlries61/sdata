@@ -1,0 +1,8 @@
+Alice 0
+. 1
+Dataset saved: tests/data/empty_rt.csv
+RUN complete. 2 records and 2 variables processed.
+Dataset opened: tests/data/empty_rt.csv
+REC# NAME$ N%
+1 Alice 0
+2 . 1
