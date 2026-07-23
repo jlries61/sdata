@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.16.0
+Version:        0.16.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Jul 23 2026 John L. Ries <john@theyarnbard.com> - 0.16.1-1
+- SELECT/condition filters can now reference character ($) and integer (%) columns directly (sdata-core #73 fix; floors sdata_core ^0.3.1).
+
 * Wed Jul 22 2026 John L. Ries <john@theyarnbard.com> - 0.16.0-1
 - empty character value is the missing value (#55)
 

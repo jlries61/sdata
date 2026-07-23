@@ -1,3 +1,9 @@
+sdata (0.16.1-1) unstable; urgency=medium
+
+  * SELECT/condition filters can now reference character ($) and integer (%) columns directly (sdata-core #73 fix; floors sdata_core ^0.3.1).
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 23 Jul 2026 15:20:16 -0700
+
 sdata (0.16.0-1) unstable; urgency=medium
 
   * empty character value is the missing value (#55)
