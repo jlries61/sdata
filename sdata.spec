@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.15.0
+Version:        0.16.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Jul 22 2026 John L. Ries <john@theyarnbard.com> - 0.16.0-1
+- empty character value is the missing value (#55)
+
 * Thu Jul 16 2026 John L. Ries <john@theyarnbard.com> - 0.15.0-1
 - 64-bit numeric types: IEEE double floats and 64-bit signed integers (#54)
 

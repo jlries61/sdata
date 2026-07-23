@@ -100,3 +100,6 @@ tests/data/pt_a.csv
 tests/data/pt_b.csv
 tests/data/neg.csv
 tests/data/style.xlsx
+
+# empty_string_roundtrip SAVE-scratch output (#55)
+tests/data/empty_rt.csv
