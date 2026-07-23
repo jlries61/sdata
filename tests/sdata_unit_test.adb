@@ -139,6 +139,14 @@ begin
    --  holds its original value are unaffected by this probe.
    Set_Value (1, "NAME$", (Kind => Val_String, Str_Val => To_Unbounded_String ("Alice")));
 
+   --  Issue #55 (review follow-up): an empty string written to a NUMERIC
+   --  column normalizes to missing rather than raising Type_Mismatch_Error.
+   Set_Value (1, "X", (Kind => Val_String, Str_Val => To_Unbounded_String ("")));
+   V := Get_Value (1, "X");
+   Check_Kind ("T-55b empty string into numeric column is missing", V.Kind, Val_Missing);
+   --  Restore X's prior numeric value so downstream tests are unaffected.
+   Set_Value (1, "X", (Kind => Val_Numeric, Num_Val => 3.14));
+
    --  Integer column.
    Set_Value (1, "N%", (Kind => Val_Integer, Int_Val => 42));
    V := Get_Value (1, "N%");
