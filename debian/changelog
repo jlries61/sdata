@@ -1,3 +1,9 @@
+sdata (0.16.0-1) unstable; urgency=medium
+
+  * empty character value is the missing value (#55)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 22 Jul 2026 19:25:23 -0700
+
 sdata (0.15.0-1) unstable; urgency=medium
 
   * 64-bit numeric types: IEEE double floats and 64-bit signed integers (#54)
