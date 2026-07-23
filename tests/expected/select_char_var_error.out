@@ -1,1 +1,0 @@
-Error: filter expression cannot reference typed variable 'CATEGORY$': character ('$') and integer ('%') column references are not supported in SELECT/condition filters (issue #73)
