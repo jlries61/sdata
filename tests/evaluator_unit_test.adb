@@ -1057,7 +1057,10 @@ begin
       Check_Missing ("55-arg VAL",    Call_Function ("VAL",    (1 => M)));
       Check_Missing ("55-arg NUM",    Call_Function ("NUM",    (1 => M)));
       Check_Missing ("55-arg INDEX",  Call_Function ("INDEX",  (S, M)));
-      Check_Missing ("55-arg MATCH",  Call_Function ("MATCH",  (S, M)));
+      --  MATCH needs 3 args; a 2-arg call returns missing on arity before the
+      --  Kind guard, so pass a real 3rd arg to actually exercise the missing-
+      --  needle guard (#55 review, Task 3).
+      Check_Missing ("55-arg MATCH",  Call_Function ("MATCH",  (S, M, (Kind => Val_Integer, Int_Val => 1))));
    end;
 
    Put_Line ("");
