@@ -81,7 +81,7 @@ Representation:
 Propagation Rules:
 
 - Operations on missing values shall result in missing values.
-- Null strings (*""*) in string operations shall be taken literally.
+- An empty (zero-length) character value **is** the character missing value; there is no distinct "empty string." Empty character values therefore propagate as missing through all string operations (e.g. *LEN("")* and *"" + "x"* are missing), consistent with the rule above that operations on missing values yield missing values.
 - If no non-missing arguments are passed to an aggregate function, a missing value shall be returned.
 - Aggregate functions shalfunctionl ignore missing values when making computations.
 - A missing value may be assigned to a variable or column of any type. Missing represents the absence of a value rather than a value of a conflicting type, so recoding an existing numeric column to missing in place (e.g. a sentinel such as *999* → *.*) succeeds, exactly as assigning missing to a new column does. This is distinct from a type mismatch: assigning a string to a numeric column (or vice versa) is still rejected.
@@ -327,7 +327,7 @@ Usage with LET/SET:
 - Character Literals:
 
   - Surrounded by single or double quotes.
-  - Missing character value: empty string (*""*).
+  - The character missing value is the empty string (*""*); an empty character literal denotes missing.
 
 ## 4. FILE I/O
 
@@ -2041,6 +2041,8 @@ All error conditions specified in this document shall produce clear, descriptive
 This specification notes several areas where future versions may provide additional capabilities:
 
 - Special missing value codes for IEEE 754 infinity and NaN (*.i*, *-.i*, *.n*).
+  (Character data has a single missing value — the empty string; these special
+  missing codes are a numeric-only extension.)
 - Additional file format support.
 - Numeric literals in bases other than ten.
 - Enhanced formula evaluation in spreadsheets.
