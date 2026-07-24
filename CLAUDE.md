@@ -24,6 +24,17 @@ AGGREGATE, TRANSPOSE, STATS, SUBMIT, BREAK, etc.). Build sdata-core too if you t
 
 See ADR-039 through ADR-043 in `doc/adrs.md` for the split rationale.
 
+**Before editing anything under `~/Develop/sdata-core/`, read `~/Develop/sdata-core/CLAUDE.md` in
+full.** It is not automatically loaded just because this file told you to go modify files over there —
+Claude Code loads `CLAUDE.md` based on session working directory, and a session rooted here in `sdata`
+never sees sdata-core's own `CLAUDE.md` unless told to. sdata-core's rules bind regardless: its own
+build/test gate, its own version-bump and git-tag conventions, its own documentation conventions
+(ADR numbering, `tests/README.md`, `docs/api/reference.html` regeneration) — don't assume this repo's
+equivalents apply there. **In particular, sdata-core has its own independent, gitignored SSD tracker
+at `~/Develop/sdata-core/.ssd/current.yml`, invisible from this repo's own `.ssd/`.** For any non-trivial
+sdata-core change, check that file and add/update an entry — sdata-core work has previously gone
+untracked for weeks because nothing prompted this (see sdata-core's ADR-0009).
+
 ### Cross-crate coordination (data-vandal is a PRIVATE sibling)
 
 `data-vandal` is **intentionally unpublished** (the prospective employer wants the
