@@ -121,7 +121,7 @@ cd ~/Develop/sdata && make check
 ```
 Expected: some pre-existing tests may now fail if they relied on the old silent-demotion behavior — note any failures here; they are expected to be exactly `variable_scoping.cmd` (fixed in Task 7) and nothing else. Do not fix `variable_scoping.cmd` yet; just confirm the failure set is limited to it.
 
-- [ ] **Step 6: Commit (sdata-core only; the test file commits with sdata's own work in Task 7, since `make check` isn't fully green yet)**
+- [ ] **Step 6: Commit the sdata-core change (the `tests/sdata_unit_test.adb` changes commit at the end of Task 2, once all `V-56*` checks — Task 1's and Task 2's — are in place and passing)**
 
 ```bash
 cd ~/Develop/sdata-core
@@ -264,7 +264,7 @@ diff -wu tests/expected/hold_test.out /tmp/hold_test_actual.out
 ```
 Expected: no diff output (the existing test, which repeatedly does `HOLD TOTAL` / `LET TOTAL = TOTAL + 1` across records, must still pass unchanged — it is the regression proof that `LET` on a held permanent variable is correctly exempted from the new error).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Commit the sdata-core change**
 
 ```bash
 cd ~/Develop/sdata-core
@@ -277,6 +277,25 @@ variable silently promoted it to permanent with no error. Set_Permanent
 now raises Script_Error instead, preserving the existing Is_Held
 exemption so LET on a held permanent variable (hold_test.cmd) is
 unaffected -- that is an ordinary update, not a promotion.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+- [ ] **Step 8: Commit the sdata-side unit test changes (both Task 1's and Task 2's `V-56*` checks, since neither was committed yet)**
+
+```bash
+cd ~/Develop/sdata
+git add tests/sdata_unit_test.adb
+git commit -m "$(cat <<'EOF'
+test: unit coverage for SET/LET storage-class hard error (#56)
+
+Adds V-56a..V-56e to sdata_unit_test.adb, covering both directions
+directly against SData_Core.Variables.Set_Temporary/Set_Permanent:
+SET on an existing column raises and leaves the column intact; LET on
+an existing genuine temporary variable raises and leaves the temp
+variable's value unchanged.
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 EOF
@@ -1163,9 +1182,10 @@ In `~/Develop/sdata-core/.ssd/current.yml`, under the existing `archived:` list 
       pin bumped to v0.16.2 (PR: <PASTE the Task 11 PR URL from Step 1>).
 ```
 
-- [ ] **Step 3: Commit directly (documentation-only, no build/test impact)**
+- [ ] **Step 3: Commit on a new branch and open a PR (sdata-core requires PRs, no direct push to `main`)**
 
 ```bash
+git checkout -b docs/56-ssd-current-yml main
 git add .ssd/current.yml
 git commit -m "$(cat <<'EOF'
 docs(ssd): record #56 storage-class fix in current.yml
@@ -1173,7 +1193,14 @@ docs(ssd): record #56 storage-class fix in current.yml
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 EOF
 )"
-git push origin main
+git push -u origin docs/56-ssd-current-yml
+gh pr create --title "docs(ssd): record #56 storage-class fix in current.yml" --body "$(cat <<'EOF'
+## Summary
+- Records the #56 SET/LET storage-class hard-error fix as an archived workstream in this crate's own .ssd/current.yml, per ADR-0009's cross-repo tracking rule.
+
+Documentation-only; no build/test impact.
+EOF
+)"
 ```
 
 ---
