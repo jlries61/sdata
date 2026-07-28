@@ -8,12 +8,14 @@ This document specifies a command interpreter modeled on Systat BASIC that opera
 
 Key Requirements:
 
-- No fixed limits under normal use, with one known exception: the current disk-spill implementation imposes a ~2000-column ceiling (see §2.1). Removing that ceiling (a long/EAV spill schema) is planned; once it ships, this requirement reverts to an unqualified "no hard memory or dimensional constraints."
+- No hard memory or dimensional constraints.
 - No limits on nesting of *FOR* loops or other structures.
 - Can run as stand-alone text-based application or embedded in a larger system.
 - External libraries must be freely available and compatible with proprietary software.
 - Code must be modular, readable, maintainable, and well-documented.
 - No copyrighted code may be copied into the generated code base.
+
+**Note:** This requirement is not yet fully met: the current disk-spill implementation imposes a ~2000-column ceiling (see §2.1). Removing that ceiling (a long/EAV spill schema) is tracked as a known gap (issue #64), not accepted as a permanent exception.
 
 ### 1.2 BW BASIC Compatibility
 
