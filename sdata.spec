@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.16.1
+Version:        0.16.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Jul 28 2026 John L. Ries <john@theyarnbard.com> - 0.16.2-1
+- SET/LET storage-class redefinition is now a hard error (#56)
+
 * Thu Jul 23 2026 John L. Ries <john@theyarnbard.com> - 0.16.1-1
 - SELECT/condition filters can now reference character ($) and integer (%) columns directly (sdata-core #73 fix; floors sdata_core ^0.3.1).
 

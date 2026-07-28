@@ -1,3 +1,9 @@
+sdata (0.16.2-1) unstable; urgency=medium
+
+  * SET/LET storage-class redefinition is now a hard error (#56)
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 28 Jul 2026 12:55:48 -0700
+
 sdata (0.16.1-1) unstable; urgency=medium
 
   * SELECT/condition filters can now reference character ($) and integer (%) columns directly (sdata-core #73 fix; floors sdata_core ^0.3.1).
