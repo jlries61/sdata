@@ -261,8 +261,7 @@ Variables and arrays may be deleted by:
 #### Redefinition Rules
 
 - Existing scalar variables and array elements may be redefined by *LET* or *SET* statements.
-- **Permanent → Temporary:** If permanent variable/array redefined by *SET*, it becomes temporary.
-- **Temporary → Permanent:** If temporary variable/array redefined by LET, it becomes permanent.
+- **No implicit cross-class redefinition:** *LET* may not redefine an existing temporary variable, and *SET* may not redefine an existing permanent variable/column; either is an error. Recompute a variable with the verb that already owns it. To convert a name's storage class deliberately: *DROP* it (effective after the next *RUN*), then *SET* it to create a temporary variable of the same name; or *UNSET* a temporary variable, then *LET* it to create a permanent variable of the same name.
 - **Temporary → Permanent via KEEP:** Listing temporary variable/array in *KEEP* statement makes it permanent.
 - Existing arrays may not be redefined as scalar variables unless first deleted.
 - Existing scalar variables may not be redefined as arrays unless first deleted.
@@ -853,7 +852,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td></td>
 <td>Deferred Execution</td>
 <td><p>As specified in the BW BASIC documentation.</p>
-<p>Defines permanent variables (those in the internal table) only. A <em>LET</em> statement that writes to a temporary variable shall make that variable permanent.</p></td>
+<p>Defines permanent variables (those in the internal table) only. A <em>LET</em> statement that writes to an existing temporary variable shall fail with an error message; use <em>SET</em> to recompute it, or <em>UNSET</em> it first to redefine it as permanent under the same name.</p></td>
 </tr>
 <tr>
 <td><em>LIST</em></td>
@@ -956,7 +955,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>SET</em></td>
 <td><em>SET</em> &lt;<em>varname</em>&gt; <em>=</em> &lt; <em>expr</em>&gt;</td>
 <td>Deferred Execution</td>
-<td>Write the output of the expression to a temporary variable, which will disappear after the next <em>RUN</em> statement is executed. A <em>SET</em> statement that attempts to write to a permanent variable will fail with an error message.</td>
+<td>Write the output of the expression to a temporary variable, which will disappear after the next <em>RUN</em> statement is executed. A <em>SET</em> statement that attempts to write to an existing permanent variable/column shall fail with an error message; use <em>LET</em> to recompute it, or <em>DROP</em> it first (effective after the next <em>RUN</em>) to redefine it as temporary under the same name.</td>
 </tr>
 <tr>
 <td><em>SORT</em></td>

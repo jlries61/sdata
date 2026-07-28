@@ -99,12 +99,17 @@ Execution: Immediate -- triggers the data step at once.
 
 Command: LET variable = expression
 Creates a permanent column in the table or updates an existing one.
+LET on an existing temporary (SET) variable is an error; use SET to
+recompute it, or UNSET it first to redefine it as permanent.
 Execution: Deferred -- executed once per record inside the data step.
 
 Command: SET variable = expression
 Creates a session variable not written to the output table.
 SET variables are not reset between records and persist across RUN calls.
 They are removed by UNSET or NEW, or when the session ends.
+SET on an existing permanent (table) variable is an error; use LET to
+recompute it, or DROP it first (effective after the next RUN) to
+redefine it as temporary.
 Execution: Deferred -- executed once per record inside the data step.
 
 Command: UNSET variable(s)

@@ -916,6 +916,13 @@ commands and executed once per record during the data step.
 .TP
 .B LET \fIvar\fR = \fIexpr\fR
 Assign a permanent (table) variable.
+Fails if
+.I var
+is already an existing temporary (SET) variable; use
+.B SET
+to recompute it, or
+.B UNSET
+it first to redefine it as permanent.
 Array element forms:
 .B LET \fIarr\fR(\fIi\fR) = \fIexpr\fR
 assigns a single element;
@@ -926,6 +933,15 @@ assigns a list of elements.
 .TP
 .B SET \fIvar\fR = \fIexpr\fR
 Assign a temporary variable (not written to the output table).
+Fails if
+.I var
+is already an existing permanent (table) variable; use
+.B LET
+to recompute it, or
+.B DROP
+it first (effective after the next
+.BR RUN )
+to redefine it as temporary.
 Array element forms are the same as for
 .BR LET .
 .TP

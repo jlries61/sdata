@@ -184,6 +184,8 @@ package body SData.Help is
    begin
       Put_Line ("Command: LET variable = expression");
       Put_Line ("Creates a permanent column in the table or updates an existing one.");
+      Put_Line ("LET on an existing temporary (SET) variable is an error; use SET to");
+      Put_Line ("recompute it, or UNSET it first to redefine it as permanent.");
       Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
    end Help_LET;
 
@@ -193,6 +195,9 @@ package body SData.Help is
       Put_Line ("Creates a session variable not written to the output table.");
       Put_Line ("SET variables are not reset between records and persist across RUN calls.");
       Put_Line ("They are removed by UNSET or NEW, or when the session ends.");
+      Put_Line ("SET on an existing permanent (table) variable is an error; use LET to");
+      Put_Line ("recompute it, or DROP it first (effective after the next RUN) to");
+      Put_Line ("redefine it as temporary.");
       Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
    end Help_SET;
 
