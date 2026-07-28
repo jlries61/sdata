@@ -8,7 +8,7 @@ This document specifies a command interpreter modeled on Systat BASIC that opera
 
 Key Requirements:
 
-- No hard memory or dimensional constraints.
+- No fixed limits under normal use, with one known exception: the current disk-spill implementation imposes a ~2000-column ceiling (see §2.1). Removing that ceiling (a long/EAV spill schema) is planned; once it ships, this requirement reverts to an unqualified "no hard memory or dimensional constraints."
 - No limits on nesting of *FOR* loops or other structures.
 - Can run as stand-alone text-based application or embedded in a larger system.
 - External libraries must be freely available and compatible with proprietary software.
@@ -65,11 +65,11 @@ Conversion Rules:
 
 ### 2.4 Overflow Handling
 
-**Integer Overflow:** Operations producing values outside the range -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807 shall fail with an error message.
+**Integer Overflow:** Operations producing values outside the range -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807 shall fail with an error message. Integer division by zero also fails with an error message; on success, integer division always produces a floating point result, never a truncated integer.
 
-**Floating Point Overflow:** Floating point operations that would produce values exceeding the representable range shall likewise fail with an error message.
+**Floating Point Overflow:** Arithmetic overflow (addition, subtraction, multiplication, exponentiation — e.g. *MAXNUM() \* 2*) does not fail; it silently produces IEEE 754 ±Infinity, regardless of the *IEEE_DIVIDE* option. Float division by zero fails with an error message unless *OPTIONS IEEE_DIVIDE YES* is in effect, in which case it instead produces ±Infinity (or, for *0/0*, an internal NaN result that is never exposed as a value: it is converted to an error message, or — if *--ignore-math-errors* is set — a warning and a missing value). *INF(x)* tests whether *x* is ±Infinity.
 
-**Note:** Future versions may support special missing value codes for IEEE 754 infinity and NaN values.
+**Note:** IEEE 754 infinity and NaN are already present in this model as described above, not a future extension. A separate, still-unimplemented extension is typed literal input syntax for these values (*.i*, *-.i*, *.n*), tracked in §8.5.
 
 ### 2.5 Missing Values
 
@@ -83,7 +83,7 @@ Propagation Rules:
 - Operations on missing values shall result in missing values.
 - An empty (zero-length) character value **is** the character missing value; there is no distinct "empty string." Empty character values therefore propagate as missing through all string operations (e.g. *LEN("")* and *"" + "x"* are missing), consistent with the rule above that operations on missing values yield missing values.
 - If no non-missing arguments are passed to an aggregate function, a missing value shall be returned.
-- Aggregate functions shalfunctionl ignore missing values when making computations.
+- Aggregate functions shall ignore missing values when making computations.
 - A missing value may be assigned to a variable or column of any type. Missing represents the absence of a value rather than a value of a conflicting type, so recoding an existing numeric column to missing in place (e.g. a sentinel such as *999* → *.*) succeeds, exactly as assigning missing to a new column does. This is distinct from a type mismatch: assigning a string to a numeric column (or vice versa) is still rejected.
 
 Error Conditions (not missing values):
@@ -564,7 +564,7 @@ Record Processing:
   - *IF*/*THEN*/*ELSE* blocks may also be nested.
   - Same stack space limitations apply.
 
-Looking blocks may also be nested inside of conditional blocks and vice versa.
+Looping blocks may also be nested inside of conditional blocks and vice versa.
 
 #### Control Structures
 
@@ -771,8 +771,8 @@ Commands control the flow of execution, manage data, and configure the interpret
 <tr>
 <td><em>DELETE</em></td>
 <td><em>DELETE</em> &lt;<em>line</em>&gt; [<em>-</em> &lt;<em>line</em>&gt;]</td>
-<td>Immediate Execition</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Immediate Execution</td>
+<td>Delete an inclusive range of lines from the program buffer (a single <em>line</em> deletes just that line). If the buffer is empty, or if either line number is out of range, or the range is reversed (first line greater than the second), the command prints a warning and does nothing — no partial deletion occurs. Deleting lines also adjusts the <em>INSERT</em> cursor: a cursor at or after the deleted range shifts back by the number of lines removed, a cursor inside the deleted range snaps to just before it, and a cursor before the deleted range is unaffected. Only meaningful in interactive (REPL) mode.</td>
 </tr>
 <tr>
 <td><em>DELETE</em></td>
@@ -790,14 +790,13 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>DIGITS</em></td>
 <td><em>DIGITS n</em></td>
 <td>Declarative</td>
-<td><p>As specified in the BW BASIC documentation.</p>
-<p>This sets the maximum number of decimal places to display (default = 5).</p></td>
+<td><p>Sets the maximum number of decimal places to display (default = 5). This governs <em>PRINT</em>, the <em>LIST</em>/<em>DISPLAY</em>/<em>NAMES</em>/<em>TABLES</em> output, and the <em>STR$</em>/<em>NUM$</em> conversion functions. It does not affect values written by <em>SAVE</em> or <em>OUTPUT</em>, which are governed independently by the <em>DECIMALS=</em> option (see <em>OUTPUT</em>) or, when that option is omitted, by round-trip precision. <em>n</em> must be a non-negative integer; there is no explicit upper bound enforced.</p></td>
 </tr>
 <tr>
 <td><em>DIM</em></td>
 <td><em>DIM</em> &lt;<em>arrayname</em>&gt; <em>([</em>&lt;<em>lower</em>&gt; <em>TO ] </em>&lt;<em>upper&gt;)</em> [<em>/TEMP</em>]</td>
 <td>Declarative</td>
-<td>As specified in the BW BASIC documentation, except that <em>&lt;filenum&gt;</em> is not supported.  The array is saved to the output dataset as a set of subscripted variables.  Appending <em>/TEMP </em>to a <em>DIM</em> statement shall create a temporary array which not be written to output datasets . A <em>DIM </em>statement that references an existing variable or array shall fail with an error message.</td>
+<td>Declares a real array, saved to the output dataset as a set of subscripted variables unless <em>/TEMP</em> is appended, in which case it is a temporary array not written to output datasets. Omitting <em>lower</em> defaults it to <em>1</em>; a reversed range (<em>lower</em> greater than <em>upper</em>) fails with an error message. Re-issuing <em>DIM</em> against a name that already names a <em>real</em> array of matching temporary/permanent status resizes it in place: elements still within the new bounds keep their existing data, and elements that fall outside the new bounds are dropped. A <em>DIM</em> that would change an existing real array's temporary status fails with an error message, as does a <em>DIM</em> naming an existing virtual array (see <em>ARRAY</em>). A <em>DIM</em> whose generated element names collide with a pre-existing plain scalar variable is not separately checked.</td>
 </tr>
 <tr>
 <td><em>DROP</em></td>
@@ -813,9 +812,9 @@ Commands control the flow of execution, manage data, and configure the interpret
 </tr>
 <tr>
 <td><em>FOR</em>/<em>NEXT</em></td>
-<td></td>
+<td><em>FOR</em> &lt;<em>var</em>&gt; <em>=</em> &lt;<em>start</em>&gt; [<em>TO</em>] &lt;<em>end</em>&gt; [<em>STEP</em> &lt;<em>step</em>&gt;] ... <em>NEXT</em> [&lt;<em>var</em>&gt;]</td>
 <td>Deferred execution</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td><em>start</em>, <em>end</em>, and <em>step</em> are each evaluated exactly once, at loop entry; changing a variable referenced in <em>end</em> or <em>step</em> from inside the loop body has no effect on the already-computed bounds. The <em>TO</em> keyword is optional and has no effect on parsing either way. <em>step</em> defaults to <em>1</em> if <em>STEP</em> is omitted; a negative <em>step</em> counts down. A <em>step</em> of <em>0</em> causes the loop to execute zero times (it does not loop forever). The loop is pre-tested like <em>WHILE</em>, not execute-at-least-once: if <em>start</em> already fails the entry condition (e.g. <em>FOR I = 10 TO 1</em> with the default <em>STEP 1</em>), the body executes zero times. The optional variable name after <em>NEXT</em> is not checked against the loop's control variable; it may name a different variable, or be omitted, with no error either way. The control variable is always a numeric (floating point) permanent variable, even when <em>start</em>/<em>end</em>/<em>step</em> are integer literals, and after the loop ends it retains the first out-of-range value rather than being reset.</td>
 </tr>
 <tr>
 <td><em>FPATH</em></td>
@@ -1954,12 +1953,32 @@ Aggregate Functions:
 
 ### 7.3 Operators and Expression Evaluation
 
-**Operator Precedence:** As specified in BW BASIC documentation.
+**Operator Precedence:** From highest (binds tightest) to lowest:
+
+| Precedence | Operators | Associativity |
+|---|---|---|
+| 1 (highest) | Unary `-` (negation), *NOT* | prefix |
+| 2 | `^` (exponentiation) | Left |
+| 3 | `*`, `/` | Left |
+| 4 | `+`, `-` (also string concatenation, see below) | Left |
+| 5 | `=`, `<>`, `<`, `<=`, `>`, `>=` | Left |
+| 6 | *AND* | Left |
+| 7 (lowest) | *OR*, *XOR* | Left |
+
+Notes:
+
+- Unary `-` and *NOT* bind tighter than every binary operator, including `^`: `-2^2` evaluates to `4` (negation is applied first, then squared), not `-4`.
+- `^` is left-associative, not right-associative: `2^3^2` evaluates to `(2^3)^2 = 64`, not `2^(3^2) = 512`.
+- Comparison operators are left-associative and chain like any other left-associative operator rather than short-circuiting a multi-term comparison: `1<2<3` parses as `(1<2)<3`.
+- *AND* binds tighter than *OR*/*XOR*, which share a precedence level.
+- There is no `^`/`**` ambiguity within a single expression context, but the two contexts in which expressions are parsed currently accept different spellings: the main statement parser accepts only `^`, while `SELECT` filter expressions currently accept only `**` (and reject `^`). This is a known inconsistency, not an intentional dual syntax; it is tracked for a fix rather than resolved here.
+- *MOD* is not an infix operator — it is the two-argument function *MOD(x,y)* (see §7.2). There is no *DIV* operator or function.
+- Parentheses group in the ordinary way, resetting precedence inside.
 
 Expression Types:
 
 - Arithmetic expressions: Numeric values, variables, and functions combined with arithmetic operators.
-- String expressions: Character values, variables, and functions combined with string operators.
+- String expressions: Character values, variables, and functions combined with string operators. String concatenation reuses the `+` operator at the same precedence as numeric addition (there is no dedicated concatenation operator); comparison operators also apply to two strings (lexicographic ordering). Any other operator (e.g. `-`, `*`, *AND*) applied to a string operand is a type-mismatch error.
 - Logical expressions: Boolean values resulting from comparisons and logical operations.
 
 **Type Checking:** Type mismatches in expressions result in error messages (e.g., adding numeric to character value).
@@ -1990,6 +2009,7 @@ Character Variables:
 Execution Control:
 
 - *--noshell*: Disable the *SYSTEM* command and the *SHELL* function.
+- *--ignore-math-errors*: Convert math domain errors (invalid arguments, *0/0*) into a warning and a missing value instead of a hard error. Disabled by default. See §2.4 and §2.5.
 
 Input Control:
 
@@ -2039,7 +2059,10 @@ All error conditions specified in this document shall produce clear, descriptive
 
 This specification notes several areas where future versions may provide additional capabilities:
 
-- Special missing value codes for IEEE 754 infinity and NaN (*.i*, *-.i*, *.n*).
+- Typed literal input syntax for IEEE 754 infinity and NaN (*.i*, *-.i*, *.n*),
+  letting a script write these values directly rather than only encountering
+  them as arithmetic results (see §2.4 — the underlying values themselves are
+  already implemented, only this literal syntax is not).
   (Character data has a single missing value — the empty string; these special
   missing codes are a numeric-only extension.)
 - Additional file format support.
