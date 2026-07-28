@@ -512,6 +512,48 @@ begin
    Check ("V-16 PDV_Resolve unknown returns 0", PDV_Resolve ("NOSUCHVAR"), 0);
 
    ---------------------------------------------------------------------------
+   --  ── SData_Core.Variables: SET/LET storage-class hard error (#56) ────────
+   ---------------------------------------------------------------------------
+
+   --  SET on an existing permanent (table) column must raise, not silently
+   --  demote the column to a temporary variable.
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   SData_Core.Table.Add_Column ("PERMCOL", SData_Core.Table.Col_Numeric);
+   declare
+      Raised : Boolean := False;
+   begin
+      begin
+         Set_Temporary ("PERMCOL", (Kind => Val_Numeric, Num_Val => 1.0));
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-56a SET on existing column raises", Raised, True);
+      Check ("V-56b column survives rejected SET",
+             SData_Core.Table.Has_Column ("PERMCOL"), True);
+   end;
+
+   --  LET on an existing genuine temporary variable must raise, not
+   --  silently promote it to permanent.
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   Initialize_PDV;
+   Set_Temporary ("TEMPVAR", (Kind => Val_Numeric, Num_Val => 1.0));
+   declare
+      Raised : Boolean := False;
+   begin
+      begin
+         Set_Permanent ("TEMPVAR", (Kind => Val_Numeric, Num_Val => 2.0));
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-56c LET on existing temp var raises", Raised, True);
+      Check ("V-56d temp var survives rejected LET", Defined ("TEMPVAR"), True);
+      V := Get ("TEMPVAR");
+      Check_Float ("V-56e rejected LET does not change temp value", V.Num_Val, 1.0);
+   end;
+
+   ---------------------------------------------------------------------------
    --  ── SData_Core.Variables: Load_PDV_From_Table roundtrip ────────────────────
    ---------------------------------------------------------------------------
 
