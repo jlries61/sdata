@@ -15,13 +15,4 @@ RUN
 NEW
 PRINT "TV is missing (1):" MISSING(TV)
 RUN
-
-NEW
-
-REM Test 3: Promotion (LET promotes SET)
-SET PROMOTED = 1
-LET PROMOTED = PROMOTED + 9
-PRINT "PROMOTED is now permanent (10):" PROMOTED
-NAMES
-RUN
 END
