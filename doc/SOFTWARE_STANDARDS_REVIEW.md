@@ -248,7 +248,7 @@ Counts synced 2026-07-30 from `make check` (the source of truth), alongside the
 EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 352
 integration tests + a fuzz-corpus regression on push and PR. data-vandal
 carries its own 145 integration tests (run manually / its own CI); sdata-core
-carries 368 in-crate assertions across nine drivers.
+carries 368 in-crate assertions across 9 drivers.
 
 **Gap — RESOLVED 2026-06-09 (remediation #3, sdata-core PR #31).**
 `sdata_core-statistics.adb` (775 lines, ~54 distribution/IDF/RNG functions) had

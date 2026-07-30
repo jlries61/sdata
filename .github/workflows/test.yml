@@ -59,6 +59,10 @@ jobs:
         working-directory: sdata
         run: alr exec -- make check
 
+      - name: Test-count doc sync check
+        working-directory: sdata
+        run: alr exec -- make check-test-counts
+
       - name: Fuzz corpus regression
         working-directory: sdata
         run: alr exec -- make fuzz-corpus

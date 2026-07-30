@@ -70,8 +70,8 @@ INSTALL_DIR  = $(DESTDIR)$(BINDIR)
 MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 DOC_DIR      = $(DESTDIR)$(DOCDIR)
 
-.PHONY: all build clean run check fuzz-corpus gnatcheck complexity-check install srpm pkg msi \
-        sdata-core-tarball
+.PHONY: all build clean run check fuzz-corpus gnatcheck complexity-check check-test-counts \
+        install srpm pkg msi sdata-core-tarball
 
 all: build
 
@@ -176,6 +176,14 @@ gnatcheck: build
 
 complexity-check:
 	@GNATMETRIC=$$(scripts/provision-gnatmetric.sh) scripts/check-complexity.sh
+
+# Verifies CLAUDE.md/CONTRIBUTING.md/doc/SOFTWARE_STANDARDS_REVIEW.md's
+# test-count prose matches what `make check` actually reports (this exact
+# drift has recurred three times -- see scripts/sync-test-counts.py).
+# Run `python3 scripts/sync-test-counts.py` (no --check) to fix any drift
+# this reports.
+check-test-counts: build
+	python3 scripts/sync-test-counts.py --check
 
 fuzz-corpus: build
 	@echo "Running corpus regression (csv_fuzz_driver)..."
