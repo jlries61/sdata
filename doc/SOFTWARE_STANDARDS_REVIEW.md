@@ -236,19 +236,19 @@ is itself a finding (see Hard Truth).
 
 | Suite | Count |
 |---|---|
-| Integration `.cmd` | **333** |
+| Integration `.cmd` | **352** |
 | `csv_unit_test` | 71 |
-| `sdata_unit_test` (Table/Variables/PDV/transient/merge) | 355 |
-| `evaluator_unit_test` | 203 |
-| `file_io_unit_test` | 100 |
-| `interpreter_unit_test` | 97 |
-| **Unit total** | **826** |
+| `sdata_unit_test` (Table/Variables/PDV/transient/merge) | 362 |
+| `evaluator_unit_test` | 224 |
+| `file_io_unit_test` | 104 |
+| `interpreter_unit_test` | 99 |
+| **Unit total** | **860** |
 
-Counts synced 2026-07-08 from `make check` (the source of truth); see the fresh
-re-audit at `.ssd/audits/2026-07-08-sdata-ecosystem/standards-report.md`.
-CI runs all unit suites + 333 integration tests + a fuzz-corpus regression on push
-and PR. data-vandal carries its own 143 integration tests (run manually / its own CI);
-sdata-core carries 279 in-crate assertions across seven drivers.
+Counts synced 2026-07-30 from `make check` (the source of truth), alongside the
+EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 352
+integration tests + a fuzz-corpus regression on push and PR. data-vandal
+carries its own 145 integration tests (run manually / its own CI); sdata-core
+carries 368 in-crate assertions across nine drivers.
 
 **Gap — RESOLVED 2026-06-09 (remediation #3, sdata-core PR #31).**
 `sdata_core-statistics.adb` (775 lines, ~54 distribution/IDF/RNG functions) had
@@ -599,11 +599,12 @@ let SData 1.0 put a stability promise on top of it.
 | O(n²) #3 BY re-sort per record **[RESOLVED v0.9.7, `396048a`]** | `src/sdata-interpreter-execute_declarative.adb` (Stmt_BY) | sorted whole table every record; pass-2 2k: 19s→0.17s |
 | Perf headline | full adult train/test script | >13 min → ~11s after the three fixes; output identical |
 | Statistics tested **[RESOLVED 2026-06-09, sdata-core PR #31]** | `sdata-core/tests/statistics_tests.adb` | 111 property-based assertions; all 14 distributions |
-| Test counts (synced 2026-07-08) | `make check`; `ls tests/*.cmd` | 333 integration; 826 unit (71/355/203/100/97); +279 sdata-core in-crate; 143 data-vandal |
+| Test counts (synced 2026-07-30) | `make check`; `ls tests/*.cmd` | 352 integration; 860 unit (71/362/224/104/99); +368 sdata-core in-crate; 145 data-vandal |
 | `when others` inventory | grep both `src/` trees | 44 total (20 sdata, 24 core); ~10 silent-null, justified |
 | Uncaught new exceptions | `sdata_core-values.adb:33,40,43`; `sdata_core-table.adb:269,274,276` | no handler; reach top-level only |
 | Threat model stale | `doc/threat_model.md:3` | v0.6.13 / 2026-05-14 / "Current" |
 | Stale doc test counts **[RE-SYNCED 2026-07-08]** | `CLAUDE.md`, this doc §4.1 | had drifted again (299/201 int, 793/733 unit); corrected to 333 int / 826 unit from `make check` |
+| Stale doc test counts **[RE-SYNCED 2026-07-30]** | `CLAUDE.md`, `CONTRIBUTING.md`, this doc §4.1 | drifted again (333/826 int/unit, 279 sdata-core, 143 data-vandal); corrected to 352/860, 368, 145 from `make check` while shipping the EAV disk-spill schema (jlries61/sdata#64) — third recorded drift-then-fix cycle for this same metric; consider whether counts belong in a generated/checked artifact rather than hand-maintained prose |
 | design doc binary-only **[RESOLVED 2026-06-10, remediation #8]** | `doc/design.md` (pandoc-converted) | ODF removed; Markdown spec now authoritative + committed |
 | Man page current | `man/man1/sdata.1:1` | v0.13.1 / 2026-07-07 |
 | Packaging version derived | `Makefile`, `debian/rules`, `slackware/sdata.SlackBuild` | sdata-core version globbed/injected, not hardcoded |
