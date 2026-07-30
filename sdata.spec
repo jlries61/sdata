@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.16.5
+Version:        0.16.6
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Jul 30 2026 John L. Ries <john@theyarnbard.com> - 0.16.6-1
+- Add Stmt_TABLES to Is_Immediate; REPL was silently dropping TABLES (issue #68)
+
 * Thu Jul 30 2026 John L. Ries <john@theyarnbard.com> - 0.16.5-1
 - Validate SORT/BY variable names unconditionally, not gated on Column_Count > 0 (issue #67)
 

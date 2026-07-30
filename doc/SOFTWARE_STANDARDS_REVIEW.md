@@ -241,8 +241,8 @@ is itself a finding (see Hard Truth).
 | `sdata_unit_test` (Table/Variables/PDV/transient/merge) | 362 |
 | `evaluator_unit_test` | 224 |
 | `file_io_unit_test` | 104 |
-| `interpreter_unit_test` | 99 |
-| **Unit total** | **860** |
+| `interpreter_unit_test` | 101 |
+| **Unit total** | **862** |
 
 Counts synced 2026-07-30 from `make check` (the source of truth), alongside the
 EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 356

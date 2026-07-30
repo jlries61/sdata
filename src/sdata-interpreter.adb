@@ -108,6 +108,13 @@ package body SData.Interpreter is
    Append_Mode  : Boolean := True;
    Insert_Point : Natural := 0;
 
+   --  Sole consumer: Run_REPL's dispatch decision (sdata_main.adb) -- batch
+   --  mode (Execute, below) never calls this, it has its own separate
+   --  deferred-kind exclusion list.  Stmt_TABLES was missing here even
+   --  though Execute_Statement dispatches it as Immediate: the REPL queued
+   --  a bare TABLES statement as if deferred, and process_one_record.adb's
+   --  per-record whitelist doesn't cover it either, so it silently never
+   --  ran (issue #68).  Keep this list and Execute_Statement's case in sync.
    function Is_Immediate (Kind : Statement_Kind) return Boolean is
    begin
       return Kind in
@@ -117,7 +124,7 @@ package body SData.Interpreter is
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
          Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE |
-         Stmt_TRANSPOSE | Stmt_STATS | Stmt_PROGRAM_INSERT;
+         Stmt_TRANSPOSE | Stmt_STATS | Stmt_TABLES | Stmt_PROGRAM_INSERT;
    end Is_Immediate;
 
    --  Reject an Immediate-tier command that reads or replaces Data_Table's row

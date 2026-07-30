@@ -1005,6 +1005,27 @@ begin
    end;
 
    -----------------------------------------------------------------------
+   --  P.  Is_Immediate dispatch classification (issue #68)
+   -----------------------------------------------------------------------
+   Put_Line ("");
+   Put_Line ("--- P: Is_Immediate dispatch classification ---");
+
+   --  IMM-01: TABLES is dispatched as Immediate by Execute_Statement but was
+   --  missing from Is_Immediate -- the sole function deciding REPL dispatch
+   --  (sdata_main.adb's Run_REPL). A bare TABLES statement typed at the
+   --  sdata> prompt was silently misrouted as a deferred per-record
+   --  statement and never executed. Batch mode was unaffected (it never
+   --  calls Is_Immediate). Direct regression guard for the exact defect.
+   Check ("IMM-01: Is_Immediate(Stmt_TABLES)",
+          SData.Interpreter.Is_Immediate (Stmt_TABLES), True);
+
+   --  IMM-02: a genuinely deferred kind must still return False, so a
+   --  sloppy fix (e.g. Is_Immediate always returning True) would not
+   --  silently pass IMM-01.
+   Check ("IMM-02: Is_Immediate(Stmt_LET)",
+          SData.Interpreter.Is_Immediate (Stmt_LET), False);
+
+   -----------------------------------------------------------------------
    --  Summary
    -----------------------------------------------------------------------
    Put_Line ("");
