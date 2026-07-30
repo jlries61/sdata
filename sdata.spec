@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.16.4
+Version:        0.16.5
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Jul 30 2026 John L. Ries <john@theyarnbard.com> - 0.16.5-1
+- Validate SORT/BY variable names unconditionally, not gated on Column_Count > 0 (issue #67)
+
 * Thu Jul 30 2026 John L. Ries <john@theyarnbard.com> - 0.16.4-1
 - Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block (issue #66)
 

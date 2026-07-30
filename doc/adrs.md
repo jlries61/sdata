@@ -61,6 +61,7 @@ that might relitigate a settled question.
 | ADR-049 | TABLES command — print-only frequency/crosstabulation reporting | 2026-07-03 | Accepted |
 | ADR-050 | SAVE /DECIMALS and round-trip float output | 2026-07-09 | Accepted |
 | ADR-051 | Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block | 2026-07-30 | Accepted |
+| ADR-052 | Validate SORT/BY variable names unconditionally, not gated on Column_Count > 0 | 2026-07-30 | Accepted |
 
 ---
 
@@ -815,3 +816,62 @@ coordination. Companion issue #67 (tighten `SORT`'s `Column_Count > 0` undefined
 can now proceed, since that bypass has no remaining legitimate case to protect once this lands.
 Issue #68 (the `Stmt_TABLES`/`Is_Immediate` REPL dispatch gap found during design) is filed as a
 separate follow-up, out of scope here.
+
+---
+
+### ADR-052: Validate SORT/BY variable names unconditionally, not gated on Column_Count > 0
+**Date:** 2026-07-30 | **Status:** Accepted
+
+**Context:** Issue #67, split from the same sdata-core PR #101 review as #66 and explicitly
+sequenced after it. `SORT`/`BY`'s undefined-variable guard (added for issue #50) only validated
+named variables against `Has_Column` when `SData_Core.Table.Column_Count > 0`; when
+`Column_Count = 0` (reachable independently of `Row_Count`), validation was skipped and a name
+that was never a column silently succeeded as a no-op instead of erroring. The bypass's original
+rationale was to allow a "legitimate forward reference" — naming a variable a later `LET` in the
+same `REPEAT` body would create.
+
+**Decision:**
+1. **Remove the `Column_Count > 0` condition entirely for both `SORT` and `BY`**
+   (`src/sdata-interpreter-execute_declarative.adb`); the `Has_Column` validation loop runs
+   unconditionally whenever named variables are given.
+2. **The "forward reference" rationale was never actually reachable, confirmed by reading
+   `Stmt_REPEAT`'s handler, not just tested.** `REPEAT n` (any `n`, including the `REPEAT 0`
+   cancel form) unconditionally calls `SData_Core.Table.Clear` before its body is parsed —
+   `Column_Count = 0` is guaranteed inside a from-scratch `REPEAT` body, not merely common.
+   Combined with `LET`/`SET` being deferred (they only execute at the body's `RUN`, regardless
+   of textual position) and `BY` being declarative (dispatches immediately as the body is
+   parsed), no ordering of `BY` relative to a same-body `LET` can ever make the named column
+   exist at `BY`'s own execution time — confirmed empirically: `REPEAT 6 / LET G=... / BY G`
+   (LET textually *before* BY) still raises `undefined variable "G"`, identically to a genuine
+   typo, once the fix is applied. For `SORT` specifically, #66 (ADR-051) independently closes
+   the same window from the other direction: `SORT` can no longer execute at all while
+   `Repeat_Active`, so by the time its guard runs there is no pending body to forward-reference
+   into. The bypass protected nothing observable in either command, in any configuration.
+3. **No sdata-core change.** This is sdata's own pre-validation catching an undefined name
+   before it reaches sdata-core's `Sorting.Sort` at all — the same architectural pattern as #66.
+   `tests/spill_sort_undef_var_test.cmd` (added alongside sdata-core PR #101, the EAV disk-spill
+   schema) exercised a third, independent trigger for `Column_Count = 0` — `DROP`-ing every
+   column of a table with real spilled rows, not `REPEAT` — reaching sdata-core's disk-spill
+   `Sorting.Sort` rebuild tolerating an unresolvable sort key (`Backing_Store.Col_Id` returning
+   0). That sdata-core tolerance mechanism is untouched and remains defensive; it is simply no
+   longer *reached* via this specific trigger, since sdata's guard now catches the undefined
+   name first. The test is rewritten to assert the corrected error instead of the old
+   tolerance, with its header comment updated to explain the new reachability.
+4. **Design.md and the man page and HELP text previously documented the exemption as
+   intentional** ("When the table has columns, each named variable must be..."), not merely as
+   an implementation artifact — found while auditing the user-facing surface for this change,
+   per this project's three-reference sync convention. All three corrected to state the
+   requirement unconditionally, matching #50's original design intent
+   (`doc/design.md`'s SORT/BY reference rows never actually meant to carve out this exemption;
+   it was an implementation-only detail that had leaked into the docs).
+
+**Consequences:** Purely additive to the error surface. No sdata-core change, no version floor
+change, no cross-crate coordination. `tests/repeat_zero_sort_ok.cmd` (an ADR-051 test) is renamed
+to `tests/repeat_zero_aggregate_ok.cmd` and its command changed from `SORT X` to `AGGREGATE
+N=N()`: `REPEAT` (any count) always clears the table, so no name `SORT` could reference after
+`REPEAT 0` would still exist once this fix landed, making `SORT` unable to isolate ADR-051's
+`Repeat_Active` boundary from this ADR's now-unconditional undefined-variable guard;
+`AGGREGATE N=N()` takes no input-column argument and cleanly tests only the ADR-051 boundary.
+New tests: `tests/by_repeat_body_undefined.cmd` (BY inside a REPEAT body on a same-body,
+not-yet-run `LET` target, confirming the "backward reference" case errors identically to a
+typo). `make check`: 355 → 356.

@@ -236,7 +236,7 @@ is itself a finding (see Hard Truth).
 
 | Suite | Count |
 |---|---|
-| Integration `.cmd` | **355** |
+| Integration `.cmd` | **356** |
 | `csv_unit_test` | 71 |
 | `sdata_unit_test` (Table/Variables/PDV/transient/merge) | 362 |
 | `evaluator_unit_test` | 224 |
@@ -245,7 +245,7 @@ is itself a finding (see Hard Truth).
 | **Unit total** | **860** |
 
 Counts synced 2026-07-30 from `make check` (the source of truth), alongside the
-EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 355
+EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 356
 integration tests + a fuzz-corpus regression on push and PR. data-vandal
 carries its own 145 integration tests (run manually / its own CI); sdata-core
 carries 368 in-crate assertions across 9 drivers.

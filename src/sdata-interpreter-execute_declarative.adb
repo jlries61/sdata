@@ -688,25 +688,28 @@ begin
             --  unordered while still reporting success (issue #50).  The common
             --  trigger is omitting the type suffix (column N%, script SORT N).
             --  Reject it loudly, mirroring SELECT's undefined-variable posture.
-            --  Guard on Column_Count > 0: on an empty table there is no data to
-            --  misorder (SORT is a documented no-op) and the vars may be forward
-            --  references introduced by a later LET in the same deferred block.
-            if SData_Core.Table.Column_Count > 0 then
-               declare
-                  V : Variable_List := Curr_Var;
-               begin
-                  while V /= null loop
-                     if not SData_Core.Table.Has_Column
-                              (V.Var.Start_Name (1 .. V.Var.Start_Len))
-                     then
-                        raise Script_Error with
-                          "undefined variable """
-                          & V.Var.Start_Name (1 .. V.Var.Start_Len) & """";
-                     end if;
-                     V := V.Next;
-                  end loop;
-               end;
-            end if;
+            --  Validated unconditionally (issue #67): this used to be skipped when
+            --  Column_Count = 0 on the theory that the vars could be forward
+            --  references to a later LET in the same REPEAT body, but SORT can no
+            --  longer appear inside a REPEAT body at all (issue #66 rejects it
+            --  outright while Repeat_Active) -- so by the time this runs, either
+            --  the table already has real columns or there is no pending body to
+            --  forward-reference into, and Column_Count = 0 means the name was
+            --  simply never a column.
+            declare
+               V : Variable_List := Curr_Var;
+            begin
+               while V /= null loop
+                  if not SData_Core.Table.Has_Column
+                           (V.Var.Start_Name (1 .. V.Var.Start_Len))
+                  then
+                     raise Script_Error with
+                       "undefined variable """
+                       & V.Var.Start_Name (1 .. V.Var.Start_Len) & """";
+                  end if;
+                  V := V.Next;
+               end loop;
+            end;
             if Count > 0 then
                declare
                   Crit : Sort_Criteria_Array (1 .. Count);
@@ -779,26 +782,28 @@ begin
                --  misspelled name (e.g. dropped type suffix) would otherwise
                --  sort on all-missing keys and establish a bogus single group,
                --  silently corrupting BY-group logic (issue #50, as for SORT).
-               --  Guard on Column_Count > 0: with an empty table (BY inside a
-               --  data step under REPEAT, before any LET has run) the vars are
-               --  forward references introduced later in the block, and the
-               --  sort is a no-op, so validation is deferred to that point.
-               if SData_Core.Table.Column_Count > 0 then
-                  declare
-                     V : Variable_List := Curr_Var;
-                  begin
-                     while V /= null loop
-                        if not SData_Core.Table.Has_Column
-                                 (V.Var.Start_Name (1 .. V.Var.Start_Len))
-                        then
-                           raise Script_Error with
-                             "undefined variable """
-                             & V.Var.Start_Name (1 .. V.Var.Start_Len) & """";
-                        end if;
-                        V := V.Next;
-                     end loop;
-                  end;
-               end if;
+               --  Validated unconditionally (issue #67): this used to be skipped
+               --  when Column_Count = 0 on the theory that the vars could be
+               --  forward references to a later LET in the same REPEAT body, but
+               --  a genuine forward reference and an undefined name are provably
+               --  indistinguishable in that window -- Group_Flags collapses a
+               --  from-scratch REPEAT body to one implicit group regardless of
+               --  which BY names were given (see ADR-051's Root Cause), so the
+               --  exemption protected no observable behavior, only a footgun.
+               declare
+                  V : Variable_List := Curr_Var;
+               begin
+                  while V /= null loop
+                     if not SData_Core.Table.Has_Column
+                              (V.Var.Start_Name (1 .. V.Var.Start_Len))
+                     then
+                        raise Script_Error with
+                          "undefined variable """
+                          & V.Var.Start_Name (1 .. V.Var.Start_Len) & """";
+                     end if;
+                     V := V.Next;
+                  end loop;
+               end;
                SData_Core.Table.Clear_By_Vars;
                declare
                   Crit : Sort_Criteria_Array (1 .. Count);

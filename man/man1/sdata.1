@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-07-30" "sdata 0.16.4" "User Commands"
+.TH SDATA 1 "2026-07-30" "sdata 0.16.5" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -495,8 +495,8 @@ flags are set accordingly for each record.
 Bare
 .B BY
 (no variables) cancels an active grouping.
-When the data table already has columns, each named variable must be one of
-them; an undefined name (for example, a dropped type suffix) is rejected with an
+Each named variable must be an existing table column; an undefined name (for
+example, a dropped type suffix) is rejected with an
 .RI \(dq undefined\ variable \(dq
 error rather than establishing a spurious single group.
 .TP
