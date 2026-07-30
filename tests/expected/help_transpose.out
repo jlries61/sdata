@@ -10,4 +10,6 @@ Reshapes the Data Table so that each transposed column becomes a row.
           row (long form, default: _X_); used when /ID is absent.
 Respects the active SELECT filter; transposes each BY block separately.
 Flushes a pending SAVE; clears the active SELECT and BY afterward.
+Refuses to run while un-run deferred statements are pending, or between
+REPEAT n and its matching RUN; issue RUN or NEW first.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).

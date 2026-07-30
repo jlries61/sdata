@@ -139,6 +139,8 @@ Command: SORT variable(s)
 Reorders the Data Table based on the specified variables.
 When the table has columns, each named variable must be an existing
 column; an undefined name (e.g. a dropped type suffix) is rejected.
+Rejected between REPEAT n and its matching RUN (the table being
+generated does not exist yet); issue RUN or NEW first.
 Execution: Immediate -- re-orders the table at once.
 
 Command: AGGREGATE outvar=fn(invar) [outvar=fn(invar) ...]
@@ -150,6 +152,8 @@ Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN.
 Input may be a scalar column, a whole array (applied element-wise), or
 an array element such as x(1). The active SELECT filter is respected; a
 pending SAVE is written; the active SELECT and BY are then cleared.
+Refuses to run while un-run deferred statements are pending, or between
+REPEAT n and its matching RUN; issue RUN or NEW first.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
 Command: TRANSPOSE [/KEEP=varlist] [/DROP=varlist] [/NAME=var$] [/ID=var] [/ARRAY=var]
@@ -164,6 +168,8 @@ Reshapes the Data Table so that each transposed column becomes a row.
           row (long form, default: _X_); used when /ID is absent.
 Respects the active SELECT filter; transposes each BY block separately.
 Flushes a pending SAVE; clears the active SELECT and BY afterward.
+Refuses to run while un-run deferred statements are pending, or between
+REPEAT n and its matching RUN; issue RUN or NEW first.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
 Command: STATS [var ...] [/STATS=stat ...] [/NOPRINT]
@@ -180,6 +186,8 @@ replaces the Data Table.
             printing the result.
 Respects the active SELECT filter; flushes a pending SAVE; clears the
 active SELECT and BY afterward.
+Refuses to run while un-run deferred statements are pending, or between
+REPEAT n and its matching RUN; issue RUN or NEW first.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
 Command: TABLES request [request ...] [/CHISQ] [/MISSING] [/LIST]
@@ -359,6 +367,8 @@ Execution: Deferred -- executed once per record inside the data step.
 Command (data step): REPEAT n  (creates n records)
 REPEAT n also cancels any queued deferred statements (LET, SET, etc.).
 Enter setup statements AFTER the REPEAT command, not before it.
+SORT, AGGREGATE, TRANSPOSE, and STATS are rejected between REPEAT n and
+its matching RUN -- the table being generated does not exist yet.
 Execution: Declarative -- the n-record mode is active for the next RUN.
 
 Command (loop): REPEAT ... UNTIL condition

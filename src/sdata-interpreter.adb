@@ -120,6 +120,24 @@ package body SData.Interpreter is
          Stmt_TRANSPOSE | Stmt_STATS | Stmt_PROGRAM_INSERT;
    end Is_Immediate;
 
+   --  Reject an Immediate-tier command that reads or replaces Data_Table's row
+   --  content (SORT, AGGREGATE, TRANSPOSE, STATS) while a REPEAT n data-step
+   --  body is still being queued -- i.e. before its matching RUN has populated
+   --  the table (issue #66).  Checked ahead of each command's own
+   --  Pending_Deferred guard: Repeat_Active is the more specific and, in
+   --  practice, the more common condition (a REPEAT body almost always has a
+   --  LET/SET queued ahead of the Immediate command), so its message should be
+   --  the one the user sees -- it names the actual cause rather than "pending
+   --  statements exist".
+   procedure Reject_If_Repeat_Active (Command : String) is
+   begin
+      if SData_Core.Config.Runtime.Repeat_Active then
+         raise SData_Core.Script_Error with
+           Command & ": cannot run before RUN inside a REPEAT n "
+           & "data-generation step; issue RUN or NEW first";
+      end if;
+   end Reject_If_Repeat_Active;
+
    procedure Set_Interactive (Val : Boolean) is
    begin
       SData_Core.IO.Set_Interactive (Val);
@@ -1603,14 +1621,20 @@ package body SData.Interpreter is
          when Stmt_PROGRAM_INSERT =>
             Execute_Program_Insert (Stmt);
          when Stmt_AGGREGATE =>
+            Reject_If_Repeat_Active ("AGGREGATE");
             Execute_Aggregate (Stmt);
          when Stmt_TRANSPOSE =>
+            Reject_If_Repeat_Active ("TRANSPOSE");
             Execute_Transpose (Stmt);
          when Stmt_STATS =>
+            Reject_If_Repeat_Active ("STATS");
             Execute_Stats (Stmt);
          when Stmt_TABLES =>
             Execute_Tables (Stmt);
-         when Stmt_USE | Stmt_SAVE | Stmt_SORT | Stmt_BY | Stmt_REPEAT
+         when Stmt_SORT =>
+            Reject_If_Repeat_Active ("SORT");
+            Execute_Declarative (Stmt);
+         when Stmt_USE | Stmt_SAVE | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
             | Stmt_OPTIONS =>
             Execute_Declarative (Stmt);

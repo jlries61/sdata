@@ -59,6 +59,8 @@ that might relitigate a settled question.
 | ADR-047 | TRANSPOSE command — type-uniformity, union-of-IDs, max-K padding, and output-collision rules | 2026-06-25 | Accepted |
 | ADR-048 | STATS command — transposed-AGGREGATE layout, always-replace + print/NOPRINT, shared group-scan helper | 2026-06-30 | Accepted |
 | ADR-049 | TABLES command — print-only frequency/crosstabulation reporting | 2026-07-03 | Accepted |
+| ADR-050 | SAVE /DECIMALS and round-trip float output | 2026-07-09 | Accepted |
+| ADR-051 | Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block | 2026-07-30 | Accepted |
 
 ---
 
@@ -733,3 +735,83 @@ data-vandal's code is unaffected by the additive API, but because the round-trip
 default changes saved-float bytes unconditionally, its own expected-output fixtures containing
 saved floats must be regenerated once it advances its `sdata-core` floor, and its `make check`
 re-run before push, per the standing two-consumer local gate.
+
+---
+
+### ADR-051: Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block
+**Date:** 2026-07-30 | **Status:** Accepted
+
+**Context:** Issue #66 (split from sdata-core PR #101's review, the EAV disk-spill schema). `SORT`
+placed between `REPEAT n` and its matching `RUN` executed immediately against `Data_Table`, but
+the `REPEAT` body had not yet populated it — the sort silently no-op'd. `tests/sort_by.cmd` masked
+this for years: its sample data (`VAL = RECNO()`) was already monotonic in generation order, so
+"no sort happened" was indistinguishable from "sorted." `AGGREGATE`/`TRANSPOSE`/`STATS` have the
+same latent gap, incidentally masked in the common case by their existing `Pending_Deferred > 0`
+guard (which happens to be nonzero once at least one `LET`/`SET` is queued ahead of them in the
+body) but not when the Immediate command is the very first statement after `REPEAT n`.
+
+**Decision:**
+1. **Reuse the existing `Repeat_Active` flag** (`SData_Core.Config.Runtime`) as the guard
+   condition, rather than introducing new interpreter state. Verified against the source: it is
+   set `True` by `Execute_REPEAT (Count)` when `Count > 0`
+   (`sdata_core-config-runtime-internal.adb`), and cleared `False` only by `Commit_Step`
+   (`sdata-interpreter.adb`), which runs after the matching `RUN` executes the deferred body and
+   commits the table — i.e. it is exactly coextensive with "between `REPEAT n` and its matching
+   `RUN`."
+2. **Guard once, at the shared `Execute_Statement` dispatch point**, not by duplicating a check at
+   each of the batch `Execute` and REPL `Run_REPL` call sites. Tracing both confirmed they already
+   funnel every non-deferred, non-`RUN` statement through the same `Execute_Statement` procedure —
+   one guard there covers batch and interactive mode identically by construction, with no second
+   code path to keep in sync (the class of drift risk CLAUDE.md already flags for HELP/man/design.md).
+3. **Gate exactly `Stmt_SORT | Stmt_AGGREGATE | Stmt_TRANSPOSE | Stmt_STATS`** — the Immediate-tier
+   commands that read or replace `Data_Table` row content. Every other Immediate-tier command
+   (`OPTIONS`, `HELP`, `DIGITS`, `ECHO`, `RSEED`, `SYSTEM`, `NAMES`, `LIST`, `DISPLAY`, `FPATH`,
+   `KEEP`/`DROP`/`RENAME`, `ARRAY`/`DIM`, `HOLD`/`UNHOLD`, `SUBMIT`, `OUTPUT`) is unaffected and
+   remains legal mid-body. `Stmt_TABLES` is dispatched the same way but was found, during this
+   design pass, to be missing from `Is_Immediate` entirely — a separate, REPL-only dispatch-routing
+   bug (queued via `Add_To_Active_Program` instead of executed immediately, then silently dropped by
+   `process_one_record.adb`'s per-record whitelist) unrelated to `Repeat_Active`. Deliberately left
+   out of this fix and filed separately (issue #68) rather than folded in, matching how #66/#67 split
+   from #64's review.
+4. **The new check runs *before* each command's existing `Pending_Deferred` guard**, not after.
+   `Repeat_Active` is the more specific condition and, in practice, the more common one (a real
+   `REPEAT` body almost always has a `LET`/`SET` queued ahead of the Immediate command, so without
+   this ordering the misleading "pending program statements exist" message — which reads as "you
+   have stray queued statements," not "you are structurally inside an unrun data-generation step" —
+   would be what most users actually see). Placing the guard directly in `Execute_Statement`, ahead
+   of the call into `Execute_Aggregate`/`Execute_Transpose`/`Execute_Stats`, gets this ordering for
+   free rather than requiring it to be threaded through each handler.
+5. **Message names the actual cause** rather than reusing the `Pending_Deferred` text verbatim:
+   `"<CMD>: cannot run before RUN inside a REPEAT n data-generation step; issue RUN or NEW first"`.
+   "REPEAT n data-generation step," not bare "REPEAT block," to avoid confusion with the unrelated
+   `REPEAT`/`UNTIL` control-flow loop this same language already has an on-record ambiguity finding
+   about (issue #57; design.md §5.5's note on the same distinction).
+6. **`tests/sort_by.cmd` is rewritten, not merely re-asserted.** Its pre-fix expected output already
+   reflected the no-op behavior (unsorted, generation-order data) the issue proved wrong. The rewrite
+   moves `SORT`/`BY` to after the generating `RUN` (mirroring `tests/spill_sort_test.cmd`'s working
+   pattern), and required two further adjustments discovered only by actually running the interpreter
+   rather than hand-deriving the new expected output: block 1's `VAL` formula was changed from
+   `RECNO()` to `7 - RECNO()` so the sort's effect is empirically visible (the original formula was
+   already monotonic — the same coincidence that hid the bug for years); block 2's `SET VAL` became
+   `LET VAL`, since a `SET` temporary variable does not survive past the `RUN` it was computed in,
+   and the rewritten structure now needs `VAL` to persist into a second, later `RUN`. A side effect of
+   moving `BY G` out from before `RUN`: `Group_Flags` (`sdata-interpreter.adb`) special-cases
+   `Row_Count = 0` (true throughout a from-scratch `REPEAT` body) as "all generated records form one
+   implicit group," so the pre-fix test's cumulative-sum column never actually reset between BY
+   groups (10, 15, 21 continuing across the G=0/G=1 boundary); with `BY G` now evaluated after the
+   table is committed, groups reset correctly (1, 3, 6 then 4, 9, 15) — the more obviously correct
+   behavior, and a second latent symptom of the same root design gap this ADR fixes, not a separate
+   bug. New tests (`tests/repeat_sort_reject.cmd`, `tests/repeat_aggregate_reject.cmd`) specifically
+   exercise the zero-pending-statements case (the actual net-new coverage — with statements already
+   pending, `Pending_Deferred` alone already caught it), plus `tests/repeat_zero_sort_ok.cmd`
+   confirming `REPEAT 0` (the documented cancel form) does not trip the new guard.
+
+**Consequences:** Purely additive to the error surface — no existing test relied on any of these
+four commands succeeding inside an active `REPEAT` body (`make check`: 352 → 355, all green). No
+sdata-core API change: `Repeat_Active` and `Execute_REPEAT` are shared plumbing, but `data-vandal`
+has no `REPEAT` statement or `Is_Immediate`-equivalent dispatcher of its own (confirmed: zero
+matches in its source), so this fix is sdata-only, no version floor change, no cross-crate
+coordination. Companion issue #67 (tighten `SORT`'s `Column_Count > 0` undefined-variable bypass)
+can now proceed, since that bypass has no remaining legitimate case to protect once this lands.
+Issue #68 (the `Stmt_TABLES`/`Is_Immediate` REPL dispatch gap found during design) is filed as a
+separate follow-up, out of scope here.

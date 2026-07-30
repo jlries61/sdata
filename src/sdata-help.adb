@@ -242,6 +242,8 @@ package body SData.Help is
       Put_Line ("Reorders the Data Table based on the specified variables.");
       Put_Line ("When the table has columns, each named variable must be an existing");
       Put_Line ("column; an undefined name (e.g. a dropped type suffix) is rejected.");
+      Put_Line ("Rejected between REPEAT n and its matching RUN (the table being");
+      Put_Line ("generated does not exist yet); issue RUN or NEW first.");
       Put_Line ("Execution: Immediate -- re-orders the table at once.");
    end Help_SORT;
 
@@ -256,6 +258,8 @@ package body SData.Help is
       Put_Line ("Input may be a scalar column, a whole array (applied element-wise), or");
       Put_Line ("an array element such as x(1). The active SELECT filter is respected; a");
       Put_Line ("pending SAVE is written; the active SELECT and BY are then cleared.");
+      Put_Line ("Refuses to run while un-run deferred statements are pending, or between");
+      Put_Line ("REPEAT n and its matching RUN; issue RUN or NEW first.");
       Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
    end Help_AGGREGATE;
 
@@ -274,6 +278,8 @@ package body SData.Help is
       Put_Line ("          row (long form, default: _X_); used when /ID is absent.");
       Put_Line ("Respects the active SELECT filter; transposes each BY block separately.");
       Put_Line ("Flushes a pending SAVE; clears the active SELECT and BY afterward.");
+      Put_Line ("Refuses to run while un-run deferred statements are pending, or between");
+      Put_Line ("REPEAT n and its matching RUN; issue RUN or NEW first.");
       Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
    end Help_TRANSPOSE;
 
@@ -293,6 +299,8 @@ package body SData.Help is
       Put_Line ("            printing the result.");
       Put_Line ("Respects the active SELECT filter; flushes a pending SAVE; clears the");
       Put_Line ("active SELECT and BY afterward.");
+      Put_Line ("Refuses to run while un-run deferred statements are pending, or between");
+      Put_Line ("REPEAT n and its matching RUN; issue RUN or NEW first.");
       Put_Line ("Execution: Immediate -- rebuilds the table at once. See man page sdata(1).");
    end Help_STATS;
 
@@ -569,6 +577,8 @@ package body SData.Help is
       Put_Line ("Command (data step): REPEAT n  (creates n records)");
       Put_Line ("REPEAT n also cancels any queued deferred statements (LET, SET, etc.).");
       Put_Line ("Enter setup statements AFTER the REPEAT command, not before it.");
+      Put_Line ("SORT, AGGREGATE, TRANSPOSE, and STATS are rejected between REPEAT n and");
+      Put_Line ("its matching RUN -- the table being generated does not exist yet.");
       Put_Line ("Execution: Declarative -- the n-record mode is active for the next RUN.");
       New_Line;
       Put_Line ("Command (loop): REPEAT ... UNTIL condition");

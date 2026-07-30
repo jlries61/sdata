@@ -675,7 +675,30 @@ represent a change from earlier versions, where those conditions silently return
 missing value. Programs that relied on the silent missing-value behavior for unknown
 names must be updated.
 
-### 5.7 Script Execution
+### 5.7 Immediate Commands Inside REPEAT
+
+*SORT*, *AGGREGATE*, *TRANSPOSE*, and *STATS* read or replace the data table's
+row content. Placed between a *REPEAT n* statement and its matching *RUN*,
+they would otherwise run against a table the *REPEAT* body has not yet
+populated — silently producing a result that reflects stale or absent data
+rather than the records being generated. They are rejected in that window with
+a clear error naming the cause; issue *RUN* (to execute the body and commit
+the table) or *NEW* (to discard it) first.
+
+This is independent of, and checked ahead of, each command's separate
+requirement that no un-run deferred statements be pending: a *REPEAT* body's
+Immediate command can be the very first statement after *REPEAT n*, with
+nothing yet queued, so the pending-statements check alone does not cover this
+case.
+
+**Note:** This refers to the *REPEAT* command (specify number of records), not
+the *REPEAT*/*UNTIL* loop — see §5.5's note on the same ambiguity. All other
+Immediate-tier commands (*OPTIONS*, *HELP*, *DIGITS*, *ECHO*, *RSEED*,
+*SYSTEM*, *NAMES*, *LIST*, *DISPLAY*, *FPATH*, *KEEP*/*DROP*/*RENAME*,
+*ARRAY*/*DIM*, *HOLD*/*UNHOLD*, *SUBMIT*, *OUTPUT*) remain legal inside a
+*REPEAT* body before *RUN*.
+
+### 5.8 Script Execution
 
 **SUBMIT Statement:** Reads and executes commands from specified file.
 

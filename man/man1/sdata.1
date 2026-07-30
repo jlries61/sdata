@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-07-29" "sdata 0.16.3" "User Commands"
+.TH SDATA 1 "2026-07-30" "sdata 0.16.4" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -519,6 +519,15 @@ Each named variable must be an existing table column; naming one that does not
 exist (for example, dropping a type suffix) is rejected with an
 .RI \(dq undefined\ variable \(dq
 error rather than silently leaving the data unsorted.
+Also rejected between
+.B REPEAT \fIn\fR
+and its matching
+.B RUN
+(issue
+.B RUN
+or
+.B NEW
+first).
 .TP
 .B REPEAT \fIn\fR
 Create
@@ -532,6 +541,16 @@ etc.); enter setup statements
 the
 .B REPEAT
 command, not before it.
+.B SORT ,
+.BR AGGREGATE ,
+.BR TRANSPOSE ,
+and
+.B STATS
+are rejected between
+.B REPEAT \fIn\fR
+and its matching
+.B RUN
+\(em the table being generated does not exist yet.
 .TP
 .B FPATH \fIpath\fR /\fBUSE\fR|\fBSAVE\fR|\fBSUBMIT\fR|\fBOUTPUT\fR
 Set the default directory for the specified file category.
@@ -557,6 +576,15 @@ SELECT filter or BY grouping.
 .TP
 .B SORT \fIvar\fR [\fIvar\fR ...]
 Re\-order the data table.
+Rejected between
+.B REPEAT \fIn\fR
+and its matching
+.B RUN
+(issue
+.B RUN
+or
+.B NEW
+first).
 .TP
 .B AGGREGATE \fIoutvar\fB=\fIfn\fB(\fIinvar\fB)\fR [\fIoutvar\fB=\fIfn\fB(\fIinvar\fB)\fR ...]
 Collapse the data table to one row per active
@@ -595,6 +623,15 @@ and
 .B BY
 are cleared.
 The deferred program buffer must hold no un\-run statements (issue
+.B RUN
+or
+.B NEW
+first).
+Also rejected between
+.B REPEAT \fIn\fR
+and its matching
+.B RUN
+(issue
 .B RUN
 or
 .B NEW
@@ -664,6 +701,15 @@ The deferred program buffer must be empty (issue
 or
 .B NEW
 first).
+Also rejected between
+.B REPEAT \fIn\fR
+and its matching
+.B RUN
+(issue
+.B RUN
+or
+.B NEW
+first).
 See also
 .BR AGGREGATE .
 .TP
@@ -707,6 +753,15 @@ and
 .B BY
 are cleared.
 The deferred program buffer must hold no un\-run statements (issue
+.B RUN
+or
+.B NEW
+first).
+Also rejected between
+.B REPEAT \fIn\fR
+and its matching
+.B RUN
+(issue
 .B RUN
 or
 .B NEW
