@@ -1,0 +1,5 @@
+Dataset opened: tests/data/spill_delete_a.csv
+RUN complete. 0 records and 50 variables processed.
+Dataset opened: tests/data/spill_delete_b.csv
+d1= 51.00000 d50= 100.00000
+RUN complete. 1 records and 50 variables processed.

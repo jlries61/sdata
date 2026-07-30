@@ -1,1 +1,4 @@
-Error: dataset "data" has too many columns for SQLite spill (2100 cols, limit ~2000); use -m 0 or fewer columns [SQLite: SQL execution error: too many columns on data (Error code:  1)]
+Dataset opened: tests/data/wide_table.csv
+c1= 1.00000 c1050= 1050.00000 c2100= 2100.00000
+c1= 1.00000 c1050= 1050.00000 c2100= 2100.00000
+RUN complete. 2 records and 2100 variables processed.

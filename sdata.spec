@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.16.2
+Version:        0.16.3
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Jul 29 2026 John L. Ries <john@theyarnbard.com> - 0.16.3-1
+- Bump sdata_core floor to ^0.4.0 (EAV disk-spill schema, jlries61/sdata#64); add spill_delete_all_test.cmd + spill_sort_undef_var_test.cmd; rewrite wide_table_spill.cmd to assert the ~2000-column ceiling is gone.
+
 * Tue Jul 28 2026 John L. Ries <john@theyarnbard.com> - 0.16.2-1
 - SET/LET storage-class redefinition is now a hard error (#56)
 
