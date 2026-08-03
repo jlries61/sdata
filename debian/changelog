@@ -1,3 +1,9 @@
+sdata (0.16.8-1) unstable; urgency=medium
+
+  * Add REPL integration test coverage via a Makefile .repl marker convention (issue #69, ADR-053).
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 03 Aug 2026 10:14:03 -0700
+
 sdata (0.16.7-1) unstable; urgency=medium
 
   * Accept ^ and ** as interchangeable exponentiation spellings everywhere (issue #65).

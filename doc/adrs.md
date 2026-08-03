@@ -62,6 +62,7 @@ that might relitigate a settled question.
 | ADR-050 | SAVE /DECIMALS and round-trip float output | 2026-07-09 | Accepted |
 | ADR-051 | Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block | 2026-07-30 | Accepted |
 | ADR-052 | Validate SORT/BY variable names unconditionally, not gated on Column_Count > 0 | 2026-07-30 | Accepted |
+| ADR-053 | REPL test coverage via a Makefile `.repl` marker convention, not a Run_REPL refactor | 2026-08-03 | Accepted |
 
 ---
 
@@ -875,3 +876,61 @@ N=N()`: `REPEAT` (any count) always clears the table, so no name `SORT` could re
 New tests: `tests/by_repeat_body_undefined.cmd` (BY inside a REPEAT body on a same-body,
 not-yet-run `LET` target, confirming the "backward reference" case errors identically to a
 typo). `make check`: 355 → 356.
+
+### ADR-053: REPL test coverage via a Makefile `.repl` marker convention, not a Run_REPL refactor
+**Date:** 2026-08-03 | **Status:** Accepted
+
+**Context:** Issue #69, found during #68's design pass. All `tests/*.cmd` integration tests run via
+`./bin/sdata tests/<name>.cmd` (a filename argument), which selects **batch mode**
+(`SData.Interpreter.Execute`) exclusively. `Run_REPL` (`src/sdata_main.adb`) — reached only when
+**no** filename is given, reading from stdin instead — was never exercised by `make check` at any
+level. This is exactly why #68 (`Stmt_TABLES` missing from `Is_Immediate`) went unnoticed: nothing
+in the automated suite could have caught it, since nothing in the suite ever called `Run_REPL`.
+#69 raised three options without evaluating them in depth: (1) extend the test harness to pipe
+stdin and strip `Run_REPL`'s version-string-bearing startup banner before diffing; (2) refactor
+`Run_REPL`'s dispatch loop into a small, separately-testable public procedure callable by both
+`Run_REPL` and a unit test; (3) accept the gap and rely on targeted unit tests per regression, as
+#68 did for `Is_Immediate`.
+
+**Decision:** Option 1. A `tests/<name>.repl` marker file, placed alongside a `tests/<name>.cmd`
+script, tells `make check`'s existing test loop to invoke `./bin/sdata $EXTRA_FLAGS < tests/<name>.cmd`
+(piped stdin, no filename argument) instead of `./bin/sdata $EXTRA_FLAGS tests/<name>.cmd` — this
+alone is sufficient to select `Run_REPL` instead of batch mode; no source change to `Run_REPL`
+itself is required. The fixed 3-line startup banner (which embeds `SData.Version.Version_Str`, not
+suppressed by any existing flag including `-q`, confirmed empirically) is stripped from actual
+output (`tail -n +4`) before the existing `diff -wu` comparison against `tests/expected/<name>.out`
+runs, so expected files stay version-string-free and never need hand-editing on a version bump —
+directly avoiding the maintenance trap #69 itself warned a naive REPL test would create.
+
+Option 2 was rejected: extracting `Run_REPL`'s dispatch loop into a public, separately-testable
+procedure is a real behavioral-preservation refactor (the loop's state — `Buffer`,
+`Ended_With_Continuation`'s interaction with `Parser_Context`, the pager-flush points inside each
+exception handler — is intertwined with the surrounding `Get_Line`/prompt loop) with its own risk of
+introducing a regression in the exact code path being protected, for no coverage benefit over Option
+1's zero-source-change approach. Option 3 was rejected as strictly weaker: it only re-guards
+regressions after they ship (as #68's `IMM-01`/`IMM-02` unit tests now do for `Stmt_TABLES`
+specifically), never testing the REPL's dispatch loop, buffering, or error-recovery behavior as a
+whole; the actual `.cmd` scripts below prove Option 1 test the literal `Run_REPL` code path, not a
+substitute.
+
+**New tests** (all exercise genuinely REPL-only code paths, not just a REPL-mode restatement of an
+existing batch test): `repl_dispatch_basic.cmd` (normal immediate/deferred/RUN dispatch through the
+REPL loop); `repl_tables_immediate.cmd` (direct regression guard reproducing #68's exact shape — a
+bare `TABLES` statement must produce output immediately, with no `RUN` in between; verified to
+independently fail when `Stmt_TABLES` is removed from `Is_Immediate` again, confirming this closes
+the actual gap #69 reports, not just adds inert test files); `repl_continuation.cmd` (the
+trailing-comma line-continuation buffer, which only exists in `Run_REPL`'s incremental
+`Get_Line`/`Parse_Program` loop — batch mode parses the whole file at once and never distinguishes a
+mid-file trailing comma from any other character); `repl_error_recovery.cmd` (a script error from an
+Immediate-tier command mid-session resets the buffer and the REPL keeps accepting input afterward,
+proving `Run_REPL`'s own exception handlers, not batch's `Execute`, recovered cleanly);
+`repl_eof_no_quit.cmd` (reaching end-of-input without an explicit `QUIT`/`END` exercises the
+`Ada.Text_IO.End_Error` handler, a distinct exit path from the `Stmt_QUIT`/`Stmt_END` dispatch
+branch `repl_dispatch_basic.cmd` already covers).
+
+**Consequences:** sdata-only, no sdata-core change (`Run_REPL` and the Makefile are both sdata-only
+surfaces). No source change to `src/sdata_main.adb` at all — this ADR is a test-infrastructure
+decision, not a behavioral one. `make check`: 357 → 362. The `.repl` marker convention generalizes:
+any future REPL-specific behavior (e.g. a fix to `Insert_Point`/`Append_Mode` program-buffer editing,
+issue #32) gets the same treatment — write the `.cmd` script normally, add an empty `tests/<name>.repl`
+marker, and generate the expected output by running the actual binary once and stripping the banner.

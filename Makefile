@@ -1,6 +1,6 @@
 # Makefile for SData
 
-VERSION          := 0.16.7
+VERSION          := 0.16.8
 ZIPADA_VERSION      := 61.0.0
 XMLADA_VERSION      := 26.0.0
 MATHPAQS_VERSION    := 20260205.0.0
@@ -123,6 +123,11 @@ check: build
 	   i=$$((i+1)); \
 	 done; \
 	 printf -- '-- depth-chain terminal (reached only without the guard)\n' > tests/data/submit_depth_gen/c065.cmd
+	@#  A tests/<name>.repl marker (issue #69) runs the script via piped
+	@#  stdin instead of a filename argument, exercising Run_REPL (the
+	@#  interactive dispatch loop) instead of batch mode; the fixed 3-line
+	@#  startup banner is stripped before diffing since it embeds the live
+	@#  version string.
 	@failures=0; failed_list=""; total=0; \
 	for f in tests/*.cmd; do \
 		total=$$((total+1)); \
@@ -135,8 +140,16 @@ check: build
 		exitcode_file="tests/$$base.exitcode"; \
 		expected_exit=0; \
 		if [ -f "$$exitcode_file" ]; then expected_exit=$$(cat "$$exitcode_file"); fi; \
-		$(TIMEOUT) 10 ./bin/sdata $$extra_flags $$f > tests/$$base.tmp 2>&1; \
+		if [ -f "tests/$$base.repl" ]; then \
+			$(TIMEOUT) 10 ./bin/sdata $$extra_flags < $$f > tests/$$base.tmp 2>&1; \
+		else \
+			$(TIMEOUT) 10 ./bin/sdata $$extra_flags $$f > tests/$$base.tmp 2>&1; \
+		fi; \
 		actual_exit=$$?; \
+		if [ -f "tests/$$base.repl" ] && [ -f "tests/$$base.tmp" ]; then \
+			tail -n +4 tests/$$base.tmp > tests/$$base.tmp.stripped; \
+			mv tests/$$base.tmp.stripped tests/$$base.tmp; \
+		fi; \
 		if [ $$actual_exit -eq 124 ]; then \
 			echo "FAILED (Timed out after 10s)"; \
 			rm -f tests/$$base.tmp; \

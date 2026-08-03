@@ -1,0 +1,18 @@
+sdata> sdata> sdata> sdata> sdata> sdata> sdata> Dataset opened: tests/data/freq_select.csv
+sdata> Error: TABLES: unknown variable 'NOPE$'
+sdata> sdata> still alive
+still alive
+still alive
+still alive
+still alive
+still alive
+RUN complete. 6 records and 3 variables processed.
+sdata> Frequency table for PRODUCT$
+
+PRODUCT$ Frequency Percent Cum_Freq Cum_Percent
+A 3 50.00 3 50.00
+B 3 50.00 6 100.00
+Total 6 100.00
+
+TABLES complete.
+sdata> 
