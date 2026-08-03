@@ -678,29 +678,50 @@ represent a change from earlier versions, where those conditions silently return
 missing value. Programs that relied on the silent missing-value behavior for unknown
 names must be updated.
 
-### 5.7 Immediate Commands Inside REPEAT
+### 5.7 Implicit RUN Before SORT/AGGREGATE/TRANSPOSE/STATS With a Pending Program
 
 *SORT*, *AGGREGATE*, *TRANSPOSE*, and *STATS* read or replace the data table's
-row content. Placed between a *REPEAT n* statement and its matching *RUN*,
-they would otherwise run against a table the *REPEAT* body has not yet
-populated — silently producing a result that reflects stale or absent data
-rather than the records being generated. They are rejected in that window with
-a clear error naming the cause; issue *RUN* (to execute the body and commit
-the table) or *NEW* (to discard it) first.
+row content. If invoked while a deferred program is pending — either because
+un-run deferred statements (*LET*, *SET*, etc.) have been queued since the
+last *RUN*, or because a *REPEAT n* body is still open (its matching *RUN*
+has not yet executed) — they would otherwise run against a table that program
+has not yet populated, silently producing a result that reflects stale or
+absent data rather than the records being generated.
 
-This is independent of, and checked ahead of, each command's separate
-requirement that no un-run deferred statements be pending: a *REPEAT* body's
-Immediate command can be the very first statement after *REPEAT n*, with
-nothing yet queued, so the pending-statements check alone does not cover this
-case.
+Rather than rejecting this (the previous behavior, issue #66 / ADR-051), each
+of these four commands now performs the equivalent of *RUN* automatically
+first — announcing itself with the same *"RUN complete. N records and M
+variables processed."* message an explicit *RUN* prints, immediately before
+the triggering command's own output — and then proceeds with the original
+command against the now-current table. There is no configuration option to
+restore the old reject behavior; issue #70 / ADR-055 replaces it outright.
+
+Both trigger conditions are checked uniformly for all four commands: a
+pending deferred statement queued since the last *RUN*, or an open *REPEAT n*
+body with nothing yet queued (the very first statement after *REPEAT n* is
+one of these four commands). If a *REPEAT n* body is empty when the implicit
+*RUN* fires (no *LET*/*SET* ever queued), the generated records have no
+columns at all; a command that then references a variable name finds it
+undefined (per §5.6's entry-time checking), rather than silently succeeding
+against an empty row shape.
+
+**SAVE association:** A registered *SAVE* is one-shot — it is written and
+cleared by whichever commit point reaches it first, not re-written at every
+subsequent commit. The implicit *RUN* an *SAVE*-with-a-pending-program
+triggers does *not* consume a registered *SAVE* itself; the write is
+associated with the triggering command's own result instead. For example,
+*`REPEAT 4 / LET X = RECNO / SAVE "f.csv" / AGGREGATE TOTAL=SUM(X)`* (no
+explicit *RUN*) writes *f.csv* with the aggregated *TOTAL*, not the
+pre-aggregate per-record *X* values the implicit *RUN* produced internally.
 
 **Note:** This refers to the *REPEAT* command (specify number of records), not
 the *DO*/*UNTIL* loop (renamed from *REPEAT*/*UNTIL*, issue #63 / ADR-054) —
-see §5.5's note. All other
-Immediate-tier commands (*OPTIONS*, *HELP*, *DIGITS*, *ECHO*, *RSEED*,
-*SYSTEM*, *NAMES*, *LIST*, *DISPLAY*, *FPATH*, *KEEP*/*DROP*/*RENAME*,
-*ARRAY*/*DIM*, *HOLD*/*UNHOLD*, *SUBMIT*, *OUTPUT*) remain legal inside a
-*REPEAT* body before *RUN*.
+see §5.5's note. All other Immediate-tier commands (*OPTIONS*, *HELP*,
+*DIGITS*, *ECHO*, *RSEED*, *SYSTEM*, *NAMES*, *LIST*, *DISPLAY*, *FPATH*,
+*KEEP*/*DROP*/*RENAME*, *ARRAY*/*DIM*, *HOLD*/*UNHOLD*, *SUBMIT*, *OUTPUT*)
+are unaffected by this section — they never read or replace the table's row
+content, so no implicit *RUN* is needed before them, and they remain legal
+inside a *REPEAT* body before *RUN* exactly as before.
 
 ### 5.8 Script Execution
 

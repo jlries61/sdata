@@ -1,0 +1,13 @@
+sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> Dataset opened: tests/data/freq_select.csv
+sdata> sdata> sdata> RUN complete. 6 records and 4 variables processed.
+SORT complete. 6 records and 4 variables processed.
+Dataset saved: tests/data/repl_implicit_run_save_out.csv
+sdata> sdata> Dataset opened: tests/data/repl_implicit_run_save_out.csv
+sdata> REC# REGION$ PRODUCT$ ID Z 
+1 West B 6.00000 -6.00000 
+2 West B 5.00000 -5.00000 
+3 West A 4.00000 -4.00000 
+4 East B 3.00000 -3.00000 
+5 East A 2.00000 -2.00000 
+6 East A 1.00000 -1.00000 
+sdata> 

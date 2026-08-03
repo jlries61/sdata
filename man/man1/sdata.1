@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-08-03" "sdata 0.17.0" "User Commands"
+.TH SDATA 1 "2026-08-03" "sdata 0.17.1" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -519,15 +519,21 @@ Each named variable must be an existing table column; naming one that does not
 exist (for example, dropping a type suffix) is rejected with an
 .RI \(dq undefined\ variable \(dq
 error rather than silently leaving the data unsorted.
-Also rejected between
+A pending
+.B SAVE
+is written after sorting.
+If un\-run deferred statements are pending, or a
 .B REPEAT \fIn\fR
-and its matching
+body is still open (its matching
 .B RUN
-(issue
+has not yet executed), performs an implicit
 .B RUN
-or
-.B NEW
-first).
+first \(em announcing itself with the same message an explicit
+.B RUN
+prints \(em then proceeds (issue #70). A pending
+.B SAVE
+is associated with this command's own result, not written by the implicit
+.BR RUN .
 .TP
 .B REPEAT \fIn\fR
 Create
@@ -546,11 +552,14 @@ command, not before it.
 .BR TRANSPOSE ,
 and
 .B STATS
-are rejected between
+automatically perform an implicit
+.B RUN
+first if invoked between
 .B REPEAT \fIn\fR
 and its matching
 .B RUN
-\(em the table being generated does not exist yet.
+\(em the table being generated would not exist yet otherwise (issue #70;
+formerly rejected outright, issue #66).
 .TP
 .B FPATH \fIpath\fR /\fBUSE\fR|\fBSAVE\fR|\fBSUBMIT\fR|\fBOUTPUT\fR
 Set the default directory for the specified file category.
@@ -622,20 +631,16 @@ is written; then the active
 and
 .B BY
 are cleared.
-The deferred program buffer must hold no un\-run statements (issue
-.B RUN
-or
-.B NEW
-first).
-Also rejected between
+If un\-run deferred statements are pending, or a
 .B REPEAT \fIn\fR
-and its matching
+body is still open, performs an implicit
 .B RUN
-(issue
+first \(em announcing itself with the same message an explicit
 .B RUN
-or
-.B NEW
-first).
+prints \(em then proceeds (issue #70). A pending
+.B SAVE
+is associated with this command's own result, not written by the implicit
+.BR RUN .
 .TP
 .B TRANSPOSE\fR [\fB/KEEP=\fIvarlist\fB]\fR [\fB/DROP=\fIvarlist\fB]\fR [\fB/NAME=\fIvar$\fB]\fR [\fB/ID=\fIvar\fB]\fR [\fB/ARRAY=\fIvar\fB]
 Reshape the data table so that each column in the transposed set becomes one
@@ -696,20 +701,16 @@ is written; then the active
 and
 .B BY
 are cleared.
-The deferred program buffer must be empty (issue
-.B RUN
-or
-.B NEW
-first).
-Also rejected between
+If un\-run deferred statements are pending, or a
 .B REPEAT \fIn\fR
-and its matching
+body is still open, performs an implicit
 .B RUN
-(issue
+first \(em announcing itself with the same message an explicit
 .B RUN
-or
-.B NEW
-first).
+prints \(em then proceeds (issue #70). A pending
+.B SAVE
+is associated with this command's own result, not written by the implicit
+.BR RUN .
 See also
 .BR AGGREGATE .
 .TP
@@ -752,20 +753,16 @@ is written; then the active
 and
 .B BY
 are cleared.
-The deferred program buffer must hold no un\-run statements (issue
-.B RUN
-or
-.B NEW
-first).
-Also rejected between
+If un\-run deferred statements are pending, or a
 .B REPEAT \fIn\fR
-and its matching
+body is still open, performs an implicit
 .B RUN
-(issue
+first \(em announcing itself with the same message an explicit
 .B RUN
-or
-.B NEW
-first).
+prints \(em then proceeds (issue #70). A pending
+.B SAVE
+is associated with this command's own result, not written by the implicit
+.BR RUN .
 See also
 .BR AGGREGATE .
 .TP

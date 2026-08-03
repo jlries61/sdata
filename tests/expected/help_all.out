@@ -139,8 +139,11 @@ Command: SORT variable(s)
 Reorders the Data Table based on the specified variables.
 Each named variable must be an existing table column; an undefined name
 (e.g. a dropped type suffix) is rejected.
-Rejected between REPEAT n and its matching RUN (the table being
-generated does not exist yet); issue RUN or NEW first.
+A pending SAVE is written after sorting.
+If un-run deferred statements are pending, or a REPEAT n body is
+still open, performs an implicit RUN first (announcing itself like
+an explicit RUN); a pending SAVE is associated with SORT's own
+result, not written by the implicit RUN.
 Execution: Immediate -- re-orders the table at once.
 
 Command: AGGREGATE outvar=fn(invar) [outvar=fn(invar) ...]
@@ -152,8 +155,10 @@ Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN.
 Input may be a scalar column, a whole array (applied element-wise), or
 an array element such as x(1). The active SELECT filter is respected; a
 pending SAVE is written; the active SELECT and BY are then cleared.
-Refuses to run while un-run deferred statements are pending, or between
-REPEAT n and its matching RUN; issue RUN or NEW first.
+If un-run deferred statements are pending, or a REPEAT n body is
+still open, performs an implicit RUN first (announcing itself like
+an explicit RUN); a pending SAVE is associated with this command's
+own result, not written by the implicit RUN.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
 Command: TRANSPOSE [/KEEP=varlist] [/DROP=varlist] [/NAME=var$] [/ID=var] [/ARRAY=var]
@@ -168,8 +173,10 @@ Reshapes the Data Table so that each transposed column becomes a row.
           row (long form, default: _X_); used when /ID is absent.
 Respects the active SELECT filter; transposes each BY block separately.
 Flushes a pending SAVE; clears the active SELECT and BY afterward.
-Refuses to run while un-run deferred statements are pending, or between
-REPEAT n and its matching RUN; issue RUN or NEW first.
+If un-run deferred statements are pending, or a REPEAT n body is
+still open, performs an implicit RUN first (announcing itself like
+an explicit RUN); a pending SAVE is associated with this command's
+own result, not written by the implicit RUN.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
 Command: STATS [var ...] [/STATS=stat ...] [/NOPRINT]
@@ -186,8 +193,10 @@ replaces the Data Table.
             printing the result.
 Respects the active SELECT filter; flushes a pending SAVE; clears the
 active SELECT and BY afterward.
-Refuses to run while un-run deferred statements are pending, or between
-REPEAT n and its matching RUN; issue RUN or NEW first.
+If un-run deferred statements are pending, or a REPEAT n body is
+still open, performs an implicit RUN first (announcing itself like
+an explicit RUN); a pending SAVE is associated with this command's
+own result, not written by the implicit RUN.
 Execution: Immediate -- rebuilds the table at once. See man page sdata(1).
 
 Command: TABLES request [request ...] [/CHISQ] [/MISSING] [/LIST]

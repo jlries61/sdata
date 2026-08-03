@@ -60,10 +60,11 @@ that might relitigate a settled question.
 | ADR-048 | STATS command — transposed-AGGREGATE layout, always-replace + print/NOPRINT, shared group-scan helper | 2026-06-30 | Accepted |
 | ADR-049 | TABLES command — print-only frequency/crosstabulation reporting | 2026-07-03 | Accepted |
 | ADR-050 | SAVE /DECIMALS and round-trip float output | 2026-07-09 | Accepted |
-| ADR-051 | Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block | 2026-07-30 | Accepted |
+| ADR-051 | Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block | 2026-07-30 | Superseded by ADR-055 |
 | ADR-052 | Validate SORT/BY variable names unconditionally, not gated on Column_Count > 0 | 2026-07-30 | Accepted |
 | ADR-053 | REPL test coverage via a Makefile `.repl` marker convention, not a Run_REPL refactor | 2026-08-03 | Accepted |
 | ADR-054 | Resolve REPEAT/DELETE keyword overloading: rename the low-usage side (REPEAT/UNTIL loop -> DO/UNTIL; DELETE n[-m] line editor -> REMOVE n[-m]) | 2026-08-03 | Accepted |
+| ADR-055 | Implicit RUN instead of rejecting SORT/AGGREGATE/TRANSPOSE/STATS with a pending program (supersedes ADR-051's reject mechanism) | 2026-08-03 | Accepted |
 
 ---
 
@@ -742,7 +743,12 @@ re-run before push, per the standing two-consumer local gate.
 ---
 
 ### ADR-051: Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block
-**Date:** 2026-07-30 | **Status:** Accepted
+**Date:** 2026-07-30 | **Status:** Superseded by [ADR-055](#adr-055-implicit-run-instead-of-rejecting-sortaggregatetransposestats-with-a-pending-program)
+
+**Superseded 2026-08-03:** issue #70 reconsidered the reject *mechanism* below — it is
+replaced by an implicit `RUN` (see ADR-055). The root-cause finding this ADR established
+(these four commands could silently execute against a table their own pending body hadn't
+populated yet) remains correct and is still cited by ADR-055; only the remedy changes.
 
 **Context:** Issue #66 (split from sdata-core PR #101's review, the EAV disk-spill schema). `SORT`
 placed between `REPEAT n` and its matching `RUN` executed immediately against `Data_Table`, but
@@ -1000,3 +1006,125 @@ spellings now fail cleanly, exit 1, with the migration-hint message). HELP (`sda
 summary lines), man page, and design.md (§5.3, §5.4, §5.5, §5.7, §5.8, the command-reference table)
 all updated per the three-reference sync rule; `tests/expected/help_all.out` and
 `tests/expected/help_index.out` regenerated. `make check`: 362 → 365. Closes jlries61/sdata#63.
+
+### ADR-055: Implicit RUN instead of rejecting SORT/AGGREGATE/TRANSPOSE/STATS with a pending program
+**Date:** 2026-08-03 | **Status:** Accepted (supersedes [ADR-051](#adr-051-reject-sortaggregatetransposestats-inside-an-active-repeat-block)'s reject mechanism)
+
+**Context:** Issue #70. ADR-051 rejects `SORT`/`AGGREGATE`/`TRANSPOSE`/`STATS` outright when a
+deferred program is pending — either un-run statements queued since the last `RUN`
+(`Pending_Deferred > 0`) or an open `REPEAT n` body (`Repeat_Active`) — because they would
+otherwise silently read a table that program hasn't populated yet. User's own framing: *"This
+strikes me as more intuitive than simply making those commands fail."* Confirmed decisions from
+prior exploration (2026-07-30, embedded in the issue): the implicit `RUN` always announces itself
+with the identical `"RUN complete. N records and M variables processed."` message an explicit
+`RUN` prints; no `OPTIONS` toggle (replaces the reject outright — zero external users of that
+behavior existed); applies uniformly to all four commands; both trigger conditions consolidate
+into one shared check.
+
+**Decision — one injection point, not two.** The issue's own prior exploration assumed batch mode
+and REPL needed separate injection points (REPL supposedly having "zero visibility" into
+interpreter internals). Re-reading the current source found this premise wrong:
+`SData.Interpreter.Execute (Prog : Statement_Access)` is a single public procedure that *both*
+modes call through — REPL's `Run_REPL` (`sdata_main.adb`) dispatches every Immediate-tier statement
+that isn't `RUN`/`QUIT`/`END` through this exact same `Execute`, just with a singleton `Prog`. A new
+local procedure `Ensure_Pending_Flushed`, declared inside `Execute` (so it has access to that
+call's own `Step_Start`/`Current`), is invoked from one new `elsif` branch checking
+`Current.Kind in Stmt_SORT | Stmt_AGGREGATE | Stmt_TRANSPOSE | Stmt_STATS and then
+(Pending_Deferred > 0 or else Repeat_Active)`, placed ahead of `Execute_Statement`'s normal
+dispatch for these four kinds. `Reject_If_Repeat_Active` and the three individual
+`Pending_Deferred > 0` guards inside `Execute_Aggregate`/`Execute_Transpose`/`Execute_Stats` are
+deleted entirely (`SORT` never had one of its own).
+
+`Ensure_Pending_Flushed` still needs two flush mechanisms, since batch and REPL represent "the
+pending program" via genuinely different structures: `Active_Program_Vec` (REPL's queue,
+populated only by `Add_To_Active_Program`, which only `Run_REPL` ever calls — batch never touches
+it) vs. the `Step_Start..Current` slice of *this specific call's own* list walk (correct for batch's
+whole-file walk, but for REPL's singleton-statement calls this range is always empty, since any
+real pending statement lives in `Active_Program_Vec`, invisible to it). A batch-style flush when
+`Active_Program_Vec` is non-empty would silently skip the real pending statement — reproducing the
+exact bug this feature fixes — so the mechanism is chosen by `Active_Program_Vec.Is_Empty`: non-empty
+→ call the already-public `Run_Active_Program` (no new query needed, contrary to the prior
+exploration's assumption); empty → replicate the existing `Stmt_RUN` branch's
+`Analyze_Deferred`/`Run_One_Step` call using `Current` as the boundary (not `Current.Next`, since
+`Current` itself still needs its own `Execute_Statement` dispatch afterward). Verified
+mechanically: `Process_One_Record`'s walk (`while Iter /= null and then Iter /= Boundary loop`) and
+`Analyze_Deferred`'s guard (`if Start = null or else Start = Boundary then`) both treat
+`Start = Boundary` as empty regardless of whether the shared value is null or a real node, so
+`Run_One_Step (Current, Current)` — the empty-`REPEAT`-body case — behaves identically to
+`Run_One_Step (null, null)`: it runs `Repeat_Count` records through zero deferred statements,
+matching a from-scratch empty body. **Verified concretely, not just reasoned through**: reverted the
+`Active_Program_Vec.Is_Empty` check to `if False then` and confirmed a REPL scenario (`LET Z=99`
+typed, then `SORT Z`) broke exactly as predicted (`Z` silently never created, `SORT Z` then raised
+"undefined variable"), then restored it and confirmed the same scenario works correctly.
+
+**A second, related bug found and fixed in the same change: SAVE association.** A registered `SAVE`
+is one-shot — sdata-core's `Flush_Pending_Save` calls `Clear_Pending_Save` immediately after
+writing, so it is consumed by whichever commit point reaches it first (matches
+`tests/aggregate_save_flush.cmd`'s own pre-existing comment, "a pending SAVE is written and then
+cleared" — previously misread during investigation as evidence of a *persistent*, re-written-every-commit
+model, which is not what the code does). Without a fix, an implicit `RUN` becomes a *new* commit
+point that didn't exist under ADR-051 (these four commands previously either ran with `SAVE`
+already flushed by a prior explicit `RUN`, or were rejected before reaching one) and silently
+steals the one-shot write — confirmed empirically: `REPEAT 4 / LET X=RECNO / SAVE "f.csv" /
+AGGREGATE TOTAL=SUM(X)` (no explicit `RUN`) wrote the *pre-aggregate* per-record data to `f.csv`,
+not the aggregated `TOTAL`, and the identical pattern reproduced for `SORT` (writes the pre-sort
+order). Fixed with a small additive **sdata-core** change: `SData_Core.Commands.Execute_Commit_Step`
+gained an optional `Flush_Save : Boolean := True` parameter (default preserves existing behavior for
+every other call site) so the flush can be skipped for exactly one commit. sdata's own
+`Ensure_Pending_Flushed` sets a new package-body flag, `Suppress_Next_Save_Flush`, immediately
+before performing its flush (covers both the direct `Run_One_Step` path and the path inside
+`Run_Active_Program`'s own nested `Execute` call, since the flag is package-level and shared across
+nesting depth); `Commit_Step` consumes-and-resets it, passing `Flush_Save => False` through for that
+one commit only. This lets the *triggering command's own* existing save-flush step — `SORT`'s direct
+`Execute_Commit_Step` call, or `AGGREGATE`/`TRANSPOSE`/`STATS`'s `Commit_Reshaped_Table` (a separate,
+inline check-and-flush that does not go through `Execute_Commit_Step` at all) — be the one that
+actually consumes the one-shot `SAVE`, with the correct post-command result. No sdata-core signature
+change was needed beyond the one additive parameter; no new public `Flush_Pending_Save` exposure was
+needed either, since all four commands already had their own flush step once traced fully (an
+earlier, incomplete trace of `SORT`'s code had missed its `Execute_Commit_Step` call in
+`sdata-interpreter-execute_declarative.adb`, which is in sdata, not sdata-core — that led to a
+wrong initial assumption that `SORT` needed a new flush step added; it did not).
+
+**Rejected alternative**: unifying batch's `Step_Start` tracking onto `Active_Program_Vec`-style
+accumulation, so there is only one representation of "the pending program." Rejected as a real
+rearchitecture of how batch mode walks a script file, out of scope for this feature (the original
+exploration already recorded and rejected this; re-confirmed here).
+
+**Test plan.** Existing tests asserting the old reject behavior rewritten to assert success instead:
+`tests/repeat_sort_reject.cmd` → `tests/repeat_sort_implicit_run_undefined.cmd` (implicit RUN then
+ADR-052's undefined-variable error, since the REPEAT body is empty); `tests/repeat_aggregate_reject.cmd`
+→ `tests/repeat_aggregate_implicit_run.cmd` (implicit RUN then success, since `N()` needs no input
+column — the two together show the trigger is orthogonal to whether the triggering command then
+succeeds); `tests/aggregate_buffer_nonempty.cmd` → `tests/aggregate_pending_implicit_run.cmd`,
+`tests/stats_pending_error.cmd` → `tests/stats_pending_implicit_run.cmd`,
+`tests/transpose_buffer_nonempty.cmd` → `tests/transpose_pending_implicit_run.cmd` (the original,
+pre-#66 `Pending_Deferred`-only guards, predating `REPEAT` involvement entirely); `tests/aggregate_submit_pending.cmd`
+kept (still valid: `SUBMIT`'s save/restore of `Pending_Deferred` around its nested `Execute` call
+means the outer `LET` is still pending after the sub-script's own `RUN` returns, now triggering a
+second, correct implicit RUN before `AGGREGATE`, rather than an error). `tests/repeat_zero_aggregate_ok.cmd`
+and `tests/by_repeat_body_undefined.cmd` needed no changes (the former's assertion — no active
+`REPEAT` after `REPEAT 0`, so neither trigger fires — is still exactly correct; the latter never
+invokes any of the four commands at all). `tests/sort_by.cmd` needed no changes either (both blocks
+already place `SORT`/`BY` after an explicit `RUN`, so neither trigger condition holds). New tests:
+`tests/pending_sort_implicit_run.cmd` (the one `Pending_Deferred`-alone case not already covered —
+`SORT` never had its own individual guard before this ADR); `tests/repeat_transpose_implicit_run_empty.cmd`
+/ `tests/repeat_stats_implicit_run_empty.cmd` (`Repeat_Active`-alone for the two commands not
+covered by the renamed reject tests); `tests/repl_implicit_run_sort.cmd` (a `.repl` marker test per
+ADR-053 — the one test that actually discriminates a correct implementation from a naive one, per
+the verification described above); `tests/repeat_save_implicit_run.cmd` and
+`tests/repl_implicit_run_save.cmd` (`.repl`, covering the `Run_Active_Program` flush path
+specifically) for the SAVE-association fix, both re-loading the saved file via `USE`+`DISPLAY` so
+`make check`'s stdout-diff can verify content (this project's test harness does not diff produced
+CSV files directly).
+
+**Consequences:** Cross-crate — this is the first sdata-only feature in the #66/#67/#68/#70 lineage
+to also require an sdata-core change, once the SAVE-association bug was found. sdata-core:
+`Execute_Commit_Step` gains the additive `Flush_Save` parameter (`docs/api/reference.html`
+regenerated per sdata-core's own convention for public `.ads` changes); no version-floor bump
+needed in either consumer (additive, matches the STATS/TRANSPOSE precedent). sdata:
+`Reject_If_Repeat_Active` deleted; `Suppress_Next_Save_Flush` added; `design.md` §5.7 fully rewritten
+(implicit-RUN semantics plus the SAVE-association note); HELP (`Help_SORT`/`Help_AGGREGATE`/
+`Help_TRANSPOSE`/`Help_STATS`) and the man page updated to match, per the three-reference sync rule.
+`make check`: 365 → 371 (6 net new: `pending_sort_implicit_run`, `repeat_transpose_implicit_run_empty`,
+`repeat_stats_implicit_run_empty`, `repl_implicit_run_sort`, `repeat_save_implicit_run`,
+`repl_implicit_run_save`; the renamed reject/pending tests are not net-new). Closes jlries61/sdata#70.

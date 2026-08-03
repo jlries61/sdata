@@ -1,0 +1,6 @@
+RUN complete. 4 records and 1 variables processed.
+Dataset saved: tests/data/repeat_save_implicit_run_out.csv
+AGGREGATE complete. 1 records and 1 variables processed.
+Dataset opened: tests/data/repeat_save_implicit_run_out.csv
+REC# TOTAL 
+1 10.00000 

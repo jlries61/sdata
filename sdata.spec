@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.17.0
+Version:        0.17.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Aug 03 2026 John L. Ries <john@theyarnbard.com> - 0.17.1-1
+- Implicit RUN instead of rejecting SORT/AGGREGATE/TRANSPOSE/STATS with a pending program (issue #70, ADR-055); requires sdata-core 0.4.2.
+
 * Mon Aug 03 2026 John L. Ries <john@theyarnbard.com> - 0.17.0-1
 - Resolve REPEAT/DELETE keyword overloading: REPEAT/UNTIL loop renamed to DO/UNTIL, DELETE n[-m] line editor renamed to REMOVE n[-m] (issue #63, ADR-054, breaking change).
 

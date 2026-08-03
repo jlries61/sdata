@@ -99,6 +99,19 @@ package body SData.Interpreter is
    --  modes.
    Pending_Deferred : Natural := 0;
 
+   --  Set by Ensure_Pending_Flushed (issue #70 / ADR-055) immediately before
+   --  it performs an implicit RUN's commit, and consumed by Commit_Step
+   --  (reset to False either way). A registered SAVE is one-shot -- consumed
+   --  by whichever commit point reaches it first (Flush_Pending_Save clears
+   --  it after writing) -- so without this, an implicit RUN's own commit
+   --  would silently steal the write meant for the triggering command's
+   --  result. When True, Commit_Step passes Flush_Save => False through to
+   --  SData_Core.Commands.Execute_Commit_Step for this one commit only,
+   --  leaving the SAVE registered for the triggering command's own
+   --  save-flush (SORT's direct Execute_Commit_Step call, or
+   --  AGGREGATE/TRANSPOSE/STATS's Commit_Reshaped_Table) to pick up.
+   Suppress_Next_Save_Flush : Boolean := False;
+
    --  Program-buffer insertion cursor (REPL editing, issue #32).
    --  When Append_Mode is True, newly queued deferred statements append
    --  (default).  When False, they are inserted after line Insert_Point
@@ -126,24 +139,6 @@ package body SData.Interpreter is
          Stmt_SYSTEM | Stmt_PROGRAM_REMOVE | Stmt_OPTIONS | Stmt_AGGREGATE |
          Stmt_TRANSPOSE | Stmt_STATS | Stmt_TABLES | Stmt_PROGRAM_INSERT;
    end Is_Immediate;
-
-   --  Reject an Immediate-tier command that reads or replaces Data_Table's row
-   --  content (SORT, AGGREGATE, TRANSPOSE, STATS) while a REPEAT n data-step
-   --  body is still being queued -- i.e. before its matching RUN has populated
-   --  the table (issue #66).  Checked ahead of each command's own
-   --  Pending_Deferred guard: Repeat_Active is the more specific and, in
-   --  practice, the more common condition (a REPEAT body almost always has a
-   --  LET/SET queued ahead of the Immediate command), so its message should be
-   --  the one the user sees -- it names the actual cause rather than "pending
-   --  statements exist".
-   procedure Reject_If_Repeat_Active (Command : String) is
-   begin
-      if SData_Core.Config.Runtime.Repeat_Active then
-         raise SData_Core.Script_Error with
-           Command & ": cannot run before RUN inside a REPEAT n "
-           & "data-generation step; issue RUN or NEW first";
-      end if;
-   end Reject_If_Repeat_Active;
 
    procedure Set_Interactive (Val : Boolean) is
    begin
@@ -1363,21 +1358,15 @@ package body SData.Interpreter is
    --  SData_Core.Script_Error on any detected violation.
    procedure Analyze_One (Stmt : Statement_Access) is separate;
 
-   --  AGGREGATE (immediate).  Enforces error #10 (no pending deferred
-   --  statements), converts the AST spec vector into the core spec type, and
-   --  delegates the heavy lifting to SData_Core.Commands.Execute_AGGREGATE.
+   --  AGGREGATE (immediate).  Converts the AST spec vector into the core spec
+   --  type and delegates the heavy lifting to
+   --  SData_Core.Commands.Execute_AGGREGATE.  Issue #70 / ADR-055: a pending
+   --  program is no longer rejected here -- Execute's own loop performs an
+   --  implicit RUN before dispatching to this procedure at all, so by the
+   --  time we get here there is nothing pending.
    procedure Execute_Aggregate (Stmt : Statement_Access) is
       Core_Specs : SData_Core.Commands.Aggregate_Spec_Vectors.Vector;
    begin
-      --  #10 — there must be no pending (un-run) deferred statements.  A
-      --  data-step program that has already been run may remain resident
-      --  (RUN does not clear it); only statements queued since the last RUN
-      --  block AGGREGATE, since those would otherwise be silently dropped.
-      if Pending_Deferred > 0 then
-         raise SData_Core.Script_Error with
-           "AGGREGATE: pending program statements exist; issue RUN or NEW first";
-      end if;
-
       for I in Stmt.Agg_List.First_Index .. Stmt.Agg_List.Last_Index loop
          declare
             A : constant SData.AST.Aggregate_Spec_Access := Stmt.Agg_List (I);
@@ -1414,19 +1403,13 @@ package body SData.Interpreter is
       end;
    end Execute_Aggregate;
 
-   --  TRANSPOSE (immediate).  Enforces error #12 (no pending deferred
-   --  statements), converts the AST fields into the core Transpose_Options
-   --  type, and delegates the heavy lifting to
-   --  SData_Core.Commands.Execute_TRANSPOSE.
+   --  TRANSPOSE (immediate).  Converts the AST fields into the core
+   --  Transpose_Options type and delegates the heavy lifting to
+   --  SData_Core.Commands.Execute_TRANSPOSE.  Issue #70 / ADR-055: a pending
+   --  program is no longer rejected here -- see Execute_Aggregate's comment.
    procedure Execute_Transpose (Stmt : Statement_Access) is
       Opts : SData_Core.Commands.Transpose_Options;
    begin
-      --  #12 — there must be no pending (un-run) deferred statements.
-      if Pending_Deferred > 0 then
-         raise SData_Core.Script_Error with
-           "TRANSPOSE: pending program statements exist; issue RUN or NEW first";
-      end if;
-
       --  Convert Keep_Vars Variable_List → Keep_List Name_Vectors.Vector.
       declare
          Curr : Variable_List := Stmt.Keep_Vars;
@@ -1472,17 +1455,14 @@ package body SData.Interpreter is
       end;
    end Execute_Transpose;
 
-   --  STATS (immediate).  Enforces the pending-deferred guard, converts the
-   --  AST lists into the core Stats_Options, delegates to
-   --  SData_Core.Commands.Execute_STATS, then prints the result table via the
-   --  DISPLAY renderer unless /NOPRINT was given.
+   --  STATS (immediate).  Converts the AST lists into the core Stats_Options,
+   --  delegates to SData_Core.Commands.Execute_STATS, then prints the result
+   --  table via the DISPLAY renderer unless /NOPRINT was given.  Issue #70 /
+   --  ADR-055: a pending program is no longer rejected here -- see
+   --  Execute_Aggregate's comment.
    procedure Execute_Stats (Stmt : Statement_Access) is
       Opts : SData_Core.Commands.Stats_Options;
    begin
-      if Pending_Deferred > 0 then
-         raise SData_Core.Script_Error with
-           "STATS: pending program statements exist; issue RUN or NEW first";
-      end if;
 
       declare
          Curr : Variable_List := Stmt.Stats_Vars;
@@ -1628,18 +1608,14 @@ package body SData.Interpreter is
          when Stmt_PROGRAM_INSERT =>
             Execute_Program_Insert (Stmt);
          when Stmt_AGGREGATE =>
-            Reject_If_Repeat_Active ("AGGREGATE");
             Execute_Aggregate (Stmt);
          when Stmt_TRANSPOSE =>
-            Reject_If_Repeat_Active ("TRANSPOSE");
             Execute_Transpose (Stmt);
          when Stmt_STATS =>
-            Reject_If_Repeat_Active ("STATS");
             Execute_Stats (Stmt);
          when Stmt_TABLES =>
             Execute_Tables (Stmt);
          when Stmt_SORT =>
-            Reject_If_Repeat_Active ("SORT");
             Execute_Declarative (Stmt);
          when Stmt_USE | Stmt_SAVE | Stmt_BY | Stmt_REPEAT
             | Stmt_SELECT_FILTER | Stmt_DIGITS | Stmt_RSEED | Stmt_NEW
@@ -1758,8 +1734,14 @@ package body SData.Interpreter is
       Apply_Pending_Mods;
       --  Delegate the end-of-step shared work (filter rebuild against the
       --  newly committed table, plus pending-SAVE flush) to sdata-core so
-      --  the same semantics are available to other front ends.
-      SData_Core.Commands.Execute_Commit_Step;
+      --  the same semantics are available to other front ends. Issue #70 /
+      --  ADR-055: an implicit RUN suppresses this one commit's SAVE flush
+      --  (Suppress_Next_Save_Flush, set by Ensure_Pending_Flushed) so the
+      --  one-shot pending SAVE survives for the triggering command's own
+      --  save-flush instead of being consumed here.
+      SData_Core.Commands.Execute_Commit_Step
+        (Flush_Save => not Suppress_Next_Save_Flush);
+      Suppress_Next_Save_Flush := False;
 
       --  Multi-target SAVE flush (Follow-on C): per-record routing.
       --  Each target's buffer was filled during the data step by
@@ -1950,6 +1932,66 @@ package body SData.Interpreter is
    procedure Execute (Prog : Statement_Access) is
       Step_Start : Statement_Access := Prog;
       Current    : Statement_Access;
+
+      --  Prints the same "RUN complete. N records and M variables processed."
+      --  message an explicit RUN prints, shared by the Stmt_RUN branch below
+      --  and Ensure_Pending_Flushed (issue #70 / ADR-055) so the two stay
+      --  byte-identical.
+      procedure Print_Run_Complete is
+         RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
+         VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
+      begin
+         Debug_Trace ("RUN complete: "
+                      & RC (RC'First + 1 .. RC'Last)
+                      & " records, "
+                      & VC (VC'First + 1 .. VC'Last)
+                      & " variables", 1);
+         if not SData_Core.Config.Quiet_Mode then
+            Put_Line ("RUN complete. " &
+                      RC (RC'First + 1 .. RC'Last) & " records and " &
+                      VC (VC'First + 1 .. VC'Last) & " variables processed.");
+         end if;
+      end Print_Run_Complete;
+
+      --  Issue #70 / ADR-055: SORT/AGGREGATE/TRANSPOSE/STATS used to reject
+      --  outright (ADR-051) when a program was pending (Pending_Deferred > 0)
+      --  or a REPEAT n body was still open (Repeat_Active). They now perform
+      --  the equivalent of RUN first -- announcing itself exactly like an
+      --  explicit RUN -- then proceed with the original command. Batch mode
+      --  and REPL represent "the pending program" via two different
+      --  mechanisms: Active_Program_Vec (REPL, populated only by
+      --  Add_To_Active_Program -- batch never touches it) vs. the
+      --  Step_Start..Current slice of THIS call's own list walk (batch's
+      --  whole-file walk, and also REPL's own singleton-statement calls into
+      --  this same Execute, since Run_REPL dispatches Immediate-tier
+      --  statements through it too). The trigger condition is already
+      --  unified (Pending_Deferred is incremented by both mechanisms), but
+      --  the flush action is not: a batch-style flush of an empty
+      --  (Step_Start = Current) slice would silently skip real pending REPL
+      --  statements sitting in Active_Program_Vec, so which flush runs must
+      --  be chosen by Active_Program_Vec.Is_Empty, not assumed.
+      procedure Ensure_Pending_Flushed is
+      begin
+         --  Issue #70 / ADR-055: a registered SAVE is one-shot (consumed by
+         --  whichever commit reaches it first), so this implicit RUN must not
+         --  steal the write meant for the triggering command's own result --
+         --  Commit_Step consumes this flag on the very next commit, whichever
+         --  path below reaches it (the direct Run_One_Step call, or the one
+         --  inside Run_Active_Program's own nested Execute call).
+         Suppress_Next_Save_Flush := True;
+         if not Active_Program_Vec.Is_Empty then
+            Run_Active_Program;
+         else
+            Analyze_Deferred (Step_Start, Current);
+            Run_One_Step (Step_Start, Current);
+            Print_Run_Complete;
+            Pending_Deferred := 0;
+         end if;
+         --  Current (the triggering command) still needs its own
+         --  Execute_Statement dispatch by the caller below -- unlike the
+         --  Stmt_RUN branch, do not advance Step_Start past Current.
+         Step_Start := Current;
+      end Ensure_Pending_Flushed;
    begin
       if Prog = null then
          Run_One_Step (null, null);
@@ -1965,21 +2007,7 @@ package body SData.Interpreter is
             --  before any record is processed.
             Analyze_Deferred (Step_Start, Current);
             Run_One_Step (Step_Start, Current);
-            declare
-               RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
-               VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
-            begin
-               Debug_Trace ("RUN complete: "
-                            & RC (RC'First + 1 .. RC'Last)
-                            & " records, "
-                            & VC (VC'First + 1 .. VC'Last)
-                            & " variables", 1);
-               if not SData_Core.Config.Quiet_Mode then
-                  Put_Line ("RUN complete. " &
-                            RC (RC'First + 1 .. RC'Last) & " records and " &
-                            VC (VC'First + 1 .. VC'Last) & " variables processed.");
-               end if;
-            end;
+            Print_Run_Complete;
             --  Deferred body just ran; nothing pending until more is queued.
             Pending_Deferred := 0;
             Step_Start := Current.Next;
@@ -1990,6 +2018,12 @@ package body SData.Interpreter is
             and then Current.Kind /= Stmt_DELETE  and then Current.Kind /= Stmt_WRITE
             and then Current.Kind /= Stmt_DIM     and then Current.Kind /= Stmt_BREAK
          then
+            if Current.Kind in Stmt_SORT | Stmt_AGGREGATE | Stmt_TRANSPOSE | Stmt_STATS
+               and then (Pending_Deferred > 0
+                         or else SData_Core.Config.Runtime.Repeat_Active)
+            then
+               Ensure_Pending_Flushed;
+            end if;
             declare
                Outer_Ctx : Step_Context;
             begin
