@@ -411,7 +411,13 @@ package body SData.Lexer is
             case C is
                when '+' => T.Kind := Token_Plus; Advance (Ctx);
                when '-' => T.Kind := Token_Minus; Advance (Ctx);
-               when '*' => T.Kind := Token_Star; Advance (Ctx);
+               when '*' =>
+                  Advance (Ctx);
+                  if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '*' then
+                     T.Kind := Token_Caret; Advance (Ctx);
+                  else
+                     T.Kind := Token_Star;
+                  end if;
                when '/' => T.Kind := Token_Slash; Advance (Ctx);
                when '^' => T.Kind := Token_Caret; Advance (Ctx);
                when '=' => T.Kind := Token_Equal; Advance (Ctx);

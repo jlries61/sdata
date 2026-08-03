@@ -236,19 +236,19 @@ is itself a finding (see Hard Truth).
 
 | Suite | Count |
 |---|---|
-| Integration `.cmd` | **356** |
+| Integration `.cmd` | **357** |
 | `csv_unit_test` | 71 |
 | `sdata_unit_test` (Table/Variables/PDV/transient/merge) | 362 |
-| `evaluator_unit_test` | 224 |
+| `evaluator_unit_test` | 225 |
 | `file_io_unit_test` | 104 |
 | `interpreter_unit_test` | 101 |
-| **Unit total** | **862** |
+| **Unit total** | **863** |
 
 Counts synced 2026-07-30 from `make check` (the source of truth), alongside the
-EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 356
+EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 357
 integration tests + a fuzz-corpus regression on push and PR. data-vandal
-carries its own 145 integration tests (run manually / its own CI); sdata-core
-carries 368 in-crate assertions across 9 drivers.
+carries its own 147 integration tests (run manually / its own CI); sdata-core
+carries 369 in-crate assertions across 9 drivers.
 
 **Gap — RESOLVED 2026-06-09 (remediation #3, sdata-core PR #31).**
 `sdata_core-statistics.adb` (775 lines, ~54 distribution/IDF/RNG functions) had

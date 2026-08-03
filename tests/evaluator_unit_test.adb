@@ -704,6 +704,9 @@ begin
    --  EV-08: Integer ^ integer always yields Val_Numeric
    Check_Num ("EV-08: 2 ^ 3 = 8.0 (Val_Numeric)", Eval ("2 ^ 3"), 8.0);
 
+   --  EV-08b: ** is an accepted spelling of exponentiation too (issue #65)
+   Check_Num ("EV-08b: 2 ** 3 = 8.0 (Val_Numeric)", Eval ("2 ** 3"), 8.0);
+
    --  EV-09: Real operand promotes result to Val_Numeric
    Check_Num ("EV-09: 1.5 + 0.5 = 2.0 (Val_Numeric)", Eval ("1.5 + 0.5"), 2.0);
 

@@ -1,0 +1,16 @@
+RUN complete. 4 records and 3 variables processed.
+1.00000 1.00000 1.00000
+2.00000 4.00000 4.00000
+3.00000 9.00000 9.00000
+4.00000 16.00000 16.00000
+RUN complete. 4 records and 3 variables processed.
+RUN complete. 4 records and 1 variables processed.
+RUN complete. 2 records and 1 variables processed.
+SEL-CARET: 3.00000
+SEL-CARET: 4.00000
+RUN complete. 2 records and 1 variables processed.
+RUN complete. 4 records and 1 variables processed.
+RUN complete. 2 records and 1 variables processed.
+SEL-STARSTAR: 3.00000
+SEL-STARSTAR: 4.00000
+RUN complete. 2 records and 1 variables processed.

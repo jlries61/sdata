@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.16.6
+Version:        0.16.7
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Aug 03 2026 John L. Ries <john@theyarnbard.com> - 0.16.7-1
+- Accept ^ and ** as interchangeable exponentiation spellings everywhere (issue #65).
+
 * Thu Jul 30 2026 John L. Ries <john@theyarnbard.com> - 0.16.6-1
 - Add Stmt_TABLES to Is_Immediate; REPL was silently dropping TABLES (issue #68)
 

@@ -1,3 +1,9 @@
+sdata (0.16.7-1) unstable; urgency=medium
+
+  * Accept ^ and ** as interchangeable exponentiation spellings everywhere (issue #65).
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 03 Aug 2026 09:24:45 -0700
+
 sdata (0.16.6-1) unstable; urgency=medium
 
   * Add Stmt_TABLES to Is_Immediate; REPL was silently dropping TABLES (issue #68)
