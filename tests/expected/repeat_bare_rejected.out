@@ -1,0 +1,1 @@
+Error: REPEAT requires a record count (e.g. REPEAT 10); for a REPEAT/UNTIL-style loop, use DO/UNTIL instead

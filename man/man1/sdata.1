@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-08-03" "sdata 0.16.8" "User Commands"
+.TH SDATA 1 "2026-08-03" "sdata 0.17.0" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -865,7 +865,7 @@ Respects any active
 .B SELECT
 filter.
 .TP
-.BR "DELETE " \fIn\fR [ \fB\-\fIm\fR ]
+.BR "REMOVE " \fIn\fR [ \fB\-\fIm\fR ]
 Remove program buffer entries
 .I n
 through
@@ -876,6 +876,11 @@ Omitting
 removes only entry
 .IR n .
 Only meaningful in interactive mode.
+(Renamed from
+.BR "DELETE " \fIn\fR [ \fB\-\fIm\fR ]
+by issue #63 to resolve the keyword overload with the
+.B DELETE
+record-delete statement.)
 .TP
 .BR "INSERT " [ \fIn\fR | \fB$\fR ]
 Set the program\-buffer insertion point.
@@ -1019,16 +1024,25 @@ Counter\-controlled loop.
 .B WHILE \fIcond\fR ... WEND
 Condition\-controlled loop.
 .TP
-.B REPEAT ... UNTIL \fIcond\fR
+.B DO ... UNTIL \fIcond\fR
 Post\-test loop.
+(Renamed from
+.B REPEAT ... UNTIL
+by issue #63 to resolve the keyword overload with
+.BR "REPEAT n" .)
 .TP
 .B DELETE
 Discard the current record; no output is written for it.
 See
-.B "DELETE n[-m]"
+.B "REMOVE n[-m]"
 under
 .I "Immediate commands"
-for program\-buffer deletion.
+for program\-buffer deletion
+(renamed from
+.B "DELETE n[-m]"
+by issue #63 to resolve the keyword overload with this
+.B DELETE
+statement).
 .TP
 .B BREAK
 Pauses execution and enters the interactive debug inspection prompt (see
@@ -1524,7 +1538,7 @@ BW BASIC (Bywater BASIC), but the two systems differ in fundamental ways.
 programs have no line numbers.
 .B LIST
 displays program\-buffer entries by sequential index (1, 2, 3, \&...).
-.B DELETE\ n[\-m]
+.B REMOVE\ n[\-m]
 removes entries by index, not by BASIC line number.
 .TP
 .B No GOTO / GOSUB
@@ -1533,7 +1547,7 @@ Control flow is provided by
 .BR IF / THEN / ELSE ,
 .BR FOR / NEXT ,
 .BR WHILE / WEND ,
-.BR REPEAT ,
+.BR DO / UNTIL ,
 and
 .BR SELECT\ CASE .
 .TP

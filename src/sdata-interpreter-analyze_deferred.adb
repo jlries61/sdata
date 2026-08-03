@@ -69,8 +69,8 @@ procedure Analyze_Deferred (Start, Boundary : Statement_Access) is
             Walk_Body (Stmt.Else_Branch);
          when Stmt_WHILE =>
             Walk_Body (Stmt.While_Body);
-         when Stmt_LOOP_REPEAT =>
-            Walk_Body (Stmt.Repeat_Body);
+         when Stmt_LOOP_DO =>
+            Walk_Body (Stmt.Do_Body);
          when Stmt_SELECT =>
             declare
                Br : Case_Branch := Stmt.Branches;

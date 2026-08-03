@@ -165,7 +165,8 @@ package SData.AST is
       Stmt_FOR,    -- Loop
       Stmt_WHILE,  -- Loop
       Stmt_REPEAT, -- Loop (Data Step creation)
-      Stmt_LOOP_REPEAT, -- REPEAT/UNTIL loop
+      Stmt_LOOP_DO, -- DO/UNTIL loop (issue #63: renamed from REPEAT/UNTIL to
+                    -- resolve the keyword overload with Stmt_REPEAT, ADR-054)
       Stmt_END,    -- Terminate program
       Stmt_QUIT,   -- Terminate program
       Stmt_NAMES,  -- List column names
@@ -191,7 +192,9 @@ package SData.AST is
       Stmt_HELP,   -- Display help
       Stmt_RUN,            -- Execute and export
       Stmt_NEW,            -- Reset environment
-      Stmt_PROGRAM_DELETE, -- Delete line(s) from program buffer (immediate)
+      Stmt_PROGRAM_REMOVE, -- Delete line(s) from program buffer (immediate;
+                           -- issue #63: renamed from DELETE to resolve the
+                           -- keyword overload with Stmt_DELETE, ADR-054)
       Stmt_DISPLAY,        -- Display Data Table rows (immediate)
       Stmt_OPTIONS,        -- Set runtime option (OPTIONS key value)
       Stmt_AGGREGATE,      -- Collapse table to one row per BY group (immediate)
@@ -280,8 +283,8 @@ package SData.AST is
          when Stmt_WHILE =>
             While_Cond   : Expression_Access;
             While_Body   : Statement_Access;
-         when Stmt_LOOP_REPEAT =>
-            Repeat_Body  : Statement_Access;
+         when Stmt_LOOP_DO =>
+            Do_Body  : Statement_Access;
             Until_Cond   : Expression_Access;
          when Stmt_RSEED =>
             Seed_Expr    : Expression_Access;
@@ -295,9 +298,9 @@ package SData.AST is
             Echo_State : Boolean;
          when Stmt_DIGITS =>
             Digits_Count   : Natural;
-         when Stmt_PROGRAM_DELETE =>
-            Delete_From : Positive := 1;
-            Delete_To   : Positive := 1;
+         when Stmt_PROGRAM_REMOVE =>
+            Remove_From : Positive := 1;
+            Remove_To   : Positive := 1;
          when Stmt_OPTIONS =>
             Options_Key     : String (1 .. Max_Name_Len);
             Options_Key_Len : Natural := 0;

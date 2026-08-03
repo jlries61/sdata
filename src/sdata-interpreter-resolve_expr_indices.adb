@@ -67,8 +67,8 @@ procedure Resolve_Expr_Indices (Start, Boundary : Statement_Access) is
          when Stmt_WHILE =>
             Resolve_Expr (S.While_Cond);
             Resolve_Stmt_List (S.While_Body, null);
-         when Stmt_LOOP_REPEAT =>
-            Resolve_Stmt_List (S.Repeat_Body, null);
+         when Stmt_LOOP_DO =>
+            Resolve_Stmt_List (S.Do_Body, null);
             Resolve_Expr (S.Until_Cond);
          when Stmt_SELECT =>
             Resolve_Expr (S.Selector);

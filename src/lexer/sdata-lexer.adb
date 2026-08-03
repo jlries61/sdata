@@ -274,6 +274,7 @@ package body SData.Lexer is
                elsif Upper = "WHILE" then T.Kind := Token_WHILE;
                elsif Upper = "WEND" then T.Kind := Token_WEND;
                elsif Upper = "REPEAT" then T.Kind := Token_REPEAT;
+               elsif Upper = "DO" then T.Kind := Token_DO;
                elsif Upper = "UNTIL" then T.Kind := Token_UNTIL;
                elsif Upper = "SELECT" then T.Kind := Token_SELECT;
                elsif Upper = "CASE" then T.Kind := Token_CASE;
@@ -298,6 +299,7 @@ package body SData.Lexer is
                elsif Upper = "SORT" then T.Kind := Token_SORT;
                elsif Upper = "RENAME" then T.Kind := Token_RENAME;
                elsif Upper = "DELETE" then T.Kind := Token_DELETE;
+               elsif Upper = "REMOVE" then T.Kind := Token_REMOVE;
                elsif Upper = "RSEED" then T.Kind := Token_RSEED;
                elsif Upper = "NOT" then T.Kind := Token_NOT;
                elsif Upper = "AND" then T.Kind := Token_AND;

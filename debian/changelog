@@ -1,3 +1,9 @@
+sdata (0.17.0-1) unstable; urgency=medium
+
+  * Resolve REPEAT/DELETE keyword overloading: REPEAT/UNTIL loop renamed to DO/UNTIL, DELETE n[-m] line editor renamed to REMOVE n[-m] (issue #63, ADR-054, breaking change).
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 03 Aug 2026 11:11:44 -0700
+
 sdata (0.16.8-1) unstable; urgency=medium
 
   * Add REPL integration test coverage via a Makefile .repl marker convention (issue #69, ADR-053).

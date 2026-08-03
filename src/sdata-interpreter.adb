@@ -123,7 +123,7 @@ package body SData.Interpreter is
          Stmt_HOLD | Stmt_UNHOLD | Stmt_ARRAY | Stmt_DIM | Stmt_REPEAT | Stmt_NEW |
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
-         Stmt_SYSTEM | Stmt_PROGRAM_DELETE | Stmt_OPTIONS | Stmt_AGGREGATE |
+         Stmt_SYSTEM | Stmt_PROGRAM_REMOVE | Stmt_OPTIONS | Stmt_AGGREGATE |
          Stmt_TRANSPOSE | Stmt_STATS | Stmt_TABLES | Stmt_PROGRAM_INSERT;
    end Is_Immediate;
 
@@ -165,7 +165,7 @@ package body SData.Interpreter is
    procedure Execute_Print        (Stmt : Statement_Access);
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context);
    procedure Execute_Metadata        (Stmt : Statement_Access);
-   procedure Execute_Program_Delete  (Stmt : Statement_Access);
+   procedure Execute_Program_Remove  (Stmt : Statement_Access);
    procedure Execute_Program_Insert  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access);
@@ -721,8 +721,8 @@ package body SData.Interpreter is
                if Has_Output_Statement (Curr.For_Body) then return True; end if;
             when Stmt_WHILE =>
                if Has_Output_Statement (Curr.While_Body) then return True; end if;
-            when Stmt_LOOP_REPEAT =>
-               if Has_Output_Statement (Curr.Repeat_Body) then return True; end if;
+            when Stmt_LOOP_DO =>
+               if Has_Output_Statement (Curr.Do_Body) then return True; end if;
             when Stmt_SELECT =>
                declare
                   Branch : Case_Branch := Curr.Branches;
@@ -858,11 +858,11 @@ package body SData.Interpreter is
    --  KEEP / DROP / HOLD / UNHOLD / UNSET / RENAME / ARRAY / DIM / NAMES.
    procedure Execute_Metadata (Stmt : Statement_Access) is separate;
 
-   --  Execute_Program_Delete — removes entries From..To (1-based) from the
+   --  Execute_Program_Remove — removes entries From..To (1-based) from the
    --  program buffer vector.
-   procedure Execute_Program_Delete (Stmt : Statement_Access) is
-      From : constant Positive := Stmt.Delete_From;
-      To   : constant Positive := Stmt.Delete_To;
+   procedure Execute_Program_Remove (Stmt : Statement_Access) is
+      From : constant Positive := Stmt.Remove_From;
+      To   : constant Positive := Stmt.Remove_To;
       Last : constant Natural  := Natural (Active_Program_Vec.Length);
    begin
       if Last = 0 then
@@ -906,7 +906,7 @@ package body SData.Interpreter is
             end if;
          end;
       end if;
-   end Execute_Program_Delete;
+   end Execute_Program_Remove;
 
    --  Execute_Program_Insert — set the program-buffer insertion cursor.
    --  $/bare INSERT -> append mode.  INSERT n -> after line n (0 = start);
@@ -1292,8 +1292,8 @@ package body SData.Interpreter is
          when Stmt_WHILE =>
             Check_Expr (S.While_Cond, Check_Undefined);
             Check_Body (S.While_Body, Check_Undefined);
-         when Stmt_LOOP_REPEAT =>
-            Check_Body (S.Repeat_Body, Check_Undefined);
+         when Stmt_LOOP_DO =>
+            Check_Body (S.Do_Body, Check_Undefined);
             Check_Expr (S.Until_Cond,  Check_Undefined);
          when Stmt_RSEED =>
             Check_Expr (S.Seed_Expr, Check_Undefined);
@@ -1618,13 +1618,13 @@ package body SData.Interpreter is
             Execute_Assignment (Stmt);
          when Stmt_PRINT =>
             Execute_Print (Stmt);
-         when Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT =>
+         when Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_DO | Stmt_SELECT =>
             Execute_Control_Flow (Stmt, Ctx);
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET
             | Stmt_RENAME | Stmt_ARRAY | Stmt_DIM | Stmt_NAMES | Stmt_LIST | Stmt_DISPLAY =>
             Execute_Metadata (Stmt);
-         when Stmt_PROGRAM_DELETE =>
-            Execute_Program_Delete (Stmt);
+         when Stmt_PROGRAM_REMOVE =>
+            Execute_Program_Remove (Stmt);
          when Stmt_PROGRAM_INSERT =>
             Execute_Program_Insert (Stmt);
          when Stmt_AGGREGATE =>
@@ -1986,7 +1986,7 @@ package body SData.Interpreter is
          elsif Current.Kind /= Stmt_LET and then Current.Kind /= Stmt_SET
             and then Current.Kind /= Stmt_PRINT  and then Current.Kind /= Stmt_IF
             and then Current.Kind /= Stmt_FOR     and then Current.Kind /= Stmt_WHILE
-            and then Current.Kind /= Stmt_LOOP_REPEAT and then Current.Kind /= Stmt_SELECT
+            and then Current.Kind /= Stmt_LOOP_DO and then Current.Kind /= Stmt_SELECT
             and then Current.Kind /= Stmt_DELETE  and then Current.Kind /= Stmt_WRITE
             and then Current.Kind /= Stmt_DIM     and then Current.Kind /= Stmt_BREAK
          then

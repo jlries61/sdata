@@ -14,10 +14,10 @@ package body SData.Help is
    procedure Help_Index is
    begin
       Put_Line ("Available Commands:");
-      Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, INSERT, DISPLAY");
+      Put_Line ("  Data:        USE, SAVE, RUN, NEW, NAMES, WRITE, DELETE, INSERT, REMOVE, DISPLAY");
       Put_Line ("  Variables:   LET, SET, UNSET, HOLD, UNHOLD, KEEP, DROP, RENAME");
       Put_Line ("  Arrays:      ARRAY, DIM");
-      Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, REPEAT, BREAK");
+      Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, DO/UNTIL, BREAK");
       Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, TRANSPOSE, STATS, REPEAT");
       Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
       Put_Line ("  Files/paths: FPATH");
@@ -343,7 +343,7 @@ package body SData.Help is
       Put_Line ("Displays the numbered contents of the program buffer (deferred statements");
       Put_Line ("queued for the next RUN).  If the buffer is empty, reports that fact.");
       Put_Line ("See also: DISPLAY to show Data Table records.");
-      Put_Line ("          DELETE n[-m] to remove program buffer entries.");
+      Put_Line ("          REMOVE n[-m] to remove program buffer entries.");
       Put_Line ("          INSERT [n|$] to set where new statements are inserted.");
    end Help_LIST;
 
@@ -368,14 +368,24 @@ package body SData.Help is
    procedure Help_DELETE is
    begin
       Put_Line ("Command: DELETE");
-      Put_Line ("Two forms:");
-      Put_Line ("  DELETE           Discard the current record; no output is produced for it.");
-      Put_Line ("                   Execution: Deferred -- executed per record in the data step.");
-      Put_Line ("  DELETE n[-m]     Remove program buffer entries n through m (1-based).");
-      Put_Line ("                   A single number removes one entry; n-m removes a range.");
-      Put_Line ("                   Execution: Immediate -- takes effect at once.");
-      Put_Line ("                   Only meaningful in interactive (REPL) mode.");
+      Put_Line ("Discard the current record; no output is produced for it.");
+      Put_Line ("Execution: Deferred -- executed per record in the data step.");
+      Put_Line ("To remove program buffer entries, see REMOVE n[-m] instead --");
+      Put_Line ("DELETE and REMOVE used to share this keyword (DELETE n[-m]) until");
+      Put_Line ("issue #63 / ADR-054 split them to resolve the resulting ambiguity.");
    end Help_DELETE;
+
+   procedure Help_REMOVE is
+   begin
+      Put_Line ("Command: REMOVE n[-m]");
+      Put_Line ("Remove program buffer entries n through m (1-based).");
+      Put_Line ("A single number removes one entry; n-m removes a range.");
+      Put_Line ("Execution: Immediate -- takes effect at once.");
+      Put_Line ("Only meaningful in interactive (REPL) mode.");
+      Put_Line ("(Renamed from DELETE n[-m] by issue #63 / ADR-054, to resolve the");
+      Put_Line ("keyword overload with the DELETE record-delete statement above.)");
+      Put_Line ("See also: LIST, INSERT.");
+   end Help_REMOVE;
 
    procedure Help_INSERT is
    begin
@@ -391,7 +401,7 @@ package body SData.Help is
       Put_Line ("are inserted.  NEW or another INSERT resets it.  n past the end");
       Put_Line ("warns and clamps to the end; a negative n is rejected (no-op).");
       Put_Line ("Only meaningful in interactive (REPL) mode.");
-      Put_Line ("See LIST (shows the marker) and DELETE.");
+      Put_Line ("See LIST (shows the marker) and REMOVE.");
    end Help_INSERT;
 
    procedure Help_BREAK is
@@ -580,17 +590,24 @@ package body SData.Help is
       Put_Line ("SORT, AGGREGATE, TRANSPOSE, and STATS are rejected between REPEAT n and");
       Put_Line ("its matching RUN -- the table being generated does not exist yet.");
       Put_Line ("Execution: Declarative -- the n-record mode is active for the next RUN.");
-      New_Line;
-      Put_Line ("Command (loop): REPEAT ... UNTIL condition");
+      Put_Line ("For the REPEAT/UNTIL post-test loop, see HELP DO -- issue #63 / ADR-054");
+      Put_Line ("renamed it to DO/UNTIL to resolve the ambiguity with REPEAT n above.");
+   end Help_REPEAT;
+
+   procedure Help_DO is
+   begin
+      Put_Line ("Command (loop): DO ... UNTIL condition");
       Put_Line ("Post-test loop; always executes the body at least once.");
       Put_Line ("Example:");
       Put_Line ("  SET I = 1");
-      Put_Line ("  REPEAT");
+      Put_Line ("  DO");
       Put_Line ("    PRINT I");
       Put_Line ("    SET I = I + 1");
       Put_Line ("  UNTIL I > 10");
       Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
-   end Help_REPEAT;
+      Put_Line ("(Renamed from REPEAT/UNTIL by issue #63 / ADR-054, to resolve the");
+      Put_Line ("keyword overload with the REPEAT n data-step command; see HELP REPEAT.)");
+   end Help_DO;
 
    procedure Help_OUTPUT is
    begin
@@ -695,11 +712,11 @@ package body SData.Help is
       Put_Line ("  Immediate -- execute at once, outside any data step.");
       Put_Line ("    Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET, RENAME,");
       Put_Line ("              SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,");
-      Put_Line ("              DELETE n[-m], INSERT [n|$], QUIT, END");
+      Put_Line ("              REMOVE n[-m], INSERT [n|$], QUIT, END");
       New_Line;
       Put_Line ("  Deferred -- queued between RUN markers; executed once per");
       Put_Line ("    record during the data step.");
-      Put_Line ("    Commands: LET, SET, PRINT, IF, FOR, WHILE, REPEAT/UNTIL,");
+      Put_Line ("    Commands: LET, SET, PRINT, IF, FOR, WHILE, DO/UNTIL,");
       Put_Line ("              SELECT/CASE, DELETE, WRITE, HOLD, UNHOLD,");
       Put_Line ("              ARRAY, DIM, BREAK");
       New_Line;
@@ -1313,6 +1330,7 @@ package body SData.Help is
    K_DISPLAY      : aliased constant String := "DISPLAY";
    K_NAMES        : aliased constant String := "NAMES";
    K_DELETE       : aliased constant String := "DELETE";
+   K_REMOVE       : aliased constant String := "REMOVE";
    K_INSERT       : aliased constant String := "INSERT";
    K_HOLD         : aliased constant String := "HOLD";
    K_UNHOLD       : aliased constant String := "UNHOLD";
@@ -1325,6 +1343,7 @@ package body SData.Help is
    K_FOR          : aliased constant String := "FOR";
    K_WHILE        : aliased constant String := "WHILE";
    K_REPEAT       : aliased constant String := "REPEAT";
+   K_DO           : aliased constant String := "DO";
    K_OUTPUT       : aliased constant String := "OUTPUT";
    K_ECHO         : aliased constant String := "ECHO";
    K_DIGITS       : aliased constant String := "DIGITS";
@@ -1531,6 +1550,7 @@ package body SData.Help is
       (K_DISPLAY'Access,  Help_DISPLAY'Access,  C, N),
       (K_NAMES'Access,    Help_NAMES'Access,    C, N),
       (K_DELETE'Access,   Help_DELETE'Access,   C, N),
+      (K_REMOVE'Access,   Help_REMOVE'Access,   C, N),
       (K_INSERT'Access,   Help_INSERT'Access,   C, N),
       (K_BREAK'Access,    Help_BREAK'Access,    C, N),
       (K_HOLD'Access,     Help_HOLD'Access,     C, N),
@@ -1544,6 +1564,7 @@ package body SData.Help is
       (K_FOR'Access,      Help_FOR'Access,      C, N),
       (K_WHILE'Access,    Help_WHILE'Access,    C, N),
       (K_REPEAT'Access,   Help_REPEAT'Access,   C, N),
+      (K_DO'Access,       Help_DO'Access,       C, N),
       (K_OUTPUT'Access,   Help_OUTPUT'Access,   C, N),
       (K_ECHO'Access,     Help_ECHO'Access,     C, N),
       (K_DIGITS'Access,   Help_DIGITS'Access,   C, N),

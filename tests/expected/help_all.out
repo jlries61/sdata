@@ -221,7 +221,7 @@ Execution: Immediate
 Displays the numbered contents of the program buffer (deferred statements
 queued for the next RUN).  If the buffer is empty, reports that fact.
 See also: DISPLAY to show Data Table records.
-          DELETE n[-m] to remove program buffer entries.
+          REMOVE n[-m] to remove program buffer entries.
           INSERT [n|$] to set where new statements are inserted.
 
 Command: DISPLAY [variable(s)]
@@ -237,13 +237,20 @@ Lists currently defined permanent and temporary variables.
 Execution: Immediate -- takes effect at once.
 
 Command: DELETE
-Two forms:
-  DELETE           Discard the current record; no output is produced for it.
-                   Execution: Deferred -- executed per record in the data step.
-  DELETE n[-m]     Remove program buffer entries n through m (1-based).
-                   A single number removes one entry; n-m removes a range.
-                   Execution: Immediate -- takes effect at once.
-                   Only meaningful in interactive (REPL) mode.
+Discard the current record; no output is produced for it.
+Execution: Deferred -- executed per record in the data step.
+To remove program buffer entries, see REMOVE n[-m] instead --
+DELETE and REMOVE used to share this keyword (DELETE n[-m]) until
+issue #63 / ADR-054 split them to resolve the resulting ambiguity.
+
+Command: REMOVE n[-m]
+Remove program buffer entries n through m (1-based).
+A single number removes one entry; n-m removes a range.
+Execution: Immediate -- takes effect at once.
+Only meaningful in interactive (REPL) mode.
+(Renamed from DELETE n[-m] by issue #63 / ADR-054, to resolve the
+keyword overload with the DELETE record-delete statement above.)
+See also: LIST, INSERT.
 
 Command: INSERT
 Execution: Immediate -- takes effect at once.
@@ -257,7 +264,7 @@ The cursor is sticky: it persists across RUN and advances as lines
 are inserted.  NEW or another INSERT resets it.  n past the end
 warns and clamps to the end; a negative n is rejected (no-op).
 Only meaningful in interactive (REPL) mode.
-See LIST (shows the marker) and DELETE.
+See LIST (shows the marker) and REMOVE.
 
 Command: BREAK  |  BREAK WHEN <boolean-expr>
 Pauses execution and enters the debug inspection prompt.
@@ -370,16 +377,20 @@ Enter setup statements AFTER the REPEAT command, not before it.
 SORT, AGGREGATE, TRANSPOSE, and STATS are rejected between REPEAT n and
 its matching RUN -- the table being generated does not exist yet.
 Execution: Declarative -- the n-record mode is active for the next RUN.
+For the REPEAT/UNTIL post-test loop, see HELP DO -- issue #63 / ADR-054
+renamed it to DO/UNTIL to resolve the ambiguity with REPEAT n above.
 
-Command (loop): REPEAT ... UNTIL condition
+Command (loop): DO ... UNTIL condition
 Post-test loop; always executes the body at least once.
 Example:
   SET I = 1
-  REPEAT
+  DO
     PRINT I
     SET I = I + 1
   UNTIL I > 10
 Execution: Deferred -- executed once per record inside the data step.
+(Renamed from REPEAT/UNTIL by issue #63 / ADR-054, to resolve the
+keyword overload with the REPEAT n data-step command; see HELP REPEAT.)
 
 Command: OUTPUT ["filename"] [/CHARSET=...] [/FMT=...]
 Redirects all console output to a file (written to file AND stdout).
@@ -458,11 +469,11 @@ sdata commands fall into three execution tiers:
   Immediate -- execute at once, outside any data step.
     Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET, RENAME,
               SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,
-              DELETE n[-m], INSERT [n|$], QUIT, END
+              REMOVE n[-m], INSERT [n|$], QUIT, END
 
   Deferred -- queued between RUN markers; executed once per
     record during the data step.
-    Commands: LET, SET, PRINT, IF, FOR, WHILE, REPEAT/UNTIL,
+    Commands: LET, SET, PRINT, IF, FOR, WHILE, DO/UNTIL,
               SELECT/CASE, DELETE, WRITE, HOLD, UNHOLD,
               ARRAY, DIM, BREAK
 

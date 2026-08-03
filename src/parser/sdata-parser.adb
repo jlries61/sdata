@@ -2351,23 +2351,34 @@ package body SData.Parser is
             end;
 
          when Token_REPEAT =>
-            --  If the next token is a newline (or EOF/colon) it is a REPEAT/UNTIL
-            --  loop block; otherwise it is REPEAT n (data-step record count).
-            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline or else
-               Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_EOF or else
-               Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon
-            then
-               Stmt := new Statement (Stmt_LOOP_REPEAT);
-               Stmt.Repeat_Body := Parse_Block (Ctx, Token_UNTIL);
-               Stmt.Until_Cond  := Parse_Expression (Ctx);
-            else
-               declare
-                  Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-               begin
-                  Stmt := new Statement (Stmt_REPEAT);
-                  Stmt.Count := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
-               end;
+            --  REPEAT n: data-step record count (issue #63 / ADR-054 --
+            --  formerly also matched a bare REPEAT/UNTIL loop here via
+            --  lookahead; that loop is now spelled DO/UNTIL, see
+            --  Token_DO below, so REPEAT unconditionally means this).
+            --  A clean, migration-specific error (rather than an unguarded
+            --  Natural'Value crash) matters here more than at most other
+            --  numeric-argument sites in this file: a bare REPEAT with no
+            --  count is exactly the pre-#63 REPEAT/UNTIL loop spelling, the
+            --  single most likely mistake a script written before this
+            --  rename will make.
+            if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Numeric_Literal then
+               raise Script_Error with
+                 "REPEAT requires a record count (e.g. REPEAT 10); for a "
+                 & "REPEAT/UNTIL-style loop, use DO/UNTIL instead";
             end if;
+            declare
+               Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               Stmt := new Statement (Stmt_REPEAT);
+               Stmt.Count := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+            end;
+
+         when Token_DO =>
+            --  DO/UNTIL loop (issue #63 / ADR-054: renamed from REPEAT/UNTIL
+            --  to resolve the keyword overload with Stmt_REPEAT above).
+            Stmt := new Statement (Stmt_LOOP_DO);
+            Stmt.Do_Body   := Parse_Block (Ctx, Token_UNTIL);
+            Stmt.Until_Cond := Parse_Expression (Ctx);
 
          when Token_PRINT =>
             Stmt := new Statement (Stmt_PRINT);
@@ -2846,37 +2857,45 @@ package body SData.Parser is
             Parse_TABLES (Ctx, Stmt);
 
          when Token_DELETE =>
+            --  Bare DELETE: deferred, marks current record for deletion
+            --  (issue #63 / ADR-054 -- formerly also matched DELETE n[-m]
+            --  here via lookahead; that program-buffer command is now
+            --  spelled REMOVE n[-m], see Token_REMOVE below, so DELETE
+            --  unconditionally means this). A migration-specific hint for
+            --  the single most likely pre-#63 mistake: DELETE followed by
+            --  a number used to mean the program-buffer command.
+            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Numeric_Literal then
+               raise Script_Error with
+                 "DELETE takes no argument (it deletes the current record); "
+                 & "to remove program-buffer line(s), use REMOVE n[-m] instead";
+            end if;
+            Stmt := new Statement (Stmt_DELETE);
+
+         when Token_REMOVE =>
+            --  REMOVE n[-m]: immediate program-buffer deletion (issue #63 /
+            --  ADR-054: renamed from DELETE n[-m] to resolve the keyword
+            --  overload with Stmt_DELETE above).
             declare
-               Next_Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+               Num_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               From_Num : Positive;
             begin
-               if Next_Tok.Kind = Token_Numeric_Literal then
-                  --  DELETE n[-m]: immediate program buffer deletion
-                  declare
-                     Num_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                     From_Num : Positive;
-                  begin
-                     From_Num := Positive (Real'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
-                     Stmt := new Statement (Stmt_PROGRAM_DELETE);
-                     Stmt.Delete_From := From_Num;
-                     Stmt.Delete_To   := From_Num;
+               From_Num := Positive (Real'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
+               Stmt := new Statement (Stmt_PROGRAM_REMOVE);
+               Stmt.Remove_From := From_Num;
+               Stmt.Remove_To   := From_Num;
+               declare
+                  Maybe_Minus : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Maybe_Minus.Kind = Token_Minus then
                      declare
-                        Maybe_Minus : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                        Ignored  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        To_Tok   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        pragma Unreferenced (Ignored);
                      begin
-                        if Maybe_Minus.Kind = Token_Minus then
-                           declare
-                              Ignored  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                              To_Tok   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                              pragma Unreferenced (Ignored);
-                           begin
-                              Stmt.Delete_To := Positive (Real'Value (To_Tok.Text (1 .. To_Tok.Length)));
-                           end;
-                        end if;
+                        Stmt.Remove_To := Positive (Real'Value (To_Tok.Text (1 .. To_Tok.Length)));
                      end;
-                  end;
-               else
-                  --  Bare DELETE: deferred, marks current record for deletion
-                  Stmt := new Statement (Stmt_DELETE);
-               end if;
+                  end if;
+               end;
             end;
 
          when Token_INSERT =>

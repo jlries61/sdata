@@ -1,0 +1,1 @@
+Error: DELETE takes no argument (it deletes the current record); to remove program-buffer line(s), use REMOVE n[-m] instead

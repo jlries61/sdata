@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.16.8
+Version:        0.17.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Aug 03 2026 John L. Ries <john@theyarnbard.com> - 0.17.0-1
+- Resolve REPEAT/DELETE keyword overloading: REPEAT/UNTIL loop renamed to DO/UNTIL, DELETE n[-m] line editor renamed to REMOVE n[-m] (issue #63, ADR-054, breaking change).
+
 * Mon Aug 03 2026 John L. Ries <john@theyarnbard.com> - 0.16.8-1
 - Add REPL integration test coverage via a Makefile .repl marker convention (issue #69, ADR-053).
 

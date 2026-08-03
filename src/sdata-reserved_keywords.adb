@@ -26,6 +26,7 @@ package body SData.Reserved_Keywords is
       S.Insert ("DIM");
       S.Insert ("DIGITS");
       S.Insert ("DISPLAY");
+      S.Insert ("DO");
       S.Insert ("DROP");
       S.Insert ("ECHO");
       S.Insert ("ELSE");
@@ -57,6 +58,7 @@ package body SData.Reserved_Keywords is
       S.Insert ("PRINT");
       S.Insert ("QUIT");
       S.Insert ("REM");
+      S.Insert ("REMOVE");
       S.Insert ("RENAME");
       S.Insert ("REPEAT");
       S.Insert ("RSEED");

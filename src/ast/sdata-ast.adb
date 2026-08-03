@@ -164,8 +164,8 @@ package body SData.AST is
          when Stmt_WHILE =>
             SData_Core.Evaluator.Free_Expression (Stmt.While_Cond);
             Free_Program (Stmt.While_Body);
-         when Stmt_LOOP_REPEAT =>
-            Free_Program (Stmt.Repeat_Body);
+         when Stmt_LOOP_DO =>
+            Free_Program (Stmt.Do_Body);
             SData_Core.Evaluator.Free_Expression (Stmt.Until_Cond);
          when Stmt_RSEED =>
             SData_Core.Evaluator.Free_Expression (Stmt.Seed_Expr);

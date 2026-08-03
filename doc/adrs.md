@@ -63,6 +63,7 @@ that might relitigate a settled question.
 | ADR-051 | Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block | 2026-07-30 | Accepted |
 | ADR-052 | Validate SORT/BY variable names unconditionally, not gated on Column_Count > 0 | 2026-07-30 | Accepted |
 | ADR-053 | REPL test coverage via a Makefile `.repl` marker convention, not a Run_REPL refactor | 2026-08-03 | Accepted |
+| ADR-054 | Resolve REPEAT/DELETE keyword overloading: rename the low-usage side (REPEAT/UNTIL loop -> DO/UNTIL; DELETE n[-m] line editor -> REMOVE n[-m]) | 2026-08-03 | Accepted |
 
 ---
 
@@ -934,3 +935,68 @@ decision, not a behavioral one. `make check`: 357 → 362. The `.repl` marker co
 any future REPL-specific behavior (e.g. a fix to `Insert_Point`/`Append_Mode` program-buffer editing,
 issue #32) gets the same treatment — write the `.cmd` script normally, add an empty `tests/<name>.repl`
 marker, and generate the expected output by running the actual binary once and stripping the banner.
+
+### ADR-054: Resolve REPEAT/DELETE keyword overloading by renaming the low-usage side
+**Date:** 2026-08-03 | **Status:** Accepted
+
+**Context:** Issue #63, split from #57 item 2. `REPEAT` names two unrelated constructs: the
+`REPEAT`/`UNTIL` post-test loop (design.md §5.3, inherited from the Bywater BASIC heritage this
+project's spec defers to) and `REPEAT n`, sdata's own data-step record-count command (§5.5, §5.7).
+`DELETE` names two unrelated constructs: the classic-BASIC line-editor command `DELETE n[-m]`
+(removes program-buffer entries, REPL-only) and the SAS-DATA-step-style bare `DELETE` (marks the
+current record for deletion, the meaning this project's own data-step model is built around). The
+parser already disambiguated both pairs correctly by lookahead (a following newline/EOF/colon vs.
+a numeric literal), and #57's docs pass had already added explicit "Note:" disambiguation to
+design.md — nothing was actually broken. The issue's own framing declined to decide unilaterally:
+"needs a deliberate decision on whether to rename one construct in each pair — a breaking
+change — rather than deciding it incidentally."
+
+**Decision:** Rename the *lower-usage* member of each pair, not the historically-inherited one, and
+confirmed this choice with the user (rather than picking unilaterally) given usage data that cuts
+against intuition:
+
+- `REPEAT`/`UNTIL` loop → **`DO`/`UNTIL`** (mirrors this language's existing `WHILE`/`WEND`
+  start/condition-bearing-end pairing style; `DO` was an unclaimed keyword).
+- `DELETE n[-m]` (line editor) → **`REMOVE n[-m]`** (pairs naturally with the existing `INSERT`
+  line-editor command; `REMOVE` was unclaimed).
+
+**Usage data that drove the decision, not just intuition:** `REPEAT n` (data-step) appeared in 74
+of 362 test scripts at decision time — the single most central idiom in the whole suite — versus
+`REPEAT`/`UNTIL` (the loop) in exactly 1. Bare `DELETE` (record) appeared in 2 tests; `DELETE n[-m]`
+(line editor) in 0 committed tests (REPL-only, untestable before ADR-053/issue #69 built the
+`.repl` marker convention). The historically "standard" BASIC-heritage meaning is the *low-usage*
+side in both pairs; sdata's own domain-specific invention is the dominant, load-bearing one.
+Renaming the dominant side to satisfy a near-unused legacy construct would have touched ~20% of the
+test suite and every user script using the core data-generation idiom, for comparatively little
+benefit — renaming the low-usage side costs one test each.
+
+Both `Token_REPEAT` and `Token_DELETE` retain their original grammar-disambiguation *shape* even
+though the ambiguity is gone: `Token_REPEAT` now unconditionally parses a following numeric
+literal (`REPEAT n`); `Token_DELETE` now unconditionally takes no argument (bare record-delete).
+A bare `REPEAT` (no count) or a `DELETE n` (numeric argument) — both pre-#63 spellings — now raise
+a clean, migration-specific `Script_Error` (`"REPEAT requires a record count...; for a
+REPEAT/UNTIL-style loop, use DO/UNTIL instead"` / `"DELETE takes no argument...; to remove
+program-buffer line(s), use REMOVE n[-m] instead"`) rather than an unguarded `Natural'Value`
+`CONSTRAINT_ERROR` crash — this migration hint matters more here than at most other numeric-argument
+parse sites in this file, since it is exactly the mistake a pre-#63 script is most likely to make.
+
+Internal identifiers renamed alongside the keywords, for consistency (not just user-facing
+syntax): `Stmt_LOOP_REPEAT` → `Stmt_LOOP_DO`, `Stmt_PROGRAM_DELETE` → `Stmt_PROGRAM_REMOVE`, the
+AST record fields `Repeat_Body` → `Do_Body` and `Delete_From`/`Delete_To` →
+`Remove_From`/`Remove_To`, and `Execute_Program_Delete` → `Execute_Program_Remove`. Leaving these
+named after the old keyword would recreate a diluted form of the exact reader-confusion this ADR
+resolves.
+
+**Consequences:** sdata-only (this whole feature family — lexer, AST, parser, REPL line editor —
+lives in this crate, confirmed no sdata-core or data-vandal involvement). Breaking change,
+acknowledged: `tests/repeat_until_test.cmd` renamed to `tests/do_until_test.cmd` and rewritten to
+`DO`/`UNTIL`; `tests/interpreter_unit_test.adb`'s IC-20/IC-21 (loop) and IN-12/13/14/19
+(line-editor) rewritten to the new spellings. New tests: `tests/repl_remove_lines.cmd` (a `.repl`
+marker test, ADR-053's convention — the first genuine end-to-end REPL integration test for the
+INSERT/LIST/REMOVE program-buffer-editor family, previously only unit-tested via direct procedure
+calls); `tests/repeat_bare_rejected.cmd` and `tests/delete_numeric_rejected.cmd` (confirm the old
+spellings now fail cleanly, exit 1, with the migration-hint message). HELP (`sdata-help.adb`:
+`Help_REPEAT`/new `Help_DO`, `Help_DELETE`/new `Help_REMOVE`, the command index and execution-tier
+summary lines), man page, and design.md (§5.3, §5.4, §5.5, §5.7, §5.8, the command-reference table)
+all updated per the three-reference sync rule; `tests/expected/help_all.out` and
+`tests/expected/help_index.out` regenerated. `make check`: 362 → 365. Closes jlries61/sdata#63.

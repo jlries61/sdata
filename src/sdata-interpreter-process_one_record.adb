@@ -98,7 +98,7 @@ begin
             --  with Create, truncating everything written before the data step
             --  and leaving only the final "RUN complete" line (issue #40).
             when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
-               | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_REPEAT | Stmt_SELECT
+               | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_DO | Stmt_SELECT
                | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE | Stmt_ECHO
                | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
                | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>

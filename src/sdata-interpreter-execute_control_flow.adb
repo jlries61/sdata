@@ -51,9 +51,9 @@ begin
                end loop;
             end;
          end;
-      when Stmt_LOOP_REPEAT =>
+      when Stmt_LOOP_DO =>
          loop
-            Execute_List (Stmt.Repeat_Body, Ctx);
+            Execute_List (Stmt.Do_Body, Ctx);
             exit when Is_True (Evaluate (Stmt.Until_Cond));
          end loop;
       when Stmt_SELECT =>

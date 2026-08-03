@@ -379,25 +379,27 @@ begin
    --  E.  REPEAT / UNTIL loop
    -----------------------------------------------------------------------
    Put_Line ("");
-   Put_Line ("--- E: REPEAT/UNTIL ---");
+   Put_Line ("--- E: DO/UNTIL ---");
 
    --  IC-20: Body executes at least once even when condition is true initially.
+   --  (issue #63 / ADR-054: loop renamed from REPEAT/UNTIL to DO/UNTIL to
+   --  resolve the keyword overload with the REPEAT n data-step command.)
    Run ("LET J = 10" & L &
         "LET C = 0" & L &
-        "REPEAT" & L &
+        "DO" & L &
         "  LET C = C + 1" & L &
         "  LET J = J + 1" & L &
         "UNTIL J > 5" & L & "RUN");
-   Check ("IC-20: REPEAT/UNTIL executes once (condition initially true)", GI ("C"), 1);
+   Check ("IC-20: DO/UNTIL executes once (condition initially true)", GI ("C"), 1);
 
-   --  IC-21: REPEAT/UNTIL iterates until condition becomes true.
+   --  IC-21: DO/UNTIL iterates until condition becomes true.
    Run ("LET I = 1" & L &
         "LET C = 0" & L &
-        "REPEAT" & L &
+        "DO" & L &
         "  LET C = C + 1" & L &
         "  LET I = I + 1" & L &
         "UNTIL I > 3" & L & "RUN");
-   Check ("IC-21: REPEAT/UNTIL runs 3 iterations", GI ("C"), 3);
+   Check ("IC-21: DO/UNTIL runs 3 iterations", GI ("C"), 3);
 
    -----------------------------------------------------------------------
    --  F.  BREAK
@@ -865,7 +867,9 @@ begin
              Index (Slurp (Cap), "Insertion point set after line 1.") > 0, True);
    end;
 
-   --  IN-12: DELETE before the cursor shifts it back so inserts stay in place.
+   --  IN-12: REMOVE before the cursor shifts it back so inserts stay in place.
+   --  (issue #63 / ADR-054: renamed from DELETE n[-m] to resolve the keyword
+   --  overload with the DELETE record-delete statement.)
    --  Buffer [A=1, A=2, A=3]; cursor after line 3; delete line 1 -> buffer
    --  [A=2, A=3], cursor now after line 2 (still the end).  Insert A=9 lands
    --  last -> A=9.
@@ -874,12 +878,12 @@ begin
    Queue ("LET A = 2");
    Queue ("LET A = 3");
    Immediate ("INSERT 3");        --  cursor after line 3
-   Immediate ("DELETE 1");        --  removes A=1; cursor -> after line 2
+   Immediate ("REMOVE 1");        --  removes A=1; cursor -> after line 2
    Queue ("LET A = 9");           --  appended after A=3 -> [A=2, A=3, A=9]
    SData.Interpreter.Run_Active_Program;
-   Check ("IN-12: delete-before shifts cursor -> A=9", GI ("A"), 9);
+   Check ("IN-12: remove-before shifts cursor -> A=9", GI ("A"), 9);
 
-   --  IN-13: DELETE the line the cursor sits after moves cursor before the
+   --  IN-13: REMOVE the line the cursor sits after moves cursor before the
    --  deleted span.  Buffer [B=1, B=2, B=3]; cursor after line 2; delete
    --  line 2 -> [B=1, B=3], cursor -> after line 1.  Insert B=7 -> [B=1, B=7,
    --  B=3] -> final B=3.
@@ -888,12 +892,12 @@ begin
    Queue ("LET B = 2");
    Queue ("LET B = 3");
    Immediate ("INSERT 2");        --  cursor after line 2
-   Immediate ("DELETE 2");        --  cursor at/after deleted line; after-span branch fires -> after line 1
+   Immediate ("REMOVE 2");        --  cursor at/after deleted line; after-span branch fires -> after line 1
    Queue ("LET B = 7");           --  [B=1, B=7, B=3]
    SData.Interpreter.Run_Active_Program;
-   Check ("IN-13: delete-at-cursor -> B=3", GI ("B"), 3);
+   Check ("IN-13: remove-at-cursor -> B=3", GI ("B"), 3);
 
-   --  IN-14: DELETE after the cursor leaves it unchanged.  Buffer
+   --  IN-14: REMOVE after the cursor leaves it unchanged.  Buffer
    --  [C=1, C=2, C=3]; cursor after line 1; delete line 3 -> [C=1, C=2],
    --  cursor still after line 1.  Insert C=5 -> [C=1, C=5, C=2] -> final C=2.
    SData.Interpreter.Clear_Active_Program;
@@ -901,10 +905,10 @@ begin
    Queue ("LET C = 2");
    Queue ("LET C = 3");
    Immediate ("INSERT 1");        --  cursor after line 1
-   Immediate ("DELETE 3");        --  after cursor -> unchanged
+   Immediate ("REMOVE 3");        --  after cursor -> unchanged
    Queue ("LET C = 5");           --  [C=1, C=5, C=2]
    SData.Interpreter.Run_Active_Program;
-   Check ("IN-14: delete-after-cursor -> C=2", GI ("C"), 2);
+   Check ("IN-14: remove-after-cursor -> C=2", GI ("C"), 2);
 
    --  IN-15: LIST marks the cursor between lines (cursor after line 1).
    declare
@@ -955,8 +959,8 @@ begin
    SData.Interpreter.Run_Active_Program;
    Check ("IN-18: cursor survives RUN -> X=1", GI ("X"), 1);
 
-   --  IN-19: cursor strictly inside a multi-line deleted span moves to just
-   --  before the span. Buffer [A=1,A=2,A=3,A=4]; cursor after line 2; DELETE 2-3
+   --  IN-19: cursor strictly inside a multi-line removed span moves to just
+   --  before the span. Buffer [A=1,A=2,A=3,A=4]; cursor after line 2; REMOVE 2-3
    --  removes lines 2 and 3 (cursor inside -> moves to after line 1). Buffer
    --  becomes [A=1,A=4]; inserting A=9 -> [A=1,A=9,A=4] -> final A=4
    --  (a stale cursor at 2 would append -> A=9).
@@ -966,10 +970,10 @@ begin
    Queue ("LET A = 3");
    Queue ("LET A = 4");
    Immediate ("INSERT 2");           --  cursor after line 2
-   Immediate ("DELETE 2-3");         --  cursor inside span -> after line 1
+   Immediate ("REMOVE 2-3");         --  cursor inside span -> after line 1
    Queue ("LET A = 9");              --  [A=1, A=9, A=4]
    SData.Interpreter.Run_Active_Program;
-   Check ("IN-19: DELETE inside-span -> A=4", GI ("A"), 4);
+   Check ("IN-19: REMOVE inside-span -> A=4", GI ("A"), 4);
 
    --  IN-20: LIST prints the marker before line 1 when the cursor is at 0.
    declare

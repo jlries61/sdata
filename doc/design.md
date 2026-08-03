@@ -557,7 +557,7 @@ Record Processing:
 
 - Looping Blocks:
 
-  - *FOR*/*NEXT*, *REPEAT*/*UNTIL*, *WHILE*/*WEND* may be nested inside each other.
+  - *FOR*/*NEXT*, *DO*/*UNTIL*, *WHILE*/*WEND* may be nested inside each other.
   - Limited only by available stack space.
   - Running program fails with error message if it runs out of memory (user responsibility to prevent).
 
@@ -586,11 +586,12 @@ Looping blocks may also be nested inside of conditional blocks and vice versa.
   - Condition-controlled iteration.
   - Loop continues while condition is true.
 
-- REPEAT/UNTIL:
+- DO/UNTIL:
 
   - Condition-controlled iteration.
   - Loop continues until condition becomes true.
-  - **Note:** Also used as *REPEAT* command (different purpose).
+  - **Note:** Renamed from *REPEAT*/*UNTIL* (issue #63 / ADR-054) to resolve
+    the keyword overload with the *REPEAT n* data-step command below.
 
 - SELECT/CASE:
 
@@ -601,7 +602,7 @@ Looping blocks may also be nested inside of conditional blocks and vice versa.
 
 - Declarative Statements:
 
-  - May not appear in *FOR*, *WHILE*, or *REPEAT*/*UNTIL* blocks.
+  - May not appear in *FOR*, *WHILE*, or *DO*/*UNTIL* blocks.
   - Examples: *USE*, *SAVE*, *KEEP*, *DROP*, *BY*, *DIM*, *ARRAY*, *DIGITS*, *OPTIONS*.
   - Command reference table indicates which commands are declarative.
 
@@ -624,7 +625,9 @@ Mutual Cancellation:
 
   - Either cancels any non-declarative statements currently in effect.
 
-**Note:** This refers to the *REPEAT* command (specify number of records), not *REPEAT*/*UNTIL* loop.
+**Note:** This refers to the *REPEAT* command (specify number of records). The
+*DO*/*UNTIL* loop (renamed from *REPEAT*/*UNTIL*, issue #63 / ADR-054) is an
+unrelated construct and does not interact with *USE* compatibility.
 
 ### 5.6 Entry-Time Semantic Checking
 
@@ -692,7 +695,8 @@ nothing yet queued, so the pending-statements check alone does not cover this
 case.
 
 **Note:** This refers to the *REPEAT* command (specify number of records), not
-the *REPEAT*/*UNTIL* loop — see §5.5's note on the same ambiguity. All other
+the *DO*/*UNTIL* loop (renamed from *REPEAT*/*UNTIL*, issue #63 / ADR-054) —
+see §5.5's note. All other
 Immediate-tier commands (*OPTIONS*, *HELP*, *DIGITS*, *ECHO*, *RSEED*,
 *SYSTEM*, *NAMES*, *LIST*, *DISPLAY*, *FPATH*, *KEEP*/*DROP*/*RENAME*,
 *ARRAY*/*DIM*, *HOLD*/*UNHOLD*, *SUBMIT*, *OUTPUT*) remain legal inside a
@@ -704,7 +708,7 @@ Immediate-tier commands (*OPTIONS*, *HELP*, *DIGITS*, *ECHO*, *RSEED*,
 
 - Restrictions:
 
-  - If *SUBMIT* appears inside *IF*, *FOR*, *WHILE*, or *REPEAT*/*UNTIL* block, submitted file may not contain declarative statements.
+  - If *SUBMIT* appears inside *IF*, *FOR*, *WHILE*, or *DO*/*UNTIL* block, submitted file may not contain declarative statements.
   - File may contain one or more *SUBMIT* statements.
 
 - Recursion Prevention:
@@ -794,10 +798,10 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>Divide the input into blocks defined by the combination of variable values. An empty <em>BY</em> statement cancels any <em>BY</em> statement currently in effect. A new <em>BY</em> statement overrides any <em>BY</em> statement currently in effect. Blocks are defined by consecutive records with the same combination of <em>BY</em> variable values. A new block begins whenever any <em>BY </em>variable value changes, even if a previous block had the same combination of values. The blocks need not be in sorted order. Missing values in the named variables shall be treated as distinct values for grouping purposes. Each named variable must be an existing column; an undefined name (for example, a dropped type suffix) is rejected with an <em>undefined variable</em> error rather than establishing a spurious single group. If no <em>USE</em> statement is in effect and no <em>REPEAT</em> is active then a <em>BY</em> statement shall fail with an error message.</td>
 </tr>
 <tr>
-<td><em>DELETE</em></td>
-<td><em>DELETE</em> &lt;<em>line</em>&gt; [<em>-</em> &lt;<em>line</em>&gt;]</td>
+<td><em>REMOVE</em></td>
+<td><em>REMOVE</em> &lt;<em>line</em>&gt; [<em>-</em> &lt;<em>line</em>&gt;]</td>
 <td>Immediate Execution</td>
-<td>Delete an inclusive range of lines from the program buffer (a single <em>line</em> deletes just that line). If the buffer is empty, or if either line number is out of range, or the range is reversed (first line greater than the second), the command prints a warning and does nothing — no partial deletion occurs. Deleting lines also adjusts the <em>INSERT</em> cursor: a cursor at or after the deleted range shifts back by the number of lines removed, a cursor inside the deleted range snaps to just before it, and a cursor before the deleted range is unaffected. Only meaningful in interactive (REPL) mode.</td>
+<td>Delete an inclusive range of lines from the program buffer (a single <em>line</em> deletes just that line). If the buffer is empty, or if either line number is out of range, or the range is reversed (first line greater than the second), the command prints a warning and does nothing — no partial deletion occurs. Deleting lines also adjusts the <em>INSERT</em> cursor: a cursor at or after the deleted range shifts back by the number of lines removed, a cursor inside the deleted range snaps to just before it, and a cursor before the deleted range is unaffected. Only meaningful in interactive (REPL) mode. (Renamed from <em>DELETE</em> &lt;<em>line</em>&gt; [<em>-</em> &lt;<em>line</em>&gt;] by issue #63 / ADR-054, to resolve the keyword overload with the <em>DELETE</em> record-delete statement below.)</td>
 </tr>
 <tr>
 <td><em>DELETE</em></td>
@@ -940,10 +944,10 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>Specify the number of records to be written to the internal table or output dataset. This command will cancel any <em>USE</em> statement currently in effect, and also cancels any queued deferred statements (<em>LET</em>, <em>SET</em>, etc.). Consequently, setup statements that should govern the <em>REPEAT</em> data step must be entered <em>after</em> the <em>REPEAT</em> command (the setup-after-REPEAT idiom).</td>
 </tr>
 <tr>
-<td><em>REPEAT</em>/<em>UNTIL</em></td>
+<td><em>DO</em>/<em>UNTIL</em></td>
 <td></td>
 <td>Deferred Execution</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Post-test loop, as specified in the BW BASIC documentation (there spelled <em>REPEAT</em>/<em>UNTIL</em>; renamed here by issue #63 / ADR-054 to resolve the keyword overload with the <em>REPEAT n</em> data-step command above).</td>
 </tr>
 <tr>
 <td><em>RSEED</em></td>
@@ -1015,7 +1019,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>SUBMIT</em></td>
 <td><em>SUBMIT</em> &lt;<em>filename</em> &gt;</td>
 <td>Deferred Execution</td>
-<td>Read and execute the commands contained in the specified file.  If the statement appears inside an <em>IF</em>, <em>FOR</em>, <em>WHILE</em>, or <em>REPEAT</em>/<em>UNTIL</em> block then the file may not contain any declarative statements. The file to be executed may contain one or more <em>SUBMIT</em> statements, but a <em>SUBMIT</em> statement that attempts to submit a file that is already in the current execution chain will fail with an error message.</td>
+<td>Read and execute the commands contained in the specified file.  If the statement appears inside an <em>IF</em>, <em>FOR</em>, <em>WHILE</em>, or <em>DO</em>/<em>UNTIL</em> block then the file may not contain any declarative statements. The file to be executed may contain one or more <em>SUBMIT</em> statements, but a <em>SUBMIT</em> statement that attempts to submit a file that is already in the current execution chain will fail with an error message.</td>
 </tr>
 <tr>
 <td><em>SYSTEM</em></td>
@@ -1050,7 +1054,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 </tbody>
 </table>
 
-Deferred Execution Commands are part of the program that is executed with the next *RUN* statement. Statements and blocks are executed in the order in which they were entered. The currently defined program may be listed with the *LIST* command. Statements may be deleted with the *DELETE* command.
+Deferred Execution Commands are part of the program that is executed with the next *RUN* statement. Statements and blocks are executed in the order in which they were entered. The currently defined program may be listed with the *LIST* command. Statements may be removed with the *REMOVE* command.
 
 **Declarative Commands** are executed immediately. They typically configure the interpreter state or define data structures.
 
