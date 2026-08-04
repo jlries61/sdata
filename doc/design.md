@@ -900,7 +900,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>IF</em>/<em>THEN</em>/<em>ELSE</em>/<em>ELSEIF</em>/<em>END IF</em></td>
 <td></td>
 <td>Deferred Execution</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Standard conditional execution, extending Bywater BASIC's single-line <em>IF value THEN line1 [ELSE line2]</em> form with a multi-line block form terminated by <em>END IF</em> and multi-way branching via <em>ELSEIF</em>. May be nested. Also usable as a three-argument function, <em>IF(condition, true_value, false_value)</em>, returning <em>true_value</em> when <em>condition</em> is non-zero/non-empty, else <em>false_value</em>.</td>
 </tr>
 <tr>
 <td><em>INSERT</em></td>
@@ -918,14 +918,14 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>LET</em></td>
 <td></td>
 <td>Deferred Execution</td>
-<td><p>As specified in the BW BASIC documentation.</p>
+<td><p>Assign the value of <em>expression</em> to <em>variable</em>, creating a permanent column in the table if it does not already exist. Unlike Bywater BASIC, the <em>LET</em> keyword is mandatory (it may not be omitted) and only a single variable may be assigned per statement.</p>
 <p>Defines permanent variables (those in the internal table) only. A <em>LET</em> statement that writes to an existing temporary variable shall fail with an error message; use <em>SET</em> to recompute it, or <em>UNSET</em> it first to redefine it as permanent under the same name.</p></td>
 </tr>
 <tr>
 <td><em>LIST</em></td>
 <td></td>
 <td>Immediate Execution</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Display the numbered contents of the program buffer (deferred statements queued for the next <em>RUN</em>); unlike Bywater BASIC's <em>LIST line1 [- line2]</em>, <em>LIST</em> takes no arguments and always shows the whole buffer. If the buffer is empty, reports that fact. See also <em>DISPLAY</em> to show Data Table records, <em>REMOVE n[-m]</em> to remove program buffer entries, and <em>INSERT [n|$]</em> to set where new statements are inserted.</td>
 </tr>
 <tr>
 <td><em>NAMES</em></td>
@@ -937,7 +937,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>NEW</em></td>
 <td></td>
 <td>Immediate Execution</td>
-<td>As specified in the BW BASIC documentation. In addition, any declarative statements in effect, except for <em>OUTPUT</em>, are canceled.</td>
+<td>Clear the Data Table, all variables, and the queued program; also reset the active <em>SELECT</em> record filter and <em>BY</em> grouping. In addition, any declarative statements in effect, except for <em>OUTPUT</em>, are canceled.</td>
 </tr>
 <tr>
 <td><em>OPTIONS</em></td>
@@ -961,13 +961,13 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>QUIT</em>|<em>END</em></td>
 <td></td>
 <td>Immediate Execution</td>
-<td>As specified in the BW BASIC documentation. Initially, <em>END</em> shall be an alias for <em>QUIT</em>.</td>
+<td>Exit the interpreter immediately. Unlike Bywater BASIC — where <em>QUIT</em> exits to the operating system but <em>END</em> only terminates the running program and returns to the BASIC prompt — <em>END</em> is initially an alias for <em>QUIT</em> here: both exit the interpreter.</td>
 </tr>
 <tr>
 <td><em>REM</em></td>
 <td></td>
 <td>Immediate Execution</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Remark: the remainder of the line is a comment and has no effect.</td>
 </tr>
 <tr>
 <td><em>REMOVE</em></td>
@@ -998,7 +998,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>RUN</em></td>
 <td></td>
 <td>Immediate Execution</td>
-<td>As specified in the BW BASIC documentation.  Following the execution of any statements then in effect, the internal table is written to the output dataset specified by the <em>SAVE</em> command (if there is one).  If a variable appears in both the current <em>KEEP</em> statement and a subsequent <em>DROP </em>statement, then the latter shall take precedence. Once the program is run, the numbers of records and variables are displayed.</td>
+<td>Trigger execution of the Data Step. Unlike Bywater BASIC's <em>RUN</em> (which starts or resumes execution of a stored program, optionally from a given line or file), <em>RUN</em> here takes no arguments: queued statements are validated first (assignment type mismatches, unknown functions, arity errors, and undefined variables are all reported as hard errors before any record is processed), then executed once per record. Following the execution of any statements then in effect, the internal table is written to the output dataset specified by the <em>SAVE</em> command (if there is one).  If a variable appears in both the current <em>KEEP</em> statement and a subsequent <em>DROP </em>statement, then the latter shall take precedence. Once the program is run, the numbers of records and variables are displayed.</td>
 </tr>
 <tr>
 <td><em>SAVE</em></td>
@@ -1013,10 +1013,10 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>Process only the subset of the data described by the comma-delimited set of boolean expressions.</td>
 </tr>
 <tr>
-<td><em>SELECT CASE</em>/<em>CASE</em>/<em>CASE END</em></td>
+<td><em>SELECT CASE</em>/<em>CASE</em>/<em>END SELECT</em></td>
 <td></td>
 <td>Deferred Execution</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Multi-way branch: evaluate <em>expression</em> once, then execute the statement(s) under the first matching <em>CASE</em> value (or the <em>OTHERWISE</em> clause, if present and no <em>CASE</em> matches), terminated by <em>END SELECT</em>. Note the closing keyword is <em>END SELECT</em>, not <em>CASE END</em>.</td>
 </tr>
 <tr>
 <td><em>SET</em></td>
@@ -1082,7 +1082,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>WHILE</em>/<em>WEND</em></td>
 <td></td>
 <td>Deferred Execution</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Condition-controlled loop: execute the body repeatedly while <em>condition</em> is true, tested before each iteration (pre-tested, like <em>FOR</em>), terminated by <em>WEND</em>.</td>
 </tr>
 <tr>
 <td><em>WRITE</em></td>
@@ -1115,19 +1115,19 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>ABS</em></td>
 <td><em>ABS(<em>x</em>)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the absolute value of <em>x</em>.</td>
 </tr>
 <tr>
 <td><em>ARCCOS</em></td>
 <td><em>ARCCOS(<em>x</em>)</em></td>
 <td>-1 ≤ <em><em>x</em></em> ≤ 1</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the arccosine of <em>x</em>, in radians, in the range 0 to &pi;.</td>
 </tr>
 <tr>
 <td><em>ARCSIN</em></td>
 <td><em>ARCSIN(x)</em></td>
 <td>-1 ≤ <em><em>x</em></em> ≤ 1</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the arcsine of <em>x</em>, in radians, in the range -&pi;/2 to &pi;/2.</td>
 </tr>
 <tr>
 <td><em>ARCTAN</em></td>
@@ -1145,7 +1145,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>ASCII</em></td>
 <td><em>ASCII(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the ASCII code of the first character of <em>A$</em>. <em>ASC</em> is a synonym (the Bywater BASIC spelling).</td>
 </tr>
 <tr>
 <td><em>ATAN2</em></td>
@@ -1199,7 +1199,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>BIN$</em></td>
 <td><em>BIN$(X, Y%)</em></td>
 <td>0 ≤ <em>Y%</em> ≤ 255</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the binary (base 2) representation of <em>X</em> as a string, at least <em>Y%</em> digits long (zero-padded on the left if needed).</td>
 </tr>
 <tr>
 <td><em>BOF</em></td>
@@ -1236,19 +1236,19 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>CLG</em></td>
 <td><em>CLG(X)</em></td>
 <td><em>X</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the common (base-10) logarithm of <em>X</em>. <em>LGT</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>COS</em></td>
 <td><em>COS(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the cosine of <em>X</em>, in radians.</td>
 </tr>
 <tr>
 <td><em>COSD</em></td>
 <td><em>COSD(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the cosine of <em>X</em>, in degrees.</td>
 </tr>
 <tr>
 <td><em>COSH</em></td>
@@ -1260,13 +1260,13 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>COT</em></td>
 <td><em>COT(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the cotangent of <em>X</em> (cos(X)/sin(X)), in radians.</td>
 </tr>
 <tr>
 <td><em>CSC</em></td>
 <td><em>CSC(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the cosecant of <em>X</em> (1/sin(X)), in radians.</td>
 </tr>
 <tr>
 <td><em>DATE$</em></td>
@@ -1332,7 +1332,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>EXP</em></td>
 <td><em>EXP(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return e (the base of natural logarithms) raised to the power <em>X</em>.</td>
 </tr>
 <tr>
 <td><em>FALSE</em></td>
@@ -1368,7 +1368,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>FIX</em></td>
 <td><em>FIX(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Return the integer part of <em>X</em>, truncated toward zero. <em>IP</em> is a synonym. Unlike <em>INT</em>, which rounds toward negative infinity, <em>FIX(-1.3)</em> is <em>-1</em>, not <em>-2</em>.</td>
 </tr>
 <tr>
 <td><em>FLOOR</em></td>
@@ -1380,7 +1380,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>FP</em>/<em>FRAC</em></td>
 <td><em>FP(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Return the fractional part of <em>X</em> (<em>X - FIX(X)</em>). <em>FRAC</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>FRN</em></td>
@@ -1432,19 +1432,19 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>HCS</em></td>
 <td><em>HCS(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the hyperbolic cosine of <em>X</em>. Synonym for <em>COSH</em>.</td>
 </tr>
 <tr>
 <td><em>HEX</em></td>
 <td><em>HEX(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the integer value of the hexadecimal string <em>A$</em>.</td>
 </tr>
 <tr>
 <td><em>HEX$</em></td>
 <td><em>HEX$(X, Y)</em></td>
 <td>0 &lt; <em>Y <em>≤</em></em> 255</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the hexadecimal (base 16) representation of <em>X</em> as a string. If <em>Y</em> is given, the result is left-padded with zeros to at least <em>Y</em> digits.</td>
 </tr>
 <tr>
 <td><em>HMEAN</em></td>
@@ -1456,19 +1456,19 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>HSN</em></td>
 <td><em>HSN(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the hyperbolic sine of <em>X</em>. Synonym for <em>SINH</em>.</td>
 </tr>
 <tr>
 <td><em>HTN</em></td>
 <td><em>HTN(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the hyperbolic tangent of <em>X</em>. Synonym for <em>TANH</em>.</td>
 </tr>
 <tr>
 <td><em>INDEX</em></td>
 <td><em>INDEX(A$, B$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Return the 1-based position at which <em>B$</em> first occurs in <em>A$</em>, searching from the start of <em>A$</em>; 0 if not found.</td>
 </tr>
 <tr>
 <td><em>INF</em></td>
@@ -1480,19 +1480,19 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>INSTR</em></td>
 <td>INSTR(<em>X%</em>, <em>A$</em>, <em>B$</em>)</td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Return the 1-based position at which <em>B$</em> first occurs in <em>A$</em> (haystack first, needle second — the Bywater BASIC argument order); 0 if not found.</td>
 </tr>
 <tr>
 <td><em>INT</em></td>
 <td><em>INT(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Return the largest integer not greater than <em>X</em> (rounds toward negative infinity); e.g. <em>INT(1.3) = 1</em> and <em>INT(-1.3) = -2</em>.</td>
 </tr>
 <tr>
 <td><em>IP</em></td>
 <td><em>IP(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Synonym for <em>FIX</em>.</td>
 </tr>
 <tr>
 <td><em>LAG</em></td>
@@ -1510,13 +1510,13 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>LBOUND</em></td>
 <td><em>LBOUND(arrayname)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the lower bound (first valid subscript) of the named array. Works for both virtual (<em>ARRAY</em>) and real (<em>DIM</em>) arrays; returns missing if the array does not exist. The array name may be given unquoted.</td>
 </tr>
 <tr>
 <td><em>LCASE$</em></td>
 <td><em>LCASE$(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return <em>A$</em> with every uppercase letter replaced by its lowercase equivalent. <em>LOWER$</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>LCF</em></td>
@@ -1534,19 +1534,19 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>LEFT$</em></td>
 <td><em>LEFT$(A$, X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the leftmost <em>X</em> characters of <em>A$</em>.</td>
 </tr>
 <tr>
 <td><em>LEN</em></td>
 <td><em>LEN(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the length of <em>A$</em>.</td>
 </tr>
 <tr>
 <td><em>LGT</em></td>
 <td><em>LGT(X)</em></td>
 <td><em>X</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Synonym for <em>CLG</em>.</td>
 </tr>
 <tr>
 <td><em>LIF</em></td>
@@ -1558,37 +1558,37 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>LN</em></td>
 <td><em>LN(X)</em></td>
 <td><em>X</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the natural logarithm of <em>X</em>. <em>LOGE</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>LOG</em></td>
 <td><em>LOG(X)</em></td>
 <td><em>X</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the natural logarithm of <em>X</em>.</td>
 </tr>
 <tr>
 <td><em>LOG10</em></td>
 <td><em>LOG10(X)</em></td>
 <td><em>X</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the base-10 logarithm of <em>X</em>.</td>
 </tr>
 <tr>
 <td><em>LOG2</em></td>
 <td><em>LOG2(X)</em></td>
 <td><em>X</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the base-2 logarithm of <em>X</em>.</td>
 </tr>
 <tr>
 <td><em>LOGE</em></td>
 <td><em>LOGE(X)</em></td>
 <td><em>X</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Synonym for <em>LN</em>.</td>
 </tr>
 <tr>
 <td><em>LOWER$</em></td>
 <td><em>LOWER$(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Synonym for <em>LCASE$</em>.</td>
 </tr>
 <tr>
 <td><em>LRN</em></td>
@@ -1600,25 +1600,25 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>LTRIM$</em></td>
 <td><em>LTRIM$(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return <em>A$</em> with leading spaces removed.</td>
 </tr>
 <tr>
 <td><em>LTW</em></td>
 <td><em>LTW(X)</em></td>
-<td><em>X</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td><em>X</em> ≥ -1/e</td>
+<td>Return the value of the Lambert W function W&#8320;(<em>X</em>), the principal branch.</td>
 </tr>
 <tr>
 <td><em>MATCH</em></td>
 <td><em>MATCH(A$, B$, X%)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the 1-based position, within <em>A$</em>, of the first occurrence of <em>B$</em> at or after position <em>X</em>; 0 if not found.</td>
 </tr>
 <tr>
 <td><em>MAX</em></td>
 <td><em>MAX(</em>&lt;<em>value</em>&gt;,...<em>)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation; except that any number of arguments shall be permitted and that all elements in any array arguments shall be compared.</td>
+<td>Return the largest of the given values. Unlike Bywater BASIC's fixed two-argument form, any number of arguments is permitted and all elements of any array argument are compared; unlike Bywater BASIC, which also accepts two strings, only numeric arguments are supported here.</td>
 </tr>
 <tr>
 <td><em>MAXINT</em></td>
@@ -1630,13 +1630,13 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>MAXLEN</em></td>
 <td><em>MAXLEN(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the maximum character variable length in effect for the session (see the <em>--clen</em> command-line option).</td>
 </tr>
 <tr>
 <td><em>MAXLVL</em></td>
 <td></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the maximum stack (nesting) level supported.</td>
 </tr>
 <tr>
 <td><em>MAXNUM</em></td>
@@ -1672,7 +1672,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>MID$</em></td>
 <td><em>MID$(A$, X%, Y%)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Return the <em>Y%</em> characters of <em>A$</em> starting at position <em>X%</em>.</td>
 </tr>
 <tr>
 <td><em>MIF</em></td>
@@ -1684,7 +1684,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>MIN</em></td>
 <td><em>MIN(</em>&lt;<em>value</em>&gt;...<em>)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation; except that any number of arguments shall be permitted and that all elements in any array arguments shall be compared.</td>
+<td>Return the smallest of the given values. Unlike Bywater BASIC's fixed two-argument form, any number of arguments is permitted and all elements of any array argument are compared; unlike Bywater BASIC, which also accepts two strings, only numeric arguments are supported here.</td>
 </tr>
 <tr>
 <td><em>MININT</em></td>
@@ -1708,7 +1708,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>MOD</em></td>
 <td><em>MOD(X%, Y%)</em></td>
 <td><em>Y%</em> ≠ 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return <em>X%</em> modulo <em>Y%</em> (the remainder of floor division).</td>
 </tr>
 <tr>
 <td><em>MRN</em></td>
@@ -1775,13 +1775,13 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>NUM</em></td>
 <td><em>NUM(</em>&lt;<em>value</em>&gt;...<em>)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation, except that any number of arguments shall be accepted. If there is a single scalar argument, then a single value will be returned, otherwise an array containing one element per scalar argument or array argument element. Any individual array elements shall be treated as scalars. Only character arguments allowed.</td>
+<td>Convert a numeric-looking string to a floating-point value. Unlike Bywater BASIC's single-argument form, any number of arguments is accepted: if there is a single scalar argument, a single value is returned; otherwise an array is returned containing one element per scalar argument or array-argument element (individual array elements are treated as scalars). Only character arguments are allowed.</td>
 </tr>
 <tr>
 <td><em>NUM$</em></td>
 <td><em>NUM$(</em>&lt;<em>value</em>&gt;...<em>)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation, except that any number of arguments shall be accepted and shall be processed as by <em>NUM</em>. Only numeric arguments shall be permitted.</td>
+<td>Format a numeric value as a string, the way <em>PRINT</em> would render it. Unlike Bywater BASIC's single-argument form, any number of arguments is accepted and processed the same way as <em>NUM</em>. Only numeric arguments are permitted. <em>STR$</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>OBS</em></td>
@@ -1799,13 +1799,13 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>OCT$</em></td>
 <td><em>OCT$(X, Y% )</em></td>
 <td>0 &lt; <em>Y%</em> ≤ 255</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the octal (base 8) representation of <em>X</em> as a string. If <em>Y%</em> is given, the result is left-padded with zeros to at least <em>Y%</em> digits.</td>
 </tr>
 <tr>
 <td><em>ORD</em></td>
 <td><em>ORD(A$)</em></td>
 <td><em>LEN(A$)</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>With no arguments, return the current record number (equivalent to <em>RECNO</em>); with a string argument, return the ASCII/ordinal code of its first character (equivalent to <em>ASCII</em>).</td>
 </tr>
 <tr>
 <td><em>PCF</em></td>
@@ -1825,7 +1825,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>PI</em></td>
 <td></td>
 <td></td>
-<td>As specified in the BW BASIC documentation, except that pi shall be returned as precisely as the word size will permit.</td>
+<td>Return &pi; (3.14159...), the ratio of a circle's circumference to its diameter, as precisely as the floating-point type will permit.</td>
 </tr>
 <tr>
 <td><em>PIF</em></td>
@@ -1836,15 +1836,15 @@ Functions perform computations and return values. Unless otherwise stated:
 </tr>
 <tr>
 <td><em>POS</em></td>
-<td><em>POS(A$, B$)</em></td>
+<td><em>POS(needle$, haystack$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the 1-based position at which <em>needle$</em> first occurs within <em>haystack$</em>; 0 if not found. <strong>Note the argument order:</strong> needle first, haystack second — the reverse of <em>INDEX</em>, <em>INSTR</em>, and <em>MATCH</em>, which all take the haystack first (matching Bywater BASIC's own convention for those three). This is a genuine, verified difference in <em>POS</em>'s own argument order versus Bywater BASIC's <em>POS(A$, B$)</em> (haystack, needle), not just a documentation choice.</td>
 </tr>
 <tr>
 <td><em>POS</em></td>
-<td><em>POS(A$, B$, X)</em></td>
+<td><em>POS(needle$, haystack$, X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Return the 1-based position at which <em>needle$</em> first occurs within <em>haystack$</em>, searching from position <em>X</em>; 0 if not found. Same needle-first argument order as the two-argument form above.</td>
 </tr>
 <tr>
 <td><em>PRN</em></td>
@@ -1856,7 +1856,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>RAD</em>/<em>RADIAN</em></td>
 <td><em>RAD(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Convert <em>X</em> from degrees to radians. <em>RADIAN</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>RAN</em></td>
@@ -1880,7 +1880,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>RIGHT$</em></td>
 <td><em>RIGHT$(A$, X%)</em></td>
 <td><em>X%</em> &gt; 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the rightmost <em>X%</em> characters of <em>A$</em>.</td>
 </tr>
 <tr>
 <td><em>RND</em></td>
@@ -1892,56 +1892,56 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>ROUND</em></td>
 <td><em>ROUND(X, Y%)</em></td>
 <td>Y% ≥ 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return <em>X</em> rounded to <em>Y%</em> decimal places (a negative <em>Y%</em> rounds to the left of the decimal point).</td>
 </tr>
 <tr>
 <td><em>RTRIM$</em></td>
 <td><em>RTRIM$(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return <em>A$</em> with trailing spaces removed.</td>
 </tr>
 <tr>
 <td><em>SEC</em></td>
 <td><em>SEC(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the secant of <em>X</em> (1/cos(X)), in radians.</td>
 </tr>
 <tr>
 <td><em>SEG$</em></td>
 <td><em>SEG$(A$, X%, Y%)</em></td>
 <td><p><em>X%</em> ≥ 0</p>
 <p><em>Y%</em> &gt; 0</p></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return a substring of <em>A$</em> of length <em>Y%</em> characters, beginning at position <em>X%</em> (a position of 0 is treated the same as 1).</td>
 </tr>
 <tr>
 <td><em>SGN</em></td>
 <td><em>SGN(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the sign of <em>X</em>: -1 if negative, 0 if zero, or 1 if positive.</td>
 </tr>
 <tr>
 <td><em>SHELL</em></td>
 <td><em>SHELL(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Execute <em>A$</em> as an operating-system command, returning 0 on success or 1 on failure. Disabled when <em>--noshell</em> is in effect.</td>
 </tr>
 <tr>
 <td><em>SIN</em></td>
 <td><em>SIN(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the sine of <em>X</em>, in radians.</td>
 </tr>
 <tr>
 <td><em>SIND</em></td>
 <td><em>SIND(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the sine of <em>X</em>, in degrees.</td>
 </tr>
 <tr>
 <td><em>SINH</em></td>
 <td><em>SINH(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the hyperbolic sine of <em>X</em>. <em>HSN</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>SQR</em></td>
@@ -1977,19 +1977,19 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>TAN</em></td>
 <td><em>TAN(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the tangent of <em>X</em>, in radians.</td>
 </tr>
 <tr>
 <td><em>TAND</em></td>
 <td><em>TAND(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the tangent of <em>X</em>, in degrees.</td>
 </tr>
 <tr>
 <td><em>TANH</em></td>
 <td><em>TANH(X)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the hyperbolic tangent of <em>X</em>. <em>HTN</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>TCF</em></td>
@@ -2020,13 +2020,13 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>TIMER</em></td>
 <td>No arguments</td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the number of seconds elapsed since midnight, per the system clock.</td>
 </tr>
 <tr>
 <td><em>TRIM$</em></td>
 <td><em>TRIM$(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return <em>A$</em> with both leading and trailing spaces removed.</td>
 </tr>
 <tr>
 <td><em>TRN</em></td>
@@ -2044,19 +2044,19 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>TRUNCATE</em></td>
 <td><em>TRUNCATE(X, Y%)</em></td>
 <td><em>Y%</em> ≥ 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return <em>X</em> truncated (toward zero) to <em>Y%</em> decimal places (a negative <em>Y%</em> truncates to the left of the decimal point).</td>
 </tr>
 <tr>
 <td><em>UBOUND</em></td>
 <td><em>UBOUND(arrayname)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the upper bound (last valid subscript) of the named array. Works for both virtual (<em>ARRAY</em>) and real (<em>DIM</em>) arrays; returns missing if the array does not exist. <em>HBOUND</em> is the SAS-compatible spelling.</td>
 </tr>
 <tr>
 <td><em>UCASE$</em></td>
 <td><em>UCASE$(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return <em>A$</em> with every lowercase letter replaced by its uppercase equivalent. <em>UPPER$</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>UCF</em></td>
@@ -2080,7 +2080,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>UPPER$</em></td>
 <td><em>UPPER$(A$)</em></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Synonym for <em>UCASE$</em>.</td>
 </tr>
 <tr>
 <td><em>URN</em></td>
