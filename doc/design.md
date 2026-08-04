@@ -321,7 +321,7 @@ Usage with LET/SET:
 
 - Numeric Literals:
 
-  - Base ten only (may change in future versions).
+  - Base ten only (may change in future versions; tracked in §8.5).
   - May be integers, floating point numbers, or E notation.
   - Missing numeric value: unquoted period (*.*).
 
@@ -418,7 +418,7 @@ Three file formats are supported for data input and output:
   - If formula cannot be evaluated (errors or unsupported functions):
 
     - Cell treated as missing value.
-    - Formulas not supported for internal calculations or output.
+    - Formulas not supported for internal calculations or output (enhanced formula evaluation is tracked in §8.5).
 
 - Merged Cells:
 
@@ -431,7 +431,7 @@ Three file formats are supported for data input and output:
 
 Same behavior as ODF spreadsheets (see above).
 
-**Note:** Support for other formats likely to be added in future versions.
+**Note:** Support for other formats likely to be added in future versions (tracked in §8.5).
 
 ### 4.2 Input Operations
 
@@ -543,7 +543,7 @@ Record Processing:
   - Blocks need not be in sorted order.
   - Missing values in *BY* variables treated as distinct values for grouping purposes.
 
-- **Requirements:** - *USE* statement must be in effect; otherwise *BY* statement fails with error message
+- **Requirements:** - A *USE* statement or an active *REPEAT* must be in effect; otherwise *BY* statement fails with error message (see the *BY* command reference, §7.1, for the exact condition).
 
 - Functions:
 
@@ -807,10 +807,22 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>Description</td>
 </tr>
 <tr>
+<td><em>AGGREGATE</em></td>
+<td><em>AGGREGATE</em> &lt;<em>outvar</em>&gt;=&lt;<em>fn</em>&gt;(&lt;<em>invar</em>&gt;) [&lt;<em>outvar</em>&gt;=&lt;<em>fn</em>&gt;(&lt;<em>invar</em>&gt;)...]</td>
+<td>Immediate Execution</td>
+<td>Collapse the data table to one row per active <em>BY</em> group, computing an aggregate function for each <em>outvar</em>. With no active <em>BY</em>, the whole table is one group. <em>fn</em> is any registered aggregate function (<em>SUM</em>, <em>MEAN</em>, <em>STD</em>, <em>VAR</em>, <em>MIN</em>, <em>MAX</em>, <em>N</em>, <em>NMISS</em>, <em>GMEAN</em>, <em>HMEAN</em>, <em>MEDIAN</em>); non-aggregate functions are rejected at parse time. An aggregate function accepts a character input only if its dispatch metadata permits it (currently only <em>N</em> and <em>NMISS</em>). <em>invar</em> may be a scalar column, a whole array (the output is an array with the input's bounds, computed element-wise), or an array element such as <em>x(1)</em>. Every function except <em>N</em> requires an argument; <em>N()</em> with no argument yields the integer group row count. The output table has the active BY variables (one row per group) followed by the outvar columns in command order. The active <em>SELECT</em> filter is respected during the group scan; if a <em>SAVE</em> is pending the result is written to it; then the active <em>SELECT</em> and <em>BY</em> are cleared. If un-run deferred statements are pending, or an active <em>REPEAT n</em> body has not yet reached its matching <em>RUN</em>, AGGREGATE performs an implicit <em>RUN</em> first (see §5.7), then proceeds. Note that because <em>BY</em> sorts the table, equal BY-key values are always grouped together even if they were non-adjacent in the input.</td>
+</tr>
+<tr>
 <td><em>ARRAY</em></td>
 <td><em>ARRAY </em>&lt;<em>array name</em>&gt; [&lt;&gt;...]</td>
 <td>Declarative</td>
 <td>Create a virtual array consisting of the variables specified (comma delimited list). Specifying the array name without the list undefines any virtual arrays by that name (but not any actual arrays). Issuing the command only lists the virtual arrays currently defined. Virtual arrays may be referenced in exactly the same ways as actual arrays created by the <em>DIM</em> command. If an actual array with the name specified already exists then the command shall fail with an error message. If a virtual array with the name specified exists then the new definition shall replace the old one. All variables constituting the new array must exist and must be of the same type.</td>
+</tr>
+<tr>
+<td><em>BREAK</em></td>
+<td><em>BREAK</em> | <em>BREAK WHEN</em> &lt;<em>boolean-expr</em>&gt;</td>
+<td>Deferred Execution</td>
+<td>Pause execution and enter the interactive debug inspection prompt. <em>BREAK</em> always pauses; <em>BREAK WHEN</em> &lt;<em>expr</em>&gt; pauses only when the condition is true. Valid only inside a data step (deferred context); ignored in immediate mode. When paused, the inspection prompt accepts <em>PRINT</em> &lt;<em>expr</em>&gt; (evaluate and display any expression), <em>RECORD n</em>/<em>+n</em>/<em>-n</em> (load or move to a record in the inspection view), <em>CONTINUE</em>/<em>C</em> (resume from the paused point), <em>STEP</em>/<em>S</em> (resume to the next record, then pause again), and <em>RUN</em> (resume to completion with no further automatic pausing). In non-interactive mode (stdin not a TTY), <em>BREAK</em> emits a trace line to stderr and continues automatically without waiting for input.</td>
 </tr>
 <tr>
 <td><em>BY</em></td>
@@ -819,22 +831,10 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>Divide the input into blocks defined by the combination of variable values. An empty <em>BY</em> statement cancels any <em>BY</em> statement currently in effect. A new <em>BY</em> statement overrides any <em>BY</em> statement currently in effect. Blocks are defined by consecutive records with the same combination of <em>BY</em> variable values. A new block begins whenever any <em>BY </em>variable value changes, even if a previous block had the same combination of values. The blocks need not be in sorted order. Missing values in the named variables shall be treated as distinct values for grouping purposes. Each named variable must be an existing column; an undefined name (for example, a dropped type suffix) is rejected with an <em>undefined variable</em> error rather than establishing a spurious single group. If no <em>USE</em> statement is in effect and no <em>REPEAT</em> is active then a <em>BY</em> statement shall fail with an error message.</td>
 </tr>
 <tr>
-<td><em>REMOVE</em></td>
-<td><em>REMOVE</em> &lt;<em>line</em>&gt; [<em>-</em> &lt;<em>line</em>&gt;]</td>
-<td>Immediate Execution</td>
-<td>Delete an inclusive range of lines from the program buffer (a single <em>line</em> deletes just that line). If the buffer is empty, or if either line number is out of range, or the range is reversed (first line greater than the second), the command prints a warning and does nothing — no partial deletion occurs. Deleting lines also adjusts the <em>INSERT</em> cursor: a cursor at or after the deleted range shifts back by the number of lines removed, a cursor inside the deleted range snaps to just before it, and a cursor before the deleted range is unaffected. Only meaningful in interactive (REPL) mode. (Renamed from <em>DELETE</em> &lt;<em>line</em>&gt; [<em>-</em> &lt;<em>line</em>&gt;] by issue #63 / ADR-054, to resolve the keyword overload with the <em>DELETE</em> record-delete statement below.)</td>
-</tr>
-<tr>
 <td><em>DELETE</em></td>
 <td><em>DELETE</em></td>
 <td>Deferred Execution</td>
 <td>Delete the current record and start processing the next record.</td>
-</tr>
-<tr>
-<td><em>INSERT</em></td>
-<td><em>INSERT</em> [ &lt;<em>line</em>&gt; | <em>$</em> ]</td>
-<td>Immediate Execution</td>
-<td>Set the program-buffer insertion point so subsequently entered deferred statements are inserted there instead of appended. <em>INSERT 0</em> inserts before the first line; <em>INSERT n</em> inserts after existing line <em>n</em>; <em>INSERT $</em> (or bare <em>INSERT</em>) appends at the end (the default). The cursor is sticky: it persists across <em>RUN</em> and advances as lines are inserted; <em>NEW</em> or another <em>INSERT</em> resets it. A line number past the end warns and clamps to the end; a negative line number is rejected with a warning. Only meaningful in interactive (REPL) mode.</td>
 </tr>
 <tr>
 <td><em>DIGITS</em></td>
@@ -847,6 +847,18 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>DIM</em> &lt;<em>arrayname</em>&gt; <em>([</em>&lt;<em>lower</em>&gt; <em>TO ] </em>&lt;<em>upper&gt;)</em> [<em>/TEMP</em>]</td>
 <td>Declarative</td>
 <td>Declares a real array, saved to the output dataset as a set of subscripted variables unless <em>/TEMP</em> is appended, in which case it is a temporary array not written to output datasets. Omitting <em>lower</em> defaults it to <em>1</em>; a reversed range (<em>lower</em> greater than <em>upper</em>) fails with an error message. Re-issuing <em>DIM</em> against a name that already names a <em>real</em> array of matching temporary/permanent status resizes it in place: elements still within the new bounds keep their existing data, and elements that fall outside the new bounds are dropped. A <em>DIM</em> that would change an existing real array's temporary status fails with an error message, as does a <em>DIM</em> naming an existing virtual array (see <em>ARRAY</em>). A <em>DIM</em> whose generated element names collide with a pre-existing plain scalar variable is not separately checked.</td>
+</tr>
+<tr>
+<td><em>DISPLAY</em></td>
+<td><em>DISPLAY</em> [&lt;<em>varname</em>&gt;...]</td>
+<td>Immediate Execution</td>
+<td>Show the current Data Table as a formatted table with a record-number column. With no arguments all columns are shown; with a variable list only those columns appear. Column ranges are supported (e.g. <em>DISPLAY A-Z</em>). Respects any active <em>SELECT</em> filter.</td>
+</tr>
+<tr>
+<td><em>DO</em>/<em>UNTIL</em></td>
+<td></td>
+<td>Deferred Execution</td>
+<td>Post-test loop, as specified in the BW BASIC documentation (there spelled <em>REPEAT</em>/<em>UNTIL</em>; renamed here by issue #63 / ADR-054 to resolve the keyword overload with the <em>REPEAT n</em> data-step command above).</td>
 </tr>
 <tr>
 <td><em>DROP</em></td>
@@ -889,6 +901,12 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td></td>
 <td>Deferred Execution</td>
 <td>As specified in the BW BASIC documentation.</td>
+</tr>
+<tr>
+<td><em>INSERT</em></td>
+<td><em>INSERT</em> [ &lt;<em>line</em>&gt; | <em>$</em> ]</td>
+<td>Immediate Execution</td>
+<td>Set the program-buffer insertion point so subsequently entered deferred statements are inserted there instead of appended. <em>INSERT 0</em> inserts before the first line; <em>INSERT n</em> inserts after existing line <em>n</em>; <em>INSERT $</em> (or bare <em>INSERT</em>) appends at the end (the default). The cursor is sticky: it persists across <em>RUN</em> and advances as lines are inserted; <em>NEW</em> or another <em>INSERT</em> resets it. A line number past the end warns and clamps to the end; a negative line number is rejected with a warning. Only meaningful in interactive (REPL) mode.</td>
 </tr>
 <tr>
 <td><em>KEEP</em></td>
@@ -952,6 +970,12 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>As specified in the BW BASIC documentation.</td>
 </tr>
 <tr>
+<td><em>REMOVE</em></td>
+<td><em>REMOVE</em> &lt;<em>line</em>&gt; [<em>-</em> &lt;<em>line</em>&gt;]</td>
+<td>Immediate Execution</td>
+<td>Delete an inclusive range of lines from the program buffer (a single <em>line</em> deletes just that line). If the buffer is empty, or if either line number is out of range, or the range is reversed (first line greater than the second), the command prints a warning and does nothing — no partial deletion occurs. Deleting lines also adjusts the <em>INSERT</em> cursor: a cursor at or after the deleted range shifts back by the number of lines removed, a cursor inside the deleted range snaps to just before it, and a cursor before the deleted range is unaffected. Only meaningful in interactive (REPL) mode. (Renamed from <em>DELETE</em> &lt;<em>line</em>&gt; [<em>-</em> &lt;<em>line</em>&gt;] by issue #63 / ADR-054, to resolve the keyword overload with the <em>DELETE</em> record-delete statement below.)</td>
+</tr>
+<tr>
 <td><em>RENAME</em></td>
 <td><em>RENAME </em>&lt;<em>oldname = newname, …&gt;</em></td>
 <td>Declarative</td>
@@ -963,12 +987,6 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>REPEAT</em> &lt;<em>n</em>&gt;</td>
 <td>Declarative</td>
 <td>Specify the number of records to be written to the internal table or output dataset. This command will cancel any <em>USE</em> statement currently in effect, and also cancels any queued deferred statements (<em>LET</em>, <em>SET</em>, etc.). Consequently, setup statements that should govern the <em>REPEAT</em> data step must be entered <em>after</em> the <em>REPEAT</em> command (the setup-after-REPEAT idiom).</td>
-</tr>
-<tr>
-<td><em>DO</em>/<em>UNTIL</em></td>
-<td></td>
-<td>Deferred Execution</td>
-<td>Post-test loop, as specified in the BW BASIC documentation (there spelled <em>REPEAT</em>/<em>UNTIL</em>; renamed here by issue #63 / ADR-054 to resolve the keyword overload with the <em>REPEAT n</em> data-step command above).</td>
 </tr>
 <tr>
 <td><em>RSEED</em></td>
@@ -1010,31 +1028,13 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>SORT</em></td>
 <td><em>SORT</em> &lt; <em>varname</em>&gt;...</td>
 <td>Immediate Execution</td>
-<td>Sort the output dataset by the variables named. Each named variable must be an existing column; naming one that does not exist (for example, a dropped type suffix such as <em>SORT N</em> for column <em>N%</em>) is rejected with an <em>undefined variable</em> error rather than silently leaving the data unsorted.</td>
-</tr>
-<tr>
-<td><em>AGGREGATE</em></td>
-<td><em>AGGREGATE</em> &lt;<em>outvar</em>&gt;=&lt;<em>fn</em>&gt;(&lt;<em>invar</em>&gt;) [&lt;<em>outvar</em>&gt;=&lt;<em>fn</em>&gt;(&lt;<em>invar</em>&gt;)...]</td>
-<td>Immediate Execution</td>
-<td>Collapse the data table to one row per active <em>BY</em> group, computing an aggregate function for each <em>outvar</em>. With no active <em>BY</em>, the whole table is one group. <em>fn</em> is any registered aggregate function (<em>SUM</em>, <em>MEAN</em>, <em>STD</em>, <em>VAR</em>, <em>MIN</em>, <em>MAX</em>, <em>N</em>, <em>NMISS</em>, <em>GMEAN</em>, <em>HMEAN</em>, <em>MEDIAN</em>); non-aggregate functions are rejected at parse time. An aggregate function accepts a character input only if its dispatch metadata permits it (currently only <em>N</em> and <em>NMISS</em>). <em>invar</em> may be a scalar column, a whole array (the output is an array with the input's bounds, computed element-wise), or an array element such as <em>x(1)</em>. Every function except <em>N</em> requires an argument; <em>N()</em> with no argument yields the integer group row count. The output table has the active BY variables (one row per group) followed by the outvar columns in command order. The active <em>SELECT</em> filter is respected during the group scan; if a <em>SAVE</em> is pending the result is written to it; then the active <em>SELECT</em> and <em>BY</em> are cleared. AGGREGATE refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). Note that because <em>BY</em> sorts the table, equal BY-key values are always grouped together even if they were non-adjacent in the input.</td>
-</tr>
-<tr>
-<td><em>TRANSPOSE</em></td>
-<td><em>TRANSPOSE</em> [/<em>KEEP</em>=<em>varlist</em>] [/<em>DROP</em>=<em>varlist</em>] [/<em>NAME</em>=<em>var$</em>] [/<em>ID</em>=<em>var</em>] [/<em>ARRAY</em>=<em>var</em>]</td>
-<td>Immediate Execution</td>
-<td>Reshape the data table: each column in the <em>transposed set</em> becomes one output row; each input row becomes one value column. With an active <em>BY</em>, each BY block is transposed separately into the same output table. The <em>transposed set</em> is determined by <em>/KEEP</em> and <em>/DROP</em> (combined as KEEP∖DROP; default: all non-BY columns). All columns in the transposed set must share a single type (all numeric or all character); a mixed set is an error. The output schema is: BY variables (one value per output row for that block), a name column (default <em>_NAME_$</em>, overridden by <em>/NAME=var$</em>) whose value is the original column name, and then the transposed value columns. <em>/ARRAY</em> and <em>/ID</em> are mutually exclusive; if neither is given, <em>/ARRAY=_X_</em> is implied. <em>/ARRAY=var</em> produces a long-form output: <em>var(1)..var(K)</em> where K is the maximum block row count across all blocks; shorter blocks are padded with missing values. The <em>/ARRAY</em> name's <em>$</em>-suffix must match the transposed-set type. <em>/ID=var</em> produces a wide-form output: the values of <em>var</em> become output column names (in first-encounter order across all blocks), and <em>var</em> is auto-excluded from the transposed set; sparse blocks (missing an ID value) leave that cell missing. The active <em>SELECT</em> filter is respected during the scan; a pending <em>SAVE</em> is written; then the active <em>SELECT</em> and <em>BY</em> are cleared. TRANSPOSE refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). See also <em>AGGREGATE</em>.</td>
+<td>Sort the output dataset by the variables named. Each named variable must be an existing column; naming one that does not exist (for example, a dropped type suffix such as <em>SORT N</em> for column <em>N%</em>) is rejected with an <em>undefined variable</em> error rather than silently leaving the data unsorted. If un-run deferred statements are pending, or an active <em>REPEAT n</em> body has not yet reached its matching <em>RUN</em>, SORT performs an implicit <em>RUN</em> first (see §5.7), then proceeds.</td>
 </tr>
 <tr>
 <td><em>STATS</em></td>
 <td><em>STATS</em> [<em>var</em> ...] [/<em>STATS</em>=<em>stat</em> ...] [/<em>NOPRINT</em>]</td>
 <td>Immediate Execution</td>
-<td>Compute summary statistics for the chosen <em>var</em> list (default: all numeric columns of the table, excluding the active <em>BY</em> variables), producing one output row per active <em>BY</em> group per variable. With no active <em>BY</em>, the whole (<em>SELECT</em>-filtered) table is one group. The output schema is: the active BY variables, then a name column <em>_NAME_$</em> holding each analysis variable's name, then one column per requested statistic. <em>/STATS=</em> lists the statistics (default <em>N MIN MEAN MAX STD</em>); any registered aggregate function is allowed (<em>SUM</em>, <em>MEAN</em>, <em>STD</em>, <em>VAR</em>, <em>MIN</em>, <em>MAX</em>, <em>N</em>, <em>NMISS</em>, <em>GMEAN</em>, <em>HMEAN</em>, <em>MEDIAN</em>); a non-aggregate name is rejected. A character variable is permitted only when every requested statistic accepts character input (currently only <em>N</em> and <em>NMISS</em>). A whole-array name expands to one row per element. <em>N</em> and <em>NMISS</em> columns are integer; the rest are float. The result replaces the in-memory table via build-and-swap; the table is printed (via DISPLAY) unless <em>/NOPRINT</em> is given. The active <em>SELECT</em> filter is respected during the scan; if a <em>SAVE</em> is pending the result is written to it; then the active <em>SELECT</em> and <em>BY</em> are cleared. STATS refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). See also <em>AGGREGATE</em>.</td>
-</tr>
-<tr>
-<td><em>TABLES</em></td>
-<td><em>TABLES</em> <em>request</em> [<em>request</em> ...] [/<em>CHISQ</em>] [/<em>MISSING</em>] [/<em>ORDER</em>=<em>FREQ</em>] [/<em>LIST</em>] [/<em>NOCUM</em>] [/<em>NOPERCENT</em>]</td>
-<td>Immediate Execution</td>
-<td>Print frequency and crosstabulation reports (SAS PROC FREQ analogue). A <em>request</em> is a single variable name (one-way table) or two or more variable names joined by <em>*</em> (crossing: <em>A*B</em> two-way; <em>A*B*C</em> multiway). Multiple requests per statement are allowed; all options apply to every request. <em>TABLES</em> is <strong>print-only</strong>: it never replaces the table, alters the PDV, flushes a pending <em>SAVE</em>, or clears <em>SELECT</em>/<em>BY</em>. The active <em>SELECT</em> filter is honored; one table set is produced per active <em>BY</em> group (with no active BY the whole table is one implicit group); <em>BY</em> and <em>SELECT</em> are left intact afterward. Options: <em>/CHISQ</em> requests chi-square-family statistics (see below); <em>/MISSING</em> treats missing as a valid category (default: excluded, reported as <em>Frequency Missing = N</em>); <em>/ORDER=FREQ</em> orders levels by descending frequency (default: by value); <em>/LIST</em> forces list format for two-way tables (presentation-only; no effect on statistics); <em>/NOCUM</em> suppresses cumulative columns (one-way and list forms); <em>/NOPERCENT</em> suppresses the overall cell percent. For crossings, an observation is excluded if <em>any</em> crossing variable is missing (SAS behavior), unless <em>/MISSING</em>. Output: one-way — level, Frequency, Percent, Cum Freq, Cum Percent, and a Total row; two-way (grid, default) — stacked cell Frequency/Percent/Row%/Col% plus row, column, and grand totals; multiway or two-way <em>/LIST</em> — list form (one row per observed combination, columns: crossing variables, Frequency, Percent, Cum Freq, Cum Percent). <em>/CHISQ</em> behavior by table dimension: one-way = equal-proportions goodness-of-fit (&#967;&#178; with DF = k&#8722;1); two-way = Pearson, Likelihood-Ratio, Continuity-Adjusted (2&#215;2 only, Yates), and Mantel-Haenszel chi-squares plus Phi, Contingency Coefficient, and Cram&#233;r&#8217;s V (a low-expected-count warning is printed when more than 20% of expected cell counts fall below 5); three-or-more-way = not computed (skipped with a warning). TABLES refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). See also <em>STATS</em>, <em>AGGREGATE</em>.</td>
+<td>Compute summary statistics for the chosen <em>var</em> list (default: all numeric columns of the table, excluding the active <em>BY</em> variables), producing one output row per active <em>BY</em> group per variable. With no active <em>BY</em>, the whole (<em>SELECT</em>-filtered) table is one group. The output schema is: the active BY variables, then a name column <em>_NAME_$</em> holding each analysis variable's name, then one column per requested statistic. <em>/STATS=</em> lists the statistics (default <em>N MIN MEAN MAX STD</em>); any registered aggregate function is allowed (<em>SUM</em>, <em>MEAN</em>, <em>STD</em>, <em>VAR</em>, <em>MIN</em>, <em>MAX</em>, <em>N</em>, <em>NMISS</em>, <em>GMEAN</em>, <em>HMEAN</em>, <em>MEDIAN</em>); a non-aggregate name is rejected. A character variable is permitted only when every requested statistic accepts character input (currently only <em>N</em> and <em>NMISS</em>). A whole-array name expands to one row per element. <em>N</em> and <em>NMISS</em> columns are integer; the rest are float. The result replaces the in-memory table via build-and-swap; the table is printed (via DISPLAY) unless <em>/NOPRINT</em> is given. The active <em>SELECT</em> filter is respected during the scan; if a <em>SAVE</em> is pending the result is written to it; then the active <em>SELECT</em> and <em>BY</em> are cleared. If un-run deferred statements are pending, or an active <em>REPEAT n</em> body has not yet reached its matching <em>RUN</em>, STATS performs an implicit <em>RUN</em> first (see §5.7), then proceeds. See also <em>AGGREGATE</em>.</td>
 </tr>
 <tr>
 <td><em>SUBMIT</em></td>
@@ -1049,16 +1049,34 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td>Execute the specified system command. If no command is given, then spawn a shell and resume the program when the shell exits. If the command is quoted, then it will be taken literally. Otherwise, it will be taken as the name of a variable or expression. If execution of a system command inside of a program is desired, then use the <em>SHELL</em> function.</td>
 </tr>
 <tr>
+<td><em>TABLES</em></td>
+<td><em>TABLES</em> <em>request</em> [<em>request</em> ...] [/<em>CHISQ</em>] [/<em>MISSING</em>] [/<em>ORDER</em>=<em>FREQ</em>] [/<em>LIST</em>] [/<em>NOCUM</em>] [/<em>NOPERCENT</em>]</td>
+<td>Immediate Execution</td>
+<td>Print frequency and crosstabulation reports (SAS PROC FREQ analogue). A <em>request</em> is a single variable name (one-way table) or two or more variable names joined by <em>*</em> (crossing: <em>A*B</em> two-way; <em>A*B*C</em> multiway). Multiple requests per statement are allowed; all options apply to every request. <em>TABLES</em> is <strong>print-only</strong>: it never replaces the table, alters the PDV, flushes a pending <em>SAVE</em>, or clears <em>SELECT</em>/<em>BY</em>. The active <em>SELECT</em> filter is honored; one table set is produced per active <em>BY</em> group (with no active BY the whole table is one implicit group); <em>BY</em> and <em>SELECT</em> are left intact afterward. Options: <em>/CHISQ</em> requests chi-square-family statistics (see below); <em>/MISSING</em> treats missing as a valid category (default: excluded, reported as <em>Frequency Missing = N</em>); <em>/ORDER=FREQ</em> orders levels by descending frequency (default: by value); <em>/LIST</em> forces list format for two-way tables (presentation-only; no effect on statistics); <em>/NOCUM</em> suppresses cumulative columns (one-way and list forms); <em>/NOPERCENT</em> suppresses the overall cell percent. For crossings, an observation is excluded if <em>any</em> crossing variable is missing (SAS behavior), unless <em>/MISSING</em>. Output: one-way — level, Frequency, Percent, Cum Freq, Cum Percent, and a Total row; two-way (grid, default) — stacked cell Frequency/Percent/Row%/Col% plus row, column, and grand totals; multiway or two-way <em>/LIST</em> — list form (one row per observed combination, columns: crossing variables, Frequency, Percent, Cum Freq, Cum Percent). <em>/CHISQ</em> behavior by table dimension: one-way = equal-proportions goodness-of-fit (&#967;&#178; with DF = k&#8722;1); two-way = Pearson, Likelihood-Ratio, Continuity-Adjusted (2&#215;2 only, Yates), and Mantel-Haenszel chi-squares plus Phi, Contingency Coefficient, and Cram&#233;r&#8217;s V (a low-expected-count warning is printed when more than 20% of expected cell counts fall below 5); three-or-more-way = not computed (skipped with a warning). TABLES refuses to run while un-run deferred statements are pending (issue <em>RUN</em> or <em>NEW</em> first). See also <em>STATS</em>, <em>AGGREGATE</em>.</td>
+</tr>
+<tr>
+<td><em>TRANSPOSE</em></td>
+<td><em>TRANSPOSE</em> [/<em>KEEP</em>=<em>varlist</em>] [/<em>DROP</em>=<em>varlist</em>] [/<em>NAME</em>=<em>var$</em>] [/<em>ID</em>=<em>var</em>] [/<em>ARRAY</em>=<em>var</em>]</td>
+<td>Immediate Execution</td>
+<td>Reshape the data table: each column in the <em>transposed set</em> becomes one output row; each input row becomes one value column. With an active <em>BY</em>, each BY block is transposed separately into the same output table. The <em>transposed set</em> is determined by <em>/KEEP</em> and <em>/DROP</em> (combined as KEEP∖DROP; default: all non-BY columns). All columns in the transposed set must share a single type (all numeric or all character); a mixed set is an error. The output schema is: BY variables (one value per output row for that block), a name column (default <em>_NAME_$</em>, overridden by <em>/NAME=var$</em>) whose value is the original column name, and then the transposed value columns. <em>/ARRAY</em> and <em>/ID</em> are mutually exclusive; if neither is given, <em>/ARRAY=_X_</em> is implied. <em>/ARRAY=var</em> produces a long-form output: <em>var(1)..var(K)</em> where K is the maximum block row count across all blocks; shorter blocks are padded with missing values. The <em>/ARRAY</em> name's <em>$</em>-suffix must match the transposed-set type. <em>/ID=var</em> produces a wide-form output: the values of <em>var</em> become output column names (in first-encounter order across all blocks), and <em>var</em> is auto-excluded from the transposed set; sparse blocks (missing an ID value) leave that cell missing. The active <em>SELECT</em> filter is respected during the scan; a pending <em>SAVE</em> is written; then the active <em>SELECT</em> and <em>BY</em> are cleared. If un-run deferred statements are pending, or an active <em>REPEAT n</em> body has not yet reached its matching <em>RUN</em>, TRANSPOSE performs an implicit <em>RUN</em> first (see §5.7), then proceeds. See also <em>AGGREGATE</em>.</td>
+</tr>
+<tr>
 <td><em>UNHOLD</em></td>
 <td><em>UNHOLD</em></td>
 <td>Declarative</td>
 <td>Cancel any <em>HOLD</em> statement currently in effect.</td>
 </tr>
 <tr>
+<td><em>UNSET</em></td>
+<td><em>UNSET</em> &lt;<em>varname</em>&gt;...</td>
+<td>Immediate Execution</td>
+<td>Remove one or more temporary (<em>SET</em>) variables from memory. A removed name may then be redefined as a permanent variable via <em>LET</em> (see &sect;3.5's redefinition rules) or recreated as a new temporary variable via <em>SET</em>.</td>
+</tr>
+<tr>
 <td><em>USE</em></td>
-<td><em>USE</em> [<em>MOCK</em> | &lt;<em>filename</em>&gt;]<em> / NSCAN =</em> &lt;<em>n</em>&gt;</td>
+<td><em>USE</em> [<em>MOCK</em> | &lt;<em>spec</em>&gt;[<em>, </em>&lt;<em>spec</em>&gt;...]] [<em>/BY=</em>&lt;<em>varname</em>&gt;...] [<em>/INTERLEAVE</em> | <em>/JOIN</em> | <em>/APPEND</em>] <em>/ NSCAN =</em> &lt;<em>n</em>&gt;</td>
 <td>Declarative</td>
-<td>Open a dataset for reading and display the names of the columns and the number of records. The internal table shall be overwritten with the contents of the file. Any column with a name that ends in “$” is assumed to be character. Otherwise, any column with non-numeric values in any of the first <em>n</em> rows (if there are that many) will be taken as character and “$” will be added to the name. If subsequently, a non-numeric value appears in such a column, it will be taken as missing and a warning will be issued (maximum of 10 shall be written). If a column name appears more than once in the file, only the last column with the name will be used and a warning shall be issued. If the file name is unquoted, it is converted to uppercase. If the name is unquoted and has no extension,<em>  </em>“.CSV” is appended to the name. The default directory is the current working directory unless changed by the <em>FPATH</em> command. The format of the file will be assumed based on the file name extension. Any <em>DROP</em>, <em>KEEP</em>, <em>LET</em>, <em>or</em> <em>REPEAT</em> statements are canceled when a new dataset is read in. <em>USE MOCK</em> generates mock data for testing purposes.</td>
+<td>Open a dataset for reading and display the names of the columns and the number of records. The internal table shall be overwritten with the contents of the file. Any column with a name that ends in “$” is assumed to be character. Otherwise, any column with non-numeric values in any of the first <em>n</em> rows (if there are that many) will be taken as character and “$” will be added to the name. If subsequently, a non-numeric value appears in such a column, it will be taken as missing and a warning will be issued (maximum of 10 shall be written). If a column name appears more than once in the file, only the last column with the name will be used and a warning shall be issued. If the file name is unquoted, it is converted to uppercase. If the name is unquoted and has no extension,<em>  </em>“.CSV” is appended to the name. The default directory is the current working directory unless changed by the <em>FPATH</em> command. The format of the file will be assumed based on the file name extension. Any <em>DROP</em>, <em>KEEP</em>, <em>LET</em>, <em>or</em> <em>REPEAT</em> statements are canceled when a new dataset is read in. <em>USE MOCK</em> generates mock data for testing purposes.<p><strong>Multi-file merge:</strong> when two or more comma-separated <em>spec</em>s are given (each of the form &lt;<em>file</em>&gt;[<em>[</em>&lt;<em>sheet</em>&gt;<em>]</em>] [<em>AS</em> &lt;<em>alias</em>&gt;] [<em>(</em>&lt;<em>per-dataset options</em>&gt;<em>)</em>]; for ODF/OOXML workbooks a sheet name may follow the filename in brackets, e.g. <em>"sales.xlsx[Q1]"</em>, defaulting to the first sheet), <em>USE</em> merges them into a single table instead of loading one file. With no <em>/BY=</em> option, rows are combined positionally (shorter datasets are padded with missing values). With <em>/BY=</em>&lt;<em>varname</em>&gt;<em>...</em> alone, inputs are auto-sorted by the BY variables and corresponding BY-group rows are match-merged (full outer); a warning is emitted for each BY group in which two or more inputs each contribute more than one row. <em>/BY=</em>&lt;<em>varname</em>&gt;<em>... /INTERLEAVE</em> retains all rows from every input, emitted in BY-sorted order. <em>/BY=</em>&lt;<em>varname</em>&gt;<em>... /JOIN</em> produces a Cartesian inner join of every row combination within each BY group, dropping unmatched groups; a warning is emitted if a group's Cartesian product exceeds <em>OPTIONS JOIN_WARN_THRESHOLD</em>. <em>/APPEND</em> vertically stacks all rows of every input in the order the specs are listed, taking the union of the input columns by name — a row carries missing values for any column its source dataset lacks; same-named numeric columns are reconciled (integer and floating-point promote to floating-point); and a character column always keeps its trailing “$” name, so a numeric and a character field of the same base name remain distinct columns. <em>/APPEND</em> requires two or more datasets and may not be combined with <em>/BY=</em>, <em>/INTERLEAVE</em>, or <em>/JOIN</em> (use <em>/INTERLEAVE</em> for BY-sorted stacking).</p></td>
 </tr>
 <tr>
 <td><em>WHILE</em>/<em>WEND</em></td>
@@ -1118,10 +1136,40 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>As specified in the BW BASIC. documentation</td>
 </tr>
 <tr>
+<td><em>ASC</em></td>
+<td><em>ASC(A$)</em></td>
+<td></td>
+<td>Synonym for <em>ASCII</em> (the BW BASIC spelling).</td>
+</tr>
+<tr>
 <td><em>ASCII</em></td>
 <td><em>ASCII(A$)</em></td>
 <td></td>
 <td>As specified in the BW BASIC documentation.</td>
+</tr>
+<tr>
+<td><em>ATAN2</em></td>
+<td><em>ATAN2(y, x)</em></td>
+<td></td>
+<td>Return the arctangent of <em>y/x</em>, in radians, using the signs of both arguments to determine the correct quadrant.</td>
+</tr>
+<tr>
+<td><em>ATAN2D</em></td>
+<td><em>ATAN2D(y, x)</em></td>
+<td></td>
+<td>Return the arctangent of <em>y/x</em>, in degrees, using the signs of both arguments to determine the correct quadrant.</td>
+</tr>
+<tr>
+<td><em>ATN</em></td>
+<td><em>ATN(x)</em></td>
+<td></td>
+<td>Synonym for <em>ARCTAN</em> (the BW BASIC spelling).</td>
+</tr>
+<tr>
+<td><em>ATND</em></td>
+<td><em>ATND(x)</em></td>
+<td></td>
+<td>Return the arctangent of <em>x</em>, in degrees.</td>
 </tr>
 <tr>
 <td><em>BCF</em></td>
@@ -1173,6 +1221,18 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>Return a random number from the beta distribution. <em>p</em> and <em>q</em> are the alpha and beta shape parameters. Both must be greater than 0.</td>
 </tr>
 <tr>
+<td><em>CEIL</em></td>
+<td><em>CEIL(x)</em></td>
+<td></td>
+<td>Return the smallest integer greater than or equal to <em>x</em>.</td>
+</tr>
+<tr>
+<td><em>CHR$</em></td>
+<td><em>CHR$(n)</em></td>
+<td></td>
+<td>Return the character with ASCII code <em>n</em>.</td>
+</tr>
+<tr>
 <td><em>CLG</em></td>
 <td><em>CLG(X)</em></td>
 <td><em>X</em> &gt; 0</td>
@@ -1191,6 +1251,12 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>As specified in the BW BASIC documentation.</td>
 </tr>
 <tr>
+<td><em>COSH</em></td>
+<td><em>COSH(x)</em></td>
+<td></td>
+<td>Synonym for <em>HCS</em>.</td>
+</tr>
+<tr>
 <td><em>COT</em></td>
 <td><em>COT(X)</em></td>
 <td></td>
@@ -1203,6 +1269,12 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>As specified in the BW BASIC documentation.</td>
 </tr>
 <tr>
+<td><em>DATE$</em></td>
+<td>No arguments</td>
+<td></td>
+<td>Return the current date as <em>"YYYY-MM-DD"</em>.</td>
+</tr>
+<tr>
 <td><em>DEG</em>/<em>DEGREE</em></td>
 <td><em>DEG(x)</em></td>
 <td></td>
@@ -1211,13 +1283,13 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>ECF</em></td>
 <td><em>ECF(x)</em></td>
-<td>0 ≤ <em>x ≤ 1</em></td>
+<td><em>x</em> ≥ 0</td>
 <td>Return the value of the cumulative distribution function of the exponential distribution where <em>x</em> is the evaluation point.</td>
 </tr>
 <tr>
 <td><em>EDF</em></td>
 <td><em>EDF(x)</em></td>
-<td>0 ≤ <em>x ≤ 1</em></td>
+<td><em>x</em> ≥ 0</td>
 <td>Return the value of the probability density function of the exponential distribution where <em>x</em> is the evaluation point.</td>
 </tr>
 <tr>
@@ -1239,10 +1311,22 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>True (1) for the last record of a <em>BY</em> group and false (0) otherwise. Same value as <em>EOF</em> if a <em>BY</em> statement is not in effect.</td>
 </tr>
 <tr>
+<td><em>ERL</em></td>
+<td>No arguments</td>
+<td></td>
+<td>Return the record number where the last caught error occurred (0 if no error has been caught in the current session). Set alongside <em>ERR</em> when the <em>-k</em>/<em>--continue-on-error</em> option catches a runtime error. Reset to 0 by <em>NEW</em>.</td>
+</tr>
+<tr>
 <td><em>ERN</em></td>
 <td><em>ERN</em></td>
 <td></td>
 <td>Return a random number in the exponential distribution.</td>
+</tr>
+<tr>
+<td><em>ERR</em></td>
+<td>No arguments</td>
+<td></td>
+<td>Return the last error code (0 = no error, 1 = error caught). Set when an error is caught under <em>-k</em>/<em>--continue-on-error</em>; not set by <em>--ignore-math-errors</em> domain warnings. Reset to 0 by <em>NEW</em>.</td>
 </tr>
 <tr>
 <td><em>EXP</em></td>
@@ -1259,7 +1343,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>FCF</em></td>
 <td><em>FCF(F, df1, df2)</em></td>
-<td><p>0 ≤ <em>F</em> ≤ 1</p>
+<td><p><em>F</em> ≥ 0</p>
 <p><em>df1 </em>&gt; 0</p>
 <p><em>df2 </em>&gt; 0</p></td>
 <td>Return the value of the cumulative distribution function of the F distribution where <em>F</em> is the evaluation point and <em>df1</em> and <em>df2</em> are the set of degrees of freedom.</td>
@@ -1267,7 +1351,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>FDF</em></td>
 <td><em>FDF(F, df1, df2)</em></td>
-<td><p>0 ≤ <em>F</em> ≤ 1</p>
+<td><p><em>F</em> ≥ 0</p>
 <p><em>df1 </em>&gt; 0</p>
 <p><em>df2 </em>&gt; 0</p></td>
 <td>Return the value of the probability density function of the F distribution where <em>F</em> is the evaluation point and <em>df1</em> and <em>df2</em> are the set of degrees of freedom.</td>
@@ -1287,6 +1371,12 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>As specified in the BW BASIC documentation</td>
 </tr>
 <tr>
+<td><em>FLOOR</em></td>
+<td><em>FLOOR(x)</em></td>
+<td></td>
+<td>Return the largest integer less than or equal to <em>x</em>.</td>
+</tr>
+<tr>
 <td><em>FP</em>/<em>FRAC</em></td>
 <td><em>FP(X)</em></td>
 <td></td>
@@ -1302,14 +1392,14 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>GCF</em></td>
 <td><em>GCF(γ, p)</em></td>
-<td><p>0 ≤ <em>γ</em> ≤ 1</p>
+<td><p><em>γ</em> ≥ 0</p>
 <p><em>p</em> &gt; 0</p></td>
 <td>Return the value of the cumulative distribution function of the gamma distribution where  <em>γ </em>is the evaluation point and <em>p </em>is the shape parameter.</td>
 </tr>
 <tr>
 <td><em>GDF</em></td>
 <td><em>GDF(γ, p)</em></td>
-<td><p>0 ≤ <em>γ</em> ≤ 1</p>
+<td><p><em>γ</em> ≥ 0</p>
 <p><em>p</em> &gt; 0</p></td>
 <td>Return the value of the gamma density function where <em>γ </em>is the evaluation point and <em>p </em>is the shape parameter.</td>
 </tr>
@@ -1331,6 +1421,12 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>GRN(p)</em></td>
 <td><em>p</em> &gt; 0</td>
 <td>Return a random number in the gamma distribution where <em>p</em> is the shape parameter.</td>
+</tr>
+<tr>
+<td><em>HBOUND</em></td>
+<td><em>HBOUND(arrayname)</em></td>
+<td></td>
+<td>Synonym for <em>UBOUND</em> (SAS-style name).</td>
 </tr>
 <tr>
 <td><em>HCS</em></td>
@@ -1375,6 +1471,12 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>As specified in the BW BASIC documentation</td>
 </tr>
 <tr>
+<td><em>INF</em></td>
+<td><em>INF(x)</em></td>
+<td></td>
+<td>Return 1 if <em>x</em> is <em>+Inf</em> or <em>-Inf</em>, else 0 (including for missing values and strings). <em>Inf</em> arises from arithmetic overflow or from floating-point division by zero when <em>OPTIONS IEEE_DIVIDE YES</em> is set. Combine with a sign test (e.g. <em>INF(x) AND x &gt; 0</em>) to distinguish positive from negative infinity; <em>NOT INF(x)</em> serves the role of a <em>FINITE()</em> test for non-missing values.</td>
+</tr>
+<tr>
 <td><em>INSTR</em></td>
 <td>INSTR(<em>X%</em>, <em>A$</em>, <em>B$</em>)</td>
 <td></td>
@@ -1399,6 +1501,12 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>Return the <em>n</em>th prior value of the specified scalar variable, array, or array subset of any type. If <em>n</em> is unspecified then it will default to 1. If an array or array subset is specified, an array of the same size is returned. If there are fewer than <em>n</em> prior records, then return a missing value or an array of missing values as the case may require. The value returned will always be of the same type as the specified variable. If a <em>BY</em> statement is in effect then the search shall be restricted to records within the current <em>BY</em> group.</td>
 </tr>
 <tr>
+<td><em>LAGC$</em></td>
+<td><em>LAGC$(</em>&lt;<em>varname</em>&gt; [<em>, </em>&lt;<em>n</em>&gt;]<em>)</em></td>
+<td><em>n</em> &gt; 0</td>
+<td>String-returning form of <em>LAG</em>: returns the <em>n</em>th prior value of the named variable as a character value.</td>
+</tr>
+<tr>
 <td><em>LBOUND</em></td>
 <td><em>LBOUND(arrayname)</em></td>
 <td></td>
@@ -1413,20 +1521,14 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>LCF</em></td>
 <td><em>LCF(x)</em></td>
-<td>0 ≤ <em>x</em> ≤ 1</td>
+<td></td>
 <td>Return the value of the cumulative distribution function of the logistic distribution where <em>x</em> is the evaluation point.</td>
 </tr>
 <tr>
 <td><em>LDF</em></td>
 <td><em>LDF(x)</em></td>
-<td>0 ≤ <em>x</em> ≤ 1</td>
-<td>Return the value of the inverse probability density function function of the logistic distribution where <em>x</em> is the evaluation point.</td>
-</tr>
-<tr>
-<td><em>LIF</em></td>
-<td><em>LIF(p</em>)</td>
-<td>0 ≤ <em>p</em> ≤ 1</td>
-<td>Return the value of the probability density function function of the logistic distribution where <em>p</em> is the probability.</td>
+<td></td>
+<td>Return the value of the probability density function of the logistic distribution where <em>x</em> is the evaluation point.</td>
 </tr>
 <tr>
 <td><em>LEFT$</em></td>
@@ -1445,6 +1547,12 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>LGT(X)</em></td>
 <td><em>X</em> &gt; 0</td>
 <td>As specified in the BW BASIC documentation.</td>
+</tr>
+<tr>
+<td><em>LIF</em></td>
+<td><em>LIF(p</em>)</td>
+<td>0 ≤ <em>p</em> ≤ 1</td>
+<td>Return the value of the inverse probability density function of the logistic distribution where <em>p</em> is the probability.</td>
 </tr>
 <tr>
 <td><em>LN</em></td>
@@ -1516,7 +1624,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>MAXINT</em></td>
 <td></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the largest representable integer value: 9,223,372,036,854,775,807 (see §2.2's 64-bit integer type; not the same value as BW BASIC's own <em>MAXINT</em>).</td>
 </tr>
 <tr>
 <td><em>MAXLEN</em></td>
@@ -1534,7 +1642,19 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>MAXNUM</em></td>
 <td></td>
 <td></td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the largest finite value representable by the floating point type (see §2.2's IEEE 754 double precision type; not the same value as BW BASIC's own <em>MAXNUM</em>).</td>
+</tr>
+<tr>
+<td><em>MCF</em></td>
+<td><em>MCF(x,n,p)</em></td>
+<td></td>
+<td>Synonym for <em>NCF</em> (alternative naming convention for the binomial distribution).</td>
+</tr>
+<tr>
+<td><em>MDF</em></td>
+<td><em>MDF(x,n,p)</em></td>
+<td></td>
+<td>Synonym for <em>NDF</em> (alternative naming convention for the binomial distribution).</td>
 </tr>
 <tr>
 <td><em>MEAN</em></td>
@@ -1555,6 +1675,12 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>As specified in the BW BASIC documentation</td>
 </tr>
 <tr>
+<td><em>MIF</em></td>
+<td><em>MIF(p,n,prob)</em></td>
+<td></td>
+<td>Synonym for <em>NIF</em> (alternative naming convention for the binomial distribution).</td>
+</tr>
+<tr>
 <td><em>MIN</em></td>
 <td><em>MIN(</em>&lt;<em>value</em>&gt;...<em>)</em></td>
 <td></td>
@@ -1564,13 +1690,13 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>MININT</em></td>
 <td></td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Return the smallest representable integer value: -9,223,372,036,854,775,808 (see §2.2's 64-bit integer type; not the same value as BW BASIC's own <em>MININT</em>).</td>
 </tr>
 <tr>
 <td><em>MINNUM</em></td>
 <td></td>
 <td></td>
-<td>As specified in the BW BASIC documentation</td>
+<td>Return the smallest positive value representable by the floating point type (nearest to zero, not the most negative finite value — see §2.2's IEEE 754 double precision type; not the same value as BW BASIC's own <em>MINNUM</em>).</td>
 </tr>
 <tr>
 <td><em>MISSING</em></td>
@@ -1585,9 +1711,21 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>As specified in the BW BASIC documentation.</td>
 </tr>
 <tr>
+<td><em>MRN</em></td>
+<td><em>MRN(n, p)</em></td>
+<td></td>
+<td>Synonym for <em>NRN</em> (alternative naming convention for the binomial distribution).</td>
+</tr>
+<tr>
+<td><em>N</em></td>
+<td><em>N(</em>&lt;<em>varname</em>&gt;...<em>)</em></td>
+<td></td>
+<td>Return the count of non-missing values across the supplied arguments. Arguments may be individual values or array names, which are expanded automatically.</td>
+</tr>
+<tr>
 <td><em>NCF</em></td>
 <td><em>NCF(x,n,p</em>)</td>
-<td><p>0 ≤ <em>x ≤ 1</em></p>
+<td><p>0 ≤ <em>x</em> ≤ <em>n</em></p>
 <p><em>n &gt; 0</em></p>
 <p><em>0 &lt;  p &lt; 1</em></p></td>
 <td>Return the value of the cumulative distribution function for the binomial distribution where <em>x</em> is the evaluation point, <em>n</em> is the number of trials, and <em>p</em> is the probability of success in each trial.</td>
@@ -1595,7 +1733,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>NDF</em></td>
 <td><em>NDF(x,n,p)</em></td>
-<td><p>0 ≤ <em>x ≤ 1</em></p>
+<td><p>0 ≤ <em>x</em> ≤ <em>n</em></p>
 <p><em>n &gt; 0</em></p>
 <p><em>0 &lt;  p &lt; 1</em></p></td>
 <td>Return the value of the probability density function for the binomial distribution where <em>x</em> is the evaluation point, <em>n</em> is the number of trials, and <em>p</em> is the probability of success in each trial.</td>
@@ -1605,6 +1743,20 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>NEXT(</em>&lt;<em>varname</em>&gt; [<em>, </em>&lt;<em>n&gt;</em>]<em>)</em></td>
 <td><em>n &gt; 0</em></td>
 <td>Return the <em>n</em>th succeeding value of the specified scalar variable, array, or array subset of any type. If <em>n</em> is unspecified then it shall default to 1. If an array or array subset is specified, an array of the same size is returned. If there are fewer than <em>n</em> succeeding records, then return a missing value or an array of missing values as the case may require. The value returned shall always be of the same type as the specified variable. If a <em>BY</em> statement is in effect then the search shall be restricted to records within the current <em>BY</em> group.</td>
+</tr>
+<tr>
+<td><em>NEXTC$</em></td>
+<td><em>NEXTC$(</em>&lt;<em>varname</em>&gt; [<em>, </em>&lt;<em>n</em>&gt;]<em>)</em></td>
+<td><em>n</em> &gt; 0</td>
+<td>String-returning form of <em>NEXT</em>: returns the <em>n</em>th succeeding value of the named variable as a character value.</td>
+</tr>
+<tr>
+<td><em>NIF</em></td>
+<td><em>NIF(p,n,prob)</em></td>
+<td><p>0 &lt; <em>p</em> &lt; 1</p>
+<p><em>n &gt; 0</em></p>
+<p>0 &lt; <em>prob</em> &lt; 1</p></td>
+<td>Return the quantile (inverse cumulative distribution) of the binomial distribution: the smallest <em>x</em> such that <em>NCF(x,n,prob)</em> ≥ <em>p</em>. <em>n</em> is the number of trials and <em>prob</em> is the probability of success in each trial.</td>
 </tr>
 <tr>
 <td><em>NMISS</em></td>
@@ -1632,6 +1784,18 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>As specified in the BW BASIC documentation, except that any number of arguments shall be accepted and shall be processed as by <em>NUM</em>. Only numeric arguments shall be permitted.</td>
 </tr>
 <tr>
+<td><em>OBS</em></td>
+<td><em>OBS(</em>&lt;<em>varname</em>&gt;<em>, </em>&lt;<em>row</em>&gt;<em>)</em></td>
+<td><em>row</em> ≥ 1</td>
+<td>Return the value of the named variable from the specified physical row (1-based), counting all rows regardless of any active <em>SELECT</em> filter — <em>OBS</em> ignores the logical/filtered view, unlike <em>LAG</em>/<em>NEXT</em>. Returns missing if <em>row</em> is out of range. <em>varname</em> may be given unquoted, e.g. <em>OBS(X, 3)</em>.</td>
+</tr>
+<tr>
+<td><em>OBSC$</em></td>
+<td><em>OBSC$(</em>&lt;<em>varname</em>&gt;<em>, </em>&lt;<em>row</em>&gt;<em>)</em></td>
+<td><em>row</em> ≥ 1</td>
+<td>String-returning form of <em>OBS</em>: returns the value of the named variable from the specified physical row as a character value.</td>
+</tr>
+<tr>
 <td><em>OCT$</em></td>
 <td><em>OCT$(X, Y% )</em></td>
 <td>0 &lt; <em>Y%</em> ≤ 255</td>
@@ -1646,15 +1810,15 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>PCF</em></td>
 <td><em>PCF(x, p)</em></td>
-<td><p>0 ≤ <em>x</em> ≤ 1</p>
-<p>0 ≤ <em>p</em> ≤ 1</p></td>
+<td><p><em>x</em> ≥ 0</p>
+<p><em>p</em> &gt; 0</p></td>
 <td>Return the value of the cumulative distribution function of the Poisson distribution where <em>x</em> is the evaluation point and <em>p</em> is the Poisson parameter.</td>
 </tr>
 <tr>
 <td><em>PDF</em></td>
 <td><em>PDF(</em>x<em>, p)</em></td>
-<td><p>0 ≤ <em>x</em> ≤ 1</p>
-<p>0 ≤ <em>p</em> ≤ 1</p></td>
+<td><p><em>x</em> ≥ 0</p>
+<p><em>p</em> &gt; 0</p></td>
 <td>Return the value of the probability mass function of the Poisson distribution where <em>x</em> is the evaluation point and <em>p</em> is the Poisson parameter.</td>
 </tr>
 <tr>
@@ -1667,7 +1831,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>PIF</em></td>
 <td><em>PIF(ᶲ, p)</em></td>
 <td><p>0 ≤ <em>ᶲ</em> ≤ 1</p>
-<p>0 ≤ <em>p</em> ≤ 1</p></td>
+<p><em>p</em> &gt; 0</p></td>
 <td>Return the value of the inverse probability mass function of the Poisson distribution where <em>ᶲ</em> is the probability and <em>p</em> is the Poisson parameter.</td>
 </tr>
 <tr>
@@ -1685,7 +1849,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>PRN</em></td>
 <td><em>PRN(p)</em></td>
-<td></td>
+<td><em>p</em> &gt; 0</td>
 <td>Return a random number in the Poisson distribution where <em>p</em> is the Poisson parameter.</td>
 </tr>
 <tr>
@@ -1695,10 +1859,34 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>As specified in the BW BASIC documentation.</td>
 </tr>
 <tr>
+<td><em>RAN</em></td>
+<td>No arguments</td>
+<td></td>
+<td>Return a uniform random number in [0, 1). <em>RANDOM</em> and <em>RND</em> are synonyms. Issue <em>RSEED n</em> before calling to get a reproducible sequence.</td>
+</tr>
+<tr>
+<td><em>RANDOM</em></td>
+<td>No arguments</td>
+<td></td>
+<td>Synonym for <em>RAN</em>.</td>
+</tr>
+<tr>
+<td><em>RECNO</em></td>
+<td>No arguments</td>
+<td></td>
+<td>Return the current logical record number (1-based). When a <em>SELECT</em> filter is active, <em>RECNO</em> counts only visible (filtered-in) records.</td>
+</tr>
+<tr>
 <td><em>RIGHT$</em></td>
 <td><em>RIGHT$(A$, X%)</em></td>
 <td><em>X%</em> &gt; 0</td>
 <td>As specified in the BW BASIC documentation.</td>
+</tr>
+<tr>
+<td><em>RND</em></td>
+<td>No arguments</td>
+<td></td>
+<td>Synonym for <em>RAN</em> (the BW BASIC spelling).</td>
 </tr>
 <tr>
 <td><em>ROUND</em></td>
@@ -1714,7 +1902,7 @@ Functions perform computations and return values. Unless otherwise stated:
 </tr>
 <tr>
 <td><em>SEC</em></td>
-<td><em>RTRIM$(A$)</em></td>
+<td><em>SEC(X)</em></td>
 <td></td>
 <td>As specified in the BW BASIC documentation.</td>
 </tr>
@@ -1759,13 +1947,25 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>SQR</em></td>
 <td><em>SQR(X)</em></td>
 <td>X ≥ 0</td>
-<td>As specified in the BW BASIC documentation.</td>
+<td>Return the square root of <em>X</em>. <em>SQRT</em> is a synonym.</td>
+</tr>
+<tr>
+<td><em>SQRT</em></td>
+<td><em>SQRT(X)</em></td>
+<td><em>X</em> ≥ 0</td>
+<td>Return the square root of <em>X</em>. <em>SQR</em> is a synonym.</td>
 </tr>
 <tr>
 <td><em>STD</em></td>
 <td><em>STD(v1, [v2, ...])</em></td>
 <td></td>
 <td>Return the standard deviation of the arguments, each element of any array arguments being treated as a single argument. Missing values shall be ignored.</td>
+</tr>
+<tr>
+<td><em>STR$</em></td>
+<td><em>STR$(x)</em></td>
+<td></td>
+<td>Return the numeric value <em>x</em> formatted as a string.</td>
 </tr>
 <tr>
 <td><em>SUM</em></td>
@@ -1794,15 +1994,13 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>TCF</em></td>
 <td><em>TCF(t, df)</em></td>
-<td><p>0 ≤ <em>t </em>≤ 1</p>
-<p><em>df </em>&gt; 0</p></td>
+<td><em>df </em>&gt; 0</td>
 <td>Return the value of the cumulative distribution function of the T distribution where <em>t </em>is the evaluation point and <em>df </em>is the number of degrees of freedom.</td>
 </tr>
 <tr>
 <td><em>TDF</em></td>
 <td><em>TDF(t, df)</em></td>
-<td><p>0 ≤ <em>t </em>≤ 1</p>
-<p><em>df </em>&gt; 0</p></td>
+<td><em>df </em>&gt; 0</td>
 <td>Return the value of the probability density function of the T distribution where <em>t </em>is the evaluation point and <em>df </em>is the number of degrees of freedom.</td>
 </tr>
 <tr>
@@ -1811,6 +2009,12 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><p>0 ≤ <em>ᶲ </em>≤ 1</p>
 <p><em>df </em>&gt; 0</p></td>
 <td>Return the value of the inverse probability density function of the T distribution where <em>ᶲ </em>  is the probability and <em>df </em>is the number of degrees of freedom.</td>
+</tr>
+<tr>
+<td><em>TIME$</em></td>
+<td>No arguments</td>
+<td></td>
+<td>Return the current time as <em>"HH:MM:SS"</em>.</td>
 </tr>
 <tr>
 <td><em>TIMER</em></td>
@@ -1885,42 +2089,21 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>Return a uniformly distributed random number between 0 and 1.</td>
 </tr>
 <tr>
+<td><em>VAL</em></td>
+<td><em>VAL(s$)</em></td>
+<td></td>
+<td>Parse the string <em>s$</em> as a number and return its numeric value.</td>
+</tr>
+<tr>
 <td><em>VAR</em></td>
 <td><em>VAR(v1, [v2, ...])</em></td>
 <td></td>
 <td>Row-wise sample variance.</td>
 </tr>
 <tr>
-<td><em>XCF</em></td>
-<td><em>XCF(x, df)</em></td>
-<td><p><em>0 ≤ x ≤ 1</em></p>
-<p><em>df &gt; 0</em></p></td>
-<td>Return the value of the cumulative distribution function of the chi square distribution where <em>x</em> is the evaluation point and <em>df</em> is the number of degrees of freedom.</td>
-</tr>
-<tr>
-<td><em>XDF</em></td>
-<td><em>XDF(x, df)</em></td>
-<td><p><em>0 ≤ x ≤ 1</em></p>
-<p><em>df &gt; 0</em></p></td>
-<td>Return the value of the probability density function of the chi square distribution where <em>x</em> is the evaluation point and <em>df</em> is the number of degrees of freedom.</td>
-</tr>
-<tr>
-<td><em>XIF</em></td>
-<td><em>XIF(ᶲ, df)</em></td>
-<td><p><em>0 ≤ ᶲ ≤ 1</em></p>
-<p><em>df &gt; 0</em></p></td>
-<td>Return the value of the inverse probability density function of the chi square distribution where <em>ᶲ </em>is the probability and <em>df </em>is the number of degrees of freedom.</td>
-</tr>
-<tr>
-<td><em>XRN</em></td>
-<td><em>XRN(df)</em></td>
-<td><em>df &gt; 0</em></td>
-<td>Return a random number in the chi square distribution where <em>df</em> is the number of degrees of freedom.</td>
-</tr>
-<tr>
 <td><em>WCF</em></td>
 <td><em>WCF(x, p, q</em>)</td>
-<td><p>0 ≤ x ≤ 1</p>
+<td><p><em>x</em> ≥ 0</p>
 <p><em>p</em> &gt; 0</p>
 <p><em>q</em> &gt; 0</p></td>
 <td>Return the value of the cumulative distribution function of the Weibull distribution where <em>x</em> is the evaluation point, <em>p</em> is the scale parameter, and <em>q</em> is the shape parameter.</td>
@@ -1928,7 +2111,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>WDF</em></td>
 <td><em>WDF(x, p, q</em>)</td>
-<td><p>0 ≤ x ≤ 1</p>
+<td><p><em>x</em> ≥ 0</p>
 <p><em>p</em> &gt; 0</p>
 <p><em>q</em> &gt; 0</p></td>
 <td>Return the value of the probability density function of the Weibull distribution where <em>x</em> is the evaluation point, <em>p</em> is the scale parameter, and <em>q</em> is the shape parameter.</td>
@@ -1949,18 +2132,43 @@ Functions perform computations and return values. Unless otherwise stated:
 <td>Return a random number on the Weibull distribution where <em>p</em> is the scale parameter, and <em>q</em> is the shape parameter.</td>
 </tr>
 <tr>
+<td><em>XCF</em></td>
+<td><em>XCF(x, df)</em></td>
+<td><p><em>x</em> ≥ 0</p>
+<p><em>df &gt; 0</em></p></td>
+<td>Return the value of the cumulative distribution function of the chi square distribution where <em>x</em> is the evaluation point and <em>df</em> is the number of degrees of freedom.</td>
+</tr>
+<tr>
+<td><em>XDF</em></td>
+<td><em>XDF(x, df)</em></td>
+<td><p><em>x</em> ≥ 0</p>
+<p><em>df &gt; 0</em></p></td>
+<td>Return the value of the probability density function of the chi square distribution where <em>x</em> is the evaluation point and <em>df</em> is the number of degrees of freedom.</td>
+</tr>
+<tr>
+<td><em>XIF</em></td>
+<td><em>XIF(ᶲ, df)</em></td>
+<td><p><em>0 ≤ ᶲ ≤ 1</em></p>
+<p><em>df &gt; 0</em></p></td>
+<td>Return the value of the inverse probability density function of the chi square distribution where <em>ᶲ </em>is the probability and <em>df </em>is the number of degrees of freedom.</td>
+</tr>
+<tr>
+<td><em>XRN</em></td>
+<td><em>XRN(df)</em></td>
+<td><em>df &gt; 0</em></td>
+<td>Return a random number in the chi square distribution where <em>df</em> is the number of degrees of freedom.</td>
+</tr>
+<tr>
 <td><em>ZCF</em></td>
 <td><em>ZCF(x [, mu, sigma])</em></td>
-<td><p>0 ≤<em> z</em> ≤ 1</p>
-<p><em>sigma</em> &gt; 0</p></td>
+<td><em>sigma</em> &gt; 0</td>
 <td><p>Returns the value of the cumulative     </p>
 <p> distribution function of the normal distribution evaluated at <em>x</em>, where <em>mu</em> is the mean and <em>sigma</em> is the standard deviation. If <em>mu</em> and <em>sigma</em> are omitted, the Standard Normal distribution (mean 0, standard deviation 1) is used.</p></td>
 </tr>
 <tr>
 <td><em>ZDF</em></td>
 <td><em>ZDF(x [, mu, sigma])</em></td>
-<td><p>0 ≤ <em>z</em> ≤ 1</p>
-<p><em>sigma</em> &gt; 0</p></td>
+<td><em>sigma</em> &gt; 0</td>
 <td><p>Returns the value of the probability    </p>
 <p> density function of the normal distribution evaluated at <em>x</em>, where <em>mu</em> is the mean and <em>sigma</em> is the standard deviation. If <em>mu</em> and <em>sigma</em> are omitted, the Standard Normal    </p>
 <p> distribution (mean 0, standard deviation 1) is used.</p></td>
