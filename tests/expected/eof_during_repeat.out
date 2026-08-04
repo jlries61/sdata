@@ -1,0 +1,11 @@
+REC: 1 BOF: 1.00000 EOF: 0.00000
+REC: 2 BOF: 0.00000 EOF: 0.00000
+REC: 3 BOF: 0.00000 EOF: 1.00000
+RUN complete. 3 records and 2 variables processed.
+Generating mock data...
+REC: 1 BOF: 1.00000 EOF: 0.00000
+REC: 2 BOF: 0.00000 EOF: 0.00000
+REC: 3 BOF: 0.00000 EOF: 1.00000
+RUN complete. 3 records and 5 variables processed.
+single-record EOF: 1.00000
+RUN complete. 1 records and 1 variables processed.
