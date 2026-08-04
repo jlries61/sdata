@@ -34,7 +34,9 @@ RUN
 -- -4^0.5 remains a genuine domain error: unary minus binds tighter than ^
 -- (per §7.3), so this is (-4)^0.5 -- the square root of a negative number
 -- has no real result, and this must still fail rather than silently
--- succeed with a wrong value.
+-- succeed with a wrong value.  It must fail with a clean, descriptive
+-- message (Handle_Domain_Error) rather than a raw Ada exception leaking
+-- through (e.g. "a-ngelfu.adb:92 instantiated at ...").
 NEW
 REPEAT 1
 LET J = -4^0.5

@@ -8,10 +8,12 @@ REPEAT 1
   LET C = ARCSIN(2)
   LET D = ARCCOS(-2)
   LET E = MOD(7, 0)
+  LET F = (-2)^3.5
   PRINT "LOG(0):"     A
   PRINT "SQRT(-4):"   B
   PRINT "ARCSIN(2):"  C
   PRINT "ARCCOS(-2):" D
   PRINT "MOD(7,0):"   E
+  PRINT "(-2)^3.5:"   F
 RUN
 QUIT

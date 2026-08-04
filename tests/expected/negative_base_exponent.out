@@ -8,4 +8,4 @@ G(0^0): 1.00000
 H(0^2): 0.00000
 I(2^0.5): 1.41421
 RUN complete. 1 records and 9 variables processed.
-Error: Assignment failed for variable J: a-ngelfu.adb:92 instantiated at sdata_core-real_functions.ads:13
+Error: Fractional exponentiation of a negative base is undefined.
