@@ -71,6 +71,10 @@ package body SData.Interpreter is
       Deleted : Boolean := False;
       BOG     : Boolean := False;
       EOG     : Boolean := False;
+      --  Nesting depth of FOR/WHILE/DO-UNTIL loop bodies currently executing
+      --  (0 = not inside one). Used by Execute_Statement's P15 loop-warning
+      --  check; maintained by Execute_Control_Flow.
+      Loop_Depth : Natural := 0;
    end record;
 
    --  Program buffer vector — canonical program store; provides both indexed
@@ -1552,6 +1556,44 @@ package body SData.Interpreter is
 
    begin
       if Stmt = null then return; end if;
+
+      --  P15 (design-vs-implementation audit, ADR pending): a Declarative
+      --  statement -- one that configures interpreter state once rather
+      --  than per record -- inside a FOR/WHILE/DO-UNTIL loop is not a
+      --  syntax error, but is confusing: it takes effect once, not scoped
+      --  to that iteration. Warn (not reject), once per source occurrence
+      --  regardless of how many times the loop actually iterates. The set
+      --  below matches sdata-help.adb's own "Execution: Declarative" text
+      --  (ARRAY/BY/DIM/DROP/FPATH/KEEP/REPEAT/SAVE/SELECT), the tested
+      --  ground truth the audit itself used -- not design.md's §7.1
+      --  Commands table, whose Type column disagrees with HELP on several
+      --  unrelated rows (OPTIONS, RSEED, ECHO, RENAME, HOLD/UNHOLD).
+      if Ctx.Loop_Depth > 0 and then not Stmt.Warned_In_Loop
+         and then Stmt.Kind in Stmt_ARRAY | Stmt_BY | Stmt_DIM | Stmt_DROP
+            | Stmt_FPATH | Stmt_KEEP | Stmt_REPEAT | Stmt_SAVE | Stmt_SELECT_FILTER
+      then
+         Stmt.Warned_In_Loop := True;
+         declare
+            Name : constant String :=
+               (case Stmt.Kind is
+                   when Stmt_ARRAY         => "ARRAY",
+                   when Stmt_BY            => "BY",
+                   when Stmt_DIM           => "DIM",
+                   when Stmt_DROP          => "DROP",
+                   when Stmt_FPATH         => "FPATH",
+                   when Stmt_KEEP          => "KEEP",
+                   when Stmt_REPEAT        => "REPEAT",
+                   when Stmt_SAVE          => "SAVE",
+                   when Stmt_SELECT_FILTER => "SELECT",
+                   when others             => "?");
+         begin
+            Put_Line_Error
+              ("Warning: " & Name & " is a Declarative statement; it takes"
+               & " effect once, not scoped to each loop iteration, inside a"
+               & " FOR/WHILE/DO-UNTIL loop.");
+         end;
+      end if;
+
       case Stmt.Kind is
          when Stmt_HELP =>
             SData.Help.Print_Help (Stmt.Var_Name (1 .. Stmt.Var_Len));

@@ -65,6 +65,7 @@ that might relitigate a settled question.
 | ADR-053 | REPL test coverage via a Makefile `.repl` marker convention, not a Run_REPL refactor | 2026-08-03 | Accepted |
 | ADR-054 | Resolve REPEAT/DELETE keyword overloading: rename the low-usage side (REPEAT/UNTIL loop -> DO/UNTIL; DELETE n[-m] line editor -> REMOVE n[-m]) | 2026-08-03 | Accepted |
 | ADR-055 | Implicit RUN instead of rejecting SORT/AGGREGATE/TRANSPOSE/STATS with a pending program (supersedes ADR-051's reject mechanism) | 2026-08-03 | Accepted |
+| ADR-056 | Declarative statement inside FOR/WHILE/DO-UNTIL: warn once per occurrence, don't reject | 2026-08-05 | Accepted |
 
 ---
 
@@ -1128,3 +1129,64 @@ needed in either consumer (additive, matches the STATS/TRANSPOSE precedent). sda
 `make check`: 365 → 371 (6 net new: `pending_sort_implicit_run`, `repeat_transpose_implicit_run_empty`,
 `repeat_stats_implicit_run_empty`, `repl_implicit_run_sort`, `repeat_save_implicit_run`,
 `repl_implicit_run_save`; the renamed reject/pending tests are not net-new). Closes jlries61/sdata#70.
+
+### ADR-056: Declarative statement inside FOR/WHILE/DO-UNTIL: warn once per occurrence, don't reject
+**Date:** 2026-08-05 | **Status:** Accepted
+
+**Context:** Design-vs-implementation audit finding P15
+(`.ssd/audits/2026-08-03-design-vs-implementation/report.md`). §5.4 stated flatly that Declarative
+statements "May not appear in FOR, WHILE, or DO/UNTIL blocks," listing `USE, SAVE, KEEP, DROP, BY,
+DIM, ARRAY, DIGITS, OPTIONS` as examples. Testing three genuinely Declarative-tier commands (`KEEP`,
+`SAVE`, `BY`, verified via their own `HELP` text) inside a `FOR` loop inside a `REPEAT` body found no
+rejection at all — the statement just ran in place, same as any Deferred statement. No enforcement
+code for this restriction was ever found in the source (confirmed by grep across the interpreter);
+whether it was stale documentation or a missing check was left for a decision, same posture as P8
+before its own won't-fix resolution.
+
+**Decision (user's framing, verbatim in spirit):** *"I'm not sure how good an idea it is to put
+declarative statements inside of a loop, but at least in theory, it is not a syntax error. At most,
+it is confusing and thus warrants a warning."* — permit it, don't reject it, but surface a warning so
+the behavior (the statement takes effect once, not per iteration) isn't silently confusing.
+
+**Which statements trigger the warning.** Cross-checking design.md's own §5.4 prose list, its §7.1
+Commands reference table's `Type` column, and `sdata-help.adb`'s per-command `"Execution: ..."` lines
+found the three sources mutually disagree on several rows (`OPTIONS`, `RSEED`, `USE`, `ECHO`,
+`RENAME`, `HOLD`/`UNHOLD` are classified differently by at least two of the three). Rather than
+resolve that whole matrix here — a separate, larger audit-scale task, flagged as a residual — the
+warning set uses exactly the sources the audit's own P15 finding already established as the tested
+ground truth: each command's individual `HELP` `"Execution: Declarative"` line. That set is `ARRAY,
+BY, DIM, DROP, FPATH, KEEP, REPEAT, SAVE, SELECT` (the row-filter form, not `SELECT CASE`) — nine
+commands. Notably this *excludes* `USE` (its own `Help_USE` says `"Execution: Immediate"`, disagreeing
+with the old §5.4 list) and *includes* `ARRAY`/`DIM` (confirmed Declarative by the same audit's
+sibling finding P11's fix, sdata commit 9ad1858; `sdata-help.adb`'s general `Help_EXECUTION` overview topic still listed both under
+"Deferred," an uncaught leftover from before that fix — corrected in the same change as a directly
+adjacent, actively-contradictory piece of the same documentation surface, not scope creep).
+
+**Mechanism — warn once per source occurrence, not once per iteration.** A `Step_Context.Loop_Depth`
+counter (new field, `SData.Interpreter`) brackets `Stmt_WHILE`/`Stmt_FOR`/`Stmt_LOOP_DO` body
+execution in `Execute_Control_Flow`, exception-safe (a `BREAK` mid-loop still decrements correctly).
+`Execute_Statement` checks `Ctx.Loop_Depth > 0` for the nine-statement set and, if so, warns via
+`Put_Line_Error` — but only once: a new `Warned_In_Loop : Boolean := False` field on the AST
+`Statement` record itself (common to all statement kinds, before the `case Kind is` variant part) is
+set the first time, so a `FOR I = 1 TO 1000` loop containing a `SAVE` warns exactly once, not a
+thousand times. Verified: a 5-iteration loop produces exactly one warning line; the statement's own
+effect (e.g. `KEEP`'s filtering) still applies normally each time it's reached, matching pre-existing
+Declarative-tier semantics — nothing about *execution* changes, only that a warning is now surfaced.
+
+**Documentation, three-reference sync plus the newly-found HELP self-contradiction:**
+`design.md` §5.4 rewritten (permitted-with-warning, corrected Examples list to the nine above);
+`sdata-help.adb`'s `Help_EXECUTION` topic corrected (`ARRAY`/`DIM` moved from its stale "Deferred"
+list to "Declarative"; `USE` moved to "Immediate" to match `Help_USE`'s own line) and a note on the
+new warning added; man page's "Declarative commands" section header gained a one-sentence note.
+`tests/expected/help_all.out` regenerated and diffed before overwriting — confirmed only the intended
+`HELP EXECUTION` block changed. The man page's full per-command section placement (e.g. whether `USE`'s
+lengthy entry should move out of "Declarative commands") and design.md's §7.1 Commands table `Type`
+mismatches (`OPTIONS`, `RSEED`, `ECHO`, `RENAME`, `HOLD`/`UNHOLD`) are **not** touched by this ADR —
+flagged as a residual finding for a future pass, not fixed here.
+
+**Consequences:** sdata-only (`sdata-ast.ads`, `sdata-interpreter.adb`,
+`sdata-interpreter-execute_control_flow.adb`, `sdata-help.adb`, `design.md`, man page); no sdata-core
+change, no cross-crate gate needed. New test `tests/declarative_in_loop_warn.cmd` (a 3-iteration `FOR`
+loop containing `KEEP`, asserting exactly one warning line and correct final data). `make check`:
+376 → 377, all green. Verified via revert: reverting the interpreter changes reproduces the exact
+pre-fix silent behavior against the new test, then re-applying restores it.

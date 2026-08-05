@@ -81,9 +81,9 @@ of v0.16.3; `make check` output is the source of truth):
 3. `bin/evaluator_unit_test` — expression evaluator (225)
 4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write (104)
 5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT (101)
-6. 373 `.cmd` integration tests in `tests/` (863 unit checks total)
+6. 377 `.cmd` integration tests in `tests/` (863 unit checks total)
 
-All 373 integration tests must pass before committing. Never use `--no-verify`.
+All 377 integration tests must pass before committing. Never use `--no-verify`.
 
 **Documentation-only commits** — changes confined to `doc/`, `man/`, and `*.md`
 (README, CONTRIBUTING, CLAUDE.md) and similar non-build prose — do **not** require a
@@ -124,7 +124,7 @@ implement USE, SAVE, FPATH, OUTPUT, SELECT, KEEP, DROP, ARRAY, DIM, RUN, and
 their related helpers (`Execute_OUTPUT_Table`, `Execute_Rebuild_Filter`). sdata's
 interpreter delegates to these rather than duplicating the logic. data-vandal
 calls the same procedures. When changing one of these commands' semantics, edit
-sdata-core and confirm both `make check` (sdata, 373 integration tests) and
+sdata-core and confirm both `make check` (sdata, 377 integration tests) and
 `cd ~/Develop/data-vandal && make check` (data-vandal, 147 integration tests) still pass.
 
 ## Source Layout
@@ -149,10 +149,10 @@ src/
 tests/
   csv_unit_test.adb           -- SData_Core.CSV unit tests
   sdata_unit_test.adb         -- SData_Core.Variables / PDV unit tests
-  *.cmd                       -- integration test scripts (373)
+  *.cmd                       -- integration test scripts (377)
 doc/
   SOFTWARE_STANDARDS_REVIEW.md  -- living standards audit (annotated)
-  adrs.md                     -- 55 ADRs (ADR-001 through ADR-055; contiguous)
+  adrs.md                     -- 56 ADRs (ADR-001 through ADR-056; contiguous)
   architecture.md             -- package map, execution model, repo layout
   specs/                      -- design specs for completed features
   plans/                      -- implementation plans (step-by-step task lists)
@@ -206,7 +206,7 @@ before implementing or modifying any language-visible behaviour.
 
 **Architecture Decision Records** — `doc/adrs.md`
 
-Markdown; read directly. Documents 55 ADRs (ADR-001 through ADR-055,
+Markdown; read directly. Documents 56 ADRs (ADR-001 through ADR-056,
 contiguous) with rationale and status. ADRs 039–043 cover the sdata-core /
 data-vandal split. Check for a relevant ADR before proposing a design change.
 
@@ -278,7 +278,7 @@ one lingering. Do not reintroduce a hardcoded sdata-core version in these files.
 
 - Phases 1–4: **complete** (core, control flow, distributions/aggregates, spreadsheet I/O)
 - Phase 5 (Polish): **complete** — disk spillover, interactive improvements, pager, HELP, LIST, ERR/ERL, error messages, performance, documentation
-- Phase 6 (Testing): **ongoing** — 373 integration tests, 863 unit checks across 5 modules
+- Phase 6 (Testing): **ongoing** — 377 integration tests, 863 unit checks across 5 modules
 - v0.8.0 milestone (2026-05-21): VANDALIZE extracted into `data-vandal`; sdata-core shared library created (ADRs 039–043)
 - STATS command (2026-07-01): SData's PROC MEANS analogue — per-variable summary statistics, one row per (BY group × variable), reusing the aggregate machinery (sdata v0.12.0, sdata-core v0.1.19; ADR-048)
 

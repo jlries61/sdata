@@ -24,7 +24,16 @@ begin
             end if;
          end;
       when Stmt_WHILE =>
-         while Is_True (Evaluate (Stmt.While_Cond)) loop Execute_List (Stmt.While_Body, Ctx); end loop;
+         --  P15: Loop_Depth brackets the body so Execute_Statement can warn
+         --  on a Declarative statement dispatched from inside a loop; kept
+         --  exception-safe (e.g. BREAK) so it never leaks incremented.
+         Ctx.Loop_Depth := Ctx.Loop_Depth + 1;
+         begin
+            while Is_True (Evaluate (Stmt.While_Cond)) loop Execute_List (Stmt.While_Body, Ctx); end loop;
+         exception
+            when others => Ctx.Loop_Depth := Ctx.Loop_Depth - 1; raise;
+         end;
+         Ctx.Loop_Depth := Ctx.Loop_Depth - 1;
       when Stmt_FOR =>
          declare Start_Val : constant Value := Evaluate (Stmt.For_Start);
                  End_Val   : constant Value := Evaluate (Stmt.For_End);
@@ -38,24 +47,36 @@ begin
                ST : constant Real := Convert_To_Real (Step_Val);
             begin
                Current_I := S;
-               while (ST > 0.0 and then Current_I <= E) or else (ST < 0.0 and then Current_I >= E) loop
-                  declare
-                     Loop_Val : constant Value := (Kind => Val_Numeric, Num_Val => Current_I);
-                     For_Var_Name : constant String := Stmt.For_Var (1 .. Stmt.For_Var_Len);
-                  begin
-                     Set_Permanent (For_Var_Name, Loop_Val);
-                     Debug_Trace ("FOR " & For_Var_Name & " = " & Debug_Value (Loop_Val), 2);
-                     Execute_List (Stmt.For_Body, Ctx);
-                  end;
-                  Current_I := Current_I + ST;
-               end loop;
+               Ctx.Loop_Depth := Ctx.Loop_Depth + 1;
+               begin
+                  while (ST > 0.0 and then Current_I <= E) or else (ST < 0.0 and then Current_I >= E) loop
+                     declare
+                        Loop_Val : constant Value := (Kind => Val_Numeric, Num_Val => Current_I);
+                        For_Var_Name : constant String := Stmt.For_Var (1 .. Stmt.For_Var_Len);
+                     begin
+                        Set_Permanent (For_Var_Name, Loop_Val);
+                        Debug_Trace ("FOR " & For_Var_Name & " = " & Debug_Value (Loop_Val), 2);
+                        Execute_List (Stmt.For_Body, Ctx);
+                     end;
+                     Current_I := Current_I + ST;
+                  end loop;
+               exception
+                  when others => Ctx.Loop_Depth := Ctx.Loop_Depth - 1; raise;
+               end;
+               Ctx.Loop_Depth := Ctx.Loop_Depth - 1;
             end;
          end;
       when Stmt_LOOP_DO =>
-         loop
-            Execute_List (Stmt.Do_Body, Ctx);
-            exit when Is_True (Evaluate (Stmt.Until_Cond));
-         end loop;
+         Ctx.Loop_Depth := Ctx.Loop_Depth + 1;
+         begin
+            loop
+               Execute_List (Stmt.Do_Body, Ctx);
+               exit when Is_True (Evaluate (Stmt.Until_Cond));
+            end loop;
+         exception
+            when others => Ctx.Loop_Depth := Ctx.Loop_Depth - 1; raise;
+         end;
+         Ctx.Loop_Depth := Ctx.Loop_Depth - 1;
       when Stmt_SELECT =>
          declare
             Val     : constant Value := (if Stmt.Selector /= null then Evaluate (Stmt.Selector) else (Kind => Val_Missing));

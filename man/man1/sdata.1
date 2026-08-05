@@ -245,6 +245,10 @@ Set
 to suppress these warnings.
 .SS Declarative commands
 Execute immediately and configure state for the next data step.
+A Declarative command may appear inside a
+.BR FOR / WHILE / "DO\-UNTIL"
+loop, but doing so is discouraged and prints a one\-time warning: it still
+takes effect only once, not per iteration.
 .RS
 .TP
 .B USE \fIspec\fR[\fB,\fR \fIspec\fR ...] [\fB/BY=\fIvar\fR ...] [\fB/INTERLEAVE\fR|\fB/JOIN\fR|\fB/APPEND\fR]

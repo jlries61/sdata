@@ -471,20 +471,22 @@ sdata commands fall into three execution tiers:
 
   Declarative -- configure state for the next RUN.
     These commands take effect immediately but their primary
-    action occurs when RUN is executed.
-    Commands: USE, SAVE, BY, SELECT (filter), SELECT /ALL,
-              REPEAT n, KEEP, DROP, FPATH
+    action occurs when RUN is executed. A Declarative statement
+    may appear inside a FOR/WHILE/DO-UNTIL loop, but doing so is
+    discouraged and prints a one-time warning: it still takes
+    effect only once, not per iteration.
+    Commands: ARRAY, SAVE, BY, SELECT (filter), SELECT /ALL,
+              REPEAT n, KEEP, DROP, DIM, FPATH
 
   Immediate -- execute at once, outside any data step.
-    Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET, RENAME,
-              SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT, HELP,
-              REMOVE n[-m], INSERT [n|$], QUIT, END
+    Commands: USE, RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET,
+              RENAME, SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT,
+              HELP, REMOVE n[-m], INSERT [n|$], QUIT, END
 
   Deferred -- queued between RUN markers; executed once per
     record during the data step.
     Commands: LET, SET, PRINT, IF, FOR, WHILE, DO/UNTIL,
-              SELECT/CASE, DELETE, WRITE, HOLD, UNHOLD,
-              ARRAY, DIM, BREAK
+              SELECT/CASE, DELETE, WRITE, HOLD, UNHOLD, BREAK
 
 Note: SELECT has two forms with different tiers:
   SELECT <expr> / SELECT /ALL  -- Declarative (row filter)

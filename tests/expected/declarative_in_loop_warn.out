@@ -1,0 +1,4 @@
+Warning: KEEP is a Declarative statement; it takes effect once, not scoped to each loop iteration, inside a FOR/WHILE/DO-UNTIL loop.
+RUN complete. 1 records and 1 variables processed.
+REC# X 
+1 3.00000 

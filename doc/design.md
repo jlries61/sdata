@@ -602,8 +602,16 @@ Looping blocks may also be nested inside of conditional blocks and vice versa.
 
 - Declarative Statements:
 
-  - May not appear in *FOR*, *WHILE*, or *DO*/*UNTIL* blocks.
-  - Examples: *USE*, *SAVE*, *KEEP*, *DROP*, *BY*, *DIM*, *ARRAY*, *DIGITS*, *OPTIONS*.
+  - Configure interpreter state once, immediately, rather than being scoped to
+    a single record or loop iteration.
+  - May appear inside *FOR*, *WHILE*, or *DO*/*UNTIL* blocks, but doing so is
+    discouraged: the statement still takes effect exactly once — whenever
+    execution reaches it — not once per iteration, which is easy to misread as
+    per-iteration behavior. This is not a syntax error; the interpreter emits
+    a warning (not an error) the first time it happens for a given statement,
+    regardless of how many times the loop actually iterates.
+  - Examples: *ARRAY*, *BY*, *DIM*, *DROP*, *FPATH*, *KEEP*, *REPEAT*, *SAVE*,
+    *SELECT*.
   - Command reference table indicates which commands are declarative.
 
 - Non-Declarative Statements:

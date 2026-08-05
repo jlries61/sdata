@@ -213,6 +213,12 @@ package SData.AST is
       Arr_Idx_List : Expression_List  := null;    -- list or range subscripts
       Arr_Is_Slice : Boolean         := False;    -- True when Arr_Idx_List is a lo:hi range
       Expr         : Expression_Access;
+      --  P15 (design-vs-implementation audit): a Declarative statement
+      --  inside a FOR/WHILE/DO-UNTIL loop is not a syntax error, but is
+      --  confusing (it configures interpreter state once, not per
+      --  iteration) and warrants a one-time warning per occurrence rather
+      --  than one per iteration. Set by Execute_Statement.
+      Warned_In_Loop : Boolean := False;
       case Kind is
          when Stmt_PRINT =>
             Print_Args : Expression_List;
