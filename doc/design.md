@@ -2268,6 +2268,14 @@ Execution Control:
 
 - *--noshell*: Disable the *SYSTEM* command and the *SHELL* function.
 - *--ignore-math-errors*: Convert math domain errors (invalid arguments, *0/0*) into a warning and a missing value instead of a hard error. Disabled by default. See §2.4 and §2.5.
+- *-k* / *--continue-on-error*: Continue executing the script after a statement-level error rather than aborting; the error message is printed to standard error and processing resumes with the next statement. After a caught error, *ERR()* returns 1 and *ERL()* returns the record number where the error occurred (see the *ERR*/*ERL* function rows, §7.2).
+- *--nosubmit*: Disable the *SUBMIT* command.
+- *--shell-timeout* \<*seconds*\>: Timeout for the *SYSTEM* command and the *SHELL* function. 0 disables the timeout (unlimited). Default: 300 seconds in batch mode, 0 (unlimited) in interactive mode. Requires the *timeout(1)* utility on *PATH*; if absent, a one-time warning is printed and the limit is not enforced. Can also be adjusted at runtime with *OPTIONS SHELLTIMEOUT n*.
+
+Diagnostics:
+
+- *--progress*: Report record-count progress on standard error for long-running operations (*USE* file loads, the per-record *RUN* data step, and *SORT*). A counter is printed every 10,000 records and updated in place; written only to standard error, never to the data stream. Can also be enabled at runtime with *OPTIONS PROGRESS YES*.
+- *--debug*\[*=N*\]: Enable the debug inspection prompt used by *BREAK* (see §7.1's *BREAK* row for the prompt's own commands). *N* selects the verbosity level (default 3 if omitted): 1 (sparse) traces *USE*/*SUBMIT*/*RUN* completion events only; 2 (normal) adds a per-record header (annotated with BY-group transitions), *IF*/*ELSE* outcomes, *FOR* iterations, *SELECT* filter decisions, and *DELETE* marks; 3 (verbose) adds every *LET*/*SET* assignment. In interactive sessions, any non-zero level also pauses execution before each record at the inspection prompt. The level can be changed at runtime with *OPTIONS DEBUG n*.
 
 Input Control:
 
