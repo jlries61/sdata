@@ -1,0 +1,6 @@
+RUN complete. 1 records and 2 variables processed.
+REC# VAR1 VAR2 
+1 1.00000 2.00000 
+RUN complete. 1 records and 2 variables processed.
+REC# VAR3 OTHER 
+1 3.00000 4.00000 

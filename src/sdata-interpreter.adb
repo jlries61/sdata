@@ -371,15 +371,25 @@ package body SData.Interpreter is
       return Is_True (Evaluate (T.Opts.IF_Expr));
    end Should_Write;
 
-   --  Column modifications state.
+   --  Column modifications state.  A dash range (VAR1-VAR5, "table order")
+   --  cannot be expanded to individual column names at KEEP/DROP's own
+   --  Declarative-tier dispatch time: the endpoints frequently don't exist
+   --  in the table yet (e.g. LET-created columns are Deferred and only
+   --  materialize at the following RUN).  So a dash-range entry stores its
+   --  endpoints unresolved and is expanded against the table's final
+   --  post-commit schema in Apply_Pending_Mods, matching how single names
+   --  and colon ranges are already resolved late.
    type Column_Mod_Kind is (Mod_Keep, Mod_Drop);
    type Column_Mod_Node;
    type Column_Mod_List is access Column_Mod_Node;
    type Column_Mod_Node is record
-      Kind : Column_Mod_Kind;
-      Name : String (1 .. Max_Name_Len);
-      Len  : Natural;
-      Next : Column_Mod_List;
+      Kind     : Column_Mod_Kind;
+      Name     : String (1 .. Max_Name_Len);
+      Len      : Natural;
+      Is_Range : Boolean := False;
+      End_Name : String (1 .. Max_Name_Len) := (others => ' ');
+      End_Len  : Natural := 0;
+      Next     : Column_Mod_List;
    end record;
 
    procedure Free_Mod is new Ada.Unchecked_Deallocation (Column_Mod_Node, Column_Mod_List);
@@ -531,6 +541,24 @@ package body SData.Interpreter is
       Pending_Mods_Tail := New_Mod;
    end Add_Pending_Mod;
 
+   procedure Add_Pending_Range_Mod
+     (Kind : Column_Mod_Kind; Start_Name, End_Name : String)
+   is
+      New_Mod : constant Column_Mod_List := new Column_Mod_Node;
+      U_Start : constant String := To_Upper (Start_Name);
+      U_End   : constant String := To_Upper (End_Name);
+   begin
+      New_Mod.Kind := Kind; New_Mod.Len := U_Start'Length;
+      New_Mod.Name (1 .. U_Start'Length) := U_Start;
+      New_Mod.Is_Range := True;
+      New_Mod.End_Len := U_End'Length;
+      New_Mod.End_Name (1 .. U_End'Length) := U_End;
+      New_Mod.Next := null;
+      if Pending_Mods = null then Pending_Mods := New_Mod;
+      else Pending_Mods_Tail.Next := New_Mod; end if;
+      Pending_Mods_Tail := New_Mod;
+   end Add_Pending_Range_Mod;
+
    procedure Clear_Pending_Mods is
    begin
       while Pending_Mods /= null loop
@@ -552,17 +580,46 @@ package body SData.Interpreter is
       Drop_Names : Name_Vectors.Vector;
       Has_Keep   : Boolean := False;
       Curr       : Column_Mod_List := Pending_Mods;
-   begin
-      while Curr /= null loop
-         case Curr.Kind is
+
+      procedure Append_Name (Kind : Column_Mod_Kind; Name : String) is
+      begin
+         case Kind is
             when Mod_Keep =>
                Has_Keep := True;
-               Keep_Names.Append
-                  (To_Unbounded_String (Curr.Name (1 .. Curr.Len)));
+               Keep_Names.Append (To_Unbounded_String (Name));
             when Mod_Drop =>
-               Drop_Names.Append
-                  (To_Unbounded_String (Curr.Name (1 .. Curr.Len)));
+               Drop_Names.Append (To_Unbounded_String (Name));
          end case;
+      end Append_Name;
+   begin
+      while Curr /= null loop
+         if not Curr.Is_Range then
+            Append_Name (Curr.Kind, Curr.Name (1 .. Curr.Len));
+         else
+            --  Resolve the dash range against the table's schema as it
+            --  stands now (post Commit_Output_Table), not as it stood when
+            --  KEEP/DROP was dispatched.
+            declare
+               Start_Name : constant String := Curr.Name (1 .. Curr.Len);
+               End_Name   : constant String := Curr.End_Name (1 .. Curr.End_Len);
+               Start_Idx, End_Idx : Natural := 0;
+            begin
+               for I in 1 .. Column_Count loop
+                  declare Name : constant String := Column_Name (I); begin
+                     if Name = Start_Name then Start_Idx := I; end if;
+                     if Name = End_Name   then End_Idx   := I; end if;
+                  end;
+               end loop;
+               if Start_Idx > 0 and End_Idx > 0 then
+                  if Start_Idx > End_Idx then
+                     declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
+                  end if;
+                  for I in Start_Idx .. End_Idx loop
+                     Append_Name (Curr.Kind, Column_Name (I));
+                  end loop;
+               end if;
+            end;
+         end if;
          Curr := Curr.Next;
       end loop;
 
@@ -663,7 +720,6 @@ package body SData.Interpreter is
    procedure Expand_Range (Kind : Column_Mod_Kind; Range_Spec : Variable_Range) is
       Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
       End_Name   : constant String := (if Range_Spec.End_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
-      Start_Idx, End_Idx : Natural := 0;
    begin
       if not Range_Spec.Is_Range then
          Add_Pending_Mod (Kind, Start_Name);
@@ -679,20 +735,12 @@ package body SData.Interpreter is
             end loop;
          end;
       else
-         for I in 1 .. Column_Count loop
-            declare Name : constant String := Column_Name (I); begin
-               if Name = Start_Name then Start_Idx := I; end if;
-               if Name = End_Name   then End_Idx   := I; end if;
-            end;
-         end loop;
-         if Start_Idx > 0 and End_Idx > 0 then
-            if Start_Idx > End_Idx then
-               declare T : constant Natural := Start_Idx; begin Start_Idx := End_Idx; End_Idx := T; end;
-            end if;
-            for I in Start_Idx .. End_Idx loop
-               Add_Pending_Mod (Kind, Column_Name (I));
-            end loop;
-         end if;
+         --  Dash range: table order.  The endpoints frequently don't exist
+         --  yet at this Declarative-tier dispatch point (e.g. LET-created
+         --  columns are Deferred, materializing only at the next RUN), so
+         --  resolution is deferred to Apply_Pending_Mods, once the table's
+         --  schema is final for this step.
+         Add_Pending_Range_Mod (Kind, Start_Name, End_Name);
       end if;
    end Expand_Range;
 
