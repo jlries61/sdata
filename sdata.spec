@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.17.1
+Version:        0.17.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Aug 05 2026 John L. Ries <john@theyarnbard.com> - 0.17.2-1
+- Design-vs-implementation audit fixes: negative-base exponentiation crash, EOF() during REPEAT, DIM declarative dispatch and resize data loss, KEEP/DROP dash-range no-op, SAVE missing-directory clean error, declarative statement in loop now warns instead of silently misbehaving (ADR-056), bare PRINT no-op; closes all findings in doc/adrs.md and .ssd/audits/2026-08-03-design-vs-implementation/.
+
 * Mon Aug 03 2026 John L. Ries <john@theyarnbard.com> - 0.17.1-1
 - Implicit RUN instead of rejecting SORT/AGGREGATE/TRANSPOSE/STATS with a pending program (issue #70, ADR-055); requires sdata-core 0.4.2.
 
