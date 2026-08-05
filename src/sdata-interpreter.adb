@@ -2016,7 +2016,7 @@ package body SData.Interpreter is
             and then Current.Kind /= Stmt_FOR     and then Current.Kind /= Stmt_WHILE
             and then Current.Kind /= Stmt_LOOP_DO and then Current.Kind /= Stmt_SELECT
             and then Current.Kind /= Stmt_DELETE  and then Current.Kind /= Stmt_WRITE
-            and then Current.Kind /= Stmt_DIM     and then Current.Kind /= Stmt_BREAK
+            and then Current.Kind /= Stmt_BREAK
          then
             if Current.Kind in Stmt_SORT | Stmt_AGGREGATE | Stmt_TRANSPOSE | Stmt_STATS
                and then (Pending_Deferred > 0

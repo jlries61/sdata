@@ -212,7 +212,7 @@ package body SData.Help is
    begin
       Put_Line ("Command: ARRAY array_name variable(s)");
       Put_Line ("Creates a virtual array providing indexed access to existing variables.");
-      Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
+      Put_Line ("Execution: Declarative -- takes effect at once.");
    end Help_ARRAY;
 
    procedure Help_DIM is
@@ -221,7 +221,7 @@ package body SData.Help is
       Put_Line ("Creates a permanent or temporary array (real variables).");
       Put_Line ("Elements are initialized to missing. /TEMP makes it temporary.");
       Put_Line ("A DIM statement that references an existing variable or array shall fail.");
-      Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
+      Put_Line ("Execution: Declarative -- takes effect at once.");
    end Help_DIM;
 
    procedure Help_BY is

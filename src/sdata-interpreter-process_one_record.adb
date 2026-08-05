@@ -97,10 +97,15 @@ begin
             --  at REPL entry).  Re-executing it per record re-opens the target
             --  with Create, truncating everything written before the data step
             --  and leaving only the final "RUN complete" line (issue #40).
+            --  Stmt_DIM (and Stmt_ARRAY, never listed here) are the same
+            --  category as of the P11 fix: DIM is now dispatched once, immediately,
+            --  by the batch walker / at REPL entry, exactly like ARRAY already was.
+            --  Re-executing it per record would re-DIM (and reset) the array on
+            --  every record of a REPEAT n data step instead of once.
             when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
                | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_DO | Stmt_SELECT
                | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE | Stmt_ECHO
-               | Stmt_HOLD | Stmt_UNHOLD | Stmt_DIM
+               | Stmt_HOLD | Stmt_UNHOLD
                | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
                begin
                   Execute_Statement (Iter, Ctx);

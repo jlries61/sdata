@@ -118,13 +118,13 @@ Execution: Immediate -- takes effect at once.
 
 Command: ARRAY array_name variable(s)
 Creates a virtual array providing indexed access to existing variables.
-Execution: Deferred -- executed once per record inside the data step.
+Execution: Declarative -- takes effect at once.
 
 Command: DIM <arrayname> (<lower> [TO <upper>]) [/TEMP]
 Creates a permanent or temporary array (real variables).
 Elements are initialized to missing. /TEMP makes it temporary.
 A DIM statement that references an existing variable or array shall fail.
-Execution: Deferred -- executed once per record inside the data step.
+Execution: Declarative -- takes effect at once.
 
 Command: BY variable(s)  |  BY
 Groups data by the named variables for the next RUN.
