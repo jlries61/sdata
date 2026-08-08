@@ -992,14 +992,19 @@ package body SData.Help is
    procedure Help_INF is
    begin
       Put_Line ("Function: INF(x)  ->  1 if x is +Inf or -Inf, else 0");
-      Put_Line ("  Returns 0 for finite numeric values, missing values, and strings.");
+      Put_Line ("  Returns 0 for finite numeric values, missing values, strings, and NaN.");
       Put_Line ("");
       Put_Line ("  To test for positive infinity:  INF(x) AND x > 0");
       Put_Line ("  To test for negative infinity:  INF(x) AND x < 0");
-      Put_Line ("  NOT INF(x) serves the role of FINITE() for non-missing values.");
+      Put_Line ("  NOT INF(x) serves the role of FINITE() for non-missing, non-NaN values.");
       Put_Line ("");
-      Put_Line ("  Inf arises from arithmetic overflow (MAXNUM() * 2.0) or from");
-      Put_Line ("  float division by zero when OPTIONS IEEE_DIVIDE YES is set.");
+      Put_Line ("  Inf arises from arithmetic overflow (MAXNUM() * 2.0), from float");
+      Put_Line ("  division by zero when OPTIONS IEEE_DIVIDE YES is set, or from the");
+      Put_Line ("  .i / -.i typed literal. NaN is constructed with the .n typed");
+      Put_Line ("  literal (either case: .I, .N); a .n value may be stored, printed");
+      Put_Line ("  (as NaN), and compared (.n = .n is false, per IEEE 754), but using");
+      Put_Line ("  it in an arithmetic operation still raises the same domain error");
+      Put_Line ("  0/0 does.");
       Put_Line ("  See also: MISSING, OPTIONS IEEE_DIVIDE");
    end Help_INF;
 

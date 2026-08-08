@@ -66,6 +66,7 @@ that might relitigate a settled question.
 | ADR-054 | Resolve REPEAT/DELETE keyword overloading: rename the low-usage side (REPEAT/UNTIL loop -> DO/UNTIL; DELETE n[-m] line editor -> REMOVE n[-m]) | 2026-08-03 | Accepted |
 | ADR-055 | Implicit RUN instead of rejecting SORT/AGGREGATE/TRANSPOSE/STATS with a pending program (supersedes ADR-051's reject mechanism) | 2026-08-03 | Accepted |
 | ADR-056 | Declarative statement inside FOR/WHILE/DO-UNTIL: warn once per occurrence, don't reject | 2026-08-05 | Accepted |
+| ADR-057 | `.i`/`-.i`/`.n` typed literals construct Infinity/NaN directly; NaN's existing "never survives arithmetic" policy is preserved, not relaxed | 2026-08-08 | Accepted |
 
 ---
 
@@ -1190,3 +1191,124 @@ change, no cross-crate gate needed. New test `tests/declarative_in_loop_warn.cmd
 loop containing `KEEP`, asserting exactly one warning line and correct final data). `make check`:
 376 → 377, all green. Verified via revert: reverting the interpreter changes reproduces the exact
 pre-fix silent behavior against the new test, then re-applying restores it.
+
+### ADR-057: `.i`/`-.i`/`.n` typed literals construct Infinity/NaN directly; NaN's existing
+"never survives arithmetic" policy is preserved, not relaxed
+
+**Date:** 2026-08-08 | **Status:** Accepted
+
+**Context:** Issue #71. design.md §2.4/§8.5 already documented IEEE 754 ±Infinity and NaN as
+present in the value model — Infinity freely reachable via arithmetic overflow, NaN reachable
+internally from `0/0` but deliberately never exposed as a stored value ("converted to an error
+message... or a warning and a missing value"). §8.5 listed the missing piece as a noted-but-
+unimplemented gap: a script could not *write* `.i`/`-.i`/`.n` as a literal to construct these
+values directly, only encounter them as arithmetic side effects. That NaN policy is not just
+prose — `SData_Core.Evaluator.Numeric_Result_Checked`, which every float `Add`/`Sub`/`Mul`/`Div`/
+`Pow` result (and `SUM`/`MEAN`/`VAR`/`STD`) is routed through, raises a domain error the instant a
+NaN would otherwise be returned. The open design question a `.n` literal raises: does adding a way
+to *construct* NaN also mean *relaxing* that guard so NaN can flow through arithmetic?
+
+**Decision:** No. `.i` and `.n` are new literal forms recognized by the lexer immediately after a
+`.` and before falling back to the existing bare-`.` (missing value) or leading-dot-decimal (`.5`)
+handling — disambiguated by requiring the `i`/`n` (either case) to be followed by a word boundary,
+so `.info` still lexes exactly as before (`[Missing]["info" identifier]`, already a two-token parse
+error in every context that matters, unchanged by this feature). `.i` constructs `SData_Core.
+Values.Pos_Inf` (the existing public elaboration-time sentinel `Real'Last * 2.0`, already used
+wherever Infinity must be produced at runtime); `-.i` needs no special construction — it falls out
+for free from the existing generic unary-minus operator (`Op_Neg`, a raw sign-bit flip, not routed
+through `Numeric_Result_Checked`) applied to `.i`. `.n` constructs a new public sentinel `NaN_Val`
+(`Pos_Inf - Pos_Inf`, the canonical IEEE-754 NaN-producing operation, computed at runtime alongside
+`Pos_Inf`/`Neg_Inf` for the same static-expression reason those two are). Both bypass
+`Numeric_Result_Checked` entirely at construction (a literal is not an arithmetic *result*), but
+`Numeric_Result_Checked` itself is **unchanged**: the moment a `.n` value is used in `+`, `-`, `*`,
+`/`, or `**`, it raises the same friendly domain error `0/0` already does. `.n` therefore becomes a
+usable *sentinel/placeholder* value — assignable, storable, printable (as `NaN`), and comparable
+(`.n = .n` is `False`, correctly per IEEE 754) — without reopening whether NaN should silently
+propagate through computation, which design.md deliberately decided against.
+
+**Finding during design (systems-designer review), fixed in the same change, not deferred:**
+`SData_Core.Evaluator.Aggregate_Fns.Handle_Min_Fn`/`Handle_Max_Fn` did not route through
+`Numeric_Result_Checked` — they returned `Compute_Stats_Pass`'s raw running `Min_V`/`Max_V`
+directly. `Compute_Stats_Pass` seeds that running value from the *first* non-missing value in a BY
+group and updates it only via a plain `<`/`>` comparison; under IEEE 754 every comparison against
+NaN is `False`, so a NaN as the first value in a group used to freeze `Min_V`/`Max_V` at NaN for
+the rest of the group with no later value ever able to replace it, and `MIN()`/`MAX()` would then
+silently return that NaN with **no error** — exactly the failure shape design.md says NaN must
+never take. This was unreachable before this feature (NaN couldn't survive to be stored at all);
+`.n` makes the precondition reachable for the first time. Fixed by wrapping both functions' return
+in `Numeric_Result_Checked`, identical to the pattern `Handle_Sum`/`Handle_Mean` already use — a
+no-op for every NaN-free group, and the same domain error for a NaN-poisoned one.
+
+**Finding during implementation, fixed in the same change:** `sdata-parser.adb`'s `REMOVE n[-m]`
+line-editor command unconditionally called `Real'Value` on the token following `REMOVE` (and, for
+the range form, following `-`), assuming it was always `Token_Numeric_Literal`. `.i`/`.n` are new,
+distinct token kinds that carry no text (constructed via arithmetic, not string parsing — see
+below for why), so `REMOVE .i` or `REMOVE 1-.n` used to reach `Real'Value` on an empty string and
+raise an uncaught `Constraint_Error` — an "Internal error"-shaped crash, not the clean, descriptive,
+corrective-action error design.md §8 requires for every error condition. Fixed with an explicit
+`Token_Kind` check ahead of both `Real'Value` calls, raising a clean `Script_Error` naming the
+problem instead. A systematic grep of every `Real'Value` call site in `sdata-parser.adb` confirmed
+these were the only two unguarded sites; sibling numeric-argument commands (`INSERT`, `FOR`/`STEP`)
+either already type-check before consuming the token or compose through the general expression
+parser (where `Op_Neg` already handles `-.i` safely), so no other site needed a change.
+
+**Token representation:** two new `Token_Kind` members per lexer (`Token_Infinity`/`Token_NaN` in
+sdata's own lexer; `TK_Infinity`/`TK_NaN` in sdata-core's private `Parse_Expression` mini-lexer,
+additive, not exported) rather than reusing `Token_Numeric_Literal` with sentinel text consumed via
+`Real'Value("Inf")`/`Real'Value("NaN")` — GNAT-specific special-value string parsing is unverified
+in this codebase and compiler/version-dependent, whereas the arithmetic-construction pattern above
+is already proven safe by this project's own `Pos_Inf`/`Neg_Inf` elaboration code.
+
+**Three-repo parity, same shape as the `^`/`**` operator-parity fix (ADR — see the archived
+`caret-power-operator-fix` workstream, issue #65):** sdata's own lexer/parser (LET/IF/etc.);
+sdata-core's shared `Parse_Expression` mini-lexer (SELECT filter expressions in both sdata and
+data-vandal go through this); and data-vandal's own independent lexer, which needed the identical
+`.i`/`.n` recognition **and** a `Token_To_String` entry rendering them back as `".i"`/`".n"` — data-
+vandal's `Collect_Select_Filter_Text` reconstructs a SELECT filter's text from its own lexer's
+tokens (space-joined) before handing it to sdata-core's `Parse_Expression`; without an explicit
+`Token_To_String` arm these two token kinds (which carry no raw text) would round-trip as an empty
+string, silently dropping the literal from the reconstructed filter — the same corruption class the
+`^`/`**` fix found and fixed for data-vandal's dropped `^` character. Caught and fixed in this
+change via `tests/select_infinity_nan.cmd` (data-vandal), not discovered as a follow-up "bonus
+finding" the way the `^`/`**` fix's data-vandal bug was.
+
+**Rendering:** `SData_Core.Values.To_String`/`To_String_Formatted`/`Image_Round_Trip` already
+special-cased `Is_Inf` (`"Inf"`/`"-Inf"`) but had no `Is_NaN` branch — a stored NaN fell through to
+raw `Real'Image`, GNAT-implementation-defined text, inconsistent with the `Inf`/`-Inf` convention.
+New public `SData_Core.Values.Is_NaN` (mirrors `Is_Inf`) and an explicit `"NaN"` branch added to
+all three functions (and `Image_Fixed_Decimals`), checked ahead of the sign-based `Is_Inf` branch
+since NaN's sign bit is not meaningful. CSV output delegates to `To_String`, so this covers CSV
+round-tripping too; no separate `file_io` change needed (confirmed no independent float-formatting
+path there).
+
+**Consequences:** Easier — the literal is additive and small; `Numeric_Result_Checked` and every
+arithmetic operator body are untouched. Harder — a `.n` value used inside AGGREGATE/STATS/SORT or
+any expression that sums, compares-for-ordering, or otherwise computes over it surfaces a domain
+error at that point, not at the literal's construction site; this is correct and matches `0/0`'s
+existing behavior, verified by `tests/aggregate_min_max_nan_first.cmd` and `tests/
+infinity_nan_arithmetic_error.cmd`. Give up — no "NaN propagates silently through computation"
+mode in this iteration; a future issue wanting that is a deliberate, separately-ADR'd policy
+reversal, not a side effect of this literal-syntax addition. SORT's comparison stability with a
+stored NaN present is a known IEEE limitation (not a new fix requirement) and is not addressed
+here.
+
+**Alternatives rejected:** relaxing `Numeric_Result_Checked` to let user-constructed NaN propagate
+— rejected, `Value` doesn't (and shouldn't) carry a "how did I get this NaN" provenance tag to
+distinguish deliberate construction from an accidental arithmetic NaN, and it's out of proportion
+to what #71 asked for. Parsing `.i`/`.n` via `Real'Value` on GNAT special-value strings — rejected
+as unverified and unnecessary given the proven-safe arithmetic-construction alternative. Reusing
+`Token_Numeric_Literal` with sentinel text — rejected, the parser's existing conversion site
+unconditionally calls `Real'Value(S)` on that token kind's text, so reusing it means either
+special-casing that call site anyway or accepting the `Real'Value` risk above.
+
+**Versions/tests:** sdata-core (`Is_NaN`/`NaN_Val` on `SData_Core.Values`; `TK_Infinity`/`TK_NaN` +
+construction in `Parse_Expression`; `Handle_Min_Fn`/`Handle_Max_Fn` fix), sdata (`Token_Infinity`/
+`Token_NaN` in the lexer/parser; `REMOVE` guard fix), data-vandal (lexer + `Token_To_String`
+parity) all additive; consumer floors unchanged if no other breaking change accompanies the
+release. sdata-core in-crate tests: `parse_expression_tests.adb` (construction, disambiguation,
+arithmetic-guard-still-raises), `values_tests.adb` (`Is_NaN`/`NaN_Val`/rendering),
+`aggregate_exec_test.adb` (MIN/MAX NaN-first-row regression). sdata integration tests:
+`infinity_nan_literals.cmd`, `infinity_nan_disambiguation.cmd`, `infinity_nan_arithmetic_error.cmd`,
+`aggregate_min_max_nan_first.cmd`, `repl_remove_infinity_nan_rejected.cmd` (`.repl`-marker, per the
+`repl-test-coverage` convention). data-vandal: `select_infinity_nan.cmd`. Full three-way gate green:
+sdata-core in-crate suite, sdata `make check`, data-vandal `make check`, all pre- and post-change.

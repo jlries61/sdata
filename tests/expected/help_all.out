@@ -774,14 +774,19 @@ See also: LBOUND
 Function: MISSING(x)  ->  1 if x is missing, else 0
 
 Function: INF(x)  ->  1 if x is +Inf or -Inf, else 0
-  Returns 0 for finite numeric values, missing values, and strings.
+  Returns 0 for finite numeric values, missing values, strings, and NaN.
 
   To test for positive infinity:  INF(x) AND x > 0
   To test for negative infinity:  INF(x) AND x < 0
-  NOT INF(x) serves the role of FINITE() for non-missing values.
+  NOT INF(x) serves the role of FINITE() for non-missing, non-NaN values.
 
-  Inf arises from arithmetic overflow (MAXNUM() * 2.0) or from
-  float division by zero when OPTIONS IEEE_DIVIDE YES is set.
+  Inf arises from arithmetic overflow (MAXNUM() * 2.0), from float
+  division by zero when OPTIONS IEEE_DIVIDE YES is set, or from the
+  .i / -.i typed literal. NaN is constructed with the .n typed
+  literal (either case: .I, .N); a .n value may be stored, printed
+  (as NaN), and compared (.n = .n is false, per IEEE 754), but using
+  it in an arithmetic operation still raises the same domain error
+  0/0 does.
   See also: MISSING, OPTIONS IEEE_DIVIDE
 
 Function: RAN() / RANDOM() / RND()  ->  uniform random number in [0, 1)

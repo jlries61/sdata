@@ -471,6 +471,18 @@ package body SData.Parser is
                   when Token_Dot =>
                      return new Expression (Expr_Missing);
 
+                  when Token_Infinity =>
+                     Node := new Expression (Expr_Numeric_Literal);
+                     Node.Value      := Pos_Inf;
+                     Node.Is_Integer := False;
+                     return Node;
+
+                  when Token_NaN =>
+                     Node := new Expression (Expr_Numeric_Literal);
+                     Node.Value      := NaN_Val;
+                     Node.Is_Integer := False;
+                     return Node;
+
                   when others =>
                      return null;
                end case;
@@ -2879,6 +2891,15 @@ package body SData.Parser is
                Num_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                From_Num : Positive;
             begin
+               --  Num_Tok.Kind must be checked before Real'Value: a .i/.n
+               --  literal (Token_Infinity/Token_NaN, issue #71) carries no
+               --  text, so an unconditional Real'Value on it would raise an
+               --  uncaught Constraint_Error instead of a clean parse error.
+               if Num_Tok.Kind /= Token_Numeric_Literal then
+                  raise Script_Error with
+                    "REMOVE requires a program-buffer line number; "
+                    & "Infinity/NaN literals (.i, .n) are not valid here";
+               end if;
                From_Num := Positive (Real'Value (Num_Tok.Text (1 .. Num_Tok.Length)));
                Stmt := new Statement (Stmt_PROGRAM_REMOVE);
                Stmt.Remove_From := From_Num;
@@ -2892,6 +2913,11 @@ package body SData.Parser is
                         To_Tok   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         pragma Unreferenced (Ignored);
                      begin
+                        if To_Tok.Kind /= Token_Numeric_Literal then
+                           raise Script_Error with
+                             "REMOVE requires a program-buffer line number; "
+                             & "Infinity/NaN literals (.i, .n) are not valid here";
+                        end if;
                         Stmt.Remove_To := Positive (Real'Value (To_Tok.Text (1 .. To_Tok.Length)));
                      end;
                   end if;
