@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-08-05" "sdata 0.17.2" "User Commands"
+.TH SDATA 1 "2026-08-08" "sdata 0.17.3" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -1286,6 +1286,37 @@ is non\-zero or non\-empty, else
 .SS Special
 .BR MISSING (x)
 \(em 1 if x is missing, else 0.
+.br
+.BR INF (x)
+\(em 1 if x is IEEE 754 +Inf or \-Inf, else 0 (including for missing
+values, strings, and NaN).
+Combine with a sign test
+.RI ( "INF(x) AND x > 0" )
+to distinguish positive from negative infinity;
+.B "NOT INF(x)"
+serves the role of a FINITE() test for non\-missing, non\-NaN values.
+Inf arises from arithmetic overflow, from float division by zero under
+.B "OPTIONS IEEE_DIVIDE YES" ,
+or from the
+.B .i
+/
+.B \-.i
+typed literal (either case:
+.BR .I ).
+NaN is constructed with the
+.B .n
+typed literal (either case:
+.BR .N ).
+A
+.B .n
+value may be assigned, stored, printed (as
+.IR NaN ),
+and compared
+.RI ( ".n = .n"
+is false, per IEEE 754), but using it in an arithmetic operation still
+raises the same domain error
+.I 0/0
+does.
 .br
 .BR FALSE
 \(em the constant 0.

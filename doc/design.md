@@ -71,7 +71,7 @@ Conversion Rules:
 
 **Floating Point Overflow:** Arithmetic overflow (addition, subtraction, multiplication, exponentiation — e.g. *MAXNUM() \* 2*) does not fail; it silently produces IEEE 754 ±Infinity, regardless of the *IEEE_DIVIDE* option. Float division by zero fails with an error message unless *OPTIONS IEEE_DIVIDE YES* is in effect, in which case it instead produces ±Infinity (or, for *0/0*, an internal NaN result that is never exposed as a value: it is converted to an error message, or — if *--ignore-math-errors* is set — a warning and a missing value). *INF(x)* tests whether *x* is ±Infinity.
 
-**Note:** IEEE 754 infinity and NaN are already present in this model as described above, not a future extension. A separate, still-unimplemented extension is typed literal input syntax for these values (*.i*, *-.i*, *.n*), tracked in §8.5.
+**Typed literals:** A script may also construct these values directly, rather than only reaching them as an arithmetic result, via the typed literal forms *.i* (positive Infinity), *-.i* (negative Infinity — the ordinary unary minus operator applied to *.i*), and *.n* (NaN), either case (*.I*, *.N*). These are disambiguated from the bare missing-value literal (*.*) and from ordinary leading-dot decimals (*.5*) by requiring the *i*/*n* to immediately follow the dot with no intervening space and to be followed by a word boundary — *.info*, for instance, is unaffected and still lexes as the missing-value literal followed by a separate identifier. A *.n* literal may be assigned, stored, printed (as *NaN*), and compared (per IEEE 754, *.n = .n* is false), but using it in any arithmetic operation (+, -, \*, /, \*\*) still raises the same domain error *0/0* does — the literal is a way to *construct* NaN as a sentinel, not a way to make NaN survive computation (see ADR-057).
 
 ### 2.5 Missing Values
 
@@ -1482,7 +1482,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>INF</em></td>
 <td><em>INF(x)</em></td>
 <td></td>
-<td>Return 1 if <em>x</em> is <em>+Inf</em> or <em>-Inf</em>, else 0 (including for missing values and strings). <em>Inf</em> arises from arithmetic overflow or from floating-point division by zero when <em>OPTIONS IEEE_DIVIDE YES</em> is set. Combine with a sign test (e.g. <em>INF(x) AND x &gt; 0</em>) to distinguish positive from negative infinity; <em>NOT INF(x)</em> serves the role of a <em>FINITE()</em> test for non-missing values.</td>
+<td>Return 1 if <em>x</em> is <em>+Inf</em> or <em>-Inf</em>, else 0 (including for missing values, strings, and NaN). <em>Inf</em> arises from arithmetic overflow, from floating-point division by zero when <em>OPTIONS IEEE_DIVIDE YES</em> is set, or from the <em>.i</em>/<em>-.i</em> typed literal (see §2.4). Combine with a sign test (e.g. <em>INF(x) AND x &gt; 0</em>) to distinguish positive from negative infinity; <em>NOT INF(x)</em> serves the role of a <em>FINITE()</em> test for non-missing, non-NaN values.</td>
 </tr>
 <tr>
 <td><em>INSTR</em></td>
@@ -2333,12 +2333,6 @@ All error conditions specified in this document shall produce clear, descriptive
 
 This specification notes several areas where future versions may provide additional capabilities:
 
-- Typed literal input syntax for IEEE 754 infinity and NaN (*.i*, *-.i*, *.n*),
-  letting a script write these values directly rather than only encountering
-  them as arithmetic results (see §2.4 — the underlying values themselves are
-  already implemented, only this literal syntax is not).
-  (Character data has a single missing value — the empty string; these special
-  missing codes are a numeric-only extension.)
 - Additional file format support.
 - Numeric literals in bases other than ten.
 - Enhanced formula evaluation in spreadsheets.

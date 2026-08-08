@@ -1,0 +1,6 @@
+sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> Error: REMOVE requires a program-buffer line number; Infinity/NaN literals (.i, .n) are not valid here
+sdata> Error: REMOVE requires a program-buffer line number; Infinity/NaN literals (.i, .n) are not valid here
+sdata> RUN complete. 1 records and 1 variables processed.
+sdata> sdata> 3.00000
+RUN complete. 1 records and 1 variables processed.
+sdata>

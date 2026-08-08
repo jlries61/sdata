@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.17.2
+Version:        0.17.3
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Sat Aug 08 2026 John L. Ries <john@theyarnbard.com> - 0.17.3-1
+- Add .i/-.i/.n typed literal syntax for IEEE 754 Infinity/NaN (issue #71, ADR-057)
+
 * Wed Aug 05 2026 John L. Ries <john@theyarnbard.com> - 0.17.2-1
 - Design-vs-implementation audit fixes: negative-base exponentiation crash, EOF() during REPEAT, DIM declarative dispatch and resize data loss, KEEP/DROP dash-range no-op, SAVE missing-directory clean error, declarative statement in loop now warns instead of silently misbehaving (ADR-056), bare PRINT no-op; closes all findings in doc/adrs.md and .ssd/audits/2026-08-03-design-vs-implementation/.
 

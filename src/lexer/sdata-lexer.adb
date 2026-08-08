@@ -478,6 +478,28 @@ package body SData.Lexer is
                         T.Text (T.Length) := Current_Char (Ctx);
                         Advance (Ctx);
                      end loop;
+                  elsif not Is_End_Of_Source (Ctx)
+                     and then (Current_Char (Ctx) = 'i' or else Current_Char (Ctx) = 'I'
+                               or else Current_Char (Ctx) = 'n' or else Current_Char (Ctx) = 'N')
+                     and then (Ctx.Pos + 1 > Ctx.Source_Len
+                               or else not (Is_Alphanumeric (Element (Ctx.Source, Ctx.Pos + 1))
+                                            or else Element (Ctx.Source, Ctx.Pos + 1) = '_'
+                                            or else Element (Ctx.Source, Ctx.Pos + 1) = '$'
+                                            or else Element (Ctx.Source, Ctx.Pos + 1) = '%'))
+                  then
+                     --  Typed literal input syntax for IEEE 754 Infinity/NaN
+                     --  (.i / -.i, .n; either case) -- issue #71. The word-
+                     --  boundary lookahead keeps .info lexing unchanged
+                     --  ([Token_Dot]["info" identifier]), exactly as before
+                     --  this feature: the digit-check branch above already
+                     --  claims '.' followed by a digit, so this arm only
+                     --  narrows what used to be a bare Token_Dot followed by
+                     --  a stray identifier token (already a parse error in
+                     --  every context that matters).
+                     T.Kind :=
+                       (if Current_Char (Ctx) = 'i' or else Current_Char (Ctx) = 'I'
+                        then Token_Infinity else Token_NaN);
+                     Advance (Ctx); -- consume the 'i'/'n'
                   else
                      T.Kind := Token_Dot;
                   end if;

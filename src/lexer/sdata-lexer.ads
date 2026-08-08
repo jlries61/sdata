@@ -41,6 +41,7 @@ package SData.Lexer is
       Token_Equal, Token_Not_Equal, Token_Less, Token_Less_Equal, Token_Greater, Token_Greater_Equal, -- =, <>, <, <=, >, >=
       Token_Left_Paren, Token_Right_Paren, Token_Left_Brace, Token_Right_Brace, -- (, ), {, }
       Token_Comma, Token_Semicolon, Token_Colon, Token_Dot, -- ,, ;, :, .
+      Token_Infinity, Token_NaN, -- .i / -.i, .n -- typed IEEE 754 literals (issue #71)
       Token_Dollar,          -- standalone $ (INSERT $)
       Token_Pipe,            -- | or || (delimiter value)
       Token_Newline,         -- Explicit newline tracking
