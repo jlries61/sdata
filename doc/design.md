@@ -15,8 +15,6 @@ Key Requirements:
 - Code must be modular, readable, maintainable, and well-documented.
 - No copyrighted code may be copied into the generated code base.
 
-**Note:** This requirement is not yet fully met: the current disk-spill implementation imposes a ~2000-column ceiling (see §2.1). Removing that ceiling (a long/EAV spill schema) is tracked as a known gap (issue #64), not accepted as a permanent exception, and is planned to be resolved prior to the 1.0 release.
-
 ### 1.2 BW BASIC Compatibility
 
 Unless otherwise specified, the commands and functions listed shall be implemented as specified in the documentation for Bywater BASIC 3.20, but deviations are allowed when necessary. Bywater commands and functions not listed in this document shall not be supported.
@@ -33,7 +31,6 @@ Memory Management:
 - External file storage: used when table exceeds maximum in-memory size.
 - Cache size: equal to maximum in-memory size, but never less than the size of a single row.
 - Implementation details: format and properties of external file and cache are implementation-defined.
-- **Disk-spill column limit:** The current SQLite-backed disk-spill implementation maps each data column to a SQLite table column. SQLite imposes a hard limit of approximately 2000 columns per table; attempting to spill a dataset with more columns than that limit produces an error with an actionable message. To keep a wide dataset in memory regardless of size, use *-m 0* (unlimited) or a large *-m* value. Alternatively, reduce the column count with *KEEP* or *DROP* before the spill threshold is reached. This is a known gap against §1.1's "no hard memory or dimensional constraints" requirement (issue #64), planned to be resolved prior to the 1.0 release.
 
 **Column Ordering:** Permanent variables (including arrays) shall appear as columns in the internal table in the order in which they were created.
 
