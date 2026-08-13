@@ -1138,7 +1138,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>ARCTAN</em></td>
 <td><em>ARCTAN(x)</em></td>
 <td></td>
-<td>As specified in the BW BASIC. documentation</td>
+<td>Return the arctangent of <em>x</em>, in radians, in the range -&pi;/2 to &pi;/2.</td>
 </tr>
 <tr>
 <td><em>ASC</em></td>
