@@ -2262,7 +2262,7 @@ Expression Types:
 
 Memory Management:
 
-- *-m* \<*size*\>: Maximum in-memory table size. The unit is cells (rows × columns). 0 means unlimited (all data stays in memory). When the table exceeds this limit the rows are spilled to a temporary SQLite database; the current SQLite backend supports at most approximately 2000 columns per spilled table, so wide datasets should use *-m 0* or a value large enough to prevent spill.
+- *-m* \<*size*\>: Maximum in-memory table size. The unit is cells (rows × columns). 0 means unlimited (all data stays in memory). When the table exceeds this limit the rows are spilled to a temporary SQLite database.
 - *-t* \<*size*\>: Maximum temporary variable/array memory.
 
 Character Variables:
