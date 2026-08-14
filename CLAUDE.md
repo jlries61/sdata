@@ -102,7 +102,7 @@ first, then `cd ~/Develop/sdata && make check` to catch regressions in both laye
 
 | Tier | Examples | Behaviour |
 |---|---|---|
-| Declarative | USE, BY, SELECT, REPEAT, SAVE, FPATH, RSEED | Execute immediately; configure interpreter state |
+| Declarative | USE, BY, SELECT, REPEAT, SAVE, FPATH, RSEED, RENAME, HOLD, UNHOLD | Execute immediately; configure interpreter state |
 | Immediate | RUN, SORT, AGGREGATE, TRANSPOSE, STATS, NEW, NAMES, SYSTEM, HELP | Execute immediately; not purely declarative |
 | Deferred | LET, SET, PRINT, IF, FOR, WHILE, WRITE, DELETE | Queued in statement list; execute once per record via `Run_One_Step` |
 

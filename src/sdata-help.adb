@@ -99,7 +99,7 @@ package body SData.Help is
       Put_Line ("  formulas before import.  Otherwise cached values from the last save");
       Put_Line ("  are used -- correct for normally-saved files, but potentially stale");
       Put_Line ("  for volatile functions (TODAY, NOW, RAND) or manual-recalc files.");
-      Put_Line ("Execution: Immediate -- loads the dataset at once.");
+      Put_Line ("Execution: Declarative -- loads the dataset at once.");
    end Help_USE;
 
    procedure Help_SAVE is
@@ -485,14 +485,14 @@ package body SData.Help is
    begin
       Put_Line ("Command: HOLD [variable(s)]");
       Put_Line ("Retains the listed permanent variables across records.");
-      Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
+      Put_Line ("Execution: Declarative -- takes effect at once.");
    end Help_HOLD;
 
    procedure Help_UNHOLD is
    begin
       Put_Line ("Command: UNHOLD [variable(s)]");
       Put_Line ("Cancels a previous HOLD. No args = unhold all.");
-      Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
+      Put_Line ("Execution: Declarative -- takes effect at once.");
    end Help_UNHOLD;
 
    procedure Help_KEEP is
@@ -513,7 +513,7 @@ package body SData.Help is
    begin
       Put_Line ("Command: RENAME old=new [, old=new ...]");
       Put_Line ("Renames columns in the Data Table.");
-      Put_Line ("Execution: Immediate -- takes effect at once.");
+      Put_Line ("Execution: Declarative -- takes effect at once.");
    end Help_RENAME;
 
    procedure Help_IF is
@@ -654,7 +654,7 @@ package body SData.Help is
    begin
       Put_Line ("Command: RSEED n");
       Put_Line ("Seeds the random number generator with integer n.");
-      Put_Line ("Execution: Immediate -- takes effect at once.");
+      Put_Line ("Execution: Declarative -- takes effect at once.");
    end Help_RSEED;
 
    procedure Help_HELP is
@@ -719,17 +719,18 @@ package body SData.Help is
       Put_Line ("    discouraged and prints a one-time warning: it still takes");
       Put_Line ("    effect only once, not per iteration.");
       Put_Line ("    Commands: ARRAY, SAVE, BY, SELECT (filter), SELECT /ALL,");
-      Put_Line ("              REPEAT n, KEEP, DROP, DIM, FPATH");
+      Put_Line ("              REPEAT n, KEEP, DROP, DIM, FPATH, USE, RENAME,");
+      Put_Line ("              HOLD, UNHOLD, RSEED");
       New_Line;
       Put_Line ("  Immediate -- execute at once, outside any data step.");
-      Put_Line ("    Commands: USE, RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET,");
-      Put_Line ("              RENAME, SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT,");
+      Put_Line ("    Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET,");
+      Put_Line ("              SYSTEM, SUBMIT, ECHO, DIGITS, OUTPUT,");
       Put_Line ("              HELP, REMOVE n[-m], INSERT [n|$], QUIT, END");
       New_Line;
       Put_Line ("  Deferred -- queued between RUN markers; executed once per");
       Put_Line ("    record during the data step.");
       Put_Line ("    Commands: LET, SET, PRINT, IF, FOR, WHILE, DO/UNTIL,");
-      Put_Line ("              SELECT/CASE, DELETE, WRITE, HOLD, UNHOLD, BREAK");
+      Put_Line ("              SELECT/CASE, DELETE, WRITE, BREAK");
       New_Line;
       Put_Line ("Note: SELECT has two forms with different tiers:");
       Put_Line ("  SELECT <expr> / SELECT /ALL  -- Declarative (row filter)");

@@ -34,4 +34,4 @@ Formula cells (ODF/OOXML):
   formulas before import.  Otherwise cached values from the last save
   are used -- correct for normally-saved files, but potentially stale
   for volatile functions (TODAY, NOW, RAND) or manual-recalc files.
-Execution: Immediate -- loads the dataset at once.
+Execution: Declarative -- loads the dataset at once.

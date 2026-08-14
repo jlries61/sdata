@@ -34,8 +34,9 @@ with SData_Core.File_IO;
 --  SData.Interpreter — statement executor and data step engine.
 --
 --  Execution model (three tiers):
---    Declarative       Commands such as USE, BY, SELECT, REPEAT, SAVE, FPATH
---                      execute immediately and configure interpreter state.
+--    Declarative       Commands such as USE, BY, SELECT, REPEAT, SAVE, FPATH,
+--                      RENAME, HOLD, UNHOLD execute immediately and configure
+--                      interpreter state or shape the data step that follows.
 --    Immediate         RUN, SORT, AGGREGATE, TRANSPOSE, NEW, NAMES, SYSTEM, HELP
 --                      execute immediately but are not purely declarative.
 --    Deferred          LET, SET, PRINT, IF, FOR, WHILE, WRITE, DELETE are
@@ -1557,20 +1558,32 @@ package body SData.Interpreter is
    begin
       if Stmt = null then return; end if;
 
-      --  P15 (design-vs-implementation audit, ADR pending): a Declarative
+      --  P15 (design-vs-implementation audit, ADR-056) + the 2026-08-13
+      --  design-vs-implementation re-audit's PA-2/PB findings: a Declarative
       --  statement -- one that configures interpreter state once rather
       --  than per record -- inside a FOR/WHILE/DO-UNTIL loop is not a
       --  syntax error, but is confusing: it takes effect once, not scoped
       --  to that iteration. Warn (not reject), once per source occurrence
       --  regardless of how many times the loop actually iterates. The set
-      --  below matches sdata-help.adb's own "Execution: Declarative" text
-      --  (ARRAY/BY/DIM/DROP/FPATH/KEEP/REPEAT/SAVE/SELECT), the tested
-      --  ground truth the audit itself used -- not design.md's §7.1
-      --  Commands table, whose Type column disagrees with HELP on several
-      --  unrelated rows (OPTIONS, RSEED, ECHO, RENAME, HOLD/UNHOLD).
+      --  below is design.md §7.1's Commands table Type column (already
+      --  correct for every row below before this change) plus USE/RENAME/
+      --  HOLD/UNHOLD, added per the resolution reached working through the
+      --  2026-08-13 re-audit's PA-2/PB findings: all four "execute
+      --  immediately... and shape the data step that follows" exactly like
+      --  their siblings, so they get the same loop-placement warning.
+      --  sdata-help.adb's Execution lines were updated to match (were the
+      --  stale side of the disagreement, not design.md). RSEED was added in
+      --  the same follow-up: design.md §7.1 had said "Deferred Execution"
+      --  since the original odt->md conversion (predates this repo's git
+      --  history), while CLAUDE.md's tier table and this file's own header
+      --  comment already treated it as Declarative -- and it was never in
+      --  Process_One_Record's per-record whitelist to begin with, so
+      --  aligning the label to match shipped behavior carries none of
+      --  HOLD/UNHOLD's or DIGITS/ECHO's per-record-dependency risk.
       if Ctx.Loop_Depth > 0 and then not Stmt.Warned_In_Loop
          and then Stmt.Kind in Stmt_ARRAY | Stmt_BY | Stmt_DIM | Stmt_DROP
             | Stmt_FPATH | Stmt_KEEP | Stmt_REPEAT | Stmt_SAVE | Stmt_SELECT_FILTER
+            | Stmt_USE | Stmt_RENAME | Stmt_HOLD | Stmt_UNHOLD | Stmt_RSEED
       then
          Stmt.Warned_In_Loop := True;
          declare
@@ -1585,6 +1598,11 @@ package body SData.Interpreter is
                    when Stmt_REPEAT        => "REPEAT",
                    when Stmt_SAVE          => "SAVE",
                    when Stmt_SELECT_FILTER => "SELECT",
+                   when Stmt_USE           => "USE",
+                   when Stmt_RENAME        => "RENAME",
+                   when Stmt_HOLD          => "HOLD",
+                   when Stmt_UNHOLD        => "UNHOLD",
+                   when Stmt_RSEED         => "RSEED",
                    when others             => "?");
          begin
             Put_Line_Error

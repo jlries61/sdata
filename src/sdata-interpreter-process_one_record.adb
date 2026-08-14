@@ -102,11 +102,83 @@ begin
             --  by the batch walker / at REPL entry, exactly like ARRAY already was.
             --  Re-executing it per record would re-DIM (and reset) the array on
             --  every record of a REPEAT n data step instead of once.
-            when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_NAMES | Stmt_IF
+            --  Stmt_HOLD/Stmt_UNHOLD (also never listed here as of the
+            --  2026-08-13 re-audit's PA-2/PB-4 resolution) are the same
+            --  category too: they are Declarative -- a one-time decision
+            --  about which variables retain their value across records, not
+            --  a per-record toggle. An initial safety check against only
+            --  tests/hold_test.cmd wrongly concluded per-record replay was
+            --  never load-bearing; tests/sort_by.cmd's BY-group running-total
+            --  idiom (HOLD var / accumulate / UNHOLD var, all written inside
+            --  the per-record body) DID regress when this whitelist entry was
+            --  first removed, because Set_Permanent's Is_Held check at
+            --  assignment time -- not Reset_PDV_Non_Held's check at record
+            --  entry -- is what actually mirrors a held variable's value into
+            --  Temp_Symbols, and that only fires if HOLD is still "active"
+            --  at the moment the LET runs. Root-caused by tracing Set_Hold /
+            --  Reset_PDV_Non_Held live: the walker already dispatches a
+            --  script's HOLD/UNHOLD pair once, immediately, before the first
+            --  record ever runs (Execute's own deferred-kind exclusion list
+            --  never listed HOLD/UNHOLD either) -- so a script that declares
+            --  HOLD once *before* the loop and defers the per-group reset to
+            --  an explicit "IF FIRST.group = 1 THEN LET var = 0" needs no
+            --  per-record replay at all and produces byte-identical output.
+            --  tests/sort_by.cmd was rewritten to that idiom rather than
+            --  keeping HOLD/UNHOLD in this whitelist.
+            --  Stmt_HELP (2026-08-13 re-audit PB-8): design.md §7.1,
+            --  sdata-help.adb, and CLAUDE.md all already say Immediate: only
+            --  this whitelist disagreed, silently re-printing the same HELP
+            --  text once per record when HELP was left inside an open
+            --  data-step body. No test exercises that (all help_*.cmd tests
+            --  call HELP standalone, never inside REPEAT/RUN), so dropping it
+            --  here is a pure bug fix, not a behavior trade-off like
+            --  HOLD/UNHOLD's.
+            --  Stmt_NAMES (PB-7): same shape as PB-8 -- design.md §7.1,
+            --  sdata-help.adb, and CLAUDE.md all already say Immediate; only
+            --  this whitelist silently re-fired it once per record. NAMES's
+            --  own output happens at the moment it dispatches (like HELP) --
+            --  it doesn't set state a later *deferred* statement reads -- so
+            --  the walker's single top-to-bottom pre-scan already shows the
+            --  right column list at each distinct textual position (e.g.
+            --  before/after an interleaved RENAME) with no per-record
+            --  redispatch needed. Confirmed via all 12 previously-passing
+            --  tests using NAMES inside a data-step body: every failure after
+            --  removing it here was pure duplicate output (the same block
+            --  repeated once per record), never a position-dependent content
+            --  difference -- see tests/rename_test.cmd, tests/column_mgmt.cmd.
+            --
+            --  Stmt_DIGITS (PB-6) looks identical on paper but is NOT safe to
+            --  remove: unlike NAMES, DIGITS sets a precision that a *later
+            --  deferred* PRINT reads when PRINT itself finally dispatches
+            --  during the per-record pass. tests/digits_test.cmd interleaves
+            --  DIGITS 5 / PRINT / DIGITS 2 / PRINT / DIGITS 8 / PRINT in one
+            --  record body, expecting each PRINT to render at the precision
+            --  set immediately before it. Without per-record replay, the
+            --  walker's pre-scan collapses all three DIGITS calls to their
+            --  final value (8) before the record even runs, and every PRINT
+            --  renders at full precision instead. Confirmed by direct
+            --  regression (make check) before this comment was written --
+            --  DIGITS stays in this whitelist.
+            --
+            --  Stmt_ECHO (PB-5) was initially removed alongside HELP/NAMES on
+            --  the assumption it was the same "prints for itself, nothing
+            --  reads its state later" shape -- wrong, by the same mechanism
+            --  as DIGITS: ECHO sets a console-output flag that a *later
+            --  deferred* PRINT reads when PRINT itself dispatches. A scratch
+            --  script (ECHO OFF / PRINT "a" / ECHO ON / PRINT "b", one
+            --  record) proved it directly: with ECHO out of this whitelist,
+            --  both PRINTs render, because the walker's pre-scan already
+            --  collapsed OFF-then-ON to ON before the record ran. ECHO stays
+            --  in this whitelist for the same reason DIGITS does. (design.md
+            --  §7.1's "Immediate" label for both is still correct -- it
+            --  describes how they're documented/used, not whether the engine
+            --  can skip per-record redispatch; "Immediate" here means "takes
+            --  effect at its position in program order," which for a
+            --  statement written inside a repeated body means every record.)
+            when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_IF
                | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_DO | Stmt_SELECT
-               | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE | Stmt_ECHO
-               | Stmt_HOLD | Stmt_UNHOLD
-               | Stmt_BY | Stmt_DIGITS | Stmt_HELP =>
+               | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE
+               | Stmt_BY | Stmt_DIGITS | Stmt_ECHO =>
                begin
                   Execute_Statement (Iter, Ctx);
                exception

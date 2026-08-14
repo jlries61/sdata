@@ -35,7 +35,7 @@ Formula cells (ODF/OOXML):
   formulas before import.  Otherwise cached values from the last save
   are used -- correct for normally-saved files, but potentially stale
   for volatile functions (TODAY, NOW, RAND) or manual-recalc files.
-Execution: Immediate -- loads the dataset at once.
+Execution: Declarative -- loads the dataset at once.
 
 Command: SAVE "filename[sheet]" [/FMT=format] [/HEADER=YES|NO] [/DECIMALS=N]
 Queues the current Data Table to be saved after the next RUN command.
@@ -299,11 +299,11 @@ Execution: Deferred -- executed once per record inside the data step.
 
 Command: HOLD [variable(s)]
 Retains the listed permanent variables across records.
-Execution: Deferred -- executed once per record inside the data step.
+Execution: Declarative -- takes effect at once.
 
 Command: UNHOLD [variable(s)]
 Cancels a previous HOLD. No args = unhold all.
-Execution: Deferred -- executed once per record inside the data step.
+Execution: Declarative -- takes effect at once.
 
 Command: KEEP variable(s)
 Drops all permanent variables NOT listed after the next RUN.
@@ -315,7 +315,7 @@ Execution: Declarative -- columns are removed at the end of the next RUN.
 
 Command: RENAME old=new [, old=new ...]
 Renames columns in the Data Table.
-Execution: Immediate -- takes effect at once.
+Execution: Declarative -- takes effect at once.
 
 Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]
 Conditional execution. Supports single-line and multi-line block forms.
@@ -423,7 +423,7 @@ Execution: Declarative -- applies to all subsequent file commands.
 
 Command: RSEED n
 Seeds the random number generator with integer n.
-Execution: Immediate -- takes effect at once.
+Execution: Declarative -- takes effect at once.
 
 Command: HELP [topic | /ALL]
 Displays help. HELP /ALL prints the full reference.
@@ -476,17 +476,18 @@ sdata commands fall into three execution tiers:
     discouraged and prints a one-time warning: it still takes
     effect only once, not per iteration.
     Commands: ARRAY, SAVE, BY, SELECT (filter), SELECT /ALL,
-              REPEAT n, KEEP, DROP, DIM, FPATH
+              REPEAT n, KEEP, DROP, DIM, FPATH, USE, RENAME,
+              HOLD, UNHOLD, RSEED
 
   Immediate -- execute at once, outside any data step.
-    Commands: USE, RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET,
-              RENAME, SYSTEM, SUBMIT, ECHO, DIGITS, RSEED, OUTPUT,
+    Commands: RUN, SORT, NEW, NAMES, LIST, DISPLAY, UNSET,
+              SYSTEM, SUBMIT, ECHO, DIGITS, OUTPUT,
               HELP, REMOVE n[-m], INSERT [n|$], QUIT, END
 
   Deferred -- queued between RUN markers; executed once per
     record during the data step.
     Commands: LET, SET, PRINT, IF, FOR, WHILE, DO/UNTIL,
-              SELECT/CASE, DELETE, WRITE, HOLD, UNHOLD, BREAK
+              SELECT/CASE, DELETE, WRITE, BREAK
 
 Note: SELECT has two forms with different tiers:
   SELECT <expr> / SELECT /ALL  -- Declarative (row filter)

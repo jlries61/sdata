@@ -8,73 +8,25 @@ IDENT NAME$ SALARY_NEW
 Session Variables (SET):
 (none)
 Original Names:
-Permanent Variables (Table Columns):
-IDENT NAME$ SALARY_NEW 
-Session Variables (SET):
-(none)
 After Rename:
-Permanent Variables (Table Columns):
-IDENT NAME$ SALARY_NEW 
-Session Variables (SET):
-(none)
 Original Names:
-Permanent Variables (Table Columns):
-IDENT NAME$ SALARY_NEW 
-Session Variables (SET):
-(none)
 After Rename:
-Permanent Variables (Table Columns):
-IDENT NAME$ SALARY_NEW 
-Session Variables (SET):
-(none)
 Original Names:
-Permanent Variables (Table Columns):
-IDENT NAME$ SALARY_NEW 
-Session Variables (SET):
-(none)
 After Rename:
-Permanent Variables (Table Columns):
-IDENT NAME$ SALARY_NEW 
-Session Variables (SET):
-(none)
 RUN complete. 3 records and 2 variables processed.
 Permanent Variables (Table Columns):
 IDENT NAME$ 
 Session Variables (SET):
 (none)
 After Keep IDENT, NAME$ and RUN:
-Permanent Variables (Table Columns):
-IDENT NAME$ 
-Session Variables (SET):
-(none)
 After Keep IDENT, NAME$ and RUN:
-Permanent Variables (Table Columns):
-IDENT NAME$ 
-Session Variables (SET):
-(none)
 After Keep IDENT, NAME$ and RUN:
-Permanent Variables (Table Columns):
-IDENT NAME$ 
-Session Variables (SET):
-(none)
 RUN complete. 3 records and 1 variables processed.
 Permanent Variables (Table Columns):
 IDENT 
 Session Variables (SET):
 (none)
 After Drop NAME$ and RUN:
-Permanent Variables (Table Columns):
-IDENT 
-Session Variables (SET):
-(none)
 After Drop NAME$ and RUN:
-Permanent Variables (Table Columns):
-IDENT 
-Session Variables (SET):
-(none)
 After Drop NAME$ and RUN:
-Permanent Variables (Table Columns):
-IDENT 
-Session Variables (SET):
-(none)
 RUN complete. 3 records and 1 variables processed.

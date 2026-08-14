@@ -607,8 +607,8 @@ Looping blocks may also be nested inside of conditional blocks and vice versa.
     per-iteration behavior. This is not a syntax error; the interpreter emits
     a warning (not an error) the first time it happens for a given statement,
     regardless of how many times the loop actually iterates.
-  - Examples: *ARRAY*, *BY*, *DIM*, *DROP*, *FPATH*, *KEEP*, *REPEAT*, *SAVE*,
-    *SELECT*.
+  - Examples: *ARRAY*, *BY*, *DIM*, *DROP*, *FPATH*, *HOLD*, *KEEP*, *REPEAT*,
+    *RENAME*, *SAVE*, *SELECT*, *UNHOLD*, *USE*.
   - Command reference table indicates which commands are declarative.
 
 - Non-Declarative Statements:
@@ -874,7 +874,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <tr>
 <td><em>ECHO</em></td>
 <td><em>ECHO</em> &lt;<em>ON</em> | <em>OFF</em>&gt;</td>
-<td>Declarative</td>
+<td>Immediate Execution</td>
 <td>Enable or disable the writing of console output to standard output. Enabled by default.</td>
 </tr>
 <tr>
@@ -996,7 +996,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <tr>
 <td><em>RSEED</em></td>
 <td><em>RSEED</em> &lt;<em>n</em>&gt;</td>
-<td>Deferred Execution</td>
+<td>Declarative</td>
 <td>Set the random number seed to the specified value (must be a literal integer). Persists until changed. At the beginning of each session, the random number seed is set from the system time.</td>
 </tr>
 <tr>

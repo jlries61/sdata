@@ -3,32 +3,8 @@ Permanent Variables (Table Columns):
 IDENT NAME$ 
 Session Variables (SET):
 (none)
-Permanent Variables (Table Columns):
-IDENT NAME$ 
-Session Variables (SET):
-(none)
-Permanent Variables (Table Columns):
-IDENT NAME$ 
-Session Variables (SET):
-(none)
-Permanent Variables (Table Columns):
-IDENT NAME$ 
-Session Variables (SET):
-(none)
 RUN complete. 3 records and 2 variables processed.
 Dataset opened: tests/data/data.csv
-Permanent Variables (Table Columns):
-NUM LABEL 
-Session Variables (SET):
-(none)
-Permanent Variables (Table Columns):
-NUM LABEL 
-Session Variables (SET):
-(none)
-Permanent Variables (Table Columns):
-NUM LABEL 
-Session Variables (SET):
-(none)
 Permanent Variables (Table Columns):
 NUM LABEL 
 Session Variables (SET):
