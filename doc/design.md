@@ -953,7 +953,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <tr>
 <td><em>OUTPUT</em></td>
 <td><em>OUTPUT</em> [<em>filename</em>] [<em>/ [CHARSET =</em> &lt;<em>AUTO </em>| <em>UTF-8</em> |<em> UTF-16</em> |<em> ASCII&gt;</em>] | [<em>FMT =</em> &lt;<em>AUTO</em> | <em>LF</em> | <em>CRLF</em> | <em>CR</em>&gt;] ...]</td>
-<td>Yes</td>
+<td>Immediate Execution</td>
 <td>Redirect console output to a file, or cancel an existing redirection. File names shall be interpreted in the same manner as by the <em>USE</em> command, except that the file format shall be text, regardless of the extension; and the default extension shall be “.DAT”. If no file name is specified, then any <em>OUTPUT</em> statement in effect shall be canceled and console output shall be written to standard output only. The <em>CHARSET</em> option shall specify the character set to be used to write the console output (<em>AUTO </em>specifies the default character set for the session locale and is the default unless changed by <em>OPTIONS CHARSET</em>). The <em>FMT</em> option shall determine the text line ending (<em>AUTO</em> shall specify the system default and is the default).</td>
 </tr>
 <tr>
