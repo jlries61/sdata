@@ -1,5 +1,5 @@
 sdata> sdata> sdata> Generating mock data...
-sdata> sdata> sdata> Error: UNSET cannot remove "SUMVAL": it is currently held by HOLD; use UNHOLD "SUMVAL" first
+sdata> sdata> sdata> Error: UNSET cannot remove "SUMVAL": it is a permanent variable; use DROP "SUMVAL" (effective after the next RUN) to remove it
 sdata> sdata> 1.00000
 1.00000
 1.00000

@@ -1134,9 +1134,12 @@ for the same name is unaffected and will (re)establish the variable
 normally when the queued program next runs (see
 .B RUN
 above for how "queued" differs between batch and interactive mode).
-Naming a variable currently held by
-.B HOLD
-is rejected with an error; unhold it first.
+Naming a permanent variable (one already assigned with
+.BR LET )
+is rejected with an error; use
+.B DROP
+to remove it instead (effective after the next
+.BR RUN ).
 .TP
 .B RENAME \fIold\fR=\fInew\fR [, \fIold\fR=\fInew\fR ...]
 Rename columns.
