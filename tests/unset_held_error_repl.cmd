@@ -1,0 +1,9 @@
+-- REPL parity companion to unset_held_error.cmd.
+NEW
+USE MOCK
+HOLD SUMVAL
+LET SUMVAL = 1
+UNSET SUMVAL
+PRINT SUMVAL
+RUN
+QUIT

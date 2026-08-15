@@ -2615,7 +2615,26 @@ package body SData.Parser is
             elsif Tok.Kind = Token_HOLD then Stmt := new Statement (Stmt_HOLD);
             elsif Tok.Kind = Token_UNSET then Stmt := new Statement (Stmt_UNSET);
             else Stmt := new Statement (Stmt_UNHOLD); end if;
-            Stmt.Vars := Parse_Variable_List (Ctx);
+            --  UNSET /ALL: removes every genuine temporary variable (skips
+            --  HELD names -- see Unset_All). Mirrors HELP /ALL's parsing.
+            if Tok.Kind = Token_UNSET
+               and then Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash
+            then
+               declare
+                  Slash_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  Arg_Tok   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Slash_Tok);
+               begin
+                  if To_Upper (Arg_Tok.Text (1 .. Arg_Tok.Length)) = "ALL" then
+                     Stmt.All_Flag := True;
+                  else
+                     Put_Line_Error
+                        ("Error: Expected ALL after '/' in UNSET statement");
+                  end if;
+               end;
+            else
+               Stmt.Vars := Parse_Variable_List (Ctx);
+            end if;
 
          when Token_ARRAY | Token_DIM =>
             declare
@@ -3221,6 +3240,23 @@ package body SData.Parser is
                         end;
                      else
                         Stmt.Var_Len := 0;
+                     end if;
+                  end;
+               elsif K = Stmt_NEW
+                  and then Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash
+               then
+                  --  NEW /PROGRAM: clears only the queued program. Mirrors
+                  --  HELP /ALL's parsing.
+                  declare
+                     Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     Arg_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     pragma Unreferenced (Discard);
+                  begin
+                     if To_Upper (Arg_Tok.Text (1 .. Arg_Tok.Length)) = "PROGRAM" then
+                        Stmt.Program_Only := True;
+                     else
+                        Put_Line_Error
+                           ("Error: Expected PROGRAM after '/' in NEW statement");
                      end if;
                   end;
                end if;

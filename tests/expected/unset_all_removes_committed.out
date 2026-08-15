@@ -1,0 +1,3 @@
+Generating mock data...
+RUN complete. 3 records and 3 variables processed.
+Error: undefined variable "OTHERTEMP"

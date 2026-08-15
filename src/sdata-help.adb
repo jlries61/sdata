@@ -203,8 +203,10 @@ package body SData.Help is
 
    procedure Help_UNSET is
    begin
-      Put_Line ("Command: UNSET variable(s)");
+      Put_Line ("Command: UNSET variable(s) | UNSET /ALL");
       Put_Line ("Removes one or more session variables from memory.");
+      Put_Line ("/ALL removes every temporary (SET) variable currently");
+      Put_Line ("defined; a variable held by HOLD is left alone.");
       Put_Line ("Execution: Immediate -- takes effect at once.");
    end Help_UNSET;
 
@@ -339,9 +341,11 @@ package body SData.Help is
 
    procedure Help_NEW is
    begin
-      Put_Line ("Command: NEW");
+      Put_Line ("Command: NEW | NEW /PROGRAM");
       Put_Line ("Clears the Data Table, all variables, and the queued program.");
       Put_Line ("Also resets the active SELECT record filter and BY grouping.");
+      Put_Line ("/PROGRAM clears only the queued program, leaving the Data");
+      Put_Line ("Table, all variables, SELECT, and BY untouched.");
       Put_Line ("Execution: Immediate -- takes effect at once.");
    end Help_NEW;
 

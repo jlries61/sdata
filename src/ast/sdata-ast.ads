@@ -265,6 +265,7 @@ package SData.AST is
             Count : Natural;
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
             Vars         : Variable_List;
+            All_Flag     : Boolean := False; -- For UNSET /ALL
             Arr_Name     : String (1 .. Max_Name_Len);
             Arr_Name_Len : Natural := 0;
             Arr_Dim      : Positive; -- Number of elements (for simple arrays) - this will become derived for DIM
@@ -342,6 +343,14 @@ package SData.AST is
             Insert_At_End : Boolean := True;   --  True = append at end ($/bare)
             Insert_Line   : Natural := 0;      --  cursor after line N (0 = start)
             Insert_Bad    : Boolean := False;  --  negative/invalid argument
+         when Stmt_NEW =>
+            --  NEW /PROGRAM clears only the queued deferred-statement
+            --  program (batch: the current pending span; REPL: the whole
+            --  Active_Program_Vec buffer), leaving the Data Table, all
+            --  variables, SELECT/BY, HOLD, KEEP/DROP, ARRAY/DIM, FPATH, and
+            --  OUTPUT untouched. Bare NEW (Program_Only = False) keeps its
+            --  existing clear-everything behavior.
+            Program_Only : Boolean := False;
          when others =>
             null;
       end case;

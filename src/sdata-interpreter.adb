@@ -133,6 +133,17 @@ package body SData.Interpreter is
    --  a bare TABLES statement as if deferred, and process_one_record.adb's
    --  per-record whitelist doesn't cover it either, so it silently never
    --  ran (issue #68).  Keep this list and Execute_Statement's case in sync.
+   --  Stmt_UNSET (2026-08-13 re-audit PB-11) was the same bug: absent here,
+   --  UNSET was queued as deferred in the REPL and, being absent from
+   --  process_one_record.adb's whitelist too, never fired at all
+   --  interactively -- unlike batch, where Execute's own exclusion list
+   --  already dispatched it immediately. UNSET is genuinely single-shot
+   --  Immediate by design (it deallocates a temporary variable *now*; if a
+   --  not-yet-run deferred SET/LET for the same name precedes it in the
+   --  same pending span, UNSET correctly has nothing to remove yet -- that's
+   --  Immediate semantics acting on current state, not a bug, and the
+   --  variable can simply be redefined by a later SET), so the fix here is
+   --  the only piece needed: no change to the per-record whitelist.
    function Is_Immediate (Kind : Statement_Kind) return Boolean is
    begin
       return Kind in
@@ -142,7 +153,8 @@ package body SData.Interpreter is
          Stmt_DIGITS | Stmt_HELP | Stmt_OUTPUT | Stmt_RSEED | Stmt_FPATH |
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
          Stmt_SYSTEM | Stmt_PROGRAM_REMOVE | Stmt_OPTIONS | Stmt_AGGREGATE |
-         Stmt_TRANSPOSE | Stmt_STATS | Stmt_TABLES | Stmt_PROGRAM_INSERT;
+         Stmt_TRANSPOSE | Stmt_STATS | Stmt_TABLES | Stmt_PROGRAM_INSERT |
+         Stmt_UNSET;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -454,6 +466,23 @@ package body SData.Interpreter is
       SData_Core.Table.Clear_Index_Map;
       SData_Core.Table.Clear_By_Vars;
    end Clear_Active_Program;
+
+   --  NEW /PROGRAM's REPL-side worker. Deliberately narrower than
+   --  Clear_Active_Program: clears only the queued deferred-statement
+   --  buffer and the INSERT cursor, leaving the active SELECT filter, BY
+   --  grouping, and index map untouched -- those are declarative state
+   --  already in effect, not part of "the queued program" in the sense
+   --  /PROGRAM promises to clear.
+   procedure Clear_Program_Only is
+   begin
+      for E of Active_Program_Vec loop
+         SData.AST.Free_Program (E.Stmt);
+      end loop;
+      Active_Program_Vec.Clear;
+      Pending_Deferred := 0;
+      Append_Mode  := True;
+      Insert_Point := 0;
+   end Clear_Program_Only;
 
    procedure Debug_Trace (Msg : String; Level : Positive) is
    begin
@@ -2137,10 +2166,21 @@ package body SData.Interpreter is
             begin
                Execute_Statement (Current, Outer_Ctx);
                --  A new input source cancels any deferred statements queued
-               --  before it (design.md:960): advance the deferred-block start
-               --  past this statement and drop the pending count so the next
-               --  RUN's data step excludes them.
-               if Current.Kind = Stmt_USE or else Current.Kind = Stmt_REPEAT then
+               --  before it (design.md's USE/REPEAT rows): advance the
+               --  deferred-block start past this statement and drop the
+               --  pending count so the next RUN's data step excludes them.
+               --  Stmt_NEW belongs here too -- design.md's own NEW row says
+               --  it clears "the queued program", but this branch omitted it
+               --  (2026-08-15, found while designing NEW /PROGRAM): a
+               --  statement queued before a bare NEW in batch mode was
+               --  silently surviving to the next RUN, contradicting that
+               --  documented promise and diverging from the REPL, where
+               --  Clear_Active_Program already discards it correctly. Fixed
+               --  here rather than filed separately since NEW /PROGRAM needs
+               --  this exact reset regardless.
+               if Current.Kind = Stmt_USE or else Current.Kind = Stmt_REPEAT
+                  or else Current.Kind = Stmt_NEW
+               then
                   Step_Start := Current.Next;
                   Pending_Deferred := 0;
                end if;

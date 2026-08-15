@@ -112,8 +112,10 @@ recompute it, or DROP it first (effective after the next RUN) to
 redefine it as temporary.
 Execution: Deferred -- executed once per record inside the data step.
 
-Command: UNSET variable(s)
+Command: UNSET variable(s) | UNSET /ALL
 Removes one or more session variables from memory.
+/ALL removes every temporary (SET) variable currently
+defined; a variable held by HOLD is left alone.
 Execution: Immediate -- takes effect at once.
 
 Command: ARRAY array_name variable(s)
@@ -220,9 +222,11 @@ Honors the active SELECT filter and produces one table set per active
 BY group. Refuses to run while un-run deferred statements are pending.
 Execution: Immediate (print-only). See man page sdata(1).
 
-Command: NEW
+Command: NEW | NEW /PROGRAM
 Clears the Data Table, all variables, and the queued program.
 Also resets the active SELECT record filter and BY grouping.
+/PROGRAM clears only the queued program, leaving the Data
+Table, all variables, SELECT, and BY untouched.
 Execution: Immediate -- takes effect at once.
 
 Command: LIST

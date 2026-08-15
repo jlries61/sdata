@@ -940,9 +940,9 @@ Commands control the flow of execution, manage data, and configure the interpret
 </tr>
 <tr>
 <td><em>NEW</em></td>
-<td></td>
+<td><em>NEW</em> [<em>/ PROGRAM</em>]</td>
 <td>Immediate Execution</td>
-<td>Clear the Data Table, all variables, and the queued program; also reset the active <em>SELECT</em> record filter and <em>BY</em> grouping. In addition, any declarative statements in effect, except for <em>OUTPUT</em>, are canceled.</td>
+<td>Clear the Data Table, all variables, and the queued program; also reset the active <em>SELECT</em> record filter and <em>BY</em> grouping. In addition, any declarative statements in effect, except for <em>OUTPUT</em>, are canceled. The <em>/PROGRAM</em> option clears only the queued program, leaving the Data Table, all variables, the active <em>SELECT</em> filter, and <em>BY</em> grouping untouched — useful for discarding not-yet-run statements without losing the current dataset or session state. In interactive (REPL) mode this also resets the <em>INSERT</em> cursor, matching bare <em>NEW</em>'s existing effect on it. See &sect;5.7 for how "the queued program" differs between batch and interactive mode.</td>
 </tr>
 <tr>
 <td><em>OPTIONS</em></td>
@@ -1003,7 +1003,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>RUN</em></td>
 <td></td>
 <td>Immediate Execution</td>
-<td>Trigger execution of the Data Step. Unlike Bywater BASIC's <em>RUN</em> (which starts or resumes execution of a stored program, optionally from a given line or file), <em>RUN</em> here takes no arguments: queued statements are validated first (assignment type mismatches, unknown functions, arity errors, and undefined variables are all reported as hard errors before any record is processed), then executed once per record. Following the execution of any statements then in effect, the internal table is written to the output dataset specified by the <em>SAVE</em> command (if there is one).  If a variable appears in both the current <em>KEEP</em> statement and a subsequent <em>DROP </em>statement, then the latter shall take precedence. Once the program is run, the numbers of records and variables are displayed.</td>
+<td>Trigger execution of the Data Step. Unlike Bywater BASIC's <em>RUN</em> (which starts or resumes execution of a stored program, optionally from a given line or file), <em>RUN</em> here takes no arguments: queued statements are validated first (assignment type mismatches, unknown functions, arity errors, and undefined variables are all reported as hard errors before any record is processed), then executed once per record. Following the execution of any statements then in effect, the internal table is written to the output dataset specified by the <em>SAVE</em> command (if there is one).  If a variable appears in both the current <em>KEEP</em> statement and a subsequent <em>DROP </em>statement, then the latter shall take precedence. Once the program is run, the numbers of records and variables are displayed. <strong>The queued program's lifetime differs between modes.</strong> In batch (script) mode, each <em>RUN</em> executes only the statements queued since the previous <em>RUN</em> (or since <em>USE</em>/<em>REPEAT</em>/<em>NEW</em>); once executed, they are consumed and will not run again. In interactive (REPL) mode, the queued program persists across <em>RUN</em> — every deferred statement entered since the last <em>NEW</em>, <em>USE</em>, <em>REPEAT</em>, or explicit <em>REMOVE</em> remains queued and is re-executed on <em>every</em> subsequent <em>RUN</em>, including statements from earlier RUNs that already executed once. This lets an interactive session incrementally build up a data step and re-run the whole thing as new statements are added, but it also means a variable set earlier in the session can reappear on a later <em>RUN</em> even after being explicitly <em>UNSET</em> in between, if the statement that (re)creates it is still queued. Use <em>NEW /PROGRAM</em> to discard the queued program (in either mode) without losing the Data Table or session variables; see <em>REMOVE</em> to discard specific queued lines instead of the whole program.</td>
 </tr>
 <tr>
 <td><em>SAVE</em></td>
@@ -1073,9 +1073,9 @@ Commands control the flow of execution, manage data, and configure the interpret
 </tr>
 <tr>
 <td><em>UNSET</em></td>
-<td><em>UNSET</em> &lt;<em>varname</em>&gt;...</td>
+<td><em>UNSET</em> &lt;<em>varname</em>&gt;... <em>| UNSET / ALL</em></td>
 <td>Immediate Execution</td>
-<td>Remove one or more temporary (<em>SET</em>) variables from memory. A removed name may then be redefined as a permanent variable via <em>LET</em> (see &sect;3.5's redefinition rules) or recreated as a new temporary variable via <em>SET</em>.</td>
+<td>Remove one or more temporary (<em>SET</em>) variables from memory. A removed name may then be redefined as a permanent variable via <em>LET</em> (see &sect;3.5's redefinition rules) or recreated as a new temporary variable via <em>SET</em>. <em>/ALL</em> removes every currently-defined temporary variable in one statement; a variable currently held by <em>HOLD</em> is left alone, since its <em>Temp_Symbols</em> entry is a carry-over mirror of a permanent variable's value, not a genuine temporary. Because <em>UNSET</em> takes effect immediately, it acts only on variables already defined at the moment it dispatches — a still-queued (not-yet-run) <em>SET</em>/<em>LET</em> for the same name is unaffected and will (re)establish the variable normally when the queued program next runs; see the <em>RUN</em> row above for how "queued" differs between batch and interactive mode, and <em>NEW /PROGRAM</em> for discarding a stale queued program first.</td>
 </tr>
 <tr>
 <td><em>USE</em></td>

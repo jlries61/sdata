@@ -845,14 +845,18 @@ begin
             SData_Core.Statistics.Set_Seed (S);
          end;
       when Stmt_NEW =>
-         SData_Core.Table.Clear;
-         SData_Core.Variables.Clear_Temporary;
-         SData_Core.Variables.Initialize_PDV;
-         Clear_Active_Program;
-         Clear_Target_Buffers;
-         Clear_Registered_Saves;
-         Clear_Readonly_IN_Names;
-         SData_Core.Commands.Execute_NEW;
+         if Stmt.Program_Only then
+            Clear_Program_Only;
+         else
+            SData_Core.Table.Clear;
+            SData_Core.Variables.Clear_Temporary;
+            SData_Core.Variables.Initialize_PDV;
+            Clear_Active_Program;
+            Clear_Target_Buffers;
+            Clear_Registered_Saves;
+            Clear_Readonly_IN_Names;
+            SData_Core.Commands.Execute_NEW;
+         end if;
       when Stmt_OPTIONS =>
          declare
             Key : constant String :=

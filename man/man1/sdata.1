@@ -571,10 +571,39 @@ Execute immediately; not part of the data step body.
 .B RUN
 Execute all deferred statements once per record (data step), then commit
 the output table.
+The queued program's lifetime differs by mode: in batch (script) mode, each
+.B RUN
+executes only the statements queued since the previous
+.BR RUN " (or since " USE / REPEAT / NEW ");"
+once executed they are consumed and do not run again. In interactive (REPL)
+mode, the queued program persists across
+.B RUN
+\(em every deferred statement entered since the last
+.BR NEW ", " USE ", " REPEAT ", "
+or explicit
+.B REMOVE
+remains queued and re\-executes on
+.I every
+subsequent
+.BR RUN ,
+including statements from earlier RUNs that already executed once. Use
+.B "NEW /PROGRAM"
+to discard the queued program in either mode without losing the data table
+or session variables.
 .TP
-.B NEW
+.BR NEW " [" \fB/PROGRAM\fR "]"
 Clear the data table, all variables, the queued program, and any active
 SELECT filter or BY grouping.
+.B /PROGRAM
+clears only the queued program, leaving the data table, all variables,
+SELECT, and BY untouched \(em useful for discarding not\-yet\-run statements
+without losing the current dataset or session state. In interactive mode
+this also resets the
+.B INSERT
+cursor. See
+.B RUN
+below for how the queued program's lifetime differs between batch and
+interactive mode.
 .TP
 .B SORT \fIvar\fR [\fIvar\fR ...]
 Re\-order the data table.
@@ -1086,6 +1115,28 @@ Retain or remove columns from the output table after the next
 .TP
 .B HOLD [\fIvar\fR ...]
 Retain variable values across records (instead of resetting to missing).
+.TP
+.BR UNSET " \fIvar\fR [\fIvar\fR ...] | " UNSET " " /ALL
+Remove one or more temporary (SET) variables from memory.
+.B /ALL
+removes every currently\-defined temporary variable in one statement; a
+variable currently held by
+.B HOLD
+is left alone, since its value is a carry\-over mirror of a permanent
+variable, not a genuine temporary.
+.B UNSET
+takes effect immediately, so it only affects variables already defined at
+that moment \(em a still\-queued (not\-yet\-run)
+.B SET
+or
+.B LET
+for the same name is unaffected and will (re)establish the variable
+normally when the queued program next runs (see
+.B RUN
+above for how "queued" differs between batch and interactive mode).
+Naming a variable currently held by
+.B HOLD
+is rejected with an error; unhold it first.
 .TP
 .B RENAME \fIold\fR=\fInew\fR [, \fIold\fR=\fInew\fR ...]
 Rename columns.

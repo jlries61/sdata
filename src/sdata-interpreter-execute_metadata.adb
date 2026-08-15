@@ -10,10 +10,14 @@ begin
          declare Curr_Var : Variable_List := Stmt.Vars;
          begin
             if Stmt.Kind = Stmt_UNSET then
-               while Curr_Var /= null loop
-                  SData_Core.Variables.Unset (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
-                  Curr_Var := Curr_Var.Next;
-               end loop;
+               if Stmt.All_Flag then
+                  SData_Core.Variables.Unset_All;
+               else
+                  while Curr_Var /= null loop
+                     SData_Core.Variables.Unset (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
+                     Curr_Var := Curr_Var.Next;
+                  end loop;
+               end if;
             elsif Stmt.Kind = Stmt_KEEP or Stmt.Kind = Stmt_DROP then
                declare K : constant Column_Mod_Kind := (if Stmt.Kind = Stmt_KEEP then Mod_Keep else Mod_Drop);
                begin

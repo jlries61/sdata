@@ -1,0 +1,7 @@
+sdata> sdata> sdata> Generating mock data...
+sdata> sdata> sdata> Error: UNSET cannot remove "SUMVAL": it is currently held by HOLD; use UNHOLD "SUMVAL" first
+sdata> sdata> 1.00000
+1.00000
+1.00000
+RUN complete. 3 records and 4 variables processed.
+sdata> 
