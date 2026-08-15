@@ -1044,7 +1044,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <tr>
 <td><em>SUBMIT</em></td>
 <td><em>SUBMIT</em> &lt;<em>filename</em> &gt;</td>
-<td>Deferred Execution</td>
+<td>Immediate Execution</td>
 <td>Read and execute the commands contained in the specified file.  If the statement appears inside an <em>IF</em>, <em>FOR</em>, <em>WHILE</em>, or <em>DO</em>/<em>UNTIL</em> block then the file may not contain any declarative statements. The file to be executed may contain one or more <em>SUBMIT</em> statements, but a <em>SUBMIT</em> statement that attempts to submit a file that is already in the current execution chain will fail with an error message.</td>
 </tr>
 <tr>
