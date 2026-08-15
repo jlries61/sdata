@@ -869,7 +869,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>DROP</em></td>
 <td><em>DROP</em> &lt;&gt;...</td>
 <td>Declarative</td>
-<td>Prevent one or more permanent variables from being retained after the next <em>RUN</em> statement is executed. The affected variables may not be referenced after they given in a <em>DROP</em> statement, but may be redefined with a <em>LET</em> or <em>SET</em> statement. Individual array elements cannot be deleted. Once given, a <em>DROP</em> statement may only be canceled by deleting it.</td>
+<td>Prevent one or more permanent variables from being retained after the next <em>RUN</em> statement is executed. The affected variables may not be referenced after they given in a <em>DROP</em> statement, but may be redefined with a <em>LET</em> or <em>SET</em> statement. Individual array elements cannot be deleted. Once given, a <em>DROP</em> statement may only be canceled by deleting it. A <em>DROP</em> statement that lists a variable that does not exist as a permanent (table column) variable — including a temporary (<em>SET</em>) variable, which <em>DROP</em> cannot remove; use <em>UNSET</em> instead — shall fail with an error message.</td>
 </tr>
 <tr>
 <td><em>ECHO</em></td>
