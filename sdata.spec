@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.17.3
+Version:        0.18.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Sat Aug 15 2026 John L. Ries <john@theyarnbard.com> - 0.18.0-1
+- Reconcile execution-tier classification (USE/RENAME/HOLD/UNHOLD/RSEED/ECHO/DIGITS/NAMES/HELP/SUBMIT/OUTPUT/SYSTEM); add NEW /PROGRAM and UNSET /ALL; fix NEW's batch pending-statement bug and KEEP/DROP's missing existence validation (sdata-core 0.6.0).
+
 * Sat Aug 08 2026 John L. Ries <john@theyarnbard.com> - 0.17.3-1
 - Add .i/-.i/.n typed literal syntax for IEEE 754 Infinity/NaN (issue #71, ADR-057)
 

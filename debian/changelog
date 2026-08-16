@@ -1,3 +1,9 @@
+sdata (0.18.0-1) unstable; urgency=medium
+
+  * Reconcile execution-tier classification (USE/RENAME/HOLD/UNHOLD/RSEED/ECHO/DIGITS/NAMES/HELP/SUBMIT/OUTPUT/SYSTEM); add NEW /PROGRAM and UNSET /ALL; fix NEW's batch pending-statement bug and KEEP/DROP's missing existence validation (sdata-core 0.6.0).
+
+ -- John L. Ries <john@theyarnbard.com>  Sat, 15 Aug 2026 17:32:49 -0700
+
 sdata (0.17.3-1) unstable; urgency=medium
 
   * Add .i/-.i/.n typed literal syntax for IEEE 754 Infinity/NaN (issue #71, ADR-057)

@@ -1,6 +1,6 @@
 name = "sdata"
 description = "A data command interpreter for tabular data processing."
-version = "0.17.3"
+version = "0.18.0"
 
 authors = ["John L. Ries"]
 maintainers = ["John L. Ries <john@theyarnbard.com>"]
