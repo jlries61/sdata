@@ -98,7 +98,14 @@ first, then `cd ~/Develop/sdata && make check` to catch regressions in both laye
 
 ## Key Architecture
 
-**Three-tier execution model** (documented at top of `src/sdata-interpreter.adb`):
+**Three-tier execution model** (documented at top of `src/sdata-interpreter.adb`).
+Both that comment and this table are descriptive copies; the operational
+ground truth for the Declarative tier is the ADR-056 loop-placement-warning
+set in `src/sdata-interpreter.adb` (`Stmt.Kind in Stmt_ARRAY | ...`), since
+that is the one place the boundary has a real, checked consequence. Keep all
+three in sync when any of them changes (2026-08-13 re-audit PB-14: the header
+comment and this table had drifted independently from a shared original text
+for months without either being revisited).
 
 | Tier | Examples | Behaviour |
 |---|---|---|

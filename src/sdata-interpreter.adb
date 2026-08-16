@@ -33,12 +33,22 @@ with SData_Core.File_IO;
 
 --  SData.Interpreter — statement executor and data step engine.
 --
---  Execution model (three tiers):
+--  Execution model (three tiers). This comment and CLAUDE.md's own tier
+--  table (2026-08-13 re-audit PB-14: the two had drifted independently
+--  from a shared original text without either being revisited) are both
+--  descriptive copies -- the operational ground truth for the Declarative
+--  tier specifically is the ADR-056 loop-placement-warning set below
+--  (search this file for "Stmt.Kind in Stmt_ARRAY"), since that is the one
+--  place the boundary has a real, checked consequence rather than just
+--  being documentation. Keep both copies in sync with that set when either
+--  changes.
 --    Declarative       Commands such as USE, BY, SELECT, REPEAT, SAVE, FPATH,
---                      RENAME, HOLD, UNHOLD execute immediately and configure
---                      interpreter state or shape the data step that follows.
---    Immediate         RUN, SORT, AGGREGATE, TRANSPOSE, NEW, NAMES, SYSTEM, HELP
---                      execute immediately but are not purely declarative.
+--                      RENAME, HOLD, UNHOLD, RSEED execute immediately and
+--                      configure interpreter state or shape the data step
+--                      that follows.
+--    Immediate         RUN, SORT, AGGREGATE, TRANSPOSE, STATS, NEW, NAMES,
+--                      SYSTEM, HELP execute immediately but are not purely
+--                      declarative.
 --    Deferred          LET, SET, PRINT, IF, FOR, WHILE, WRITE, DELETE are
 --                      queued in the statement list between two RUN markers and
 --                      executed once per record inside Run_One_Step.
