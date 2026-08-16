@@ -595,9 +595,13 @@ Looping blocks may also be nested inside of conditional blocks and vice versa.
   - Multi-way branching.
   - Case-based selection.
 
-### 5.4 Declarative vs Non-Declarative Statements
+### 5.4 Declarative, Immediate, and Deferred Statements
 
-- Declarative Statements:
+Every statement belongs to exactly one of three execution tiers (see ADR-003 in
+`doc/adrs.md`): Declarative, Immediate, and Deferred. The command reference table
+in &sect;7.1 indicates which tier each command belongs to.
+
+- **Declarative Statements:**
 
   - Configure interpreter state once, immediately, rather than being scoped to
     a single record or loop iteration.
@@ -608,12 +612,30 @@ Looping blocks may also be nested inside of conditional blocks and vice versa.
     a warning (not an error) the first time it happens for a given statement,
     regardless of how many times the loop actually iterates.
   - Examples: *ARRAY*, *BY*, *DIM*, *DROP*, *FPATH*, *HOLD*, *KEEP*, *REPEAT*,
-    *RENAME*, *SAVE*, *SELECT*, *UNHOLD*, *USE*.
-  - Command reference table indicates which commands are declarative.
+    *RENAME*, *RSEED*, *SAVE*, *SELECT*, *UNHOLD*, *USE*.
 
-- Non-Declarative Statements:
+- **Immediate Statements:**
 
-  - May appear anywhere, including inside loops.
+  - Execute at once, like Declarative statements, but do not configure state
+    that shapes the data step which follows — *RUN* itself is the clearest
+    example: it triggers execution of the queued (Deferred) statements rather
+    than configuring anything for them to use.
+  - May appear inside *FOR*, *WHILE*, or *DO*/*UNTIL* blocks like any other
+    statement. Unlike Declarative statements, there is no per-iteration
+    ambiguity to warn about here: an Immediate statement never claimed to be
+    scoped to the record or loop iteration in the first place, so it is
+    unaffected by the loop-placement warning described above.
+  - Examples: *AGGREGATE*, *DIGITS*, *ECHO*, *HELP*, *NAMES*, *NEW*, *OUTPUT*,
+    *RUN*, *SORT*, *STATS*, *SUBMIT*, *SYSTEM*, *TRANSPOSE*.
+
+- **Deferred Statements:**
+
+  - Queued between two *RUN* markers (or the start of the program and the
+    first *RUN*); execute once per record when the data step runs, not when
+    the interpreter first reaches them.
+  - May appear anywhere, including inside loops — this is in fact the normal
+    case, since the control-flow statements themselves (*IF*, *FOR*, *WHILE*,
+    *DO*/*UNTIL*) are Deferred.
   - Examples: *LET*, *SET*, *PRINT*, *IF*, *DELETE* (record).
 
 - **Line Continuation:** Statement ending with comma shall be continued to next line.
