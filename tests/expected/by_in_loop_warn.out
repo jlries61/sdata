@@ -1,0 +1,6 @@
+Generating mock data...
+Warning: BY is a Declarative statement; it takes effect once, not scoped to each loop iteration, inside a FOR/WHILE/DO-UNTIL loop.
+1
+2
+3
+RUN complete. 3 records and 4 variables processed.

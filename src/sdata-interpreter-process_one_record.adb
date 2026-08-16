@@ -175,10 +175,35 @@ begin
             --  can skip per-record redispatch; "Immediate" here means "takes
             --  effect at its position in program order," which for a
             --  statement written inside a repeated body means every record.)
+            --
+            --  Stmt_BY (PB-12, 2026-08-15) was here too, but unlike
+            --  HELP/NAMES's plain "removing it was always a no-op" shape or
+            --  DIGITS/ECHO's "removing it broke something" shape, this one
+            --  already had its own purpose-built mitigation:
+            --  Execute_Declarative's Stmt_BY handler (see its own comment)
+            --  tracks whether the requested BY variables already match
+            --  By_Var_Count/By_Var_Name and short-circuits to a no-op
+            --  (Already_Established) rather than re-sorting the table every
+            --  record -- added for issue #67 / ADR-051, independently of
+            --  this whitelist. BY is Declarative and already dispatches once
+            --  via the batch walker's/REPL's immediate pre-scan before any
+            --  record runs, so the redundant per-record redispatch this
+            --  whitelist entry caused was, in the common case (a bare,
+            --  unconditional BY at the body's top level), already a
+            --  guaranteed no-op after record 1 -- removing it here changes
+            --  nothing observable. Confirmed via the full suite (396 tests)
+            --  plus a direct multi-record BY-group test
+            --  (tests/by_per_record_groups.cmd) showing FIRST./LAST. still
+            --  compute correctly. (A BY established only *inside* a loop,
+            --  with nothing establishing it beforehand, can't retroactively
+            --  populate that same record's FIRST./LAST. temp vars either way
+            --  -- Group_Flags runs once, before the body -- see
+            --  tests/by_in_loop_warn.cmd; that's a separate, structural fact
+            --  unrelated to this whitelist.)
             when Stmt_LET | Stmt_SET | Stmt_PRINT | Stmt_IF
                | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_DO | Stmt_SELECT
                | Stmt_DELETE | Stmt_BREAK | Stmt_WRITE
-               | Stmt_BY | Stmt_DIGITS | Stmt_ECHO =>
+               | Stmt_DIGITS | Stmt_ECHO =>
                begin
                   Execute_Statement (Iter, Ctx);
                exception
