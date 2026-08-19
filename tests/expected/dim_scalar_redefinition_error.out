@@ -1,0 +1,2 @@
+RUN complete. 1 records and 1 variables processed.
+Error: Error defining array S: DIM cannot redefine scalar variable "S" as an array; DROP or UNSET it first (as appropriate), then DIM it to create an array of the same name

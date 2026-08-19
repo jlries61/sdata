@@ -1,0 +1,2 @@
+RUN complete. 1 records and 3 variables processed.
+Error: LET cannot redefine array "Q"; use DROP "Q" to delete the array first, then LET it to create a permanent variable of the same name

@@ -554,6 +554,110 @@ begin
    end;
 
    ---------------------------------------------------------------------------
+   --  ── SData_Core.Variables: scalar/array storage-class hard error ─────────
+   --  (2026-08-13 re-audit PC-2 / ADR-0012 -- extends the #56 checks above
+   --  to the scalar/array boundary.)
+   ---------------------------------------------------------------------------
+
+   --  SET on an existing (real) array must raise, not silently create a
+   --  same-named temporary variable coexisting with the untouched array.
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   Dim_Array ("ARR1", 1, 3, False);
+   declare
+      Raised : Boolean := False;
+   begin
+      begin
+         Set_Temporary ("ARR1", (Kind => Val_Numeric, Num_Val => 1.0));
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-PC2a SET on existing array raises", Raised, True);
+      Check ("V-PC2b array survives rejected SET", Has_Array ("ARR1"), True);
+      Check ("V-PC2c SET did not create a shadow temp var",
+             Defined ("ARR1"), False);
+   end;
+
+   --  LET on an existing (real) array must raise, not silently create a
+   --  same-named permanent scalar coexisting with the untouched array.
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   Initialize_PDV;
+   Dim_Array ("ARR2", 1, 2, False);
+   declare
+      Raised : Boolean := False;
+   begin
+      begin
+         Set_Permanent ("ARR2", (Kind => Val_Numeric, Num_Val => 1.0));
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-PC2d LET on existing array raises", Raised, True);
+      Check ("V-PC2e array survives rejected LET", Has_Array ("ARR2"), True);
+   end;
+
+   --  DIM on an existing permanent (table-column) scalar must raise, not
+   --  silently create a shadow array coexisting with the scalar. Uses
+   --  Table.Add_Column directly (matching V-56a's setup above), not
+   --  Set_Permanent: Set_Permanent only allocates a PDV slot -- a name only
+   --  becomes a real Table column once Flush_PDV_To_Output runs (at the
+   --  next RUN), so Set_Permanent alone would not actually exercise the
+   --  Table.Has_Column branch this check tests.
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   SData_Core.Table.Add_Column ("SCALAR1", SData_Core.Table.Col_Numeric);
+   declare
+      Raised : Boolean := False;
+   begin
+      begin
+         Dim_Array ("SCALAR1", 1, 3, False);
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-PC2f DIM on existing permanent scalar raises", Raised, True);
+      Check ("V-PC2g DIM did not register an array", Has_Array ("SCALAR1"), False);
+      Check ("V-PC2h column survives rejected DIM",
+             SData_Core.Table.Has_Column ("SCALAR1"), True);
+   end;
+
+   --  DIM on an existing genuine temporary scalar must raise the same way.
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   Set_Temporary ("SCALAR2", (Kind => Val_Numeric, Num_Val => 3.0));
+   declare
+      Raised : Boolean := False;
+   begin
+      begin
+         Dim_Array ("SCALAR2", 1, 2, False);
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-PC2i DIM on existing temp scalar raises", Raised, True);
+      Check ("V-PC2j DIM did not register an array", Has_Array ("SCALAR2"), False);
+      Check ("V-PC2k temp scalar survives rejected DIM", Defined ("SCALAR2"), True);
+   end;
+
+   --  DIM resizing an *existing array* of the same name must still work
+   --  unchanged (the new check must not fire when Upper_Name is already a
+   --  registered array -- that is legitimate resize/redefinition, handled
+   --  by Dim_Array's own pre-existing Existing_Def logic below the new
+   --  check).
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   Dim_Array ("ARR3", 1, 2, False);
+   declare
+      Raised : Boolean := False;
+   begin
+      begin
+         Dim_Array ("ARR3", 1, 4, False);
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-PC2l DIM resize of existing array does not raise", Raised, False);
+      Check ("V-PC2m array still registered after resize", Has_Array ("ARR3"), True);
+   end;
+
+   ---------------------------------------------------------------------------
    --  ── SData_Core.Variables: Load_PDV_From_Table roundtrip ────────────────────
    ---------------------------------------------------------------------------
 
