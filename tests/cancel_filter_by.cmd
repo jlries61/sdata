@@ -1,5 +1,11 @@
 -- Test cancellation of SELECT filter (SELECT /ALL) and BY grouping (bare BY),
 -- and that NEW resets both.
+-- 2026-08-20 re-audit PD-1 / sdata-core ADR-0013: BY no longer sorts. GRP
+-- alternates every record, so no two adjacent (filtered) rows ever share a
+-- GRP value -- the FILTERED+GROUPED and UNFILTERED+GROUPED sections below
+-- are each four singleton groups (BOG=1 EOG=1 per row), not the paired
+-- groups a pre-fix sorted table would have produced. The later cancel/NEW
+-- sections are unaffected (BY was never active for them).
 
 -- Build 6 records: X=1..6, GRP alternates 1/2
 REPEAT 6

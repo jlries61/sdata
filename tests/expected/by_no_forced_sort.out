@@ -1,0 +1,6 @@
+Dataset opened: tests/data/bydata2.csv
+RUN complete. 3 records and 4 variables processed.
+REC# G V BOG_V EOG_V
+1 1.00000 10.00000 1.00000 1.00000
+2 2.00000 20.00000 1.00000 1.00000
+3 1.00000 30.00000 1.00000 1.00000
