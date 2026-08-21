@@ -743,14 +743,25 @@ begin
          if SData_Core.Table.Column_Count = 0 and then not SData_Core.Config.Runtime.Repeat_Active then
             raise Script_Error with "BY statement requires an active dataset (use USE or REPEAT first).";
          end if;
-         --  BY is declarative: it sorts the input table and establishes the BY
-         --  variables.  Inside a data step the parser leaves the BY statement
-         --  in the per-record body, so it is dispatched once per record; the
-         --  guard below makes the 2nd..Nth dispatch a cheap no-op instead of
-         --  re-sorting the whole table every record (which was O(n^2 log n)).
-         --  The input table is immutable during the step and the sort is
-         --  stable, so if the requested BY variables already match the
-         --  established ones the table is already sorted by them.
+         --  2026-08-20 re-audit PD-1 / sdata-core ADR-0013: BY no longer
+         --  sorts the input table -- it is purely declarative, establishing
+         --  the BY variables that grouping consumers key on, exactly as
+         --  design.md sec5.2 documents ("Blocks need not be in sorted
+         --  order"; "Blocks with same value combination but not consecutive
+         --  are treated as separate blocks"). Ordinary RUN group navigation
+         --  (Group_Flags) already worked this way -- it was only ever wrong
+         --  because of this statement's own side effect on the data it
+         --  compared. AGGREGATE/STATS/TRANSPOSE/TABLES, which do need every
+         --  same-key row grouped together regardless of adjacency, now get
+         --  that via SData_Core.Table.Partition_By_Key (through
+         --  SData_Core.Commands.Group_Boundaries), not via a pre-sorted
+         --  table.
+         --
+         --  Inside a data step the parser leaves the BY statement in the
+         --  per-record body, so it is dispatched once per record; the guard
+         --  below makes the 2nd..Nth dispatch a cheap no-op instead of
+         --  redundantly clearing and re-registering the same BY variables
+         --  every record.
          declare
             Curr_Var : Variable_List := Stmt.Sort_Vars;
             Count    : Natural := 0;
@@ -805,20 +816,11 @@ begin
                   end loop;
                end;
                SData_Core.Table.Clear_By_Vars;
-               declare
-                  Crit : Sort_Criteria_Array (1 .. Count);
-                  Idx  : Positive := 1;
-               begin
-                  while Curr_Var /= null loop
-                     Crit (Idx).Name := (others => ' ');
-                     Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
-                     Crit (Idx).Len := Curr_Var.Var.Start_Len;
-                     Crit (Idx).Dir := Ascending;
-                     SData_Core.Table.Add_By_Var (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
-                     Idx := Idx + 1; Curr_Var := Curr_Var.Next;
-                  end loop;
-                  Sort (Crit);
-               end;
+               while Curr_Var /= null loop
+                  SData_Core.Table.Add_By_Var
+                    (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
+                  Curr_Var := Curr_Var.Next;
+               end loop;
             end if;
          end;
       when Stmt_REPEAT =>
