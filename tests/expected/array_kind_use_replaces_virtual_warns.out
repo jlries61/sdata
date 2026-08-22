@@ -1,0 +1,7 @@
+Dataset opened: tests/data/subscripted.csv
+USE: replacing virtual array 'X' with a real array from the loaded dataset
+RUN complete. 2 records and 4 variables processed.
+Permanent Variables (Table Columns):
+X(1) X(2) X(3) Y 
+Session Variables (SET):
+(none)

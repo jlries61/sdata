@@ -1,0 +1,7 @@
+RUN complete. 1 records and 2 variables processed.
+Error: Error defining array V: Cannot redefine array 'V': an array already exists with that name. DROP it first, then use ARRAY to create a virtual array of the same name.
+RUN complete. 1 records and 4 variables processed.
+Permanent Variables (Table Columns):
+A B C D 
+Session Variables (SET):
+(none)
