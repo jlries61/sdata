@@ -658,6 +658,104 @@ begin
    end;
 
    ---------------------------------------------------------------------------
+   --  ── SData_Core.Variables: Get_Array_Element / Set_Array_Element hard
+   --     errors (2026-08-13 re-audit PC-1 / ADR-0014) ─────────────────────────
+   --  Direct-call coverage complementing sdata's REPL integration test
+   --  (tests/array_element_read_undefined.{cmd,repl,flags}): that test proves
+   --  a real script can reach the undefined-array raise (only via REPL mode --
+   --  batch mode's parser can never produce the Expr_Array_Access node needed,
+   --  see ADR-0014's "Coder-phase correction"); these checks prove the
+   --  underlying function itself raises correctly, independent of any parser
+   --  timing, and pin down the exact exception type (SData_Core.Script_Error,
+   --  not the pre-fix Program_Error) that a caller-side handler would need to
+   --  match.
+   ---------------------------------------------------------------------------
+
+   --  Get_Array_Element on a name that was never defined must raise.
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   declare
+      Raised : Boolean := False;
+      Sink   : Value;
+   begin
+      begin
+         Sink := Get_Array_Element ("NOSUCHARRAY", 1);
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-PC1a Get_Array_Element on undefined array raises", Raised, True);
+      if Sink.Kind = Val_Missing then null; end if;  --  reference Sink
+   end;
+
+   --  Get_Array_Element past a real (DIM'd) array's declared bounds must
+   --  raise -- matches Set_Array_Element's pre-existing behavior for the
+   --  same case (see V-PC1d below).
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   Dim_Array ("PC1F", 1, 3, False);
+   declare
+      Raised : Boolean := False;
+      Sink   : Value;
+   begin
+      begin
+         Sink := Get_Array_Element ("PC1F", 5);
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-PC1b Get_Array_Element out-of-bounds (real array) raises", Raised, True);
+      if Sink.Kind = Val_Missing then null; end if;
+   end;
+
+   --  Get_Array_Element past a virtual (ARRAY) array's constituent count
+   --  must raise the same way, via the separate Virtual_Array branch.
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   declare
+      Constituents : Name_Vectors.Vector;
+   begin
+      Constituents.Append (To_Unbounded_String ("PC1A"));
+      Constituents.Append (To_Unbounded_String ("PC1B"));
+      Constituents.Append (To_Unbounded_String ("PC1C"));
+      Define_Array ("PC1V", Constituents);
+   end;
+   declare
+      Raised : Boolean := False;
+      Sink   : Value;
+   begin
+      begin
+         Sink := Get_Array_Element ("PC1V", 5);
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("V-PC1c Get_Array_Element out-of-bounds (virtual array) raises", Raised, True);
+      if Sink.Kind = Val_Missing then null; end if;
+   end;
+
+   --  Set_Array_Element's pre-existing out-of-bounds raise must now be
+   --  SData_Core.Script_Error, not the pre-ADR-0014 Program_Error -- the one
+   --  genuinely observable behavior change in this fix (per ADR-0014 and
+   --  03-coder-status.md). A handler that still expects Program_Error would
+   --  silently stop catching this; check both directions explicitly.
+   SData_Core.Table.Clear;
+   Clear_Temporary;
+   Dim_Array ("PC1G", 1, 3, False);
+   declare
+      Raised_Script_Error  : Boolean := False;
+      Raised_Program_Error : Boolean := False;
+   begin
+      begin
+         Set_Array_Element ("PC1G", 5, (Kind => Val_Numeric, Num_Val => 99.0));
+      exception
+         when SData_Core.Script_Error => Raised_Script_Error := True;
+         when Program_Error           => Raised_Program_Error := True;
+      end;
+      Check ("V-PC1d Set_Array_Element out-of-bounds raises Script_Error",
+             Raised_Script_Error, True);
+      Check ("V-PC1e Set_Array_Element out-of-bounds no longer raises Program_Error",
+             Raised_Program_Error, False);
+   end;
+
+   ---------------------------------------------------------------------------
    --  ── SData_Core.Variables: Load_PDV_From_Table roundtrip ────────────────────
    ---------------------------------------------------------------------------
 
