@@ -31,7 +31,7 @@ PRINT (TIMER() >= 0)
 -- MAXLVL: implementation constant
 PRINT MAXLVL()
 
--- MAXLEN: 0 means unlimited (default, no --clen)
+-- MAXLEN: default is 256 (see --clen); explicit --clen 0 means unlimited
 PRINT MAXLEN("x")
 
 -- INDEX: find B$ in A$, 1-based or 0

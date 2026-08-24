@@ -1,0 +1,4 @@
+Warning: String truncated to  256 characters.
+Dataset opened: tests/data/clen_load_long_field.csv
+256
+RUN complete. 1 records and 2 variables processed.

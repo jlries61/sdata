@@ -218,8 +218,12 @@ initial read — the limit applies to the in-memory table after loading.
 
 **Residual risk:** A file with millions of rows and thousands of columns
 could cause significant wall-clock time before the spill threshold kicks in.
-No per-file size or column-count cap exists. Considered acceptable for the
-single-user CLI context.
+No per-file size or column-count cap exists. `--clen`'s truncation warning
+(default 256 characters, PC-5/ADR-0016) also scales with the number of
+over-length fields, so a crafted file with millions of them can grow a
+redirected stderr log unboundedly — a distinct resource from `MAXINTAB`'s
+cell-count accounting, which does not bound per-cell size. Considered
+acceptable for the single-user CLI context, same as the risks above.
 
 ---
 

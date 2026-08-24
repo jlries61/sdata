@@ -700,7 +700,7 @@ package body SData.Help is
       Put_Line ("  --nosubmit           : Disable SUBMIT");
       Put_Line ("  --ignore-math-errors : Domain errors return MISSING");
       Put_Line ("  --progress           : Same as OPTIONS PROGRESS YES, enabled from startup");
-      Put_Line ("  --clen <n>           : Set max character variable length");
+      Put_Line ("  --clen <n>           : Set max character variable length (default 256)");
       Put_Line ("  -m <n>               : Set max in-memory table cells (rows*cols; 0 = unlimited)");
       Put_Line ("  -t <n>               : Set max temporary variables");
       Put_Line ("  -k                   : Continue execution after statement error");
