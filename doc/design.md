@@ -27,9 +27,9 @@ The interpreter operates on a two-dimensional table containing any number of row
 
 Memory Management:
 
-- Maximum in-memory size: set by *-m* command line option or *OPTIONS MAXINTAB*.
-- External file storage: used when table exceeds maximum in-memory size.
-- Cache size: equal to maximum in-memory size, but never less than the size of a single row.
+- Maximum in-memory table size, measured in cells (rows × columns): set by *-m* command line option or *OPTIONS MAXINTAB*.
+- External file storage: used when the table exceeds the maximum in-memory cell count.
+- Cache size: derived from the same cell-count limit, but never less than a single row.
 - Implementation details: format and properties of external file and cache are implementation-defined.
 
 **Column Ordering:** Permanent variables (including arrays) shall appear as columns in the internal table in the order in which they were created.
@@ -110,7 +110,7 @@ Two categories of variables are supported:
 - Single values (numeric or character) not saved when internal table is written to external file.
 - Retained for the duration of the session until explicitly deleted (*DROP* statement) or implicitly deleted (*NEW* statement).
 - Always retain their values until/unless explicitly changed.
-- Maximum memory: set via command line *-t* option or *OPTIONS MAXTEMPMEM.*
+- Maximum temporary variable count: set via command line *-t* option or *OPTIONS MAXTEMPMEM.*
 - If maximum would be exceeded by creating a new variable/array or increasing array size, the statement shall fail with an error message.
 
 ### 3.2 Variable Names and Syntax
@@ -2284,8 +2284,8 @@ Expression Types:
 
 Memory Management:
 
-- *-m* \<*size*\>: Maximum in-memory table size. The unit is cells (rows × columns). 0 means unlimited (all data stays in memory). When the table exceeds this limit the rows are spilled to a temporary SQLite database.
-- *-t* \<*size*\>: Maximum temporary variable/array memory.
+- *-m* \<*n*\>: Maximum in-memory table size. The unit is cells (rows × columns). 0 means unlimited (all data stays in memory). When the table exceeds this limit the rows are spilled to a temporary SQLite database.
+- *-t* \<*n*\>: Maximum number of temporary variables/array elements. 0 means unlimited.
 
 Character Variables:
 
