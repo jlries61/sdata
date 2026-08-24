@@ -1,0 +1,6 @@
+Warning: "tests/data/dupcol.csv", duplicate column name "A" -- last occurrence wins
+Dataset opened: tests/data/dupcol.csv
+RUN complete. 2 records and 2 variables processed.
+REC# A B 
+1 3.00000 2.00000 
+2 6.00000 5.00000 

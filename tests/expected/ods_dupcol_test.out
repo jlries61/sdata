@@ -1,0 +1,6 @@
+Warning: "tests/data/ods_dupcol.ods", duplicate column name "name$" -- last occurrence wins
+Dataset opened: tests/data/ods_dupcol.ods
+RUN complete. 2 records and 2 variables processed.
+REC# NAME$ SCORE 
+1 AliceDup 95.00000 
+2 BobDup 82.00000 

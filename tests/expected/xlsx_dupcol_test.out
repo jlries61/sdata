@@ -1,0 +1,6 @@
+Warning: "tests/data/xlsx_dupcol.xlsx", duplicate column name "name$" -- last occurrence wins
+Dataset opened: tests/data/xlsx_dupcol.xlsx
+RUN complete. 2 records and 2 variables processed.
+REC# NAME$ SCORE 
+1 AliceDup 95.00000 
+2 BobDup 82.00000 
