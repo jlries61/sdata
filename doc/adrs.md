@@ -67,6 +67,7 @@ that might relitigate a settled question.
 | ADR-055 | Implicit RUN instead of rejecting SORT/AGGREGATE/TRANSPOSE/STATS with a pending program (supersedes ADR-051's reject mechanism) | 2026-08-03 | Accepted |
 | ADR-056 | Declarative statement inside FOR/WHILE/DO-UNTIL: warn once per occurrence, don't reject | 2026-08-05 | Accepted |
 | ADR-057 | `.i`/`-.i`/`.n` typed literals construct Infinity/NaN directly; NaN's existing "never survives arithmetic" policy is preserved, not relaxed | 2026-08-08 | Accepted |
+| ADR-058 | SUBMIT inside a loop gets the same ADR-056 declarative-in-loop warning as inline use, deduplicated by submitted file path since SUBMIT re-parses fresh each call | 2026-08-24 | Accepted |
 
 ---
 
@@ -1312,3 +1313,99 @@ arithmetic-guard-still-raises), `values_tests.adb` (`Is_NaN`/`NaN_Val`/rendering
 `aggregate_min_max_nan_first.cmd`, `repl_remove_infinity_nan_rejected.cmd` (`.repl`-marker, per the
 `repl-test-coverage` convention). data-vandal: `select_infinity_nan.cmd`. Full three-way gate green:
 sdata-core in-crate suite, sdata `make check`, data-vandal `make check`, all pre- and post-change.
+
+### ADR-058: SUBMIT inside a loop gets the same ADR-056 declarative-in-loop warning as inline use, deduplicated by submitted file path
+
+**Date:** 2026-08-24 | **Status:** Accepted
+
+**Context:** Design-vs-implementation re-audit finding PD-2
+(`.ssd/audits/2026-08-13-design-vs-implementation/report.md`). §5.8 states *"If SUBMIT appears
+inside IF, FOR, WHILE, or DO/UNTIL block, submitted file may not contain declarative statements"* —
+but nothing enforces this, and unlike the direct (non-SUBMIT) case, not even ADR-056's own warning
+fires. Traced to three broken links in the same chain: `Execute_Statement` has `Ctx.Loop_Depth` in
+scope when it dispatches `Stmt_SUBMIT` to `Execute_IO`, but doesn't pass it; `Execute_IO`'s
+`Stmt_SUBMIT` handler calls the top-level `Execute (Sub_Prog)` recursively, which has no way to
+receive an ambient loop depth either; `Execute`'s own `Outer_Ctx : Step_Context`, declared fresh
+per top-level statement it walks, always starts at the record default `Loop_Depth => 0`. Almost
+certainly a stale leftover from before ADR-056 — the restriction was presumably real when direct
+declarative-in-loop use was a hard rejection; ADR-056 changed the *direct* case from reject→warn
+but never touched (or re-derived) SUBMIT's own, separately-worded restriction.
+
+**Decision — symmetric warning, not stricter rejection.** SUBMIT gets exactly the same treatment
+ADR-056 already gives an inline loop body: permitted, warned once, not rejected. The underlying
+concern is identical in both cases (a Declarative statement takes effect once, not per iteration,
+which is confusing but not wrong) — SUBMIT's separately-worded, stricter §5.8 text is judged to be
+an artifact of predating ADR-056's unification of this concern, not a deliberately different policy
+for the SUBMIT case. §5.8 (and the `SUBMIT` command-row repeat) reworded to match ADR-056's
+permitted-with-warning posture.
+
+**Mechanism — threading `Loop_Depth` through the SUBMIT boundary.** `Execute` gains an optional
+`Base_Loop_Depth : Natural := 0` parameter; its `Outer_Ctx` now starts from that value instead of
+the implicit `0`. All 6 of `Execute`'s pre-existing call sites (top-level batch/REPL entry points)
+are unaffected by the default. `Execute_IO` gains a `Loop_Depth : Natural := 0` parameter, threaded
+from `Execute_Statement`'s existing `Ctx.Loop_Depth` at its one dispatch site. `Execute_IO`'s
+`Stmt_SUBMIT` handler passes it into the recursive `Execute (Sub_Prog, Loop_Depth)` call.
+
+**Mechanism — deduplication by file path, not by AST node (new machinery, not a reuse of ADR-056's
+own mechanism).** ADR-056's `Warned_In_Loop` flag lives on the AST `Statement` record itself and
+works because an inline loop body is parsed once and the same node objects re-execute every
+iteration. `SUBMIT` calls `Parse_Program` fresh, inside its own handler, on *every* invocation —
+a brand-new AST, with `Warned_In_Loop` reset to its default `False` every time. Naively threading
+`Loop_Depth` through with no other change would make a `SUBMIT` inside an *N*-iteration loop
+produce *N* separate warnings — one fresh reset per invocation — pure noise for the common case of
+a loop repeatedly submitting the same, unchanging file, and a real regression against ADR-056's own
+"warn once, not per iteration" intent (not caught by the original audit, whose repro used a
+single-iteration loop and couldn't distinguish "warn once" from "warn once per invocation").
+
+Fixed by keying deduplication on the submitted file's own resolved path (`Final`, the same
+normalized-absolute-path value already used by the pre-existing `Submit_Chain` recursion-detection
+set — a proven, stable key for exactly this purpose) rather than by AST node identity. A new
+`Warned_Submit_Paths : Name_Sets.Set` (same `Name_Sets` package `Submit_Chain` already uses) records
+which submitted files have already produced at least one ADR-056 warning while loop-nested. On each
+`Stmt_SUBMIT` dispatch:
+
+```ada
+Effective_Loop_Depth : constant Natural :=
+   (if Loop_Depth > 0 and then not Warned_Submit_Paths.Contains (Final)
+    then Loop_Depth else 0);
+if Effective_Loop_Depth > 0 then
+   Warned_Submit_Paths.Insert (Final);
+end if;
+...
+Execute (Sub_Prog, Effective_Loop_Depth);
+```
+
+The *first* loop-nested submission of a given file passes its real `Loop_Depth` through, so every
+distinct Declarative statement in that file warns once each (matching ADR-056's own per-statement
+granularity *within* that one invocation — a file with two different Declarative lines gets two
+warnings, not one, on its first submission). Every *subsequent* loop-nested submission of the same
+file passes `Effective_Loop_Depth = 0`, so none of that invocation's statements can trigger the
+warning at all — `Execute_Statement`'s existing `Ctx.Loop_Depth > 0` gate handles this without any
+further change. This is a deliberate coarsening relative to ADR-056's exact per-AST-node semantics
+(there, "once" means "once for the life of that specific node"; here, "once" means "once per
+distinct file path per session") — accepted because AST-node identity is exactly the thing SUBMIT's
+re-parsing makes meaningless as a dedup key, and file path is the closest stable analog available.
+Reset at `NEW` (`Stmt_NEW`'s existing block of `Clear_*` calls in `execute_declarative.adb` gains a
+matching `Clear_Warned_Submit_Paths`), matching how `Warned_In_Loop`'s own effective scope ends
+when `NEW` discards the active program and any loop body it belonged to.
+
+**Documentation:** `design.md` §5.8 and the `SUBMIT` command-row repeat reworded from "may not
+contain declarative statements" to describe the permitted-with-warning behavior, referencing this
+ADR.
+
+**Consequences:** sdata-only (`sdata-interpreter.ads`, `sdata-interpreter.adb`,
+`sdata-interpreter-execute_io.adb`, `sdata-interpreter-execute_declarative.adb`, `design.md`); no
+sdata-core change, no cross-crate gate needed. New tests: the audit's own single-iteration repro
+(now producing the ADR-056 warning instead of silence), and a multi-iteration repro proving the
+per-file-path dedup fires exactly once across N loop-nested submissions of the same file, not N
+times.
+
+**Alternatives rejected:** implementing the stricter, originally-documented rejection instead of a
+warning — rejected in favor of ADR-056 precedent-consistency (see Decision above), though this
+brief's own investigation flagged it as a legitimate alternative reading, not a clear-cut wrong
+answer. Per-statement (rather than per-file-path) deduplication, tracking `(file path, in-file
+statement position)` pairs to exactly match ADR-056's per-node granularity even across re-parses —
+rejected as more machinery than the problem warrants; a script author who has been warned once
+about a given submitted file's loop-nesting behavior does not need every distinct Declarative line
+in that same file re-flagged on every subsequent iteration once they've been told the file itself
+is affected.

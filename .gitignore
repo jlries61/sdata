@@ -17,6 +17,11 @@ tests/list_mid.txt
 tests/list_end.txt
 tests/list_top.txt
 tests/data/output.csv
+tests/data/submit_declarative_sub_out.csv
+# submit_loop_declarative_failed_then_retry SCRATCH file: SYSTEM-cp'd into
+# from committed fixtures at test time, never has meaningful committed
+# content of its own.
+tests/data/submit_loop_declarative_retry_scratch.cmd
 # SAVE-flush test outputs (aggregate_save_flush / stats_save / transpose_save_flush)
 tests/data/aggregate_save_flush_out.csv
 tests/data/stats_save_test.csv

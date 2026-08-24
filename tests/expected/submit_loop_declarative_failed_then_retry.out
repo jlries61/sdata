@@ -1,0 +1,8 @@
+Dataset opened: tests/data/subscripted.csv
+Error: Recursive SUBMIT detected: tests/data/submit_loop_declarative_retry_scratch.cmd
+Error: Recursive SUBMIT detected: tests/data/submit_loop_declarative_retry_scratch.cmd
+RUN complete. 2 records and 5 variables processed.
+Dataset opened: tests/data/subscripted.csv
+Warning: SAVE is a Declarative statement; it takes effect once, not scoped to each loop iteration, inside a FOR/WHILE/DO-UNTIL loop.
+Dataset saved: tests/data/submit_declarative_sub_out.csv
+RUN complete. 2 records and 5 variables processed.

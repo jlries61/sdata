@@ -756,7 +756,7 @@ inside a *REPEAT* body before *RUN* exactly as before.
 
 - Restrictions:
 
-  - If *SUBMIT* appears inside *IF*, *FOR*, *WHILE*, or *DO*/*UNTIL* block, submitted file may not contain declarative statements.
+  - If *SUBMIT* appears inside *IF*, *FOR*, *WHILE*, or *DO*/*UNTIL* block, a Declarative statement in the submitted file takes effect once, not scoped to each loop iteration, and triggers the same one-time warning a directly inline Declarative statement in a loop would (ADR-058) — permitted, not rejected. The warning fires once per distinct submitted file per session, not once per iteration, since the same file may be submitted many times across a loop.
   - File may contain one or more *SUBMIT* statements.
 
 - Recursion Prevention:
@@ -1067,7 +1067,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>SUBMIT</em></td>
 <td><em>SUBMIT</em> &lt;<em>filename</em> &gt;</td>
 <td>Immediate Execution</td>
-<td>Read and execute the commands contained in the specified file.  If the statement appears inside an <em>IF</em>, <em>FOR</em>, <em>WHILE</em>, or <em>DO</em>/<em>UNTIL</em> block then the file may not contain any declarative statements. The file to be executed may contain one or more <em>SUBMIT</em> statements, but a <em>SUBMIT</em> statement that attempts to submit a file that is already in the current execution chain will fail with an error message.</td>
+<td>Read and execute the commands contained in the specified file.  If the statement appears inside an <em>IF</em>, <em>FOR</em>, <em>WHILE</em>, or <em>DO</em>/<em>UNTIL</em> block then a Declarative statement in that file is permitted but triggers the same one-time loop-nesting warning an inline Declarative statement would (&sect;5.8, ADR-058), fired once per distinct submitted file per session rather than once per iteration. The file to be executed may contain one or more <em>SUBMIT</em> statements, but a <em>SUBMIT</em> statement that attempts to submit a file that is already in the current execution chain will fail with an error message.</td>
 </tr>
 <tr>
 <td><em>SYSTEM</em></td>

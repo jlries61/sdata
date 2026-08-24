@@ -11,8 +11,11 @@ with SData.AST; use SData.AST;
 
 package SData.Interpreter is
 
-   --  Executes the provided AST program.
-   procedure Execute (Prog : Statement_Access);
+   --  Executes the provided AST program. Base_Loop_Depth seeds every
+   --  top-level statement's initial Loop_Depth (ADR-058) -- nonzero only
+   --  when this Execute call is itself a recursive SUBMIT invocation from
+   --  inside a loop; 0 for every ordinary top-level entry.
+   procedure Execute (Prog : Statement_Access; Base_Loop_Depth : Natural := 0);
 
    --  Adds a statement to the global active program (for REPL deferred execution).
    --  Source is the source text of the statement (for LIST display).

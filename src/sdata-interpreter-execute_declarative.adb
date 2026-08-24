@@ -857,6 +857,7 @@ begin
             Clear_Target_Buffers;
             Clear_Registered_Saves;
             Clear_Readonly_IN_Names;
+            Clear_Warned_Submit_Paths;
             SData_Core.Commands.Execute_NEW;
          end if;
       when Stmt_OPTIONS =>

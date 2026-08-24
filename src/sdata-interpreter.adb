@@ -190,7 +190,7 @@ package body SData.Interpreter is
    procedure Execute_Program_Remove  (Stmt : Statement_Access);
    procedure Execute_Program_Insert  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
-   procedure Execute_IO           (Stmt : Statement_Access);
+   procedure Execute_IO           (Stmt : Statement_Access; Loop_Depth : Natural := 0);
    procedure Execute_Tables          (Stmt : Statement_Access);
    --  C5: entry-time single-statement checker (body is a separate subunit).
    procedure Analyze_One          (Stmt : Statement_Access);
@@ -219,6 +219,18 @@ package body SData.Interpreter is
 
    --  Set of script files currently in the SUBMIT execution chain (for cycle detection).
    Submit_Chain : Name_Sets.Set;
+
+   --  ADR-058: submitted-file paths that have already produced at least one
+   --  ADR-056 declarative-in-loop warning while loop-nested. SUBMIT
+   --  re-parses its file fresh on every call (unlike an inline loop body's
+   --  static, reused AST), so ADR-056's own per-AST-node Warned_In_Loop flag
+   --  can't dedupe across repeated SUBMIT invocations of the same file --
+   --  this set does that instead, keyed by the same Full_Path-normalized
+   --  value Submit_Chain already uses. Persists for the session; cleared at
+   --  NEW (Clear_Warned_Submit_Paths), matching Warned_In_Loop's own
+   --  effective scope (which ends only when NEW discards the active
+   --  program).
+   Warned_Submit_Paths : Name_Sets.Set;
 
    --  Shared semantic-checker state — populated by Analyze_Deferred (Pass 1)
    --  and left empty by Analyze_One.  Visible to both separate subunits so
@@ -476,6 +488,13 @@ package body SData.Interpreter is
       SData_Core.Table.Clear_Index_Map;
       SData_Core.Table.Clear_By_Vars;
    end Clear_Active_Program;
+
+   --  ADR-058: clears the "already warned" record for loop-nested SUBMIT
+   --  files, matching Warned_In_Loop's own effective scope ending at NEW.
+   procedure Clear_Warned_Submit_Paths is
+   begin
+      Warned_Submit_Paths.Clear;
+   end Clear_Warned_Submit_Paths;
 
    --  NEW /PROGRAM's REPL-side worker. Deliberately narrower than
    --  Clear_Active_Program: clears only the queued deferred-statement
@@ -1033,7 +1052,9 @@ package body SData.Interpreter is
    procedure Execute_Declarative (Stmt : Statement_Access) is separate;
 
    --  SUBMIT / SYSTEM / OUTPUT / FPATH — external interaction and I/O routing.
-   procedure Execute_IO (Stmt : Statement_Access) is separate;
+   --  Loop_Depth (ADR-058) is the caller's Ctx.Loop_Depth at the SUBMIT
+   --  dispatch site; only the Stmt_SUBMIT branch reads it.
+   procedure Execute_IO (Stmt : Statement_Access; Loop_Depth : Natural := 0) is separate;
 
    --  TABLES — frequency / crosstabulation report (counting engine + rendering).
    procedure Execute_Tables (Stmt : Statement_Access) is separate;
@@ -1769,7 +1790,7 @@ package body SData.Interpreter is
             | Stmt_OPTIONS =>
             Execute_Declarative (Stmt);
          when Stmt_SUBMIT | Stmt_SYSTEM | Stmt_OUTPUT | Stmt_FPATH =>
-            Execute_IO (Stmt);
+            Execute_IO (Stmt, Ctx.Loop_Depth);
          pragma Warnings (Off, "choice is redundant");
          when others => null;
          pragma Warnings (On, "choice is redundant");
@@ -2076,7 +2097,7 @@ package body SData.Interpreter is
    --  A Stmt_RUN node acts as a step boundary: everything between two RUN
    --  markers is a deferred body executed by Run_One_Step.  Declarative and
    --  immediate statements are executed directly here, outside any data step.
-   procedure Execute (Prog : Statement_Access) is
+   procedure Execute (Prog : Statement_Access; Base_Loop_Depth : Natural := 0) is
       Step_Start : Statement_Access := Prog;
       Current    : Statement_Access;
 
@@ -2172,7 +2193,7 @@ package body SData.Interpreter is
                Ensure_Pending_Flushed;
             end if;
             declare
-               Outer_Ctx : Step_Context;
+               Outer_Ctx : Step_Context := (Loop_Depth => Base_Loop_Depth, others => <>);
             begin
                Execute_Statement (Current, Outer_Ctx);
                --  A new input source cancels any deferred statements queued
