@@ -1,0 +1,12 @@
+Warning: "tests/data/coercion_cap_10.csv", data row 21, column "A": non-numeric value "bad21" in numeric column -- stored as missing
+Warning: "tests/data/coercion_cap_10.csv", data row 22, column "A": non-numeric value "bad22" in numeric column -- stored as missing
+Warning: "tests/data/coercion_cap_10.csv", data row 23, column "A": non-numeric value "bad23" in numeric column -- stored as missing
+Warning: "tests/data/coercion_cap_10.csv", data row 24, column "A": non-numeric value "bad24" in numeric column -- stored as missing
+Warning: "tests/data/coercion_cap_10.csv", data row 25, column "A": non-numeric value "bad25" in numeric column -- stored as missing
+Warning: "tests/data/coercion_cap_10.csv", data row 26, column "A": non-numeric value "bad26" in numeric column -- stored as missing
+Warning: "tests/data/coercion_cap_10.csv", data row 27, column "A": non-numeric value "bad27" in numeric column -- stored as missing
+Warning: "tests/data/coercion_cap_10.csv", data row 28, column "A": non-numeric value "bad28" in numeric column -- stored as missing
+Warning: "tests/data/coercion_cap_10.csv", data row 29, column "A": non-numeric value "bad29" in numeric column -- stored as missing
+Warning: "tests/data/coercion_cap_10.csv", data row 30, column "A": non-numeric value "bad30" in numeric column -- stored as missing
+Dataset opened: tests/data/coercion_cap_10.csv
+RUN complete. 30 records and 2 variables processed.
