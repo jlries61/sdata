@@ -156,15 +156,19 @@ begin
    V := Get_Value (2, "NAME$");
    Check ("PC-27 unclosed-quote row2 NAME$", To_String (V.Str_Val), "Bob");
 
-   --  PC-28..PC-31: non-numeric value in numeric column stored as missing.
+   --  PC-28..PC-31: a non-numeric value within the scan window retypes the
+   --  whole column character (ADR-0019 -- design.md's "any non-numeric
+   --  value in the first n rows forces character" is now actually
+   --  implemented; previously the first value alone won and VALUE stayed
+   --  numeric with row2 coerced to missing).
    --  File: ID,VALUE / 1,10.0 / 2,N/A / 3,30.0
    Parse_CSV ("tests/data/type_mismatch.csv");
    Check ("PC-28 type-mismatch col count",     Column_Count, 2);
    Check ("PC-29 type-mismatch row count",     Row_Count,    3);
-   V := Get_Value (2, "VALUE");
-   Check ("PC-30 type-mismatch row2 missing",  V.Kind = Val_Missing, True);
-   V := Get_Value (3, "VALUE");
-   Check_Float ("PC-31 type-mismatch row3 ok", V.Num_Val, 30.0);
+   V := Get_Value (2, "VALUE$");
+   Check ("PC-30 type-mismatch row2 N/A",      To_String (V.Str_Val), "N/A");
+   V := Get_Value (3, "VALUE$");
+   Check ("PC-31 type-mismatch row3 as text",  To_String (V.Str_Val), "30.0");
 
    --  PC-32..PC-36: ragged rows — short and long rows.
    --  File: A,B,C / 1,2,3 / 4,5 / 6,7,8,9

@@ -1,0 +1,18 @@
+Dataset opened: tests/data/scan_window_retype.csv
+RUN complete. 15 records and 2 variables processed.
+REC# A$ B 
+1 1 1.00000 
+2 2 2.00000 
+3 3 3.00000 
+4 4 4.00000 
+5 5 5.00000 
+6 6 6.00000 
+7 7 7.00000 
+8 8 8.00000 
+9 9 9.00000 
+10 10 10.00000 
+11 bad1 1.00000 
+12 bad2 2.00000 
+13 bad3 3.00000 
+14 bad4 4.00000 
+15 bad5 5.00000 
