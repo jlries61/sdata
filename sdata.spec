@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.19.0
+Version:        0.19.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Aug 24 2026 John L. Ries <john@theyarnbard.com> - 0.19.1-1
+- Cap non-numeric-value coercion warnings at 10 per USE source file (PD-7); regression coverage for PD-3/PD-5/PD-6.
+
 * Mon Aug 24 2026 John L. Ries <john@theyarnbard.com> - 0.19.0-1
 - Accumulated fixes since v0.18.0: PD-1 BY-sort scoping, PC-1 array-element hard errors, PC-3 DIM/ARRAY symmetry, PC-5 --clen default, PC-6 doc fix, PD-2 SUBMIT-in-loop warning, PD-3 OOXML absolute-Target regression test.
 
