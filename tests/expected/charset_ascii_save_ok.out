@@ -1,0 +1,6 @@
+Dataset opened: tests/data/charset_ascii_clean.csv
+Dataset saved: tests/data/charset_ascii_save_out.csv
+RUN complete. 2 records and 2 variables processed.
+NAME$,SCORE
+Alice,90
+Bob,85

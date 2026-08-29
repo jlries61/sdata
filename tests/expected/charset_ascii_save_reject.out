@@ -1,0 +1,2 @@
+Dataset opened: tests/data/charset_ascii_bad.csv
+Error: "tests/data/charset_ascii_save_reject_out.csv": non-ASCII byte (value 195) in output -- rejected (CHARSET=ASCII)
