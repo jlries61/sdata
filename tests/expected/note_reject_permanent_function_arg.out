@@ -1,0 +1,2 @@
+Dataset opened: tests/data/charset_ascii_clean.csv
+Error: NOTE: "SCORE" is a permanent variable (a per-row value); NOTE only accepts temporary variables

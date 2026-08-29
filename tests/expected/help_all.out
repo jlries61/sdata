@@ -90,6 +90,17 @@ Outputs values to the console, separated by spaces.
 No arguments: Prints all permanent variables for the current record.
 Execution: Deferred -- executed once per record inside the data step.
 
+Command: NOTE <expr> [<expr> ...]
+Outputs values to the console, separated by spaces -- the Immediate
+counterpart to PRINT. Requires at least one argument (no bare form).
+Arguments must be temporary (SET) variables, or expressions built from
+them -- a permanent (table-column) variable is rejected wherever it
+appears in an argument, since it has no single value outside a
+per-record data-step pass, which NOTE never has.
+Execution: Immediate -- fires once, at its position in program order,
+before any not-yet-run deferred statement (LET/SET awaiting RUN); never
+replayed per record inside a loop body, unlike ECHO/DIGITS.
+
 Command: RUN
 Triggers the execution of the Data Step and any deferred SAVE operations.
 Before the data step runs, queued statements are validated: assignment type

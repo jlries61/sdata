@@ -2392,8 +2392,9 @@ package body SData.Parser is
             Stmt.Do_Body   := Parse_Block (Ctx, Token_UNTIL);
             Stmt.Until_Cond := Parse_Expression (Ctx);
 
-         when Token_PRINT =>
-            Stmt := new Statement (Stmt_PRINT);
+         when Token_PRINT | Token_NOTE =>
+            Stmt := new Statement
+               (if Tok.Kind = Token_PRINT then Stmt_PRINT else Stmt_NOTE);
             Stmt.Print_Args := null;
             declare
                Last_Arg : Expression_List := null;

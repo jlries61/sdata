@@ -81,9 +81,9 @@ of v0.16.3; `make check` output is the source of truth):
 3. `bin/evaluator_unit_test` — expression evaluator (225)
 4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write (104)
 5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT (101)
-6. 444 `.cmd` integration tests in `tests/` (881 unit checks total)
+6. 456 `.cmd` integration tests in `tests/` (881 unit checks total)
 
-All 444 integration tests must pass before committing. Never use `--no-verify`.
+All 456 integration tests must pass before committing. Never use `--no-verify`.
 
 **Documentation-only commits** — changes confined to `doc/`, `man/`, and `*.md`
 (README, CONTRIBUTING, CLAUDE.md) and similar non-build prose — do **not** require a
@@ -131,7 +131,7 @@ implement USE, SAVE, FPATH, OUTPUT, SELECT, KEEP, DROP, ARRAY, DIM, RUN, and
 their related helpers (`Execute_OUTPUT_Table`, `Execute_Rebuild_Filter`). sdata's
 interpreter delegates to these rather than duplicating the logic. data-vandal
 calls the same procedures. When changing one of these commands' semantics, edit
-sdata-core and confirm both `make check` (sdata, 444 integration tests) and
+sdata-core and confirm both `make check` (sdata, 456 integration tests) and
 `cd ~/Develop/data-vandal && make check` (data-vandal, 149 integration tests) still pass.
 
 ## Source Layout
@@ -156,7 +156,7 @@ src/
 tests/
   csv_unit_test.adb           -- SData_Core.CSV unit tests
   sdata_unit_test.adb         -- SData_Core.Variables / PDV unit tests
-  *.cmd                       -- integration test scripts (444)
+  *.cmd                       -- integration test scripts (456)
 doc/
   SOFTWARE_STANDARDS_REVIEW.md  -- living standards audit (annotated)
   adrs.md                     -- 57 ADRs (ADR-001 through ADR-057; contiguous)
@@ -285,7 +285,7 @@ one lingering. Do not reintroduce a hardcoded sdata-core version in these files.
 
 - Phases 1–4: **complete** (core, control flow, distributions/aggregates, spreadsheet I/O)
 - Phase 5 (Polish): **complete** — disk spillover, interactive improvements, pager, HELP, LIST, ERR/ERL, error messages, performance, documentation
-- Phase 6 (Testing): **ongoing** — 444 integration tests, 881 unit checks across 5 modules
+- Phase 6 (Testing): **ongoing** — 456 integration tests, 881 unit checks across 5 modules
 - v0.8.0 milestone (2026-05-21): VANDALIZE extracted into `data-vandal`; sdata-core shared library created (ADRs 039–043)
 - STATS command (2026-07-01): SData's PROC MEANS analogue — per-variable summary statistics, one row per (BY group × variable), reusing the aggregate machinery (sdata v0.12.0, sdata-core v0.1.19; ADR-048)
 

@@ -1409,3 +1409,98 @@ rejected as more machinery than the problem warrants; a script author who has be
 about a given submitted file's loop-nesting behavior does not need every distinct Declarative line
 in that same file re-flagged on every subsequent iteration once they've been told the file itself
 is affected.
+
+### ADR-059: NOTE — an Immediate-tier counterpart to PRINT that unconditionally rejects permanent variables
+
+**Date:** 2026-08-29 | **Status:** Accepted
+
+**Context:** User request for a new command, `NOTE`, syntactically identical to `PRINT` (`NOTE
+<value> [<value>...]`) but Immediate-tier — it fires once, at its position in program order, like
+`SYSTEM`/`HELP`/`NAMES`/`ECHO`/`DIGITS`, rather than being queued and executed once per record via
+`RUN` the way `PRINT` is. The motivating use case is a lightweight, no-`RUN`-required way to
+inspect a temporary (`SET`) variable's value immediately, without the ceremony of queuing a data
+step.
+
+**Decision — permanent variables are rejected unconditionally, anywhere in an argument's
+expression tree, not just as a bare reference.** A permanent (table-column) variable is a per-row
+vector; it has a well-defined single value only during a per-record execution pass, which an
+Immediate-tier statement — by construction, firing once, independent of any specific record —
+never has. The natural-seeming compromise ("allow a permanent variable when it's been reduced to
+one value, e.g. inside an aggregate call like `SUM(X)`") was investigated and found not to exist as
+a real capability: `SUM(v1, [v2, ...])` used as an ordinary expression-level function (outside
+`AGGREGATE`/`STATS`'s own dedicated syntax) is a **row-wise** function — it sums several columns
+*within the current record*, not across rows — confirmed empirically (`PRINT SUM(SCORE)` against a
+two-row fixture printed each row's own `SCORE` value once per record, not a table-wide total).
+There is no mechanism anywhere in this codebase that reduces a permanent variable to a single value
+outside `AGGREGATE`/`STATS`'s own group-scan machinery, and that machinery is reachable only
+through their dedicated command syntax, not from an arbitrary expression. Since nothing can
+legitimately produce a well-defined single value from a permanent variable in a `NOTE` argument,
+allowing it anywhere — bare, or buried inside arithmetic, a non-aggregate function call, or an
+array-index expression — would only ever produce an arbitrary, unpredictable value (whatever
+happens to be sitting in the PDV at `NOTE`'s one-shot dispatch point: unpopulated if no data has
+been loaded yet, or a stale leftover from the last row a prior `RUN` processed). `NOTE` therefore
+walks each argument's full expression tree and rejects on the first permanent-variable or
+permanent-array reference found anywhere within it, before printing anything.
+
+**Decision — NOTE fires exactly once inside a loop body, never replayed per record, matching
+HELP/NAMES rather than ECHO/DIGITS.** This project's 2026-08-13 audit (findings PB-5 through PB-8)
+established that `process_one_record.adb`'s per-record replay whitelist exists specifically for
+Immediate-tier statements whose effect is read by, or itself reads, another statement's state
+within the *same* per-record pass (`ECHO`'s console-suppression flag is read by a later deferred
+`PRINT`; `DIGITS`'s precision is read the same way) — `HELP`/`NAMES` were deliberately removed from
+that whitelist because their output depends on nothing that changes per iteration. `NOTE` is
+architecturally closer to `HELP`/`NAMES`: even though its temporary-variable arguments *could* be
+updated by a preceding deferred `LET`/`SET` in the same loop body, `NOTE` fires before any deferred
+statement in that body has ever executed (deferred statements only run once `RUN` is reached), so
+replaying it per record would not show meaningfully different values without also fundamentally
+changing `NOTE`'s own one-shot Immediate semantics — a much larger design change the user
+explicitly declined. `NOTE` is therefore deliberately absent from the per-record whitelist; a
+script like `SET total=0 / REPEAT 5 / LET total=total+X / NOTE total / RUN` prints `total`'s
+pre-loop value exactly once, not a running total per iteration — a known, accepted consequence of
+this decision, not a defect.
+
+**Mechanism — shared AST field and parser arm, not duplicated.** `sdata-ast.ads`'s `Statement`
+variant record already groups multiple `Statement_Kind` values under one shared field block
+wherever their shape is identical (e.g. `Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | ...`); `Stmt_NOTE`
+joins `Stmt_PRINT`'s existing arm (`when Stmt_PRINT | Stmt_NOTE => Print_Args : Expression_List;`)
+with zero new fields, since `NOTE`'s argument list is structurally identical to `PRINT`'s.
+`sdata-parser.adb`'s `Token_PRINT` case arm widens to `Token_PRINT | Token_NOTE` the same way,
+sharing one argument-parsing loop.
+
+**Mechanism — dispatch is three independently-traced decision points, not a symmetric pair.**
+REPL's `Is_Immediate` (`sdata-interpreter.adb`) is an *inclusion* list — `Stmt_NOTE` must be added
+explicitly, or a bare `NOTE` typed interactively is silently queued as if Deferred, reproducing
+issue #68/finding PB-11's exact bug class. Batch mode's own dispatch (`Execute`'s main loop) is
+structurally different — an *exclusion* list of Deferred kinds — so `Stmt_NOTE`, not being one of
+those, already dispatches as Immediate with **zero** code change there; it must not be added to
+that list "for symmetry" with the REPL fix, which would wrongly defer it in batch mode instead.
+`process_one_record.adb`'s per-record whitelist is a third, independent list `NOTE` deliberately
+stays out of (see the fire-once decision above). All three are covered by dedicated regression
+tests, including a `.repl`-marked test exercising the REPL dispatch path specifically — a batch-only
+test would not have caught issue #68 either.
+
+**Mechanism — `Print_Value_List` extracted from `Execute_Print`, not duplicated.**
+`Execute_Print`'s existing non-bare-argument branch (bare-variable, whole-array, array-element,
+function-call, and generic-expression printing, ~75 lines) is factored into a shared procedure
+called by both `Execute_Print` (replacing its inline block, verified byte-identical output on every
+existing `PRINT` test) and the new `Execute_Note` (called once every argument has passed the
+permanent-variable check).
+
+**Consequences:** sdata-only (`sdata-lexer.{ads,adb}`, `sdata-ast.ads`, `sdata-parser.adb`,
+`sdata-interpreter.{ads,adb}`, `sdata-interpreter-execute_print.adb`, new
+`sdata-interpreter-execute_note.adb`, `sdata-reserved_keywords.adb`, `sdata-help.adb`,
+`man/man1/sdata.1`, `design.md`); no sdata-core or data-vandal change, no cross-crate gate needed
+(matching `PRINT`'s own sdata-only status per ADR-040). New reserved keyword `NOTE` — a table
+column literally named `NOTE` now triggers the existing reserved-keyword-collision warning, the
+same as any other reserved name.
+
+**Alternatives rejected:** permitting a permanent variable inside an aggregate-function call
+(`NOTE SUM(X)`) — rejected because no such capability exists today; building one would be a
+separate, cross-cutting "aggregate functions as ordinary expression-level functions" feature
+affecting `LET`/`IF`/`PRINT` too, not something to fold into adding one new command. Replaying
+`NOTE` once per record inside a loop body, matching `ECHO`/`DIGITS` — rejected by explicit user
+decision; considered because `NOTE`'s temporary-variable arguments can meaningfully change across
+loop iterations the way `ECHO`'s/`DIGITS`'s own state does, but the user judged `NOTE`'s simpler,
+`HELP`/`NAMES`-like one-shot semantics preferable. A bare `NOTE` printing all temporary variables
+(mirroring `PRINT`'s own bare-argument behavior for permanent variables) — rejected by explicit
+user decision in favor of requiring at least one argument.

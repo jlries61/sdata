@@ -4,7 +4,7 @@ Available Commands:
   Arrays:      ARRAY, DIM
   Control:     IF, SELECT CASE, FOR, WHILE, DO/UNTIL, BREAK
   Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, TRANSPOSE, STATS, REPEAT
-  Output:      PRINT, OUTPUT, ECHO, DIGITS
+  Output:      PRINT, NOTE, OUTPUT, ECHO, DIGITS
   Files/paths: FPATH
   Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END
   Debugger:    BREAK, BREAK WHEN  (see also: HELP DEBUGGER for --debug mode)

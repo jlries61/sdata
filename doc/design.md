@@ -809,6 +809,20 @@ or *ECHO OFF* is in effect.
 
 - **Number Formatting:** Floating point values printed with precision specified by most recently issued *DIGITS* statement.
 
+### 6.2a The NOTE Command
+
+- **Purpose:** Output values to console immediately — the Immediate-execution counterpart to *PRINT*.
+
+- Syntax:
+
+  - *NOTE \<value\> [\<value\>...]*: Print specified values separated by spaces. At least one argument is required — unlike *PRINT*, *NOTE* has no bare (no-argument) form, since it never has a "current record" to print permanent variables of.
+
+- **Argument restriction:** every argument must be built entirely from temporary (*SET*) variables — a permanent (table-column) variable is rejected wherever it appears in an argument's expression, not only as a bare reference, because it has no well-defined single value outside a per-record data-step pass, which *NOTE* never has (see ADR-059 for the full rationale, including why a reducing expression like an aggregate function cannot be used as a workaround).
+
+- **Execution:** Immediate — *NOTE* fires once, at its position in program order, before any not-yet-run deferred statement (*LET*/*SET* awaiting *RUN*). Unlike *ECHO*/*DIGITS*, *NOTE* is **not** replayed once per record when placed inside a *FOR*/*WHILE*/*DO*/*REPEAT* loop body — it always fires exactly once.
+
+- **Number Formatting:** Same as *PRINT* — floating point values printed with precision specified by most recently issued *DIGITS* statement.
+
 ### 6.3 Interactive Mode
 
 In interactive mode, declarative commands such as *USE*, *NAMES*, *OUTPUT*, *DIGITS*, and *ECHO* execute immediately upon entry to provide real-time feedback:
@@ -983,6 +997,12 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>PRINT</em> [&lt;<em>value</em>&gt;...]</td>
 <td>Deferred Execution</td>
 <td>Print one or more values separated by spaces. If no arguments are given, then print the values all currently defined permanent variables with their names for the current record. Floating point values shall be printed with the precision specified by the most recently issued <em>DIGITS</em> statement.</td>
+</tr>
+<tr>
+<td><em>NOTE</em></td>
+<td><em>NOTE</em> &lt;<em>value</em>&gt;[, &lt;<em>value</em>&gt;...]</td>
+<td>Immediate Execution</td>
+<td>Immediate-execution counterpart to <em>PRINT</em>: print one or more values separated by spaces. At least one argument is required. Every argument shall be built entirely from temporary (<em>SET</em>) variables — a permanent (table-column) variable is rejected wherever it appears, since it has no single value outside a per-record data-step pass. Fires once, at its position in program order; unlike <em>ECHO</em>/<em>DIGITS</em>, not replayed once per record when placed inside a loop body. Floating point values shall be printed with the precision specified by the most recently issued <em>DIGITS</em> statement.</td>
 </tr>
 <tr>
 <td><em>QUIT</em>|<em>END</em></td>

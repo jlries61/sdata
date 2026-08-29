@@ -1028,6 +1028,17 @@ Array element forms are the same as for
 Print values to the console.
 With no arguments, prints all permanent variables for the current record.
 .TP
+.B NOTE \fIexpr\fR [\fIexpr\fR ...]
+Immediate\-execution counterpart to
+.BR PRINT .
+Fires once, at its position in program order, rather than once per record.
+Requires at least one argument.
+Arguments must be temporary
+.RB ( SET )
+variables, or expressions built from them \(em a permanent (table\-column)
+variable is rejected wherever it appears in an argument, since it has no
+single value outside a per\-record data\-step pass.
+.TP
 .B IF \fIcond\fR THEN \fIstmt\fR [ELSEIF \fIcond\fR THEN \fIstmt\fR] [ELSE \fIstmt\fR]
 Conditional execution.
 Block form (terminated by

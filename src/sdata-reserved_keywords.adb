@@ -51,6 +51,7 @@ package body SData.Reserved_Keywords is
       S.Insert ("NEW");
       S.Insert ("NEXT");
       S.Insert ("NOT");
+      S.Insert ("NOTE");
       S.Insert ("OPTIONS");
       S.Insert ("OR");
       S.Insert ("OTHERWISE");

@@ -155,7 +155,8 @@ package SData.AST is
       Stmt_LET,    -- Variable assignment
       Stmt_SET,    -- Temporary assignment
       Stmt_UNSET,  -- Session variable removal
-      Stmt_PRINT,  -- Output to console
+      Stmt_PRINT,  -- Output to console (Deferred: once per record)
+      Stmt_NOTE,   -- Output to console (Immediate: once, at program-order position)
       Stmt_USE,    -- Load dataset
       Stmt_SAVE,   -- Save dataset
       Stmt_KEEP,   -- Keep specific columns
@@ -220,7 +221,7 @@ package SData.AST is
       --  than one per iteration. Set by Execute_Statement.
       Warned_In_Loop : Boolean := False;
       case Kind is
-         when Stmt_PRINT =>
+         when Stmt_PRINT | Stmt_NOTE =>
             Print_Args : Expression_List;
          when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_SYSTEM | Stmt_HELP | Stmt_OUTPUT | Stmt_FPATH =>
             File_Path : String (1 .. Max_Path_Len);

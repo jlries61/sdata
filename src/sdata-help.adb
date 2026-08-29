@@ -19,7 +19,7 @@ package body SData.Help is
       Put_Line ("  Arrays:      ARRAY, DIM");
       Put_Line ("  Control:     IF, SELECT CASE, FOR, WHILE, DO/UNTIL, BREAK");
       Put_Line ("  Data step:   SELECT (filter), SELECT /ALL, BY, SORT, AGGREGATE, TRANSPOSE, STATS, REPEAT");
-      Put_Line ("  Output:      PRINT, OUTPUT, ECHO, DIGITS");
+      Put_Line ("  Output:      PRINT, NOTE, OUTPUT, ECHO, DIGITS");
       Put_Line ("  Files/paths: FPATH");
       Put_Line ("  Session:     RSEED, SYSTEM, SUBMIT, HELP, OPTIONS, QUIT, END");
       Put_Line ("  Debugger:    BREAK, BREAK WHEN  (see also: HELP DEBUGGER for --debug mode)");
@@ -169,6 +169,20 @@ package body SData.Help is
       Put_Line ("No arguments: Prints all permanent variables for the current record.");
       Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
    end Help_PRINT;
+
+   procedure Help_NOTE is
+   begin
+      Put_Line ("Command: NOTE <expr> [<expr> ...]");
+      Put_Line ("Outputs values to the console, separated by spaces -- the Immediate");
+      Put_Line ("counterpart to PRINT. Requires at least one argument (no bare form).");
+      Put_Line ("Arguments must be temporary (SET) variables, or expressions built from");
+      Put_Line ("them -- a permanent (table-column) variable is rejected wherever it");
+      Put_Line ("appears in an argument, since it has no single value outside a");
+      Put_Line ("per-record data-step pass, which NOTE never has.");
+      Put_Line ("Execution: Immediate -- fires once, at its position in program order,");
+      Put_Line ("before any not-yet-run deferred statement (LET/SET awaiting RUN); never");
+      Put_Line ("replayed per record inside a loop body, unlike ECHO/DIGITS.");
+   end Help_NOTE;
 
    procedure Help_RUN is
    begin
@@ -1334,6 +1348,7 @@ package body SData.Help is
    K_SUBMIT       : aliased constant String := "SUBMIT";
    K_SYSTEM       : aliased constant String := "SYSTEM";
    K_PRINT        : aliased constant String := "PRINT";
+   K_NOTE         : aliased constant String := "NOTE";
    K_RUN          : aliased constant String := "RUN";
    K_LET          : aliased constant String := "LET";
    K_SET          : aliased constant String := "SET";
@@ -1554,6 +1569,7 @@ package body SData.Help is
       (K_SUBMIT'Access,   Help_SUBMIT'Access,   C, N),
       (K_SYSTEM'Access,   Help_SYSTEM'Access,   C, N),
       (K_PRINT'Access,    Help_PRINT'Access,    C, N),
+      (K_NOTE'Access,     Help_NOTE'Access,     C, N),
       (K_RUN'Access,      Help_RUN'Access,      C, N),
       (K_LET'Access,      Help_LET'Access,      C, N),
       (K_SET'Access,      Help_SET'Access,      C, N),

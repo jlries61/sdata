@@ -288,6 +288,7 @@ package body SData.Lexer is
                elsif Upper = "ARRAY" then T.Kind := Token_ARRAY;
                elsif Upper = "SYSTEM" or Upper = "/SYSTEM" then T.Kind := Token_SYSTEM;
                elsif Upper = "PRINT" then T.Kind := Token_PRINT;
+               elsif Upper = "NOTE" then T.Kind := Token_NOTE;
                elsif Upper = "WRITE" then T.Kind := Token_WRITE;
                elsif Upper = "OUTPUT" or Upper = "/OUTPUT" then T.Kind := Token_OUTPUT;
                elsif Upper = "ECHO" then T.Kind := Token_ECHO;

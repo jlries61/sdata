@@ -164,7 +164,7 @@ package body SData.Interpreter is
          Stmt_ECHO | Stmt_SORT | Stmt_BY | Stmt_SELECT_FILTER | Stmt_SUBMIT |
          Stmt_SYSTEM | Stmt_PROGRAM_REMOVE | Stmt_OPTIONS | Stmt_AGGREGATE |
          Stmt_TRANSPOSE | Stmt_STATS | Stmt_TABLES | Stmt_PROGRAM_INSERT |
-         Stmt_UNSET;
+         Stmt_UNSET | Stmt_NOTE;
    end Is_Immediate;
 
    procedure Set_Interactive (Val : Boolean) is
@@ -185,6 +185,8 @@ package body SData.Interpreter is
    procedure Execute_List         (List : Statement_Access; Ctx : in out Step_Context; Boundary : Statement_Access := null);
    procedure Execute_Assignment      (Stmt : Statement_Access);
    procedure Execute_Print        (Stmt : Statement_Access);
+   procedure Execute_Note         (Stmt : Statement_Access);
+   procedure Print_Value_List     (Args : Expression_List);
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context);
    procedure Execute_Metadata        (Stmt : Statement_Access);
    procedure Execute_Program_Remove  (Stmt : Statement_Access);
@@ -921,6 +923,17 @@ package body SData.Interpreter is
 
    --  PRINT — format and emit expression list or bare column dump.
    procedure Execute_Print (Stmt : Statement_Access) is separate;
+
+   --  NOTE (ADR-059) — Immediate-tier counterpart to PRINT: requires at
+   --  least one argument, rejects any argument referencing a permanent
+   --  variable anywhere in its expression tree, then reuses PRINT's own
+   --  printing logic via Print_Value_List.
+   procedure Execute_Note (Stmt : Statement_Access) is separate;
+
+   --  Shared by Execute_Print (non-bare argument list) and Execute_Note
+   --  (after its permanent-variable check passes) — extracted so both
+   --  commands render identically without duplicating the formatting logic.
+   procedure Print_Value_List (Args : Expression_List) is separate;
 
    --  IF / WHILE / FOR / LOOP_REPEAT / SELECT — all control flow constructs.
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context) is separate;
@@ -1766,6 +1779,8 @@ package body SData.Interpreter is
             Execute_Assignment (Stmt);
          when Stmt_PRINT =>
             Execute_Print (Stmt);
+         when Stmt_NOTE =>
+            Execute_Note (Stmt);
          when Stmt_IF | Stmt_WHILE | Stmt_FOR | Stmt_LOOP_DO | Stmt_SELECT =>
             Execute_Control_Flow (Stmt, Ctx);
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET

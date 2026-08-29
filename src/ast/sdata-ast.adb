@@ -114,7 +114,7 @@ package body SData.AST is
       SData_Core.Evaluator.Free_Expression (Stmt.Expr);
       --  Free discriminant-specific children.
       case Stmt.Kind is
-         when Stmt_PRINT =>
+         when Stmt_PRINT | Stmt_NOTE =>
             Free_Expr_List (Stmt.Print_Args);
          when Stmt_USE | Stmt_SAVE | Stmt_SUBMIT | Stmt_SYSTEM
             | Stmt_HELP | Stmt_OUTPUT | Stmt_FPATH =>
