@@ -3116,15 +3116,27 @@ package body SData.Parser is
             end;
 
          when Token_ECHO =>
+            --  Peek first (mirrors Token_REPEAT's idiom above): validate
+            --  before allocating Stmt or consuming the token, so an invalid
+            --  or missing argument raises a clean error instead of being
+            --  silently swallowed and treated as OFF, doesn't leak the
+            --  Statement node, and leaves the offending token in the stream
+            --  rather than consuming it as part of this malformed statement.
             declare
-               Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               Peek_Tok   : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+               Peek_Upper : constant String :=
+                  To_Upper (Peek_Tok.Text (1 .. Peek_Tok.Length));
             begin
-               Stmt := new Statement (Stmt_ECHO);
-               if To_Upper(Val_Tok.Text(1..Val_Tok.Length)) = "ON" then
-                  Stmt.Echo_State := True;
-               else
-                  Stmt.Echo_State := False;
+               if Peek_Upper /= "ON" and then Peek_Upper /= "OFF" then
+                  raise Script_Error with "ECHO requires ON or OFF";
                end if;
+               declare
+                  Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Val_Tok);
+               begin
+                  Stmt := new Statement (Stmt_ECHO);
+                  Stmt.Echo_State := Peek_Upper = "ON";
+               end;
             end;
 
          when Token_DIGITS =>
