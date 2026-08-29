@@ -1,3 +1,9 @@
+sdata (0.20.0-1) unstable; urgency=medium
+
+  * Add NOTE command: immediate-execution counterpart to PRINT
+
+ -- John L. Ries <john@theyarnbard.com>  Sat, 29 Aug 2026 11:42:55 -0700
+
 sdata (0.19.2-1) unstable; urgency=medium
 
   * Fix ECHO silently accepting invalid arguments instead of erroring
