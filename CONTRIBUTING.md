@@ -61,11 +61,11 @@ builds are fast.
 alr exec -- make check
 ```
 
-This runs five unit test binaries followed by 430 integration tests. Expected
+This runs five unit test binaries followed by 439 integration tests. Expected
 output ends with:
 
 ```
-All 430 tests passed.
+All 439 tests passed.
 ```
 
 ### 6. Verify the binary

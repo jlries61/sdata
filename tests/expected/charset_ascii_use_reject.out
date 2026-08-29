@@ -1,0 +1,1 @@
+Error: "tests/data/charset_ascii_bad.csv": non-ASCII byte (value 195) in input -- rejected (CHARSET=ASCII)
