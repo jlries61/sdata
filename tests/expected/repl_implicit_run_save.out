@@ -1,13 +1,27 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> Dataset opened: tests/data/freq_select.csv
-sdata> sdata> sdata> RUN complete. 6 records and 4 variables processed.
+sdata> -- Issue #70 / ADR-055: SAVE + implicit RUN association via the REPL path
+sdata> -- specifically -- Ensure_Pending_Flushed's Run_Active_Program branch (a
+sdata> -- pending LET queued in Active_Program_Vec) is a different code path from
+sdata> -- the batch-style Step_Start flush repeat_save_implicit_run.cmd covers, but
+sdata> -- both must consume the same Suppress_Next_Save_Flush flag so the
+sdata> -- registered SAVE survives for SORT's own Execute_Commit_Step flush,
+sdata> -- writing the sorted result (1,2,3,4), not the pre-sort table.
+sdata> USE "tests/data/freq_select.csv"
+Dataset opened: tests/data/freq_select.csv
+sdata> LET Z = ID * -1
+sdata> SAVE "tests/data/repl_implicit_run_save_out.csv"
+sdata> SORT Z
+RUN complete. 6 records and 4 variables processed.
 SORT complete. 6 records and 4 variables processed.
 Dataset saved: tests/data/repl_implicit_run_save_out.csv
-sdata> sdata> Dataset opened: tests/data/repl_implicit_run_save_out.csv
-sdata> REC# REGION$ PRODUCT$ ID Z 
+sdata> NEW
+sdata> USE "tests/data/repl_implicit_run_save_out.csv"
+Dataset opened: tests/data/repl_implicit_run_save_out.csv
+sdata> DISPLAY
+REC# REGION$ PRODUCT$ ID Z 
 1 West B 6.00000 -6.00000 
 2 West B 5.00000 -5.00000 
 3 West A 4.00000 -4.00000 
 4 East B 3.00000 -3.00000 
 5 East A 2.00000 -2.00000 
 6 East A 1.00000 -1.00000 
-sdata> 
+sdata> QUIT

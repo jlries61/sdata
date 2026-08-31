@@ -1,5 +1,15 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> RUN complete. 2 records and 1 variables processed.
-sdata> sdata> 1.00000
+sdata> -- Issue #69: reaching end-of-input without an explicit QUIT/END exercises a
+sdata> -- distinct exit path from repl_dispatch_basic.cmd's QUIT branch -- the
+sdata> -- Ada.Text_IO.End_Error handler (Flush_Pager_Buffer + New_Line + exit
+sdata> -- REPL), not the Stmt_QUIT/Stmt_END dispatch branch. No QUIT statement
+sdata> -- appears below; stdin simply closes after the last line.
+sdata> REPEAT 2
+sdata> LET X = RECNO
+sdata> RUN
+RUN complete. 2 records and 1 variables processed.
+sdata> PRINT X
+sdata> RUN
+1.00000
 2.00000
 RUN complete. 2 records and 1 variables processed.
 sdata> 

@@ -1,4 +1,21 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> RUN complete. 1 records and 1 variables processed.
-sdata> sdata> 4.00000
+sdata> -- Issue #63 / ADR-054: REMOVE n[-m] is the renamed program-buffer line
+sdata> -- editor command (was DELETE n[-m]). This is its first real end-to-end
+sdata> -- REPL integration test -- previously this whole command family
+sdata> -- (INSERT/LIST/REMOVE) was only exercised via interpreter_unit_test.adb's
+sdata> -- direct Immediate()/Queue() procedure calls, never through an actual
+sdata> -- REPL session (the same gap issue #69 closed generally).
+sdata> --
+sdata> -- Buffer built as [A=1, A=2, A=3, A=4]; REMOVE 2-3 drops the middle two
+sdata> -- lines -> [A=1, A=4]; RUN leaves A=4.
+sdata> LET A = 1
+sdata> LET A = 2
+sdata> LET A = 3
+sdata> LET A = 4
+sdata> REMOVE 2-3
+sdata> RUN
 RUN complete. 1 records and 1 variables processed.
-sdata> 
+sdata> PRINT A
+sdata> RUN
+4.00000
+RUN complete. 1 records and 1 variables processed.
+sdata> QUIT

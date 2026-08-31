@@ -1,6 +1,22 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> Error: REMOVE requires a program-buffer line number; Infinity/NaN literals (.i, .n) are not valid here
-sdata> Error: REMOVE requires a program-buffer line number; Infinity/NaN literals (.i, .n) are not valid here
-sdata> RUN complete. 1 records and 1 variables processed.
-sdata> sdata> 3.00000
+sdata> -- Issue #71 / systems-designer Finding 2: REMOVE n[-m]'s line-editor
+sdata> -- parser used to call Real'Value unconditionally on the token following
+sdata> -- '-', assuming it was always Token_Numeric_Literal. A .i/.n literal
+sdata> -- (Token_Infinity/Token_NaN) carries no text, so this used to raise an
+sdata> -- uncaught Constraint_Error ("Internal error"-shaped) instead of a clean,
+sdata> -- descriptive error. Confirms both the bare-argument and range-argument
+sdata> -- positions are guarded, and that the REPL keeps accepting input after
+sdata> -- the error (same recovery contract as repl_error_recovery.cmd).
+sdata> LET A = 1
+sdata> LET A = 2
+sdata> LET A = 3
+sdata> REMOVE .i
+Error: REMOVE requires a program-buffer line number; Infinity/NaN literals (.i, .n) are not valid here
+sdata> REMOVE 1-.n
+Error: REMOVE requires a program-buffer line number; Infinity/NaN literals (.i, .n) are not valid here
+sdata> RUN
 RUN complete. 1 records and 1 variables processed.
-sdata>
+sdata> PRINT A
+sdata> RUN
+3.00000
+RUN complete. 1 records and 1 variables processed.
+sdata> QUIT

@@ -1588,3 +1588,62 @@ explicit choice offered to and rejected by the project owner in favor of closing
 bug class at once, once the shared root cause was found. A broader AST-ownership refactor to
 eliminate the REPL-mode leak entirely — rejected as separate, larger, unjustified-by-need work (see
 Decision above).
+
+### ADR-061: `Run_REPL` echoes each input line unconditionally, closing design.md's "Statement Echo" gap
+
+**Date:** 2026-08-31 | **Status:** Accepted
+
+**Context:** Design-vs-implementation re-audit finding PE-7
+(`.ssd/audits/2026-08-13-design-vs-implementation/part-e-io-operators-implementation-notes.md`):
+design.md §6.3 states "Statements shall be echoed to screen, even if console output is disabled."
+No code implemented this. In a real terminal, typed characters appear on screen via the terminal
+driver's own canonical-mode echo — OS behavior sdata never provided — which does not survive
+non-tty invocation (piped stdin), even though `Run_REPL` explicitly supports it
+(`Set_Interactive (True)` is set unconditionally whenever no script filename is given). Confirmed
+empirically: `printf 'USE MOCK\nLET Z = 5\nPRINT Z\nRUN\nQUIT\n' | ./bin/sdata` showed none of the
+five typed statements in its output, only their side effects, identically with or without `-q`.
+
+**Decision.** `Run_REPL` (`src/sdata_main.adb`) now writes each input line back out via
+`Ada.Text_IO.Unbounded_IO.Put_Line (Line)` immediately after `Ada.Text_IO.Unbounded_IO.Get_Line
+(Line)` reads it — one call site, one line added. The write is unconditional: not gated by
+`Quiet_Mode` or `Local_Echo`, matching design.md's explicit "even if console output is disabled"
+wording and the existing precedent that the prompt itself (`"sdata> "` / `"..> "`) and the startup
+banner already print ungated, bypassing the pager buffer, for the identical reason (must always
+appear immediately).
+
+**Decision — echo the raw per-line input, not the assembled statement.** `Get_Line` already runs
+exactly once per loop iteration, including once per continuation line (a trailing-comma statement
+re-prompts and re-reads before the full buffer is re-parsed), so placing the echo immediately after
+`Get_Line` produces one echo per physical input line — including continuation lines — with zero
+additional bookkeeping, and mirrors what real terminal echo would show in real time rather than
+withholding output until a (possibly multi-line) statement finishes parsing.
+
+**Decision — place the echo before `Append`/`Parse_Program`, not after a successful parse.** The
+line is echoed regardless of whether it later turns out to be part of a statement that fails to
+parse. design.md's "even if console output is disabled" wording carries no carve-out for that case
+— the statement was typed and should be shown, independent of what happens to it afterward.
+
+**Non-decision — `Local_Echo`/`ECHO` is untouched.** The existing `Local_Echo` flag
+(`sdata_core-io.adb`, toggled by the `ECHO` command) gates whether **command *output*** is printed
+(e.g. `USE`'s "Generating mock data..." message) — a different, pre-existing concept from
+**statement echo**, which this ADR adds as new, independent behavior. Conflating the two would have
+been a mistake: it is the root of a separate, already-deferred finding (PE-4, `-q`'s doc claiming
+`ECHO ON` can countermand it — false, since neither `Local_Echo` nor `Quiet_Mode` has ever gated
+input text).
+
+**Consequences:** sdata-only (`src/sdata_main.adb`; `Run_REPL` is sdata-only per ADR-040) — no
+sdata-core or data-vandal change. Every existing `.repl`-marked integration test (17, found via
+`find tests -name '*.repl'`, not assumed from any prior workstream's list) required expected-output
+regeneration, since echoed input is new output appearing in all of them; each was regenerated from
+the freshly built binary and diffed to confirm the *only* delta in every case is the newly-echoed
+line text, never a change to any command's own output. Batch execution of a script file is
+unaffected — design.md §6.3 is scoped to "Interactive Mode," and `Run_REPL` is the sole call site
+touched.
+
+**Alternatives rejected:** narrowing design.md's claim to describe tty-only reliance instead of
+implementing the echo — rejected because sdata's REPL explicitly and deliberately supports
+non-tty piped invocation (the `repl-test-coverage` workstream's entire `.repl` test family exists
+because of this), so a piped session's transcript being unreadable is a real usability gap, not
+just a doc inaccuracy to soften. Buffering and echoing the fully-assembled statement instead of
+each physical line — rejected as not matching real terminal echo (which shows each line as typed)
+and as needlessly diverging from the already-correct per-line prompt pairing.

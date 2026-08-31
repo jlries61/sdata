@@ -129,6 +129,17 @@ procedure SData_Main is
          Ada.Text_IO.Flush;
          begin
             Ada.Text_IO.Unbounded_IO.Get_Line (Line);
+
+            --  Statement Echo (design.md §6.3): echo the raw input line back
+            --  unconditionally -- not gated by Quiet_Mode/Local_Echo -- so a
+            --  piped/non-tty session shows the same transcript a real
+            --  terminal's own canonical-mode echo would produce.  Placed
+            --  before Append/Parse_Program so it fires even if this line
+            --  turns out to be part of a statement that never successfully
+            --  parses; design.md's "even if console output is disabled"
+            --  wording carries no carve-out for that case (see ADR-061).
+            Ada.Text_IO.Unbounded_IO.Put_Line (Line);
+
             Append (Buffer, Line & ASCII.LF);
 
             Initialize (Ctx, To_String (Buffer));

@@ -1,7 +1,15 @@
-sdata> sdata> sdata> Generating mock data...
-sdata> sdata> sdata> Error: UNSET cannot remove "SUMVAL": it is a permanent variable; use DROP "SUMVAL" (effective after the next RUN) to remove it
-sdata> sdata> 1.00000
+sdata> -- REPL parity companion to unset_held_error.cmd.
+sdata> NEW
+sdata> USE MOCK
+Generating mock data...
+sdata> HOLD SUMVAL
+sdata> LET SUMVAL = 1
+sdata> UNSET SUMVAL
+Error: UNSET cannot remove "SUMVAL": it is a permanent variable; use DROP "SUMVAL" (effective after the next RUN) to remove it
+sdata> PRINT SUMVAL
+sdata> RUN
+1.00000
 1.00000
 1.00000
 RUN complete. 3 records and 4 variables processed.
-sdata> 
+sdata> QUIT

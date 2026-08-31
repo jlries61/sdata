@@ -1,4 +1,12 @@
-sdata> sdata> sdata> sdata> sdata> sdata> RUN complete. 1 records and 0 variables processed.
-sdata> Error: Expected expression after operator at line 1
-sdata> 7.00000
-sdata> 
+sdata> -- ADR-060: a parse error typed interactively must cleanly reset the REPL
+sdata> -- session (matching Run_REPL's existing Script_Error handler), not crash
+sdata> -- the session and not silently execute the malformed statement. The
+sdata> -- session must still work normally afterward.
+sdata> SET X = 7
+sdata> RUN
+RUN complete. 1 records and 0 variables processed.
+sdata> LET Y = 1 +
+Error: Expected expression after operator at line 1
+sdata> NOTE X
+7.00000
+sdata> QUIT
