@@ -1631,14 +1631,26 @@ been a mistake: it is the root of a separate, already-deferred finding (PE-4, `-
 `ECHO ON` can countermand it — false, since neither `Local_Echo` nor `Quiet_Mode` has ever gated
 input text).
 
-**Consequences:** sdata-only (`src/sdata_main.adb`; `Run_REPL` is sdata-only per ADR-040) — no
-sdata-core or data-vandal change. Every existing `.repl`-marked integration test (17, found via
-`find tests -name '*.repl'`, not assumed from any prior workstream's list) required expected-output
-regeneration, since echoed input is new output appearing in all of them; each was regenerated from
-the freshly built binary and diffed to confirm the *only* delta in every case is the newly-echoed
-line text, never a change to any command's own output. Batch execution of a script file is
-unaffected — design.md §6.3 is scoped to "Interactive Mode," and `Run_REPL` is the sole call site
-touched.
+**Decision — the identical fix also applies to `BREAK`'s debug sub-prompt.** Code review (round 1)
+found a second `Get_Line` call site, `Inspect_PDV` (`src/sdata-interpreter-inspect_pdv.adb`, the
+`BREAK` statement's record-by-record debug prompt), sharing the exact same defect: its own guard
+(`if not SData_Core.IO.Is_Interactive then ... return;`) looks like tty protection but
+`Is_Interactive` reads the same `Interactive_Mode` flag `Run_REPL` sets unconditionally at entry —
+so the debug prompt runs and reads real commands (`CONTINUE`/`STEP`/`RUN`/`PRINT <expr>`/
+`RECORD N`) unechoed under a piped `Run_REPL` session exactly as much as a real tty one, verified
+live. Fixed identically (echo immediately after `Get_Line`), with one adaptation: this prompt
+writes to `Standard_Error`, not `Standard_Output` like `Run_REPL`'s, so its echo does too — the
+echo always matches the stream of the prompt it completes, not a fixed stream.
+
+**Consequences:** sdata-only (`src/sdata_main.adb`, `src/sdata-interpreter-inspect_pdv.adb`; both
+sdata-only per ADR-040) — no sdata-core or data-vandal change. Every existing `.repl`-marked
+integration test (17, found via `find tests -name '*.repl'`, not assumed from any prior
+workstream's list) required expected-output regeneration, since echoed input is new output
+appearing in all of them; each was regenerated from the freshly built binary and diffed to confirm
+the *only* delta in every case is the newly-echoed line text, never a change to any command's own
+output. Batch execution of a script file is unaffected by either site — design.md §6.3 is scoped
+to "Interactive Mode," `Interactive_Mode` is never set in batch mode, and both existing
+batch-mode `BREAK` tests (`break_basic.cmd`, `break_when.cmd`) are confirmed unchanged.
 
 **Alternatives rejected:** narrowing design.md's claim to describe tty-only reliance instead of
 implementing the echo — rejected because sdata's REPL explicitly and deliberately supports
