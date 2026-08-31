@@ -1,3 +1,9 @@
+sdata (0.22.0-1) unstable; urgency=medium
+
+  * Interactive-mode statements (including BREAK's debug prompt) are now echoed to screen under piped/non-tty stdin, per design.md sec6.3 (PE-7, ADR-061).
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 31 Aug 2026 11:15:03 -0700
+
 sdata (0.21.0-1) unstable; urgency=medium
 
   * Parser errors now raise Script_Error instead of printing and continuing (PE-8, ADR-060).
