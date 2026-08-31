@@ -827,7 +827,7 @@ or *ECHO OFF* is in effect.
 
 In interactive mode, declarative commands such as *USE*, *NAMES*, *OUTPUT*, *DIGITS*, and *ECHO* execute immediately upon entry to provide real-time feedback:
 
-- **Prompt:** “*\>”* shall be used as the prompt.
+- **Prompt:** *"sdata> "* shall be used as the prompt for a new statement, and *"..> "* for a continuation line (a statement ending in a comma continues on the next line; see §5.4's Line Continuation note).
 - **Statement Echo:** Statements shall be echoed to screen, even if console output is disabled.
 - **Terminal Handling:** Any applicable terminal settings shall be handled appropriately.
 - **Paging:** If output text would otherwise scroll off the screen, display a page at a time using: - Pager specified at command line, OR - Sensible default for the operating system
