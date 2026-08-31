@@ -2302,6 +2302,12 @@ Expression Types:
 
 #### The interpreter accepts the following command-line options:
 
+General:
+
+- *-h* / *--help*: Print a usage summary and exit.
+- *-v* / *--version*: Print the version string and exit.
+- *--copyright*: Print copyright and license information and exit.
+
 Memory Management:
 
 - *-m* \<*n*\>: Maximum in-memory table size. The unit is cells (rows × columns). 0 means unlimited (all data stays in memory). When the table exceeds this limit the rows are spilled to a temporary SQLite database.
