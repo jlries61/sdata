@@ -173,7 +173,7 @@ Three types of arrays are supported:
 
 - Elements not written to output datasets
 - Remain in memory until deleted or redefined
-- Subject to temporary variable memory limits
+- Subject to the maximum temporary variable count (*-t* / *OPTIONS MAXTEMPMEM*)
 
 #### Virtual Arrays
 
