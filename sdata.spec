@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.20.0
+Version:        0.21.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Aug 31 2026 John L. Ries <john@theyarnbard.com> - 0.21.0-1
+- Parser errors now raise Script_Error instead of printing and continuing (PE-8, ADR-060).
+
 * Sat Aug 29 2026 John L. Ries <john@theyarnbard.com> - 0.20.0-1
 - Add NOTE command: immediate-execution counterpart to PRINT
 
