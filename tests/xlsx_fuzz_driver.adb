@@ -21,6 +21,7 @@
 
 with Ada.Command_Line;
 with SData_Core.Config;
+with SData_Core.IO;
 with SData_Core.Table;
 with SData_Core.File_IO.OOXML;
 
@@ -31,7 +32,7 @@ begin
       return;
    end if;
 
-   SData_Core.Config.Quiet_Mode := True;
+   SData_Core.IO.Set_Local_Echo (False);
    SData_Core.Table.Clear;
 
    begin

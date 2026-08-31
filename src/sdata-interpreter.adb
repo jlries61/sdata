@@ -2042,7 +2042,7 @@ package body SData.Interpreter is
                         Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
                         Charset         => Eff_Charset,
                         Decimals        => Eff_Decimals);
-                     if not SData_Core.Config.Quiet_Mode then
+                     if Is_Local_Echo then
                         Put_Line ("Dataset saved: " & Full);
                      end if;
                   exception
@@ -2129,7 +2129,7 @@ package body SData.Interpreter is
                       & " records, "
                       & VC (VC'First + 1 .. VC'Last)
                       & " variables", 1);
-         if not SData_Core.Config.Quiet_Mode then
+         if Is_Local_Echo then
             Put_Line ("RUN complete. " &
                       RC (RC'First + 1 .. RC'Last) & " records and " &
                       VC (VC'First + 1 .. VC'Last) & " variables processed.");

@@ -12,6 +12,7 @@ with Ada.Command_Line;
 with Ada.Exceptions;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with SData_Core.Config;
+with SData_Core.IO;
 with SData_Core.Table;           use SData_Core.Table;
 with SData_Core.Values;          use SData_Core.Values;
 with SData_Core.File_IO;
@@ -75,7 +76,7 @@ procedure File_IO_Unit_Test is
    V : Value;
 
 begin
-   SData_Core.Config.Quiet_Mode := True;
+   SData_Core.IO.Set_Local_Echo (False);
 
    ---------------------------------------------------------------------------
    --  Parse_CSV tests  (PC-01 .. PC-24)
