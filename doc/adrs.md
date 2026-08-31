@@ -1504,3 +1504,87 @@ loop iterations the way `ECHO`'s/`DIGITS`'s own state does, but the user judged 
 `HELP`/`NAMES`-like one-shot semantics preferable. A bare `NOTE` printing all temporary variables
 (mirroring `PRINT`'s own bare-argument behavior for permanent variables) — rejected by explicit
 user decision in favor of requiring at least one argument.
+
+### ADR-060: Parser errors raise Script_Error instead of printing and silently continuing
+
+**Date:** 2026-08-29 | **Status:** Accepted
+
+**Context:** Design-vs-implementation re-audit finding PE-8
+(`.ssd/audits/2026-08-13-design-vs-implementation/part-e-io-operators-implementation-notes.md`)
+sampled one parser error site (`sdata-parser.adb:562`, "Expected expression after operator") and
+found that after printing the error, the script silently continues and exits 0. Investigating that
+one site found the root cause is architectural, not local: `Parse_Program`'s loop (`exit when
+New_Stmt = null`) cannot distinguish `Parse_Statement` returning `null` because parsing legitimately
+reached the end of the program from returning `null` because a parse error occurred somewhere and
+was already printed via `Put_Line_Error`. Either way, `Parse_Program` stops and hands back whatever
+was successfully parsed *before* the problem, and the caller executes that truncated program as if
+it were complete. `grep -c Put_Line_Error src/parser/sdata-parser.adb` found **~60** call sites
+sharing this exact shape, every one printing a message beginning `"Error: ..."` (confirmed none are
+legitimate non-fatal warnings) — confirmed empirically to be systemic, not confined to the one
+audited line, via a second, unrelated repro (`USE MOCK` / `BOGUSCOMMAND` / `RUN` prints "Unrecognized
+command" yet still runs `USE MOCK` and exits 0). A handful of sites don't even return `null` on
+error — they print the message and then return a partially-built, wrong node as if parsing
+succeeded (e.g. `Parse_Primary`'s two unclosed-delimiter cases). A partial, never-fully-wired
+mitigation already existed in `Parse_USE_Stmt`/`Parse_SAVE_Stmt`: a local `Had_Error` flag, set at 9
+of their own error sites, but it only short-circuits that function's own later logic (forcing
+`Stmt.Mode := MM_Single`) — it never reached `Parse_Program`, so a malformed `USE`/`SAVE` spec still
+silently "succeeded" with a degraded statement.
+
+**Decision.** Every one of the ~60 parser error sites now `raise Script_Error with "<message>"`
+(the exact existing message text, plus location info — see Mechanism below) instead of printing via
+`Put_Line_Error` and falling through / returning `null` / returning a wrong node. This is not a new
+mechanism: it makes the parser use the *same* propagation path every other error class in this
+codebase already relies on — `sdata_main.adb`'s batch driver and `Run_REPL` both already catch
+`SData.Script_Error | SData_Core.Script_Error | ...` at the top level and print `Error: <message>`
+with a non-zero exit (batch) or a clean input-buffer reset (REPL). Zero changes were needed to
+either handler.
+
+**Decision — remove the `Had_Error` flag mechanism and other now-dead "keep parsing anyway"
+recovery code, don't leave it in place.** Once every one of `Had_Error`'s 9 assignment sites raises
+immediately instead, a downstream `if Had_Error then` check can never observe `True` — the raise has
+already unwound past it — so the variable and both of its later conditional blocks in
+`Parse_USE_Stmt`/`Parse_SAVE_Stmt` are provably dead and were deleted, not left as inert
+bookkeeping. Likewise the `/DECIMALS=` negative-integer case's explicit two-token skip
+(`sdata-parser.adb:936-943` pre-fix), which existed only to let the option-list loop keep going
+after a bad value, was deleted along with the recovery it served.
+
+**Decision — add location info to every converted site.** The audit's own finding named the missing
+`Tok.Line` at the one sampled site as part of the same complaint as the silent-continue behavior.
+Every one of the ~60 sites already had a `constant Token` in scope whose `.Line` is the correct one
+to cite (no new plumbing needed anywhere), so all of them gained an `" at line" & <token>.Line'Image`
+suffix, matching the existing "Unrecognized command ... at line N" message's own phrasing exactly.
+
+**Decision — accept a bounded, session-scoped memory leak in REPL mode; do not attempt a broader AST
+ownership refactor.** This codebase's AST nodes are plain Ada `access` types (freed explicitly via
+`Free_Program`/`Free_Expression`), not controlled types — Ada does not automatically deallocate them
+when an exception unwinds past a partially-built expression tree. In batch mode this is
+inconsequential (the process exits immediately after the top-level catch prints the error). In REPL
+mode, a malformed statement's already-allocated sub-expressions leak, bounded by how many malformed
+statements a user types before restarting the session — small in practice, and strictly *smaller*
+in consequence than the bug being fixed (which silently executes wrong or truncated programs, not
+merely leaks memory). A broader RAII-style ownership refactor of the AST to eliminate this leak
+entirely was considered and rejected as substantially larger, riskier, separate work with no
+concrete need behind it yet.
+
+**Consequences:** sdata-only (`src/parser/sdata-parser.adb`; lexer/AST/parser are sdata-only per
+ADR-040) — no sdata-core or data-vandal change. 9 existing tests required expected-output rework,
+identified by direct inspection before the change (not discovered via test failures after the
+fact): `decimals_negative.cmd` and 8 of the 16 `use_merge_err_*.cmd` tests previously encoded the
+*buggy* behavior directly — a parser error message immediately followed by a confusing, unrelated
+second error (`"Error: .CSV: No such file or directory"`) from `Parse_USE_Stmt`'s `Had_Error`-
+triggered `MM_Single` fallback attempting to open a garbled filename built from a partially-parsed
+spec. Under this fix, each of those scripts now fails cleanly at the true point of error, with a
+single, correct message — a strict readability improvement for anyone who hits one of these errors
+for real, not just a bug fix. `use_merge_err_in_col_collision.cmd` and `use_merge_err_by_missing.cmd`
+were confirmed to be genuine *runtime* errors (the dataset is actually opened first), unrelated to
+this change, and were left untouched.
+
+**Alternatives rejected:** a shared `Parser_Error` helper procedure wrapping the raise — rejected in
+favor of individual `raise Script_Error with "..."` at each site, matching this codebase's own
+established idiom for single-site errors elsewhere (`TABLES /ORDER=`, `REPEAT`'s bare-count check,
+this session's own `ECHO` fix) and keeping the diff maximally reviewable site-by-site without a new
+layer of indirection. Fixing only the one originally-audited site (`sdata-parser.adb:562`) — an
+explicit choice offered to and rejected by the project owner in favor of closing the whole ~60-site
+bug class at once, once the shared root cause was found. A broader AST-ownership refactor to
+eliminate the REPL-mode leak entirely — rejected as separate, larger, unjustified-by-need work (see
+Decision above).

@@ -2,7 +2,6 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
-with SData_Core.IO;        use SData_Core.IO;
 with SData_Core.Evaluator; use SData_Core.Evaluator;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
@@ -446,10 +445,11 @@ package body SData.Parser is
                               Next_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                            begin
                               if Next_Tok.Kind /= Closing then
-                                 Put_Line_Error ("Error: Expected closing '" &
+                                 raise Script_Error with "Expected closing '" &
                                     (if Closing = Token_Right_Paren then ")" else "]") &
                                     "' after arguments of """ &
-                                    Identifier_Text (Actual_Tok) & """");
+                                    Identifier_Text (Actual_Tok) & """ at line"
+                                    & Next_Tok.Line'Image;
                               end if;
                            end;
                         end;
@@ -463,9 +463,15 @@ package body SData.Parser is
 
                   when Token_Left_Paren =>
                      Node := Parse_Expression (Ctx);
-                     if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                        Put_Line_Error ("Error: Expected ')' to close parenthesised expression");
-                     end if;
+                     declare
+                        Closer : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     begin
+                        if Closer.Kind /= Token_Right_Paren then
+                           raise Script_Error with
+                              "Expected ')' to close parenthesised expression at line"
+                              & Closer.Line'Image;
+                        end if;
+                     end;
                      return Node;
 
                   when Token_Dot =>
@@ -559,8 +565,8 @@ package body SData.Parser is
                New_Node : Expression_Access;
             begin
                if Right = null then
-                  Put_Line_Error ("Error: Expected expression after operator");
-                  exit;
+                  raise Script_Error with
+                     "Expected expression after operator at line" & Tok.Line'Image;
                end if;
                New_Node := new Expression (Expr_Binary_Op);
                New_Node.Left := Left;
@@ -614,7 +620,9 @@ package body SData.Parser is
                      End_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                   begin
                      if not Is_Identifier_Token (End_Tok) then
-                        Put_Line_Error ("Error: Expected identifier after '" & Sep.Kind'Image & "' in range");
+                        raise Script_Error with
+                           "Expected identifier after '" & Sep.Kind'Image
+                           & "' in range at line" & End_Tok.Line'Image;
                      else
                         Node.Var.Is_Range       := True;
                         Node.Var.Is_Colon_Range := (Sep.Kind = Token_Colon);
@@ -658,13 +666,19 @@ package body SData.Parser is
             Pair.Old_Len := Tok.Length;
             Pair.Old_Name (1 .. Tok.Length) := Identifier_Text (Tok);
 
-            if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-               Put_Line_Error ("Error: Expected '=' in RENAME list");
-            end if;
+            declare
+               Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if Eq_Tok.Kind /= Token_Equal then
+                  raise Script_Error with
+                     "Expected '=' in RENAME list at line" & Eq_Tok.Line'Image;
+               end if;
+            end;
 
             Tok := Get_Next_Token (Ctx.Lex_Ctx);
             if not Is_Identifier_Token (Tok) then
-               Put_Line_Error ("Error: Expected identifier after '=' in RENAME list");
+               raise Script_Error with
+                  "Expected identifier after '=' in RENAME list at line" & Tok.Line'Image;
             end if;
             
             Pair.New_Len := Tok.Length;
@@ -734,64 +748,114 @@ package body SData.Parser is
 
             when Token_KEEP =>
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                  Put_Line_Error ("Error: Expected '=' after KEEP in spec option");
-               end if;
+               declare
+                  Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Eq_Tok.Kind /= Token_Equal then
+                     raise Script_Error with
+                        "Expected '=' after KEEP in spec option at line" & Eq_Tok.Line'Image;
+                  end if;
+               end;
                Opts.Keep_Vars := Parse_Variable_List (Ctx);
 
             when Token_DROP =>
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                  Put_Line_Error ("Error: Expected '=' after DROP in spec option");
-               end if;
+               declare
+                  Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Eq_Tok.Kind /= Token_Equal then
+                     raise Script_Error with
+                        "Expected '=' after DROP in spec option at line" & Eq_Tok.Line'Image;
+                  end if;
+               end;
                Opts.Drop_Vars := Parse_Variable_List (Ctx);
 
             when Token_RENAME =>
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                  Put_Line_Error ("Error: Expected '=' after RENAME in spec option");
-               end if;
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Left_Paren then
-                  Put_Line_Error ("Error: Expected '(' after RENAME= in spec option");
-               end if;
+               declare
+                  Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Eq_Tok.Kind /= Token_Equal then
+                     raise Script_Error with
+                        "Expected '=' after RENAME in spec option at line" & Eq_Tok.Line'Image;
+                  end if;
+               end;
+               declare
+                  LP_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if LP_Tok.Kind /= Token_Left_Paren then
+                     raise Script_Error with
+                        "Expected '(' after RENAME= in spec option at line" & LP_Tok.Line'Image;
+                  end if;
+               end;
                Opts.Rename_Pairs := Parse_Rename_List (Ctx);
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                  Put_Line_Error ("Error: Expected ')' after RENAME pairs in spec option");
-               end if;
+               declare
+                  RP_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if RP_Tok.Kind /= Token_Right_Paren then
+                     raise Script_Error with
+                        "Expected ')' after RENAME pairs in spec option at line"
+                        & RP_Tok.Line'Image;
+                  end if;
+               end;
 
             when Token_IN =>
-               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-               if not Allow_IN then
-                  Put_Line_Error ("Error: IN= not allowed in SAVE spec options");
-               end if;
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                  Put_Line_Error ("Error: Expected '=' after IN in spec option");
-               end if;
+               declare
+                  IN_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if not Allow_IN then
+                     raise Script_Error with
+                        "IN= not allowed in SAVE spec options at line" & IN_Tok.Line'Image;
+                  end if;
+               end;
+               declare
+                  Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Eq_Tok.Kind /= Token_Equal then
+                     raise Script_Error with
+                        "Expected '=' after IN in spec option at line" & Eq_Tok.Line'Image;
+                  end if;
+               end;
                declare
                   Id : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                begin
                   if not Is_Identifier_Token (Id) then
-                     Put_Line_Error ("Error: Expected identifier after IN= in spec option");
+                     raise Script_Error with
+                        "Expected identifier after IN= in spec option at line" & Id.Line'Image;
                   end if;
                   Opts.IN_Name_Len := Id.Length;
                   Opts.IN_Name (1 .. Id.Length) := Identifier_Text (Id);
                end;
 
             when Token_IF =>
-               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-               if not Allow_IF then
-                  Put_Line_Error ("Error: IF= not allowed in USE spec options");
-               end if;
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                  Put_Line_Error ("Error: Expected '=' after IF in spec option");
-               end if;
+               declare
+                  IF_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if not Allow_IF then
+                     raise Script_Error with
+                        "IF= not allowed in USE spec options at line" & IF_Tok.Line'Image;
+                  end if;
+               end;
+               declare
+                  Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Eq_Tok.Kind /= Token_Equal then
+                     raise Script_Error with
+                        "Expected '=' after IF in spec option at line" & Eq_Tok.Line'Image;
+                  end if;
+               end;
                Opts.IF_Expr := Parse_Expression (Ctx);
 
             when Token_HEADER =>
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                  Put_Line_Error ("Error: Expected '=' after HEADER in spec option");
-               end if;
+               declare
+                  Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Eq_Tok.Kind /= Token_Equal then
+                     raise Script_Error with
+                        "Expected '=' after HEADER in spec option at line" & Eq_Tok.Line'Image;
+                  end if;
+               end;
                declare
                   Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                   Val_Str : constant String :=
@@ -803,8 +867,9 @@ package body SData.Parser is
                   elsif Val_Str = "NO" then
                      Opts.Header_Val := False;
                   else
-                     Put_Line_Error ("Error: Invalid HEADER value " & Val_Str
-                                     & " (expected YES or NO)");
+                     raise Script_Error with
+                        "Invalid HEADER value " & Val_Str
+                        & " (expected YES or NO) at line" & Val_Tok.Line'Image;
                   end if;
                end;
 
@@ -816,10 +881,15 @@ package body SData.Parser is
                   Key_Up  : constant String :=
                      To_Upper (Key_Tok.Text (1 .. Key_Tok.Length));
                begin
-                  if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                     Put_Line_Error
-                       ("Error: Expected '=' after " & Key_Up & " in spec option");
-                  end if;
+                  declare
+                     Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if Eq_Tok.Kind /= Token_Equal then
+                        raise Script_Error with
+                           "Expected '=' after " & Key_Up & " in spec option at line"
+                           & Eq_Tok.Line'Image;
+                     end if;
+                  end;
 
                   if Key_Up = "FMT" then
                      declare
@@ -835,9 +905,9 @@ package body SData.Parser is
                         elsif Val_Str = "OOXML" or else Val_Str = "XLSX" then
                            Opts.Fmt_Override := SData_Core.Config.OOXML;
                         else
-                           Put_Line_Error
-                             ("Error: Unknown format """ & Val_Str &
-                              """ in spec option FMT=");
+                           raise Script_Error with
+                              "Unknown format """ & Val_Str &
+                              """ in spec option FMT= at line" & Val_Tok.Line'Image;
                         end if;
                      end;
 
@@ -912,8 +982,9 @@ package body SData.Parser is
                      or else Key_Up = "MAXROWS"
                   then
                      if not Allow_USE_Only then
-                        Put_Line_Error
-                          ("Error: " & Key_Up & "= not allowed in SAVE spec options");
+                        raise Script_Error with
+                           Key_Up & "= not allowed in SAVE spec options at line"
+                           & Key_Tok.Line'Image;
                      end if;
                      declare
                         Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
@@ -934,13 +1005,9 @@ package body SData.Parser is
                         Peek : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
                      begin
                         if Peek.Kind = Token_Minus then
-                           Put_Line_Error
-                             ("Error: /DECIMALS= requires a non-negative integer");
-                           declare
-                              D1 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                              D2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                              pragma Unreferenced (D1, D2);
-                           begin null; end;
+                           raise Script_Error with
+                              "/DECIMALS= requires a non-negative integer at line"
+                              & Peek.Line'Image;
                         else
                            declare
                               Val_Tok : constant Token :=
@@ -951,31 +1018,31 @@ package body SData.Parser is
                               Opts.Decimals_Specified := True;
                            exception
                               when Constraint_Error =>
-                                 Put_Line_Error
-                                   ("Error: /DECIMALS= requires a non-negative integer");
+                                 raise Script_Error with
+                                    "/DECIMALS= requires a non-negative integer at line"
+                                    & Val_Tok.Line'Image;
                            end;
                         end if;
                      end;
 
                   else
-                     Put_Line_Error
-                       ("Error: Unknown spec option """ & Key_Up & """");
+                     raise Script_Error with
+                        "Unknown spec option """ & Key_Up & """ at line" & Key_Tok.Line'Image;
                   end if;
                end;
 
             when Token_EOF | Token_Newline =>
-               Put_Line_Error
-                 ("Error: Unexpected end of input inside spec option list");
-               exit;
+               raise Script_Error with
+                  "Unexpected end of input inside spec option list at line" & Tok.Line'Image;
 
             when others =>
                declare
                   Bad_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                begin
-                  Put_Line_Error
-                    ("Error: Unexpected token """ &
+                  raise Script_Error with
+                     "Unexpected token """ &
                      Bad_Tok.Text (1 .. Bad_Tok.Length) &
-                     """ in spec option list");
+                     """ in spec option list at line" & Bad_Tok.Line'Image;
                end;
 
          end case;
@@ -1094,12 +1161,9 @@ package body SData.Parser is
 
             elsif Flag_Name = "DECIMALS" then
                if Val_Tok.Kind = Token_Minus then
-                  Put_Line_Error
-                    ("Error: /DECIMALS= requires a non-negative integer");
-                  declare
-                     D : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                     pragma Unreferenced (D);
-                  begin null; end;
+                  raise Script_Error with
+                     "/DECIMALS= requires a non-negative integer at line"
+                     & Val_Tok.Line'Image;
                else
                   begin
                      Opts.Decimals_Val :=
@@ -1107,8 +1171,9 @@ package body SData.Parser is
                      Opts.Decimals_Specified := True;
                   exception
                      when Constraint_Error =>
-                        Put_Line_Error
-                          ("Error: /DECIMALS= requires a non-negative integer");
+                        raise Script_Error with
+                           "/DECIMALS= requires a non-negative integer at line"
+                           & Val_Tok.Line'Image;
                   end;
                end if;
 
@@ -1126,9 +1191,9 @@ package body SData.Parser is
                   Opts.NSCAN_Val :=
                      Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
                else
-                  Put_Line_Error
-                    ("Error: NSCAN= not allowed in " & Context_Name &
-                     " slash-options");
+                  raise Script_Error with
+                     "NSCAN= not allowed in " & Context_Name &
+                     " slash-options at line" & Flag_Tok.Line'Image;
                end if;
 
             elsif Flag_Name = "SKIP" then
@@ -1136,9 +1201,9 @@ package body SData.Parser is
                   Opts.Skip_Val :=
                      Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
                else
-                  Put_Line_Error
-                    ("Error: SKIP= not allowed in " & Context_Name &
-                     " slash-options");
+                  raise Script_Error with
+                     "SKIP= not allowed in " & Context_Name &
+                     " slash-options at line" & Flag_Tok.Line'Image;
                end if;
 
             elsif Flag_Name = "MAXROWS" then
@@ -1146,15 +1211,15 @@ package body SData.Parser is
                   Opts.Maxrows_Val :=
                      Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
                else
-                  Put_Line_Error
-                    ("Error: MAXROWS= not allowed in " & Context_Name &
-                     " slash-options");
+                  raise Script_Error with
+                     "MAXROWS= not allowed in " & Context_Name &
+                     " slash-options at line" & Flag_Tok.Line'Image;
                end if;
 
             else
-               Put_Line_Error
-                 ("Error: Unknown " & Context_Name & " option /" &
-                  Flag_Name & "=");
+               raise Script_Error with
+                  "Unknown " & Context_Name & " option /" &
+                  Flag_Name & "= at line" & Flag_Tok.Line'Image;
             end if;
          end;
       end if;
@@ -1245,7 +1310,6 @@ package body SData.Parser is
       Saw_INTERLEAVE : Boolean := False;
       Saw_JOIN       : Boolean := False;
       Saw_APPEND     : Boolean := False;
-      Had_Error      : Boolean := False;
       --  True if the first (and only, for single-dataset) spec had an explicit
       --  "(" ... ")" per-dataset options block.  Used to decide whether legacy
       --  slash-options are permissible (they are only allowed when there is no
@@ -1286,9 +1350,9 @@ package body SData.Parser is
                      pragma Unreferenced (Discard);
                   begin
                      if not Is_Identifier_Token (Alias_Tok) then
-                        Put_Line_Error
-                          ("Error: Expected identifier after AS in USE");
-                        Had_Error := True;
+                        raise Script_Error with
+                           "Expected identifier after AS in USE at line"
+                           & Alias_Tok.Line'Image;
                      else
                         Spec.Alias_Len := Alias_Tok.Length;
                         Spec.Alias (1 .. Alias_Tok.Length) :=
@@ -1332,8 +1396,9 @@ package body SData.Parser is
       if Stmt.Dataset_List.Is_Empty
          and then Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash
       then
-         Put_Line_Error ("Error: USE requires at least one dataset");
-         Had_Error := True;
+         raise Script_Error with
+            "USE requires at least one dataset at line"
+            & Peek_Next_Token (Ctx.Lex_Ctx).Line'Image;
       end if;
 
       --  -----------------------------------------------------------------------
@@ -1360,8 +1425,9 @@ package body SData.Parser is
                      Stmt.By_Vars := Parse_Variable_List (Ctx);
                   end;
                else
-                  Put_Line_Error ("Error: Expected '=' after /BY in USE");
-                  Had_Error := True;
+                  raise Script_Error with
+                     "Expected '=' after /BY in USE at line"
+                     & Peek_Next_Token (Ctx.Lex_Ctx).Line'Image;
                end if;
                Saw_BY := True;
 
@@ -1381,11 +1447,10 @@ package body SData.Parser is
                   N : constant Natural := Natural (Stmt.Dataset_List.Length);
                begin
                   if N /= 1 or else First_Had_Paren_Block then
-                     Put_Line_Error
-                       ("Error: /" & Flag_Name &
+                     raise Script_Error with
+                        "/" & Flag_Name &
                         " is only allowed with a single dataset and" &
-                        " no per-dataset paren options");
-                     Had_Error := True;
+                        " no per-dataset paren options at line" & Flag_Tok.Line'Image;
                   else
                      Apply_Legacy_Slash_Option
                        (Ctx,
@@ -1403,43 +1468,28 @@ package body SData.Parser is
       --  -----------------------------------------------------------------------
       --  Validate mode combinations.
       --  -----------------------------------------------------------------------
-      if not Had_Error then
-         if Saw_APPEND
-            and then (Saw_BY or else Saw_INTERLEAVE or else Saw_JOIN)
-         then
-            Put_Line_Error
-              ("Error: /APPEND cannot be combined with /BY, /INTERLEAVE,"
-               & " or /JOIN");
-            Had_Error := True;
-         elsif Saw_APPEND and then Natural (Stmt.Dataset_List.Length) < 2 then
-            Put_Line_Error
-              ("Error: /APPEND requires multiple datasets in USE");
-            Had_Error := True;
-         elsif Saw_INTERLEAVE and then Saw_JOIN then
-            Put_Line_Error
-              ("Error: /INTERLEAVE and /JOIN cannot both be specified in USE");
-            Had_Error := True;
-         elsif (Saw_INTERLEAVE or else Saw_JOIN) and then not Saw_BY then
-            Put_Line_Error
-              ("Error: /INTERLEAVE and /JOIN require /BY= in USE");
-            Had_Error := True;
-         elsif Natural (Stmt.Dataset_List.Length) = 1
-               and then (Saw_INTERLEAVE or else Saw_JOIN)
-         then
-            Put_Line_Error
-              ("Error: /INTERLEAVE and /JOIN require multiple datasets in USE");
-            Had_Error := True;
-         end if;
+      if Saw_APPEND
+         and then (Saw_BY or else Saw_INTERLEAVE or else Saw_JOIN)
+      then
+         raise Script_Error with
+            "/APPEND cannot be combined with /BY, /INTERLEAVE, or /JOIN";
+      elsif Saw_APPEND and then Natural (Stmt.Dataset_List.Length) < 2 then
+         raise Script_Error with "/APPEND requires multiple datasets in USE";
+      elsif Saw_INTERLEAVE and then Saw_JOIN then
+         raise Script_Error with
+            "/INTERLEAVE and /JOIN cannot both be specified in USE";
+      elsif (Saw_INTERLEAVE or else Saw_JOIN) and then not Saw_BY then
+         raise Script_Error with "/INTERLEAVE and /JOIN require /BY= in USE";
+      elsif Natural (Stmt.Dataset_List.Length) = 1
+            and then (Saw_INTERLEAVE or else Saw_JOIN)
+      then
+         raise Script_Error with
+            "/INTERLEAVE and /JOIN require multiple datasets in USE";
       end if;
 
       --  -----------------------------------------------------------------------
       --  Determine Merge_Mode and populate Stmt fields.
       --  -----------------------------------------------------------------------
-      if Had_Error then
-         Stmt.Mode := MM_Single;
-         return;
-      end if;
-
       if Natural (Stmt.Dataset_List.Length) <= 1 then
          --  Single-dataset (or zero-dataset bare USE): legacy path.
          Stmt.Mode := MM_Single;
@@ -1569,7 +1619,6 @@ package body SData.Parser is
       --  -----------------------------------------------------------------------
       --  State
       --  -----------------------------------------------------------------------
-      Had_Error             : Boolean := False;
       --  True if the first (and only, for single-target) spec had an explicit
       --  "(" ... ")" per-target options block.  Used to decide whether legacy
       --  slash-options are permissible.
@@ -1608,9 +1657,9 @@ package body SData.Parser is
                      pragma Unreferenced (Discard);
                   begin
                      if not Is_Identifier_Token (Alias_Tok) then
-                        Put_Line_Error
-                          ("Error: Expected identifier after AS in SAVE");
-                        Had_Error := True;
+                        raise Script_Error with
+                           "Expected identifier after AS in SAVE at line"
+                           & Alias_Tok.Line'Image;
                      else
                         Spec.Alias_Len := Alias_Tok.Length;
                         Spec.Alias (1 .. Alias_Tok.Length) :=
@@ -1667,11 +1716,10 @@ package body SData.Parser is
                N : constant Natural := Natural (Stmt.Save_List.Length);
             begin
                if N /= 1 or else First_Had_Paren_Block then
-                  Put_Line_Error
-                    ("Error: /" & Flag_Name &
+                  raise Script_Error with
+                     "/" & Flag_Name &
                      " is only allowed with a single target and" &
-                     " no per-target paren options");
-                  Had_Error := True;
+                     " no per-target paren options at line" & Flag_Tok.Line'Image;
                else
                   Apply_Legacy_Slash_Option
                     (Ctx,
@@ -1690,7 +1738,7 @@ package body SData.Parser is
       --  Also populate legacy fields even for multi-target so downstream code
       --  that only reads Stmt.File_Path for single-target continues to work.
       --  -----------------------------------------------------------------------
-      if not Had_Error and then not Stmt.Save_List.Is_Empty then
+      if not Stmt.Save_List.Is_Empty then
          if Natural (Stmt.Save_List.Length) = 1 then
             --  Single-target: copy Spec fields into legacy Stmt fields.
             declare
@@ -2299,17 +2347,29 @@ package body SData.Parser is
                         --  Single-index form (existing behaviour)
                         A_Idx := First;
                      end if;
-                     if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Closing then
-                        Put_Line_Error ("Error: Expected matching closing parenthesis/brace in array assignment");
-                     end if;
+                     declare
+                        Closer : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     begin
+                        if Closer.Kind /= Closing then
+                           raise Script_Error with
+                              "Expected matching closing parenthesis/brace in array"
+                              & " assignment at line" & Closer.Line'Image;
+                        end if;
+                     end;
                   end;
                end if;
 
-               if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
-                  Put_Line_Error ("Error: Expected '=' after variable name """ &
-                     Identifier_Text (Var_Tok) & """ in " &
-                     (if Tok.Kind = Token_LET then "LET" else "SET") & " statement");
-               end if;
+               declare
+                  Eq_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Eq_Tok.Kind /= Token_Equal then
+                     raise Script_Error with
+                        "Expected '=' after variable name """ &
+                        Identifier_Text (Var_Tok) & """ in " &
+                        (if Tok.Kind = Token_LET then "LET" else "SET") &
+                        " statement at line" & Eq_Tok.Line'Image;
+                  end if;
+               end;
 
                Stmt := new Statement ((if Tok.Kind = Token_LET then Stmt_LET else Stmt_SET));
                Stmt.Var_Len      := Var_Tok.Length;
@@ -2629,8 +2689,9 @@ package body SData.Parser is
                   if To_Upper (Arg_Tok.Text (1 .. Arg_Tok.Length)) = "ALL" then
                      Stmt.All_Flag := True;
                   else
-                     Put_Line_Error
-                        ("Error: Expected ALL after '/' in UNSET statement");
+                     raise Script_Error with
+                        "Expected ALL after '/' in UNSET statement at line"
+                        & Arg_Tok.Line'Image;
                   end if;
                end;
             else
@@ -2671,14 +2732,15 @@ package body SData.Parser is
                         Tok_LP : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      begin
                         if Tok_LP.Kind /= Token_Left_Paren then
-                           Put_Line_Error ("Error: Expected '(' after DIM array name");
-                           return null;
+                           raise Script_Error with
+                              "Expected '(' after DIM array name at line" & Tok_LP.Line'Image;
                         end if;
 
                         Stmt.Arr_Start_Expr := Parse_Expression (Ctx);
                         if Stmt.Arr_Start_Expr = null then
-                           Put_Line_Error ("Error: Expected bound expression in DIM");
-                           return null;
+                           raise Script_Error with
+                              "Expected bound expression in DIM at line"
+                              & Peek_Next_Token (Ctx.Lex_Ctx).Line'Image;
                         end if;
 
                         declare
@@ -2687,13 +2749,19 @@ package body SData.Parser is
                            if Tok_Next.Kind = Token_TO then
                               Stmt.Arr_End_Expr := Parse_Expression (Ctx);
                               if Stmt.Arr_End_Expr = null then
-                                 Put_Line_Error ("Error: Expected upper bound expression after TO");
-                                 return null;
+                                 raise Script_Error with
+                                    "Expected upper bound expression after TO at line"
+                                    & Peek_Next_Token (Ctx.Lex_Ctx).Line'Image;
                               end if;
-                              if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                                 Put_Line_Error ("Error: Expected ')' after DIM bounds");
-                                 return null;
-                              end if;
+                              declare
+                                 Closer : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              begin
+                                 if Closer.Kind /= Token_Right_Paren then
+                                    raise Script_Error with
+                                       "Expected ')' after DIM bounds at line"
+                                       & Closer.Line'Image;
+                                 end if;
+                              end;
                            elsif Tok_Next.Kind = Token_Right_Paren then
                               Stmt.Arr_End_Expr := Stmt.Arr_Start_Expr;
                               Stmt.Arr_Start_Expr := new Expression (Expr_Numeric_Literal);
@@ -2701,8 +2769,8 @@ package body SData.Parser is
                               Stmt.Arr_Start_Expr.Is_Integer := True;
                               Stmt.Arr_Start_Expr.Int_Value  := 1;
                            else
-                              Put_Line_Error ("Error: Expected TO or ')' in DIM bounds");
-                              return null;
+                              raise Script_Error with
+                                 "Expected TO or ')' in DIM bounds at line" & Tok_Next.Line'Image;
                            end if;
                         end;
                      end;
@@ -2715,8 +2783,9 @@ package body SData.Parser is
                            if Tok_Temp.Length >= 4 and then To_Upper (Tok_Temp.Text (1 .. 4)) = "TEMP" then
                               Stmt.Is_Temporary_Dim := True;
                            else
-                              Put_Line_Error ("Error: Expected TEMP after / in DIM statement");
-                              return null;
+                              raise Script_Error with
+                                 "Expected TEMP after / in DIM statement at line"
+                                 & Tok_Temp.Line'Image;
                            end if;
                         end;
                      end if;
@@ -2751,7 +2820,8 @@ package body SData.Parser is
                      Flag_Tok      : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                   begin
                      if Flag_Tok.Kind /= Token_ALL then
-                        Put_Line_Error ("Error: Expected ALL after SELECT /");
+                        raise Script_Error with
+                           "Expected ALL after SELECT / at line" & Flag_Tok.Line'Image;
                      end if;
                   end;
                   Stmt := new Statement (Stmt_SELECT_FILTER);
@@ -2832,9 +2902,15 @@ package body SData.Parser is
                            end;
 
                            if LP then
-                              if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
-                                 Put_Line_Error ("Error: Expected ')' after CASE conditions");
-                              end if;
+                              declare
+                                 Closer : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                              begin
+                                 if Closer.Kind /= Token_Right_Paren then
+                                    raise Script_Error with
+                                       "Expected ')' after CASE conditions at line"
+                                       & Closer.Line'Image;
+                                 end if;
+                              end;
                            end if;
 
                            Branch.Branch_Body := Parse_Select_Body (Ctx);
@@ -2857,9 +2933,14 @@ package body SData.Parser is
                      end loop;
                   end loop;
 
-                  if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_END then
-                     Put_Line_Error ("Error: Expected END after SELECT");
-                  end if;
+                  declare
+                     End_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     if End_Tok.Kind /= Token_END then
+                        raise Script_Error with
+                           "Expected END after SELECT at line" & End_Tok.Line'Image;
+                     end if;
+                  end;
                   if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_SELECT then
                      declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                   end if;
@@ -3268,8 +3349,9 @@ package body SData.Parser is
                      if To_Upper (Arg_Tok.Text (1 .. Arg_Tok.Length)) = "PROGRAM" then
                         Stmt.Program_Only := True;
                      else
-                        Put_Line_Error
-                           ("Error: Expected PROGRAM after '/' in NEW statement");
+                        raise Script_Error with
+                           "Expected PROGRAM after '/' in NEW statement at line"
+                           & Arg_Tok.Line'Image;
                      end if;
                   end;
                end if;
@@ -3290,9 +3372,9 @@ package body SData.Parser is
             return null;
 
          when others =>
-            Put_Line_Error ("Error: Unrecognized command """ & Tok.Text (1 .. Tok.Length) &
-               """ at line " & Tok.Line'Image & " — type HELP for a list of commands");
-            return null;
+            raise Script_Error with
+               "Unrecognized command """ & Tok.Text (1 .. Tok.Length) &
+               """ at line " & Tok.Line'Image & " — type HELP for a list of commands";
       end case;
 
       if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon or else Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline then
