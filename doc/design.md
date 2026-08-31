@@ -2292,11 +2292,9 @@ Expression Types:
 
 ### 8.1 Usage
 
-*sdata* \[*-q -u\<filename\>* \[*--infmt=*\<csv\|odf\|ooxml\>\]\] \[*-s\<filename\>* \\
+*sdata* \[*options*\] *\[filename\]*
 
-\[*--outfmt=*\<csv\|odf\|ooxml\>\]\] \[*-o \<filename\>*\] \[*-m*\<n\>**\]** \[*--clen=*\<n\>\] \\
-
-\[*--noshell*\] *\[filename\]*
+See §8.11 below for the full list of options.
 
 #### 8.11 Command-Line Options
 
