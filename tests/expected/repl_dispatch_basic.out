@@ -1,6 +1,16 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> RUN complete. 3 records and 2 variables processed.
-sdata> sdata> 1.00000 2.00000
+sdata> -- Issue #69: no test coverage exercises Run_REPL at all. This is the basic
+sdata> -- sanity case -- immediate (REPEAT, RUN), deferred (LET, PRINT), and RUN
+sdata> -- dispatch all correctly through the REPL's own dispatch loop, not batch's
+sdata> -- Execute.
+sdata> REPEAT 3
+sdata> LET X = RECNO
+sdata> LET Y = X * 2
+sdata> RUN
+RUN complete. 3 records and 2 variables processed.
+sdata> PRINT X Y
+sdata> RUN
+1.00000 2.00000
 2.00000 4.00000
 3.00000 6.00000
 RUN complete. 3 records and 2 variables processed.
-sdata> 
+sdata> QUIT

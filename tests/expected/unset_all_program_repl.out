@@ -1,4 +1,18 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> Generating mock data...
-sdata> sdata> sdata> RUN complete. 3 records and 3 variables processed.
-sdata> sdata> sdata> sdata> Error: undefined variable "A"
-sdata> 
+sdata> -- REPL parity for UNSET /ALL: without NEW /PROGRAM first, the still-queued
+sdata> -- SET A=1/SET B=2 would replay on this second RUN (REPL's Active_Program_Vec
+sdata> -- persists across RUN -- see RUN's row in design.md) and silently resurrect
+sdata> -- A right after UNSET /ALL removed it. NEW /PROGRAM discards the queued
+sdata> -- program first, giving REPL the same result as batch.
+sdata> NEW
+sdata> USE MOCK
+Generating mock data...
+sdata> SET A = 1
+sdata> SET B = 2
+sdata> RUN
+RUN complete. 3 records and 3 variables processed.
+sdata> NEW /PROGRAM
+sdata> UNSET /ALL
+sdata> PRINT A
+sdata> RUN
+Error: undefined variable "A"
+sdata> QUIT

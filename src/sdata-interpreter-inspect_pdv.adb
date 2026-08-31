@@ -39,6 +39,16 @@ begin
       begin
          Ada.Text_IO.Put (Ada.Text_IO.Standard_Error, Prompt);
          Ada.Text_IO.Unbounded_IO.Get_Line (Line);
+
+         --  Statement Echo (design.md §6.3, ADR-061): same requirement as
+         --  Run_REPL's top-level prompt -- this debug sub-prompt is reached
+         --  only while Interactive_Mode is True (see the guard above), which
+         --  holds for a piped/non-tty Run_REPL session exactly as much as a
+         --  real tty one, so it needs the identical unconditional echo.
+         --  Written to Standard_Error to match this prompt's own stream
+         --  (unlike Run_REPL's, which is Standard_Output).
+         Ada.Text_IO.Unbounded_IO.Put_Line (Ada.Text_IO.Standard_Error, Line);
+
          declare
             S     : constant String :=
                Ada.Strings.Fixed.Trim

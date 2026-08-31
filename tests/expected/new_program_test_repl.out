@@ -1,7 +1,15 @@
-sdata> sdata> Generating mock data...
-sdata> sdata> RUN complete. 3 records and 3 variables processed.
-sdata> sdata> sdata> sdata> 1.00000
+sdata> -- REPL parity companion to new_program_test.cmd.
+sdata> USE MOCK
+Generating mock data...
+sdata> SET X = 1
+sdata> RUN
+RUN complete. 3 records and 3 variables processed.
+sdata> SET STALE = 99
+sdata> NEW /PROGRAM
+sdata> PRINT X
+sdata> RUN
+1.00000
 1.00000
 1.00000
 RUN complete. 3 records and 3 variables processed.
-sdata> 
+sdata> QUIT

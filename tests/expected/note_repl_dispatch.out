@@ -1,3 +1,12 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> RUN complete. 1 records and 0 variables processed.
-sdata> 7.00000
-sdata> 
+sdata> -- NOTE (ADR-059): direct regression guard for the REPL dispatch trap this
+sdata> -- session's own history shows is easy to get wrong (issue #68 / PB-11) --
+sdata> -- a bare NOTE must fire immediately when typed interactively, not be
+sdata> -- silently queued as if Deferred. Batch mode's own dispatch logic (an
+sdata> -- exclusion list, not an inclusion list) would not have caught this class
+sdata> -- of bug; only a real REPL-mode test does.
+sdata> SET X = 7
+sdata> RUN
+RUN complete. 1 records and 0 variables processed.
+sdata> NOTE X
+7.00000
+sdata> QUIT

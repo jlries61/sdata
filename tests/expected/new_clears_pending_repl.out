@@ -1,3 +1,10 @@
-sdata> sdata> sdata> Generating mock data...
-sdata> sdata> sdata> sdata> Error: undefined variable "LEFTOVER"
-sdata> 
+sdata> -- REPL parity companion to new_clears_pending.cmd: batch's Stmt_NEW fix
+sdata> -- should now match REPL's already-correct Clear_Active_Program behavior.
+sdata> USE MOCK
+Generating mock data...
+sdata> SET LEFTOVER = 1
+sdata> NEW
+sdata> PRINT LEFTOVER
+sdata> RUN
+Error: undefined variable "LEFTOVER"
+sdata> QUIT

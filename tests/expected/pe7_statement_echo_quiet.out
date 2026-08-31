@@ -1,0 +1,10 @@
+sdata> -- PE-7 (design.md sec6.3, ADR-061, -q variant): interactive-mode statements must be
+sdata> -- echoed to screen even under piped/non-tty stdin, where the terminal's own
+sdata> -- canonical-mode echo does not apply. This is the audit's own repro
+sdata> -- (part-e-io-operators-implementation-notes.md), pinned as a direct
+sdata> -- regression guard.
+sdata> USE MOCK
+sdata> LET Z = 5
+sdata> PRINT Z
+sdata> RUN
+sdata> QUIT

@@ -236,7 +236,7 @@ is itself a finding (see Hard Truth).
 
 | Suite | Count |
 |---|---|
-| Integration `.cmd` | **474** |
+| Integration `.cmd` | **477** |
 | `csv_unit_test` | 71 |
 | `sdata_unit_test` (Table/Variables/PDV/transient/merge) | 380 |
 | `evaluator_unit_test` | 225 |
@@ -245,7 +245,7 @@ is itself a finding (see Hard Truth).
 | **Unit total** | **881** |
 
 Counts synced 2026-07-30 from `make check` (the source of truth), alongside the
-EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 474
+EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 477
 integration tests + a fuzz-corpus regression on push and PR. data-vandal
 carries its own 149 integration tests (run manually / its own CI); sdata-core
 carries 392 in-crate assertions across 9 drivers.
@@ -279,7 +279,7 @@ structure, not a removal of the split friction.
 
 ### 4.3 Decision Records — excellent
 
-57 ADRs (ADR-001…057), 27 design specs, 36 implementation plans. ADRs 039–043
+61 ADRs (ADR-001…061), 27 design specs, 36 implementation plans. ADRs 039–043
 document the split rationale/boundary/consequences in depth; ADRs 046–049 cover
 the AGGREGATE/TRANSPOSE/STATS/TABLES commands. `scripts/bump-version.sh` updates
 9 files atomically.

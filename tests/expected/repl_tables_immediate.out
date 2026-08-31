@@ -1,5 +1,15 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> Dataset opened: tests/data/freq_select.csv
-sdata> Frequency table for PRODUCT$
+sdata> -- Issue #69's motivating case: a direct regression guard reproducing the
+sdata> -- shape of issue #68 (Stmt_TABLES missing from Is_Immediate caused the REPL
+sdata> -- to silently queue a bare TABLES statement as if deferred, instead of
+sdata> -- running it immediately). TABLES must produce output right after being
+sdata> -- typed, with no RUN in between -- if Is_Immediate ever regresses for
+sdata> -- TABLES (or any other Immediate-tier statement) again, QUIT would exit
+sdata> -- with no TABLES output at all and this test would fail loudly instead of
+sdata> -- silently, exactly the gap #69 reports make check cannot currently catch.
+sdata> USE "tests/data/freq_select.csv"
+Dataset opened: tests/data/freq_select.csv
+sdata> TABLES PRODUCT$
+Frequency table for PRODUCT$
 
 PRODUCT$ Frequency Percent Cum_Freq Cum_Percent
 A 3 50.00 3 50.00
@@ -7,4 +17,4 @@ B 3 50.00 6 100.00
 Total 6 100.00
 
 TABLES complete.
-sdata> 
+sdata> QUIT

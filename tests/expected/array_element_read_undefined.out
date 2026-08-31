@@ -1,3 +1,10 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> Error: Array 'V' not defined.
+sdata> -- PC-1: Get_Array_Element must raise on a reference to an array that is no
+sdata> -- longer defined. Needs REPL (piped stdin) to reach it -- batch mode parses
+sdata> -- V(2) before ARRAY V A B C runs, so it's a harmless missing function call.
+sdata> ARRAY V A B C
+sdata> PRINT V(2)
+sdata> ARRAY V
+sdata> RUN
+Error: Array 'V' not defined.
 RUN complete. 1 records and 0 variables processed.
-sdata> 
+sdata> QUIT

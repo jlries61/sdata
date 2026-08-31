@@ -1,13 +1,24 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> Dataset opened: tests/data/freq_select.csv
-sdata> Error: TABLES: unknown variable 'NOPE$'
-sdata> sdata> still alive
+sdata> -- Issue #69: a script error raised by an Immediate-tier command mid-session
+sdata> -- must not crash Run_REPL or leave it stuck -- the buffer resets and the
+sdata> -- REPL keeps accepting input afterward. TABLES on an unknown crossing
+sdata> -- variable errors immediately; the subsequent PRINT/RUN/TABLES sequence
+sdata> -- proves the REPL's own exception handler (not batch's Execute) recovered
+sdata> -- cleanly and state (Pending_Deferred etc.) is still consistent.
+sdata> USE "tests/data/freq_select.csv"
+Dataset opened: tests/data/freq_select.csv
+sdata> TABLES NOPE$
+Error: TABLES: unknown variable 'NOPE$'
+sdata> PRINT "still alive"
+sdata> RUN
+still alive
 still alive
 still alive
 still alive
 still alive
 still alive
 RUN complete. 6 records and 3 variables processed.
-sdata> Frequency table for PRODUCT$
+sdata> TABLES PRODUCT$
+Frequency table for PRODUCT$
 
 PRODUCT$ Frequency Percent Cum_Freq Cum_Percent
 A 3 50.00 3 50.00
@@ -15,4 +26,4 @@ B 3 50.00 6 100.00
 Total 6 100.00
 
 TABLES complete.
-sdata> 
+sdata> QUIT

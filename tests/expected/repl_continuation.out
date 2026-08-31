@@ -1,4 +1,18 @@
-sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> sdata> RUN complete. 1 records and 3 variables processed.
-sdata> ..> sdata> 1.00000 2.00000 3.00000
+sdata> -- Issue #69: comma-line-continuation buffering is REPL-only logic (batch
+sdata> -- mode reads the whole file at once, so a mid-file trailing comma is never
+sdata> -- distinguished from any other character). "PRINT X Y," ends with a
+sdata> -- trailing comma before a newline, so the lexer swallows the comma+newline
+sdata> -- and the REPL keeps buffering (prompt switches to "..>") until "Z"
+sdata> -- arrives on the next line, completing "PRINT X Y Z" as a single statement.
+sdata> REPEAT 1
+sdata> LET X = 1
+sdata> LET Y = 2
+sdata> LET Z = 3
+sdata> RUN
 RUN complete. 1 records and 3 variables processed.
-sdata> 
+sdata> PRINT X Y,
+..> Z
+sdata> RUN
+1.00000 2.00000 3.00000
+RUN complete. 1 records and 3 variables processed.
+sdata> QUIT
