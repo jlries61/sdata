@@ -287,6 +287,36 @@ hard join cap.
 
 ---
 
+#### D5 — `soffice` subprocess blocking indefinitely during ODF/OOXML conversion *(Mitigated)*
+
+**Threat:** `USE` of a formula-bearing ODF/OOXML file routes through
+`Convert_Via_LibreOffice`, which spawns `soffice --headless --convert-to ...`
+as a subprocess. The same threat shape as D2 (external subprocess spawn during
+ordinary, non-malicious operation, capable of hanging forever) but on a
+different trigger — any `USE` of a spreadsheet file needing formula
+evaluation, not an explicit SYSTEM/SHELL statement. Found as PD-4 in the
+2026-08-13 design-vs-implementation audit: the `Args` array passed to
+`GNAT.OS_Lib.Spawn` never appended `File_Name`, so `soffice` waited on stdin
+(or otherwise never completed as invoked) and `Spawn` blocked synchronously —
+an unbounded hang on ordinary, spec-compliant input.
+
+**Mitigation:** The missing `File_Name` argument was added (the actual
+defect), and a 90-second wall-clock timeout was added as defense-in-depth,
+matching this file's own D2 convention for external subprocess invocation:
+`Convert_Via_LibreOffice`, `sdata_core-file_io-helpers.adb` — `Timeout_Secs`
+constant (90s) gates the call via `Locate_Timeout_Exec`, which prefers the
+system `timeout(1)`/`gtimeout` executable and degrades to an unwrapped call
+(the pre-fix behavior) only if neither is found on `PATH`. Landed
+2026-08-19, `.ssd/features/audit-2026-08-13-tier1-remediation/`, sdata-core
+PR #116 (v0.7.0).
+
+**Residual risk:** On a system with neither `timeout(1)` nor `gtimeout` on
+`PATH`, the wrapper degrades to the unwrapped call and the hang is possible
+again — same trade-off D2 already accepts for its own timeout mechanism.
+Considered acceptable for the single-user CLI context, same as D1/D2/D4.
+
+---
+
 ### 5.6 Elevation of Privilege
 
 #### E1 — SYSTEM / SHELL executing arbitrary OS commands *(Accepted by design)*
