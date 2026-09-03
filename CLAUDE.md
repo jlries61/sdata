@@ -201,6 +201,12 @@ historically been the one most often missed:
 A syntax change that updates only the parser/interpreter, or only one of the three
 references, is incomplete.
 
+**Conflict resolution.** `doc/design.md`, supplemented by the ADRs in `doc/adrs.md`, is the
+single source of truth for language-visible behavior. When HELP, the man page, or this file's
+own summaries (e.g. the execution-tier table above) disagree with `design.md`, treat `design.md`
+as correct and fix the other source — not the reverse — unless a specific ADR has explicitly
+superseded `design.md`'s text.
+
 ## Reference Documents
 
 **Design document** — `doc/design.md`
