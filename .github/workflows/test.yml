@@ -63,6 +63,19 @@ jobs:
         working-directory: sdata
         run: alr exec -- make check-test-counts
 
+      # check-syntax-doc-sync.py diffs against the base commit, but
+      # actions/checkout defaults to a 1-commit shallow clone -- unshallow
+      # first or the diff has no history to work against.
+      - name: Unshallow sdata history for doc-sync diff
+        working-directory: sdata
+        run: git fetch --unshallow || true
+
+      - name: Syntax/doc-sync check
+        working-directory: sdata
+        env:
+          DOC_SYNC_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: make check-syntax-doc-sync
+
       - name: Fuzz corpus regression
         working-directory: sdata
         run: alr exec -- make fuzz-corpus

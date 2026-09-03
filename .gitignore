@@ -114,3 +114,7 @@ tests/data/empty_rt.csv
 # PD-8 / ADR-0021 charset-hardfail SAVE-scratch outputs
 tests/data/charset_ascii_save_out.csv
 tests/data/charset_ascii_save_reject_out.csv
+
+# Python bytecode cache (scripts/*.py)
+__pycache__/
+*.pyc

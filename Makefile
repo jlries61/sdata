@@ -71,7 +71,7 @@ MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 DOC_DIR      = $(DESTDIR)$(DOCDIR)
 
 .PHONY: all build clean run check fuzz-corpus gnatcheck complexity-check check-test-counts \
-        install srpm pkg msi sdata-core-tarball
+        check-syntax-doc-sync install srpm pkg msi sdata-core-tarball
 
 all: build
 
@@ -197,6 +197,14 @@ complexity-check:
 # this reports.
 check-test-counts: build
 	python3 scripts/sync-test-counts.py --check
+
+# Verifies a commit that changes a statement-kind-defining file (AST/
+# parser/lexer) also updates the user-facing doc set (HELP text, man
+# page, design.md) in the same change. See scripts/check-syntax-doc-sync.py
+# and CLAUDE.md's "Keeping the user-facing surface in sync" section. Pure
+# git diff + commit-message check -- no build required.
+check-syntax-doc-sync:
+	python3 scripts/check-syntax-doc-sync.py
 
 fuzz-corpus: build
 	@echo "Running corpus regression (csv_fuzz_driver)..."
