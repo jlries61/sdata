@@ -299,3 +299,17 @@ Doc-Sync: not-applicable -- <reason>
 This is logged, not silently trusted — the trailer is a greppable audit trail for the next
 `/ssd milestone` review, not a merge gate (this repo has no branch protection, so a red CI check
 here is a visibility signal, not a block). Use it honestly.
+
+### Optional: local finding-tracking hook
+
+If you're working through an `.ssd/audits/` finding list, `scripts/install-hooks.sh` installs a
+local `pre-push` hook that warns (never blocks) when a commit you're pushing cites a finding ID
+like `(PA-1)` or `(PB-5..8)` with no matching coverage in `.ssd/features/` or `.ssd/current.yml`.
+This is opt-in and not installed automatically:
+
+```sh
+./scripts/install-hooks.sh
+```
+
+Safe to re-run any time. See `scripts/check-finding-tracking.sh`'s header for what it checks and
+why it's advisory rather than blocking.
