@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.22.0
+Version:        0.23.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Sep 03 2026 John L. Ries <john@theyarnbard.com> - 0.23.0-1
+- ECHO ON now genuinely undoes -q (PE-4, sdata-core ADR-0022): Quiet_Mode retired, Local_Echo is the sole console-output-suppression flag; ODF/OOXML import warnings now print under -q.
+
 * Mon Aug 31 2026 John L. Ries <john@theyarnbard.com> - 0.22.0-1
 - Interactive-mode statements (including BREAK's debug prompt) are now echoed to screen under piped/non-tty stdin, per design.md sec6.3 (PE-7, ADR-061).
 

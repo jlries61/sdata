@@ -1,3 +1,9 @@
+sdata (0.23.0-1) unstable; urgency=medium
+
+  * ECHO ON now genuinely undoes -q (PE-4, sdata-core ADR-0022): Quiet_Mode retired, Local_Echo is the sole console-output-suppression flag; ODF/OOXML import warnings now print under -q.
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 03 Sep 2026 12:11:03 -0700
+
 sdata (0.22.0-1) unstable; urgency=medium
 
   * Interactive-mode statements (including BREAK's debug prompt) are now echoed to screen under piped/non-tty stdin, per design.md sec6.3 (PE-7, ADR-061).
