@@ -213,7 +213,7 @@ procedure Interpreter_Unit_Test is
    end GI_Arr;
 
 begin
-   SData_Core.Config.Quiet_Mode := True;
+   SData_Core.IO.Set_Local_Echo (False);
 
    Put_Line ("=== Interpreter Control Flow Unit Tests ===");
    Put_Line ("");

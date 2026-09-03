@@ -131,7 +131,7 @@ procedure SData_Main is
             Ada.Text_IO.Unbounded_IO.Get_Line (Line);
 
             --  Statement Echo (design.md §6.3): echo the raw input line back
-            --  unconditionally -- not gated by Quiet_Mode/Local_Echo -- so a
+            --  unconditionally -- not gated by Local_Echo -- so a
             --  piped/non-tty session shows the same transcript a real
             --  terminal's own canonical-mode echo would produce.  Placed
             --  before Append/Parse_Program so it fires even if this line
@@ -253,7 +253,7 @@ begin
             Ada.Text_IO.Put_Line (SData.Version.Copyright_Notice);
             return;
          elsif Arg = "-q" then
-            Quiet_Mode := True;
+            Set_Local_Echo (False);
          elsif Arg = "-o" then
             -- Handle output file redirection.
             if Idx < Argument_Count then
