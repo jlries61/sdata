@@ -75,6 +75,18 @@ is_tracked() {
   { [ -f .ssd/current.yml ] && grep -lq -- "$1" .ssd/current.yml 2>/dev/null; }
 }
 
+# Cap on how many members a "lo..hi" range form is allowed to expand to.
+# No real finding-ID block in this project's audit history has ever
+# exceeded 15 (the 2026-08-13 audit's largest, PB-1..14). A far larger
+# span is almost certainly a typo (an extra digit, a transposition), not
+# a real range -- expanding it unboundedly would spawn two grep
+# subprocesses per member and can hang the installed pre-push hook for an
+# unbounded time (reproduced during code review: PB-1..100000 did not
+# finish in 25s). Skip expansion and check the literal range string
+# as-is instead, so a malformed range still gets flagged as untracked
+# rather than silently ignored.
+MAX_RANGE_WIDTH=50
+
 untracked=""
 for id in $ids; do
   # Expand a "PB-5..8" range form into its individual member IDs before
@@ -85,12 +97,27 @@ for id in $ids; do
       prefix=${id%-*}
       lo=${id#*-}; lo=${lo%%.*}
       hi=${id##*..}
-      members=""
-      n=$lo
-      while [ "$n" -le "$hi" ]; do
-        members="$members ${prefix}-${n}"
-        n=$((n + 1))
-      done
+      case "$lo$hi" in *[!0-9]*|'') members=" $id" ;; *)
+        # Strip leading zeros before arithmetic -- $(( )) treats a
+        # leading-zero operand as octal and crashes on an invalid octal
+        # digit (e.g. "08"), which a zero-padded finding ID would trigger
+        # even though `[ -lt ]` handles the same value fine.
+        lo_n=${lo#"${lo%%[!0]*}"}; lo_n=${lo_n:-0}
+        hi_n=${hi#"${hi%%[!0]*}"}; hi_n=${hi_n:-0}
+        if [ "$hi" -lt "$lo" ] || [ $((hi_n - lo_n)) -gt "$MAX_RANGE_WIDTH" ]; then
+          echo "check-finding-tracking: warning: '$id' spans more than" \
+               "$MAX_RANGE_WIDTH IDs or is malformed -- treating as a" \
+               "single opaque ID rather than expanding (likely a typo)" >&2
+          members=" $id"
+        else
+          members=""
+          n=$lo_n
+          while [ "$n" -le "$hi" ]; do
+            members="$members ${prefix}-${n}"
+            n=$((n + 1))
+          done
+        fi
+      ;; esac
       ;;
     *) members=" $id" ;;
   esac

@@ -81,6 +81,20 @@ class EvaluateTests(unittest.TestCase):
         status, _ = evaluate(files, messages)
         self.assertEqual(status, "stale")
 
+    def test_trailer_with_separator_but_no_actual_reason_text_is_stale(self):
+        # Code review MAJOR-1: the separator's own second hyphen must not
+        # satisfy the "must have a real reason" requirement. Both the
+        # exact documented double-hyphen form with nothing after it, and
+        # with only trailing whitespace, must still be treated as having
+        # no valid trailer at all.
+        files = ["src/sdata-ast.ads"]
+        for messages in (
+            "some commit\n\nDoc-Sync: not-applicable --\n",
+            "some commit\n\nDoc-Sync: not-applicable --   \n",
+        ):
+            status, _ = evaluate(files, messages)
+            self.assertEqual(status, "stale", msg=repr(messages))
+
     def test_multiple_trigger_files_any_one_required_file_satisfies(self):
         files = ["src/sdata-ast.ads", "src/parser/sdata-parser.adb", "doc/design.md"]
         status, detail = evaluate(files, "feat: new statement kind\n")

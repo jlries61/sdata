@@ -311,5 +311,6 @@ This is opt-in and not installed automatically:
 ./scripts/install-hooks.sh
 ```
 
-Safe to re-run any time. See `scripts/check-finding-tracking.sh`'s header for what it checks and
-why it's advisory rather than blocking.
+Safe to re-run any time. If you already have a different `pre-push` hook installed, this refuses
+to overwrite it — pass `--force` if you're sure. See `scripts/check-finding-tracking.sh`'s header
+for what it checks and why it's advisory rather than blocking.

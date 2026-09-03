@@ -17,6 +17,17 @@ if [ ! -d "$hooks_dir" ]; then
 fi
 
 pre_push="$hooks_dir/pre-push"
+marker='# Installed by scripts/install-hooks.sh'
+
+if [ -e "$pre_push" ] && ! grep -qF "$marker" "$pre_push" 2>/dev/null; then
+  if [ "${1:-}" != "--force" ]; then
+    echo "install-hooks: $pre_push already exists and wasn't installed by this" >&2
+    echo "  script -- refusing to overwrite it. Back it up or remove it, or" >&2
+    echo "  re-run with --force to overwrite anyway." >&2
+    exit 1
+  fi
+  echo "install-hooks: --force given, overwriting existing $pre_push" >&2
+fi
 
 # Git's pre-push protocol: for each ref being pushed, one line on stdin,
 # "<local ref> <local sha1> <remote ref> <remote sha1>". A local sha1 of

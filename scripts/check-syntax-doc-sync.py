@@ -21,9 +21,10 @@ That's the same honest trade-off scripts/sync-test-counts.py already makes.
 Usage:
     scripts/check-syntax-doc-sync.py
 
-    Diffs $DOC_SYNC_BASE_SHA..$DOC_SYNC_HEAD_SHA (both from the
-    environment, set by CI -- see .github/workflows/test.yml). Locally,
-    with neither set, defaults to HEAD~1..HEAD.
+    Diffs $DOC_SYNC_BASE_SHA..$DOC_SYNC_HEAD_SHA. CI (see
+    .github/workflows/test.yml) sets DOC_SYNC_BASE_SHA only; HEAD_SHA
+    defaults to the literal "HEAD", which is always valid in that context.
+    Locally, with neither set, defaults to HEAD~1..HEAD.
 
 Escape hatch: a commit message trailer of the form
     Doc-Sync: not-applicable -- <reason>
@@ -61,7 +62,12 @@ REQUIRED_SET = [
     "doc/design.md",
 ]
 
-TRAILER_RE = re.compile(r"^Doc-Sync:\s*not-applicable\s*[-—]\s*\S.*$", re.MULTILINE)
+# Requires the literal double-hyphen (or em-dash) separator followed by
+# MANDATORY whitespace before the reason -- not "[-—]\s*\S", which lets
+# the required \S consume the separator's own second hyphen and pass a
+# completely empty reason (e.g. "Doc-Sync: not-applicable --" alone
+# matched under that looser pattern; verified during code review).
+TRAILER_RE = re.compile(r"^Doc-Sync:\s*not-applicable\s*(?:--|—)\s+\S.*$", re.MULTILINE)
 
 
 def git(*args: str) -> str:
@@ -80,15 +86,22 @@ def resolve_range() -> tuple[str, str]:
     if not base or set(base) == {"0"}:
         base = "HEAD~1"
 
-    # A shallow checkout, a base SHA from a history this clone doesn't have
-    # (force-push, fork), or any other resolution failure: fail safe to
-    # HEAD~1 rather than crashing the check outright.
-    check = subprocess.run(["git", "cat-file", "-e", base], cwd=ROOT,
-                            capture_output=True)
-    if check.returncode != 0:
-        print(f"warning: base {base!r} not found in this checkout, "
-              f"falling back to HEAD~1", file=sys.stderr)
-        base = "HEAD~1"
+    # A shallow checkout, a ref this clone doesn't have (force-push, fork),
+    # or any other resolution failure: fail safe rather than crashing the
+    # check outright. head defaults to the always-valid literal "HEAD", but
+    # DOC_SYNC_HEAD_SHA is accepted from the environment for forward
+    # compatibility (unused by CI today -- see module docstring) and gets
+    # the same validation base does, not a free pass.
+    for name, ref, fallback in (("base", base, "HEAD~1"), ("head", head, "HEAD")):
+        check = subprocess.run(["git", "cat-file", "-e", ref], cwd=ROOT,
+                                capture_output=True)
+        if check.returncode != 0:
+            print(f"warning: {name} {ref!r} not found in this checkout, "
+                  f"falling back to {fallback!r}", file=sys.stderr)
+            if name == "base":
+                base = fallback
+            else:
+                head = fallback
 
     return base, head
 
