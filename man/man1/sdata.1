@@ -1216,6 +1216,19 @@ In
 .I batch
 mode all four checks run as a single whole\-block pass immediately before the data
 step; no records are processed if any check fails.
+.PP
+Unknown\-function and arity checking (but not undefined\-variable checking) also
+apply to
+.BR RSEED "'s seed expression, "
+.BR NOTE "'s arguments, "
+.BR DIM "'s array\-bound expressions, and "
+.BR SAVE "'s per\-target " IF=
+option \(em statements evaluated immediately rather than as part of a deferred
+block (ADR\-062).
+.BR SAVE "'s " IF=
+is checked once, when the target is registered, not on every record; a variable
+referenced there may still be defined by a later statement before the first
+record is written.
 .SH FUNCTIONS
 Functions may appear anywhere in an expression.
 Missing\-value propagation is automatic: if any required argument is missing

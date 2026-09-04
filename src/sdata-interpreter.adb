@@ -196,6 +196,16 @@ package body SData.Interpreter is
    procedure Execute_Tables          (Stmt : Statement_Access);
    --  C5: entry-time single-statement checker (body is a separate subunit).
    procedure Analyze_One          (Stmt : Statement_Access);
+   --  ADR-062: unknown-function/arity static checks, reused (not duplicated)
+   --  by RSEED/NOTE/DIM/SAVE's IF= at their own dispatch points -- declared
+   --  here, ahead of the Execute_Note/Execute_Metadata/Execute_Declarative
+   --  subunit stubs below, so those subunits can see them (a subunit only
+   --  has visibility into what is declared before its stub in the parent
+   --  body). Check_Expr and Check_Statement remain mutually recursive with
+   --  Check_Body; their bodies stay where Check_Body already is, this is
+   --  only the forward declaration.
+   procedure Check_Statement (S : Statement_Access; Check_Undefined : Boolean);
+   procedure Check_Expr (E : Expression_Access; Check_Undefined : Boolean);
    function  Group_Flags (Logical_I     : Positive;
                           Logical_Count : Natural)
                           return Group_Flags_Result;
@@ -1239,9 +1249,11 @@ package body SData.Interpreter is
                 when Val_Integer => "integer",
                 when others      => "numeric");
 
-   --  Forward declaration: Check_Statement and Check_Body are mutually
-   --  recursive (compound statements carry nested statement bodies).
-   procedure Check_Statement (S : Statement_Access; Check_Undefined : Boolean);
+   --  Check_Statement's forward declaration now lives with the other
+   --  forward declarations near the top of this package body (ADR-062),
+   --  since Execute_Note/Execute_Metadata/Execute_Declarative need to see
+   --  it too. Check_Body below still relies on it for their mutual
+   --  recursion (compound statements carry nested statement bodies).
 
    --  Validate every statement in a body chain.
    procedure Check_Body (B : Statement_Access; Check_Undefined : Boolean) is
@@ -1399,7 +1411,11 @@ package body SData.Interpreter is
       Check_Expr_List (S.Arr_Idx_List, Check_Undefined);
 
       case S.Kind is
-         when Stmt_PRINT =>
+         when Stmt_PRINT | Stmt_NOTE =>
+            --  ADR-062: NOTE shares Print_Args with PRINT at the AST level
+            --  (ADR-059) but was never added here, so even calling
+            --  Check_Statement on a NOTE statement wouldn't check its
+            --  arguments without this arm covering it too.
             Check_Expr_List (S.Print_Args, Check_Undefined);
          when Stmt_IF =>
             Check_Expr (S.Condition, Check_Undefined);

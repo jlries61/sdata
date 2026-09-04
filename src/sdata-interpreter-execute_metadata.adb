@@ -145,6 +145,12 @@ begin
             end;
          end if;
       when Stmt_DIM =>
+         --  ADR-062/issue #76: unknown-function and arity checking on the
+         --  array-bound expressions, before they're evaluated. Deliberately
+         --  OUTSIDE the declare block below, so the raised error keeps
+         --  Check_Expr's own clean wording rather than getting wrapped by
+         --  that block's "Error defining array ...: " exception handler.
+         Check_Statement (Stmt, Check_Undefined => False);
          declare
             function Eval_Bound (Expr : Expression_Access; Label : String) return Integer is
                V : constant Value := Evaluate (Expr);

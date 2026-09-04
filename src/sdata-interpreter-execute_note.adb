@@ -88,6 +88,14 @@ begin
       raise Script_Error with "NOTE requires at least one argument";
    end if;
 
+   --  ADR-062/issue #76: unknown-function and arity checking, reusing the
+   --  same static analysis PRINT already gets via Analyze_One/
+   --  Analyze_Deferred. Check_Undefined => False: NOTE executes
+   --  immediately and has no whole-block forward-reference model to
+   --  resolve undefined variables against, so only the function-checking
+   --  half fires (matches Analyze_One's own entry-time mode).
+   Check_Statement (Stmt, Check_Undefined => False);
+
    declare
       Current_Arg : Expression_List := Stmt.Print_Args;
    begin

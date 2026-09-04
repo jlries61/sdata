@@ -1,0 +1,10 @@
+Dataset opened: tests/data/merge_a.csv
+Dataset saved: tests/data/save_if_fwd_ref_big.csv
+Dataset saved: tests/data/save_if_fwd_ref_small.csv
+RUN complete. 2 records and 3 variables processed.
+Dataset opened: tests/data/save_if_fwd_ref_big.csv
+2.00000 20.00000
+RUN complete. 1 records and 3 variables processed.
+Dataset opened: tests/data/save_if_fwd_ref_small.csv
+1.00000 10.00000
+RUN complete. 1 records and 3 variables processed.

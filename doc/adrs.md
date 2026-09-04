@@ -1659,3 +1659,102 @@ because of this), so a piped session's transcript being unreadable is a real usa
 just a doc inaccuracy to soften. Buffering and echoing the fully-assembled statement instead of
 each physical line — rejected as not matching real terminal echo (which shows each line as typed)
 and as needlessly diverging from the already-correct per-line prompt pairing.
+
+### ADR-062: Declarative/Immediate-tier expressions get the same unknown-function/arity checking as Deferred, by reusing `Check_Statement` — not by duplicating it
+
+**Date:** 2026-09-03 | **Status:** Accepted
+
+**Context:** [jlries61/sdata#76](https://github.com/jlries61/sdata/issues/76), filed during the
+`note-command` workstream's own code review. `PRINT` (Deferred-tier) gets a clean
+`Error: unknown function 'X'` / arity-mismatch error from `Check_Statement`/`Check_Expr`
+(`sdata-interpreter.adb`) — a static pass that runs once, before `Evaluate` ever executes,
+via `Analyze_One` (entry-time, on every statement queued through `Add_To_Active_Program`) and
+`Analyze_Deferred` (whole-block, immediately before `RUN`). `RSEED`, `NOTE`, and `DIM` evaluate a
+user-supplied expression exactly the same way (`Evaluate`/`Eval_Raw` → `Evaluate_Function`), but
+**never reach `Check_Statement` at all**, because none of them are ever queued through
+`Add_To_Active_Program` — RSEED and DIM are Declarative-tier, NOTE is Immediate-tier, and both
+tiers dispatch straight to execution, bypassing the only two call sites `Check_Statement` has.
+`Evaluate_Function`'s own final dispatch (`sdata_core-evaluator.adb`) silently returns
+`Val_Missing` on an unrecognized name instead of raising, so the gap is invisible rather than
+merely unhelpful: `NOTE BOGUSFUNC(X)` prints `.` (missing), and `RSEED BOGUSFUNC(1)` raises a
+confusing secondary error (`Cannot convert VAL_MISSING to Real`) from trying to use the
+silently-substituted missing value as a seed, never "unknown function."
+
+**Investigation, not assumption, before deciding:**
+
+- Searched every call site of `Evaluate_Function` across all three repos (`sdata-core`, `sdata`,
+  `data-vandal`) — exactly two, both inside `sdata_core-evaluator.adb` itself: the
+  `Expr_Function_Call` AST arm (the direct "user typed `FOO(...)`" path) and the
+  `Expr_Variable`/zero-arg-fallback path, which is pre-gated by `Is_Zero_Arg_Fallback`'s own
+  fixed, always-registered name list. **Neither call site depends on the silent-`Missing`
+  fallback for a legitimate "probe an unknown name" purpose** — the brief's stated risk for
+  Direction (a) does not materialize.
+- Enumerated every Declarative/Immediate-tier statement that evaluates an arbitrary user
+  expression the same unchecked way: **RSEED**'s `Seed_Expr`, **NOTE**'s `Print_Args` (via the
+  `Print_Value_List` helper it shares with `PRINT` — same evaluation code, different upstream
+  checking depending on which statement reached it), and **DIM**'s `Arr_Start_Expr`/`Arr_End_Expr`
+  array-bound expressions. `DISPLAY` (named as a candidate in the issue) takes a `Variable_List`,
+  not an expression — not affected. `SYSTEM` takes a raw file-path string, not an expression — not
+  affected. A fourth site, **`SAVE`'s per-target `IF=` option** (`Should_Write`,
+  `sdata-interpreter.adb`), has the identical unchecked-evaluation shape but is architecturally
+  different — evaluated once *per record* during `WRITE`'s flush, not once per statement —
+  addressed by validating it once, at SAVE-target registration time, not on every record.
+- Read `Check_Statement`'s existing `case S.Kind` dispatch (`sdata-interpreter.adb`): it **already
+  has an `Stmt_RSEED` arm** checking `Seed_Expr`, and its `Stmt_KEEP | Stmt_DROP | ... | Stmt_DIM
+  | ...` arm **already checks** `Arr_Start_Expr`/`Arr_End_Expr`. Both are dead code today — fully
+  written, fully correct, simply never invoked for these statement kinds. `Stmt_NOTE` is the one
+  gap even within `Check_Statement` itself: it shares `Print_Args` with `Stmt_PRINT` at the AST
+  level (ADR-059) but was never added to `Check_Statement`'s `Stmt_PRINT` arm, so even a future
+  caller of `Check_Statement` on a `NOTE` statement wouldn't check its arguments without one more
+  one-line fix.
+
+**Decision — reuse `Check_Statement`, don't duplicate its logic (primary fix, sdata-only).** Add
+`Stmt_NOTE` to `Check_Statement`'s existing `Stmt_PRINT` arm (one line: `when Stmt_PRINT |
+Stmt_NOTE =>`), then call `Check_Statement (Stmt, Check_Undefined => False)` at the top of each of
+`Execute_RSEED`, `Execute_Note`, and `Execute_DIM`'s own dispatch, before any evaluation happens —
+matching exactly the `Check_Undefined => False` mode `Analyze_One` already uses for entry-time
+checking of a freshly-typed Deferred statement (undefined-variable checking stays off, since these
+Declarative/Immediate statements execute immediately and don't have Deferred's whole-block forward-
+reference model — only the already-battle-tested `Is_Known_Function`/`Function_Arity` half fires).
+For `SAVE`'s `IF=` option: call `Check_Expr` once, when the target is registered
+(`Execute_SAVE`/target-parsing, not `Should_Write`'s own per-record call), so a bad expression is
+caught once at declaration time rather than re-validated on every row. This is the smallest,
+lowest-risk fix that gets both unknown-function **and** arity checking, for free, by wiring in
+logic that already exists, is already covered by `PRINT`'s own regression tests, and needs zero
+new checking logic written — only new call sites.
+
+**Decision — also raise in `Evaluate_Function`'s own fallback, as a defense-in-depth backstop
+(secondary fix, sdata-core).** `Evaluate_Function`'s final dispatch now raises
+`SData_Core.Script_Error with "unknown function '" & Name & "'"` instead of returning
+`(Kind => Val_Missing)`, matching the sibling `Call_Function`'s existing behavior. Confirmed safe
+by the call-site investigation above — nothing depends on the silent return. This does not by
+itself add arity checking (that stays `Check_Statement`'s job, since `Evaluate_Function` has no
+natural place to know an arity mismatch from a legitimately-variable-arity function without
+duplicating `Function_Arity`'s table) and is not the primary fix for *this* issue — every path
+`Check_Statement` now covers will already raise its own clearer, arity-aware error first. Its
+purpose is closing the systemic pattern, not just today's four instances: any *future*
+Declarative/Immediate-tier command that evaluates a user expression and forgets to call
+`Check_Statement`/`Check_Expr` first now fails loudly instead of silently, the same insurance
+`Call_Function`'s callers already had.
+
+**Consequences:** primary fix is sdata-only (`sdata-interpreter.adb`'s `Check_Statement`,
+`sdata-interpreter-execute_declarative.adb`'s `Execute_RSEED`, `sdata-interpreter-execute_note.adb`'s
+`Execute_Note`, `sdata-interpreter-execute_metadata.adb`'s `Execute_DIM`/SAVE-target registration).
+Secondary fix is sdata-core-only (`sdata_core-evaluator.adb`'s `Evaluate_Function`), requiring the
+standard cross-crate gate (`alr build` → sdata `make check` → data-vandal `make check`) since
+`data-vandal` also calls the shared evaluator. No data model change. No feature flag — this is a
+strictly-additive error-surfacing fix (a case that previously silently mis-evaluated now raises;
+no previously-successful script becomes an error, since a script calling a genuinely unknown
+function was never producing a meaningful result in the first place).
+
+**Alternatives rejected:** Direction (a) alone from the issue (global raise in
+`Evaluate_Function`'s fallback, no `Check_Statement` wiring) — would fix the silent-missing-value
+symptom but not arity checking, and would give `NOTE`/`RSEED`/`DIM` a different, less specific
+error message than `PRINT` gets for the identical mistake, an inconsistency the issue's own
+framing (comparing `NOTE`'s and `PRINT`'s behavior side by side) argues against. Direction (b) as
+literally specified (new, duplicated per-command checks mirroring `Reject_If_Permanent`'s
+structure) — rejected once the investigation found `Check_Statement` already implements the
+needed logic correctly and only lacks call sites; writing a second, parallel implementation of
+"is this function known, is the arity right" would itself become exactly the kind of duplicated,
+independently-drifting logic this project's own 2026-08-13 audit (and this milestone's own
+`codebase-skeptic` pass) already flagged as a recurring failure shape elsewhere in this codebase.

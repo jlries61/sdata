@@ -705,6 +705,18 @@ represent a change from earlier versions, where those conditions silently return
 missing value. Programs that relied on the silent missing-value behavior for unknown
 names must be updated.
 
+**Extension to Declarative/Immediate statements (ADR-062, issue #76):** checks 2
+(unknown function) and 3 (arity) also fire for *RSEED*'s seed expression, *NOTE*'s
+arguments, *DIM*'s array-bound expressions, and *SAVE*'s per-target *IF=* option —
+statements that evaluate a user expression immediately rather than as part of a
+deferred block, and so were not covered by this section's whole-block analysis before
+ADR-062. Each checks at its own dispatch point (*SAVE*'s *IF=* is checked once, when
+the target is registered, not on every record). Check 4 (undefined variable) does
+**not** extend to these statements — a variable referenced in, e.g., *SAVE*'s *IF=*
+may legitimately be defined by a later statement before the first record is written,
+the same forward-reference allowance interactive mode's entry-time check already
+makes for Deferred statements.
+
 ### 5.7 Implicit RUN Before SORT/AGGREGATE/TRANSPOSE/STATS With a Pending Program
 
 *SORT*, *AGGREGATE*, *TRANSPOSE*, and *STATS* read or replace the data table's

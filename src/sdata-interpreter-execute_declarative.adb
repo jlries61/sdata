@@ -672,6 +672,18 @@ begin
                         To_Unbounded_String (Spec.Alias (1 .. Spec.Alias_Len));
                   end if;
                   T.Opts := Spec.Opts;
+                  --  ADR-062/issue #76: unknown-function and arity checking
+                  --  on the target's IF= expression, once at registration
+                  --  time -- not on every record when Should_Write
+                  --  evaluates it during WRITE's flush. Check_Undefined =>
+                  --  False: a variable referenced in IF= may legitimately
+                  --  be defined by a later statement, before the first
+                  --  WRITE actually flushes this target, so undefined-
+                  --  variable checking must not fire here (systems-designer
+                  --  finding, 02-systems-designer.md). Check_Expr no-ops on
+                  --  a null expression, so no guard is needed when IF= was
+                  --  not specified.
+                  Check_Expr (T.Opts.IF_Expr, Check_Undefined => False);
                   Registered_Saves.Append (T);
                end;
             end loop;
@@ -838,6 +850,10 @@ begin
       when Stmt_DIGITS =>
          SData_Core.Config.Print_Digits := Stmt.Digits_Count;
       when Stmt_RSEED =>
+         --  ADR-062/issue #76: unknown-function and arity checking on the
+         --  seed expression, before it's evaluated -- reuses the same
+         --  static analysis PRINT already gets.
+         Check_Statement (Stmt, Check_Undefined => False);
          declare
             V : constant Value := Evaluate (Stmt.Seed_Expr);
             S : constant Integer :=
