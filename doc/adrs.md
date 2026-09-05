@@ -73,6 +73,7 @@ that might relitigate a settled question.
 | ADR-061 | `Run_REPL` echoes each input line unconditionally, closing design.md's "Statement Echo" gap | 2026-08-31 | Accepted |
 | ADR-062 | Declarative/Immediate-tier expressions get the same unknown-function/arity checking as Deferred, by reusing `Check_Statement` — not by duplicating it | 2026-09-03 | Accepted |
 | ADR-063 | NOTE's permanent-variable rejection checks the resolved array *element*, not the array's declared class | 2026-09-05 | Accepted |
+| ADR-064 | Lexer `Token_Bad` sites raise Script_Error instead of printing and silently continuing | 2026-09-05 | Accepted |
 
 ---
 
@@ -1855,3 +1856,73 @@ single-evaluation redesign fixes the general case with no idempotency hazard, so
 remaining reason to accept that narrower scope. Leaving the array-level check as a fallback for
 non-literal indices — same rejection: the general case is now handled soundly, so a fallback would
 just reintroduce the bug for exactly the cases most likely to be hit in practice.
+
+### ADR-064: Lexer `Token_Bad` sites raise Script_Error instead of printing and silently continuing
+
+**Date:** 2026-09-05 | **Status:** Accepted
+
+**Context:** [sdata#77](https://github.com/jlries61/sdata/issues/77), filed as a deliberate
+out-of-scope follow-up from the ADR-060/PE-8 parser-error-propagation workstream (that workstream's
+own brief explicitly flagged the lexer's `Token_Bad` path as "a candidate follow-up finding if
+confirmed, don't fold into this workstream's scope without a separate decision"). `SData.Lexer`'s
+backtick-quoted-identifier handling (`src/lexer/sdata-lexer.adb`) has exactly two error sites — the
+unterminated-quote and empty-quote cases — both printing `"Error: ..."` via `Put_Line_Error` and
+returning a `Token_Bad`-kind token instead of a real error. The one consuming site,
+`Parse_Statement`'s top-level dispatch (`sdata-parser.adb`, `when Token_Bad => return null;`), is
+indistinguishable from `Parse_Program`'s own clean-EOF signal — the exact same `null`-means-two-
+things ambiguity ADR-060 fixed for the parser's own ~60 sites, reintroduced one layer down. Confirmed
+empirically: `printf 'USE MOCK\n\`bad\nRUN\n' | sdata; echo $?` prints the error, then still runs
+`USE MOCK` and exits 0 — matching the issue's own repro exactly.
+
+**Scope is broader than the issue's literal repro.** The bug is not confined to `Token_Bad` as a
+statement's leading token: a backtick error nested inside an expression silently drops the whole
+containing statement while the rest of the script still succeeds — `printf 'USE MOCK\nLET Y =
+\`bad + 1\nPRINT Y\nRUN\n' | sdata` prints the lex error, then prints `Y` as missing (`.`) for
+every record and reports `RUN complete`, exit 0. The issue's own suggested fix (converting only the
+one `Parse_Statement` dispatch arm) would not have closed this case, since that arm only ever fires
+when `Token_Bad` is the first token of a statement.
+
+**Decision.** Both `Token_Bad`-producing sites now `raise Script_Error with "<message>"` (the exact
+existing message text, minus the `"Error: "` prefix the top-level handlers already supply) instead
+of printing via `Put_Line_Error` and returning a sentinel token — the same mechanism ADR-060
+established for the parser one layer up, reusing the identical, already-verified top-level catch in
+both batch and REPL mode with zero changes to either handler. Unlike ADR-060's ~60 sites, this
+required no case-by-case survey of downstream consumers: `SData.Lexer`'s tokenizing entry points are
+called from nowhere in `src/` except `src/parser/sdata-parser.ad[bs]`, and that file has exactly
+three local exception handlers, all narrowly `when Constraint_Error =>` around numeric-literal
+overflow — none catch `Script_Error` or `others` — so a lexer-raised exception unwinds unimpeded
+through every parser call site, top-level statement dispatch or nested expression parsing alike, to
+the same handlers ADR-060 already confirmed correct at all four `Parse_Program` call sites (batch
+driver, REPL, SUBMIT, BREAK-debug-prompt).
+
+**Decision — remove `Token_Bad` outright, don't leave it as an inert sentinel.** With both
+producing sites converted, `Token_Bad` has no remaining producer, so the parser's now-unreachable
+consumption arm, the enum literal itself, and its `.ads` doc comment were all deleted in the same
+change — confirmed safe: no `Token_Kind'Pos`/`'Val`-driven table exists anywhere in `src/`, so
+removing the literal cannot shift any positional encoding another site depends on, and Ada's
+case-statement exhaustiveness check would itself fail the build if any live arm had been missed.
+
+**Consequences:** sdata-only (`src/lexer/sdata-lexer.adb`, `src/lexer/sdata-lexer.ads`,
+`src/parser/sdata-parser.adb`; lexer/AST/parser are sdata-only per ADR-040) — no sdata-core or
+data-vandal change. One existing test, `tests/quoted_id_bad.cmd`, previously encoded the buggy
+exit-0 behavior directly (no `.exitcode` file present); it now requires `tests/quoted_id_bad.exitcode`
+asserting exit 1, with its expected message text unchanged. Four new regression tests were added:
+the empty-quoted-identifier variant (previously uncovered), the nested-in-expression case (the one
+that most directly demonstrates why a parser-only fix would have been insufficient), and a
+`.repl`-marked REPL-mode test modeled on ADR-060's own REPL-recovery proof, confirming a lex error
+cleanly resets the session and it keeps working afterward. Inherits the same accepted trade-off
+ADR-060 documented and does not re-litigate: a partially-built AST sub-expression from the
+nested-expression case is not freed when the raise unwinds mid-parse (Ada access types have no
+automatic cleanup) — inconsequential in batch mode (process exits immediately) and a small,
+bounded, session-scoped leak in REPL mode, strictly smaller in consequence than the bug being
+fixed.
+
+**Alternatives rejected:** raising at the parser's consumption site instead of the lexer's origin
+sites — rejected because it would leave `Token_Bad` alive as a sentinel nothing but a
+soon-to-be-dead arm produces meaning for, whereas raising at the true origin lets the whole sentinel
+be deleted outright; no lexer-level recovery mode or future consumer wanting to inspect a bad token
+rather than abort was found during design. A broader audit of every lexer error path beyond
+`Token_Bad` — deliberately out of scope: `grep -n Put_Line_Error src/lexer/sdata-lexer.adb` found
+exactly these two sites and no other lexer error class currently exists; any future discovery gets
+its own follow-up decision, matching this ADR's own origin as a scoped-out follow-up from ADR-060
+rather than silent scope creep.

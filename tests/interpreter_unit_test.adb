@@ -598,15 +598,13 @@ begin
       Check ("LC-03: `a.b c` kind = Token_Quoted_Identifier",
              T.Kind = Token_Quoted_Identifier, True);
 
-      --  LC-04: `` (empty backticks) produces Token_Bad.
-      T := Lex1 ("``");
-      Check ("LC-04: empty backticks kind = Token_Bad",
-             T.Kind = Token_Bad, True);
+      --  LC-04: `` (empty backticks) raises Script_Error (ADR-064).
+      Check ("LC-04: empty backticks raises error",
+             Raises ("``"), True);
 
-      --  LC-05: `AS (no closing backtick) produces Token_Bad.
-      T := Lex1 ("`AS");
-      Check ("LC-05: unterminated backtick kind = Token_Bad",
-             T.Kind = Token_Bad, True);
+      --  LC-05: `AS (no closing backtick) raises Script_Error (ADR-064).
+      Check ("LC-05: unterminated backtick raises error",
+             Raises ("`AS"), True);
    end;
 
    -----------------------------------------------------------------------

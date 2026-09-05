@@ -1,0 +1,12 @@
+sdata> -- ADR-064: a backtick lex error typed interactively must cleanly reset the
+sdata> -- REPL session (matching Run_REPL's existing Script_Error handler), not
+sdata> -- crash the session and not silently drop the error. The session must
+sdata> -- still work normally afterward.
+sdata> SET X = 7
+sdata> RUN
+RUN complete. 1 records and 0 variables processed.
+sdata> `bad
+Error: unterminated quoted identifier at line 1
+sdata> NOTE X
+7.00000
+sdata> QUIT

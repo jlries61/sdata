@@ -394,16 +394,11 @@ package body SData.Lexer is
                Advance (Ctx);
             end loop;
             if Is_End_Of_Source (Ctx) or else Current_Char (Ctx) = ASCII.LF then
-               Put_Line_Error
-                 ("Error: unterminated quoted identifier at line"
-                  & T.Line'Image);
-               T.Kind   := Token_Bad;
-               T.Length := 0;
+               raise Script_Error with
+                 "unterminated quoted identifier at line" & T.Line'Image;
             elsif T.Length = 0 then
-               Put_Line_Error
-                 ("Error: empty quoted identifier at line" & T.Line'Image);
-               Advance (Ctx); -- skip closing backtick
-               T.Kind := Token_Bad;
+               raise Script_Error with
+                 "empty quoted identifier at line" & T.Line'Image;
             else
                Advance (Ctx); -- skip closing backtick
                T.Kind := Token_Quoted_Identifier;
