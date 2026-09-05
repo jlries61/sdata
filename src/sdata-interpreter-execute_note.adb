@@ -6,10 +6,22 @@
 --  least one argument (no bare "print everything" form, unlike PRINT: there
 --  is no "current record" for it to print permanent variables of).  Rejects
 --  any argument whose expression tree references a permanent variable or
---  permanent array anywhere within it -- not just a bare top-level
+--  permanent array element anywhere within it -- not just a bare top-level
 --  reference -- before printing anything, since no such reference can
 --  reduce to a well-defined single value outside AGGREGATE/STATS's own
 --  group-scan machinery (see ADR-059's Context for the full rationale).
+--
+--  Array references are checked per resolved ELEMENT (ADR-063), not by the
+--  array's own declared storage class: a virtual array can alias
+--  constituents of mixed class (sdata-core ADR-0023), and the array-level
+--  flag is always False for virtual arrays regardless of what any specific
+--  element actually is. The per-element check happens INSIDE
+--  Print_Value_List's own index evaluation (via its Check_Permanent
+--  callback), not as a separate up-front pass here -- an index expression
+--  is not guaranteed idempotent (e.g. one containing RANDOM()), so
+--  evaluating it once to check and again to print could check one element
+--  and print a different one. See ADR-063 for the full rationale, including
+--  this exact hazard and why it ruled out the original two-pass design.
 separate (SData.Interpreter)
 procedure Execute_Note (Stmt : Statement_Access) is
 
@@ -20,6 +32,20 @@ procedure Execute_Note (Stmt : Statement_Access) is
          """ is a permanent variable (a per-row value); NOTE only accepts" &
          " temporary variables";
    end Reject_Name;
+
+   --  Passed to Print_Value_List as its Check_Permanent callback: rejects if
+   --  the resolved element Arr_Name(Idx) is not a genuine temporary, naming
+   --  the specific element (not the array), since it's the element (not
+   --  necessarily the array as a whole) that's permanent. Print_Value_List
+   --  calls this immediately after resolving each index and before printing
+   --  it, so the element checked here is always the exact element printed.
+   procedure Reject_Element (Arr_Name : String; Idx : Integer) is
+   begin
+      if not SData_Core.Variables.Array_Element_Is_Temporary (Arr_Name, Idx) then
+         Reject_Name (Arr_Name & "(" &
+            Ada.Strings.Fixed.Trim (Integer'Image (Idx), Ada.Strings.Both) & ")");
+      end if;
+   end Reject_Element;
 
    procedure Reject_If_Permanent (E : Expression_Access);
 
@@ -43,11 +69,10 @@ procedure Execute_Note (Stmt : Statement_Access) is
             declare
                Upper : constant String := To_Upper (E.Var_Name (1 .. E.Var_Len));
             begin
-               if Has_Array (Upper) then
-                  if not Is_Temporary_Array (Upper) then
-                     Reject_Name (Upper);
-                  end if;
-               elsif PDV_Resolve (Upper) > 0 then
+               --  A bare whole-array reference (NOTE V, no index) needs no
+               --  check here -- Print_Value_List's Check_Permanent callback
+               --  covers every element it resolves from Start_Idx..End_Idx.
+               if not Has_Array (Upper) and then PDV_Resolve (Upper) > 0 then
                   Reject_Name (Upper);
                end if;
             end;
@@ -57,26 +82,16 @@ procedure Execute_Note (Stmt : Statement_Access) is
          when Expr_Unary_Op =>
             Reject_If_Permanent (E.Operand);
          when Expr_Array_Access =>
-            declare
-               Upper : constant String := To_Upper (E.Arr_Name (1 .. E.Arr_Len));
-            begin
-               if Has_Array (Upper) and then not Is_Temporary_Array (Upper) then
-                  Reject_Name (Upper);
-               end if;
-            end;
+            --  Only the index tree itself is checked here, statically, for
+            --  an embedded permanent-variable reference -- the array
+            --  element's own storage class is Print_Value_List's
+            --  Check_Permanent callback's job (see this file's header).
             Reject_If_Permanent_List (E.Arr_Idx);
          when Expr_Function_Call =>
             --  Mirrors Print_Value_List's own "a name Has_Array is really
             --  array access parsed as a call" handling (DIM hasn't
             --  necessarily run yet when this parses, per Check_Expr's own
             --  comment on the identical ambiguity).
-            declare
-               Upper : constant String := To_Upper (E.Func_Name (1 .. E.Func_Len));
-            begin
-               if Has_Array (Upper) and then not Is_Temporary_Array (Upper) then
-                  Reject_Name (Upper);
-               end if;
-            end;
             Reject_If_Permanent_List (E.Arguments);
          when Expr_Numeric_Literal | Expr_String_Literal | Expr_Missing =>
             null;
@@ -105,5 +120,5 @@ begin
       end loop;
    end;
 
-   Print_Value_List (Stmt.Print_Args);
+   Print_Value_List (Stmt.Print_Args, Reject_Element'Access);
 end Execute_Note;

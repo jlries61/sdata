@@ -1,0 +1,2 @@
+RUN complete. 1 records and 1 variables processed.
+Error: NOTE: "V(1)" is a permanent variable (a per-row value); NOTE only accepts temporary variables
