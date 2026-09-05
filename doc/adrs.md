@@ -1758,3 +1758,95 @@ needed logic correctly and only lacks call sites; writing a second, parallel imp
 "is this function known, is the arity right" would itself become exactly the kind of duplicated,
 independently-drifting logic this project's own 2026-08-13 audit (and this milestone's own
 `codebase-skeptic` pass) already flagged as a recurring failure shape elsewhere in this codebase.
+
+### ADR-063: NOTE's permanent-variable rejection checks the resolved array *element*, not the array's declared class
+
+**Date:** 2026-09-05 | **Status:** Accepted
+
+**Context:** [jlries61/sdata#83](https://github.com/jlries61/sdata/issues/83). `NOTE`'s
+`Reject_If_Permanent` (ADR-059) rejects any argument referencing a permanent (per-row) variable,
+walking the full expression tree so a reference buried inside an array index or function argument
+is caught, not just a bare top-level one. For a virtual array (`ARRAY V A B`, aliasing possibly
+mixed-class constituents — see sdata-core ADR-0023), the check tested `Is_Temporary_Array(V)`, the
+*array's* declared storage class. `SData_Core.Variables.Define_Array` hardcodes this `False` for
+every virtual array unconditionally (ADR-0023's own finding), so the check always concluded "V is
+permanent" and rejected — even when the specific constituent a given reference actually names is a
+genuine temporary with a perfectly well-defined value. `NOTE V(2)` failed even when `V(2)` aliases
+a `SET` variable; a bare `NOTE V` (whole-array form, matching `PRINT`'s own bare-array semantics)
+failed the same way regardless of any individual constituent's real class.
+
+Confirmed the same defect reaches `NOTE` through **three** AST shapes, not one: `Expr_Variable`
+(bare `V`, which `Print_Value_List` — the shared evaluation/printing routine ADR-059 factored out —
+resolves to *every* element from `Get_Array_Bounds`'s `Start_Idx..End_Idx`), `Expr_Array_Access`
+(`V(2)`, `V(1,3,5)`, and range form `V(1:3)` — `Arr_Idx` is an `Expression_List` supporting all
+three shapes per `SData_Core.Evaluator`'s own field comment), and `Expr_Function_Call` (the
+parser's pre-`DIM`-time array-vs-call ambiguity `Print_Value_List` and `Reject_If_Permanent` both
+already special-case identically). All three currently gate on the same array-level flag and
+needed the identical fix.
+
+**Decision — check the resolved element's actual class via `Array_Element_Is_Temporary`, not the
+array's declared class, for all three shapes.** `SData_Core.Variables.Array_Element_Is_Temporary
+(Name, Index)` (added by sdata-core ADR-0023 for the identical write-side defect) already resolves
+a virtual array's constituent to its real storage class (genuinely `SET`-created and not currently
+`HOLD`-ed) and returns the array-wide flag unchanged for a real (`DIM`'d) array, where it's already
+uniformly correct.
+
+**Decision — the per-element check runs *inside* `Print_Value_List`'s own index evaluation, as a
+callback, not as a separate pass in `Reject_If_Permanent` beforehand.** The first implementation of
+this ADR had `Reject_If_Permanent` evaluate each index itself (justified by the argument that
+`Reject_If_Permanent_List` already independently guarantees the index tree contains no permanent-
+variable reference, so evaluating it can't itself violate ADR-059's "no ill-defined value" Context
+requirement) and then call `Print_Value_List`, which evaluates the *same* index expression again to
+actually print. Testing that implementation directly (constructing a mixed-class virtual array and
+indexing it with `V(1 + INT(RANDOM()*2))`) surfaced a real defect the safety argument didn't cover:
+an index expression's *evaluation* need not be idempotent even when it's permanent-reference-free —
+`RANDOM()` draws a fresh value on every call — so the check's evaluation and the print's evaluation
+could resolve to *different* elements. Observed in practice: the check-time draw would sometimes
+land on the temporary element (pass) while the separate print-time draw landed on the permanent one
+moments later, silently printing the very permanent value `NOTE` exists to reject, defeating
+ADR-059 outright. The fix is to evaluate each index exactly **once**, at the point it's actually
+used to print, and check the element there: `Print_Value_List` gained an optional
+`Check_Permanent : access procedure (Arr_Name : String; Idx : Integer)` parameter, called
+immediately after it resolves an index (or range bound) to a concrete `Idx` and before the
+corresponding `Put` — for every shape it already resolves indices in (bare `Expr_Variable`'s
+`Start_Idx..End_Idx` loop, `Expr_Array_Access`/`Expr_Function_Call`'s single/comma-list/`Is_Range`
+walk). `Execute_Print` passes no callback (`null`, the default) — `PRINT` is unaffected. `Execute_Note`
+passes `Reject_Element'Access`, a small nested procedure wrapping `Array_Element_Is_Temporary`; since
+it's an anonymous access-to-subprogram parameter, passing a nested subprogram's `'Access` directly as
+a same-call argument is accessibility-safe with no extra machinery. `Reject_If_Permanent` itself goes
+back to being purely static for arrays (ADR-059's original mechanism, unchanged): it still walks
+`Reject_If_Permanent_List(E.Arr_Idx)` / `(E.Arguments)` to catch a permanent variable referenced
+*inside* an index expression (`NOTE V(SCORE)`, still statically rejected, no evaluation involved),
+but no longer resolves or checks the array element itself — that moved entirely into
+`Print_Value_List`'s single evaluation pass.
+
+**Consequences:**
+
+*Positive* — Closes #83: `NOTE` on a virtual array's temporary element or whole array now
+correctly reflects each constituent's real storage class, matching what bare-name `NOTE B` already
+allows for that same constituent. Error messages name the specific element (`V(3)`), not just the
+array, matching sdata-core ADR-0023/0024's own established convention of naming what the user
+would need to reference. No sdata-core change — `Array_Element_Is_Temporary` already existed;
+this is sdata-only (`sdata-interpreter.adb`/`-execute_note.adb`/`-print_value_list.adb`). The index
+expression is evaluated exactly once per element, same as before this ADR, so no new evaluation
+cost and no idempotency hazard for any index expression, deterministic or not.
+
+*Negative* — `Print_Value_List` (shared with `PRINT`) now carries a `NOTE`-only parameter, a small
+layering smell, though it's `null` by default and `PRINT`'s call site is untouched. If element 1 of
+a bare/list/range `NOTE` is temporary and a later element is permanent, that first element's value
+is already `Put` to the output stream before the later check raises — a partial line precedes the
+`Error:` line — whereas the (superseded) first implementation checked every element before printing
+any of them. Accepted: existing "some output, then an error" sequences already occur elsewhere in
+this interpreter when a later argument fails after an earlier one succeeded, and no regression test
+in the current suite depends on the erased check-before-any-print ordering (the one bare-array
+regression test, `note_reject_permanent_array.cmd`, has its permanent element first).
+
+**Alternatives rejected:** the original two-pass design described above (evaluate-to-check, then
+evaluate-again-to-print) — superseded by direct testing during this same ADR's implementation,
+which found the double-evaluation defect described above; restricting the fix to literal-integer
+indices only (no evaluation anywhere) — would fix `NOTE V(2)` but not `NOTE V(I)` (variable index)
+or the bare whole-array form, leaving the bulk of real-world usage still broken, and the
+single-evaluation redesign fixes the general case with no idempotency hazard, so there was no
+remaining reason to accept that narrower scope. Leaving the array-level check as a fallback for
+non-literal indices — same rejection: the general case is now handled soundly, so a fallback would
+just reintroduce the bug for exactly the cases most likely to be hit in practice.

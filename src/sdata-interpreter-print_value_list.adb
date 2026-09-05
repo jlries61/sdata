@@ -3,7 +3,8 @@
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
 separate (SData.Interpreter)
-procedure Print_Value_List (Args : Expression_List) is
+procedure Print_Value_List (Args : Expression_List;
+                             Check_Permanent : access procedure (Arr_Name : String; Idx : Integer) := null) is
 begin
    declare Current_Arg : Expression_List := Args;
    begin
@@ -17,6 +18,7 @@ begin
                   begin
                      Get_Array_Bounds (VName, Start_Idx, End_Idx);
                      for I in Start_Idx .. End_Idx loop
+                        if Check_Permanent /= null then Check_Permanent (VName, I); end if;
                         Put (To_String_Formatted (Get_Array_Element (VName, I)));
                         if I /= End_Idx then Put (" "); end if;
                      end loop;
@@ -51,6 +53,7 @@ begin
                            if Hi_Val.Kind = Val_Integer then Hi := Integer (Hi_Val.Int_Val);
                            else Hi := Integer (Real'Floor (Convert_To_Real (Hi_Val))); end if;
                            for I in Lo .. Hi loop
+                              if Check_Permanent /= null then Check_Permanent (AName, I); end if;
                               Put (To_String_Formatted (Get_Array_Element (AName, I)));
                               if I /= Hi then Put (" "); end if;
                            end loop;
@@ -62,6 +65,7 @@ begin
                         begin
                            if Idx_Val.Kind = Val_Integer then Idx := Integer (Idx_Val.Int_Val);
                            else Idx := Integer (Real'Floor (Convert_To_Real (Idx_Val))); end if;
+                           if Check_Permanent /= null then Check_Permanent (AName, Idx); end if;
                            Put (To_String_Formatted (Get_Array_Element (AName, Idx)));
                         end;
                      end if;

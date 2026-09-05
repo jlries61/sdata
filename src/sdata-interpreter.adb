@@ -186,7 +186,8 @@ package body SData.Interpreter is
    procedure Execute_Assignment      (Stmt : Statement_Access);
    procedure Execute_Print        (Stmt : Statement_Access);
    procedure Execute_Note         (Stmt : Statement_Access);
-   procedure Print_Value_List     (Args : Expression_List);
+   procedure Print_Value_List     (Args : Expression_List;
+                                    Check_Permanent : access procedure (Arr_Name : String; Idx : Integer) := null);
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context);
    procedure Execute_Metadata        (Stmt : Statement_Access);
    procedure Execute_Program_Remove  (Stmt : Statement_Access);
@@ -943,7 +944,15 @@ package body SData.Interpreter is
    --  Shared by Execute_Print (non-bare argument list) and Execute_Note
    --  (after its permanent-variable check passes) — extracted so both
    --  commands render identically without duplicating the formatting logic.
-   procedure Print_Value_List (Args : Expression_List) is separate;
+   --  Check_Permanent (ADR-063), when non-null, is invoked on each resolved
+   --  array element immediately before it is printed, using the SAME
+   --  Evaluate result this procedure already computed to resolve the index
+   --  -- NOTE passes its per-element check here rather than re-evaluating
+   --  the index itself beforehand, because an index expression may not be
+   --  idempotent (e.g. RANDOM()); evaluating it twice could check one
+   --  element and print a different one. PRINT passes no check (null).
+   procedure Print_Value_List (Args : Expression_List;
+                                Check_Permanent : access procedure (Arr_Name : String; Idx : Integer) := null) is separate;
 
    --  IF / WHILE / FOR / LOOP_REPEAT / SELECT — all control flow constructs.
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context) is separate;
