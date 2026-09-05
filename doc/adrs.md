@@ -75,6 +75,7 @@ that might relitigate a settled question.
 | ADR-063 | NOTE's permanent-variable rejection checks the resolved array *element*, not the array's declared class | 2026-09-05 | Accepted |
 | ADR-064 | Lexer `Token_Bad` sites raise Script_Error instead of printing and silently continuing | 2026-09-05 | Accepted |
 | ADR-065 | Status/bookkeeping messages reach the OUTPUT-file transcript unconditionally, matching design.md sec6.1 | 2026-09-05 | Accepted |
+| ADR-066 | Single-target SAVE (IF=...) routes through the multi-target registration path instead of the legacy fast-path, so its IF= filter is honored on auto-flush | 2026-09-05 | Accepted |
 
 ---
 
@@ -2018,3 +2019,47 @@ issue's own framing — data-vandal's own decision, not addressed here.
 by explicit user decision (see above). Extending the fix to data-vandal's identical-shape 7th site
 in the same change — rejected as scope creep across a repo boundary the issue itself declared out
 of scope; left as a candidate for data-vandal's own decision, not silently folded in.
+
+### ADR-066: Single-target SAVE (IF=...) routes through the multi-target registration path instead of the legacy fast-path, so its IF= filter is honored on auto-flush
+
+**Date:** 2026-09-05 | **Status:** Accepted
+
+**Context:** [sdata#82](https://github.com/jlries61/sdata/issues/82), discovered as a side effect
+of writing `tests/save_if_undefined_variable.cmd` for the ADR-062/#76 work. A `SAVE` statement with
+exactly one target and an `IF=` filter did not filter rows at all when flushed via implicit
+end-of-record auto-flush (no explicit `WRITE` statement):
+
+```
+$ printf 'OPTIONS SAVEOVERWRT YES\nUSE "tests/data/merge_a.csv"\nSAVE "out.csv" (IF=ID>1)\nRUN\nQUIT\n' | sdata
+$ cat out.csv
+ID,X
+1,10        <- should have been excluded (ID=1 is not > 1)
+2,20
+```
+
+The two-or-more-target form already filtered correctly (`tests/save_multi_with_if.cmd`,
+`tests/quoted_id_save_if.cmd`), so the bug was isolated to how the single-target case is routed.
+
+**Root cause.** `Execute_Declarative`'s `Stmt_SAVE` handling
+(`src/sdata-interpreter-execute_declarative.adb:601-609`) has a single-target fast-path that
+delegates straight to `Legacy_Execute_SAVE`, bypassing target registration (`Registered_Saves`,
+`Target_Buffers`) entirely and instead calling `SData_Core.Commands.Execute_SAVE` to set up a
+single pending-save configuration with no per-record filter concept. The guard already excluded
+targets carrying `RENAME`/`KEEP`/`DROP` paren options (falling those through to the registration
+path, which the multi-target auto-flush loop in `Process_One_Record` correctly drives through
+`Should_Write`), but it never checked for `IF_Expr`, so a lone `IF=`-only target still took the
+legacy path and its filter was silently never evaluated.
+
+**Decision.** Add `and then Stmt.Save_List.First_Element.Opts.IF_Expr = null` to the existing
+fast-path guard (the same clause that already excludes RENAME/KEEP/DROP). A single target with an
+`IF=` option now falls through to the registration path exactly like a multi-target `SAVE`, so it
+gets the same per-record `Should_Write` treatment already proven correct by
+`save_multi_with_if.cmd` and `quoted_id_save_if.cmd` — no new filtering logic, just routing an
+existing one-target-only combination into the code path that already handles it. Pure one-line
+addition; no other site touched.
+
+**Consequences:** `tests/save_single_target_if.cmd` added — single-target `SAVE (IF=ID>1)` via
+auto-flush, re-opens the saved file and confirms only the `ID>1` row survived. Comments in
+`tests/save_if_undefined_variable.cmd` and `tests/save_if_forward_reference.cmd` that flagged this
+as a known, unrelated, out-of-scope gap were updated to point at the new regression test instead.
+All 516 integration tests and all unit-test suites pass (`make check`).

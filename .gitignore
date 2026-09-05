@@ -61,6 +61,8 @@ tests/data/save_if_unknown_fn_out2.csv
 tests/data/save_if_fwd_ref_big.csv
 tests/data/save_if_fwd_ref_small.csv
 tests/data/save_if_undef_var_out.csv
+# save_single_target_if (issue #82)
+tests/data/save_single_target_if_out.csv
 tests/data/qid_alias.csv
 tests/data/wide_table.csv
 # txtfmt_test line-ending SAVE outputs (self-generated, read back in-test)

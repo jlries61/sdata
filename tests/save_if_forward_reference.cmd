@@ -5,8 +5,8 @@
 -- per-record before the first WRITE actually flushes this target. This
 -- must keep working exactly as it did before the fix. Uses the two-target
 -- form since that's the form proven to actually honor IF= per record
--- (see save_multi_with_if.cmd) -- unrelated single-target IF= filtering
--- gap filed separately, out of scope for this fix (issue TBD).
+-- (see save_multi_with_if.cmd) -- single-target IF= filtering is covered
+-- separately by save_single_target_if.cmd (issue #82, fixed).
 OPTIONS SAVEOVERWRT YES
 USE "tests/data/merge_a.csv"
 SAVE "tests/data/save_if_fwd_ref_big.csv" (IF=FLAG=1), "tests/data/save_if_fwd_ref_small.csv" (IF=FLAG=0)

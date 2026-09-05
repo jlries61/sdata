@@ -1,0 +1,6 @@
+Dataset opened: tests/data/merge_a.csv
+Dataset saved: tests/data/save_single_target_if_out.csv
+RUN complete. 2 records and 2 variables processed.
+Dataset opened: tests/data/save_single_target_if_out.csv
+2.00000 20.00000
+RUN complete. 1 records and 2 variables processed.

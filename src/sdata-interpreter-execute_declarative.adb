@@ -602,6 +602,7 @@ begin
                and then Stmt.Save_List.First_Element.Opts.Rename_Pairs = null
                and then Stmt.Save_List.First_Element.Opts.Keep_Vars = null
                and then Stmt.Save_List.First_Element.Opts.Drop_Vars = null
+               and then Stmt.Save_List.First_Element.Opts.IF_Expr = null
             then
                Legacy_Execute_SAVE;
                return;
