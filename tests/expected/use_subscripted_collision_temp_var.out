@@ -1,0 +1,5 @@
+RUN complete. 1 records and 0 variables processed.
+Dataset opened: tests/data/use_subscripted_collision_temp.csv
+USE: not registering "Q" as an array from Q(1)..Q(n): "Q" already exists as a scalar variable. The "Q(n)" columns are still loaded; reference them with the backtick form, e.g. `Q(1)`.
+5.00000 10.00000 20.00000 30.00000
+RUN complete. 1 records and 3 variables processed.
