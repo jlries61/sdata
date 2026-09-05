@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.24.0
+Version:        0.25.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Sat Sep 05 2026 John L. Ries <john@theyarnbard.com> - 0.25.0-1
+- Fix OUTPUT-file transcript dropping status messages under -q (ADR-065, closes #81)
+
 * Sat Sep 05 2026 John L. Ries <john@theyarnbard.com> - 0.24.0-1
 - Fix lexer Token_Bad silent-continue bug (ADR-064, closes sdata#77)
 

@@ -1,3 +1,9 @@
+sdata (0.25.0-1) unstable; urgency=medium
+
+  * Fix OUTPUT-file transcript dropping status messages under -q (ADR-065, closes #81)
+
+ -- John L. Ries <john@theyarnbard.com>  Sat, 05 Sep 2026 12:34:40 -0700
+
 sdata (0.24.0-1) unstable; urgency=medium
 
   * Fix lexer Token_Bad silent-continue bug (ADR-064, closes sdata#77)
