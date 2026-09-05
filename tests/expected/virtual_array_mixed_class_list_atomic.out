@@ -1,0 +1,3 @@
+Error: SET statement cannot modify permanent element "V(1)" of array "V"; use LET, or DROP the underlying variable (effective after the next RUN) to convert it to temporary
+1.00000 2.00000 3.00000
+RUN complete. 1 records and 2 variables processed.
