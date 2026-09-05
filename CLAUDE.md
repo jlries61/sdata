@@ -63,8 +63,11 @@ breaking data-vandal *promptly*, rather than waiting for data-vandal's next CI r
 - **Keep the `sdata-core` version references current in BOTH repos.** When bumping
   `sdata-core`'s version, update the `sdata_core = "^X.Y.Z"` constraint in *both*
   `sdata/alire.toml` and `data-vandal/alire.toml`, and bump `sdata-core`'s
-  `consumer-tests.yml` `ref:` (currently `v0.9.3`, behind sdata `0.9.7`) to a current
-  sdata tag so its stability gate validates a current consumer.
+  `consumer-tests.yml` `ref:` to a current sdata tag so its stability gate keeps
+  validating a current consumer instead of silently lagging — check the actual
+  `ref:` value in `sdata-core/.github/workflows/consumer-tests.yml` rather than
+  trusting a remembered version pair here, since both sides move independently
+  and any hardcoded snapshot in this file goes stale immediately.
 
 ## Build & Test
 
