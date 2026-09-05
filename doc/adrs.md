@@ -74,6 +74,7 @@ that might relitigate a settled question.
 | ADR-062 | Declarative/Immediate-tier expressions get the same unknown-function/arity checking as Deferred, by reusing `Check_Statement` — not by duplicating it | 2026-09-03 | Accepted |
 | ADR-063 | NOTE's permanent-variable rejection checks the resolved array *element*, not the array's declared class | 2026-09-05 | Accepted |
 | ADR-064 | Lexer `Token_Bad` sites raise Script_Error instead of printing and silently continuing | 2026-09-05 | Accepted |
+| ADR-065 | Status/bookkeeping messages reach the OUTPUT-file transcript unconditionally, matching design.md sec6.1 | 2026-09-05 | Accepted |
 
 ---
 
@@ -1926,3 +1927,94 @@ rather than abort was found during design. A broader audit of every lexer error 
 exactly these two sites and no other lexer error class currently exists; any future discovery gets
 its own follow-up decision, matching this ADR's own origin as a scoped-out follow-up from ADR-060
 rather than silent scope creep.
+
+### ADR-065: Status/bookkeeping messages reach the OUTPUT-file transcript unconditionally, matching design.md §6.1
+
+**Date:** 2026-09-05 | **Status:** Accepted
+
+**Context:** [sdata#81](https://github.com/jlries61/sdata/issues/81), filed as a deliberate
+follow-up from the PE-4/sdata-core ADR-0022 (`Quiet_Mode`→`Local_Echo` unification) code review.
+design.md §6.1 states the `OUTPUT`-file copy of console output is written **unconditionally**,
+even under `-q` ("only the stdout copy is suppressed"). `SData_Core.IO.Put_Line`
+(`sdata-core/src/sdata_core-io.adb:219-235`) already implements this correctly on its own:
+
+```ada
+procedure Put_Line (Item : String) is
+begin
+   if Redirected then
+      Ada.Text_IO.Put_Line (Redirect_File, Item);   -- unconditional
+      Ada.Text_IO.Flush (Redirect_File);
+   end if;
+   if Local_Echo then
+      ... stdout / pager write ...                   -- correctly gated
+   end if;
+end Put_Line;
+```
+
+`Is_Local_Echo` (`sdata_core-io.adb:92`) is simply the public accessor for the same `Local_Echo`
+flag `Put_Line` already checks internally. The bug: 6 status/bookkeeping call sites additionally
+wrapped their entire `Put_Line` call in `if Is_Local_Echo then ... end if;` — fully redundant with
+`Put_Line`'s own internal stdout gating, but incorrectly *also* skipping the unconditional
+`Redirected`-file write, since the call never happened at all under `-q`. Confirmed empirically:
+`printf 'OUTPUT "/tmp/out.txt"\nUSE MOCK\nQUIT\n' | sdata -q; cat /tmp/out.txt` was empty.
+
+**Scope corrected from 5 to 6 sites.** The issue named 5; a `grep -rn Is_Local_Echo` sweep across
+`sdata` and `sdata-core` this session found a 6th, structurally identical site the issue's own
+enumeration missed — `sdata/src/sdata-interpreter.adb`'s `Commit_Step` (multi-target `SAVE ... AS
+X, ... AS Y`'s own `"Dataset saved: ..."`, a different call site than single-target `SAVE`'s
+sdata-core-side message). Final site list:
+
+| # | File | Message |
+|---|---|---|
+| 1 | `sdata-core/src/sdata_core-file_io.adb` (`Open_Input`) | `"Generating mock data..."` |
+| 2 | `sdata-core/src/sdata_core-file_io.adb` (`Open_Input`) | `"Dataset opened: ..."` |
+| 3 | `sdata-core/src/sdata_core-commands.adb` (`Flush_Pending_Output_Table`) | `"Dataset saved: ..."` |
+| 4 | `sdata-core/src/sdata_core-commands.adb` (`Flush_Pending_Save`) | `"Dataset saved: ..."` |
+| 5 | `sdata/src/sdata-interpreter.adb` (`Print_Run_Complete`) | `"RUN complete. ..."` |
+| 6 | `sdata/src/sdata-interpreter.adb` (`Commit_Step`, multi-target SAVE) | `"Dataset saved: ..."` |
+
+**Decision.** Each of the 6 sites now calls `Put_Line` directly instead of wrapping it in
+`if Is_Local_Echo then ... end if;` — a pure deletion at every site, since `Put_Line` already does
+the right thing internally. No restructuring, no new helper: every site's fix is "delete the guard,
+call `Put_Line` at one less indentation level." Confirmed via direct re-read of all 6 sites that
+none contain any logic beyond the single `Put_Line` call, so no site needed different treatment.
+
+**Decision — user chose to fix the code, not soften the doc.** Presented two options: make the
+`OUTPUT`-file transcript truly unconditional for these messages (align code with design.md §6.1 as
+literally written), or narrow §6.1's wording to document this as a stated exception. **User chose:
+fix the code.**
+
+**Site 3 (`Flush_Pending_Output_Table`) is fixed but untestable via any current test
+infrastructure — a pre-existing condition, not introduced by this fix.** `Execute_OUTPUT_Table`
+(the procedure that populates `Config.Runtime.Output_Table_Path`/`Output_Table_Active`, which
+`Flush_Pending_Output_Table` reads) was added per ADR-042 as "a parallel sdata-core entry point"
+but has **zero callers** anywhere across sdata, sdata-core, or data-vandal today — confirmed via
+`grep -rn Execute_OUTPUT_Table` across all three repos' `src/`. sdata's own `OUTPUT` command
+(`Stmt_OUTPUT`) calls the unrelated `Execute_OUTPUT` (console-redirect only); data-vandal's
+`OUTPUT` statement does the same ("Matches sdata's OUTPUT semantic" per its own source comment).
+sdata-core's own in-crate test driver explicitly excludes file-writing `Execute_*` paths from its
+scope (`tests/README.md`: "the `Execute_*` paths that load or write data ... are not [covered],
+since they require a populated table and the filesystem"). The fix is correct and forward-looking
+(a future consumer wiring up `Execute_OUTPUT_Table` inherits the fix automatically) but cannot be
+exercised by any test today — documented here rather than manufacturing an artificial test path
+for currently-dead code.
+
+**Consequences:** Cross-repo change — 4 sites in `sdata-core` (`Commands`/`File_IO`, shared with
+data-vandal), 2 in `sdata` (`sdata-interpreter.adb`, sdata-only per ADR-040). sdata-core's fix
+landed via its own PR-based workflow (server-enforced) and the mandatory three-way local gate
+(`alr build` sdata-core, `make check` sdata, `make check` data-vandal) before either half was
+pushed, per sdata's CLAUDE.md § "Cross-crate coordination." 2 new regression tests added, both
+combining multiple sites in one `-q` + `OUTPUT`-redirected script, each asserting the `OUTPUT` file
+now contains the messages while stdout remains exactly as suppressed as before (verified against 2
+existing tests — `pe4_quiet_alone_still_suppresses.cmd` and `pe4_echo_on_undoes_quiet.cmd` — whose
+stdout-suppression assertions are structurally immune to this fix, since `Put_Line`'s `Redirected`
+and `Local_Echo` gates are independent). Zero existing tests required rework: cross-referencing
+every `-q`-flagged test against every `OUTPUT`-using test found no prior overlap, confirming the
+gap this fix closes was previously completely untested. data-vandal's identical-shape 7th site
+(`execute_vandalize.adb:1230`, `"VANDALIZE complete. ..."`) is explicitly out of scope per the
+issue's own framing — data-vandal's own decision, not addressed here.
+
+**Alternatives rejected:** narrowing design.md §6.1's wording instead of fixing the code — rejected
+by explicit user decision (see above). Extending the fix to data-vandal's identical-shape 7th site
+in the same change — rejected as scope creep across a repo boundary the issue itself declared out
+of scope; left as a candidate for data-vandal's own decision, not silently folded in.

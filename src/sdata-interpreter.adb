@@ -2067,9 +2067,7 @@ package body SData.Interpreter is
                         Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
                         Charset         => Eff_Charset,
                         Decimals        => Eff_Decimals);
-                     if Is_Local_Echo then
-                        Put_Line ("Dataset saved: " & Full);
-                     end if;
+                     Put_Line ("Dataset saved: " & Full);
                   exception
                      when SData_Core.File_IO.Save_Refused => null;
                   end;
@@ -2154,11 +2152,9 @@ package body SData.Interpreter is
                       & " records, "
                       & VC (VC'First + 1 .. VC'Last)
                       & " variables", 1);
-         if Is_Local_Echo then
-            Put_Line ("RUN complete. " &
-                      RC (RC'First + 1 .. RC'Last) & " records and " &
-                      VC (VC'First + 1 .. VC'Last) & " variables processed.");
-         end if;
+         Put_Line ("RUN complete. " &
+                   RC (RC'First + 1 .. RC'Last) & " records and " &
+                   VC (VC'First + 1 .. VC'Last) & " variables processed.");
       end Print_Run_Complete;
 
       --  Issue #70 / ADR-055: SORT/AGGREGATE/TRANSPOSE/STATS used to reject
