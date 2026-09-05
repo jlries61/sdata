@@ -76,6 +76,7 @@ that might relitigate a settled question.
 | ADR-064 | Lexer `Token_Bad` sites raise Script_Error instead of printing and silently continuing | 2026-09-05 | Accepted |
 | ADR-065 | Status/bookkeeping messages reach the OUTPUT-file transcript unconditionally, matching design.md sec6.1 | 2026-09-05 | Accepted |
 | ADR-066 | Single-target SAVE (IF=...) routes through the multi-target registration path instead of the legacy fast-path, so its IF= filter is honored on auto-flush | 2026-09-05 | Accepted |
+| ADR-067 | String literals are single-line; an unterminated `"`/`'` string raises Script_Error instead of silently spanning lines or truncating at EOF | 2026-09-05 | Accepted |
 
 ---
 
@@ -2063,3 +2064,56 @@ auto-flush, re-opens the saved file and confirms only the `ID>1` row survived. C
 `tests/save_if_undefined_variable.cmd` and `tests/save_if_forward_reference.cmd` that flagged this
 as a known, unrelated, out-of-scope gap were updated to point at the new regression test instead.
 All 516 integration tests and all unit-test suites pass (`make check`).
+
+### ADR-067: String literals are single-line; an unterminated `"`/`'` string raises Script_Error instead of silently spanning lines or truncating at EOF
+
+**Date:** 2026-09-05 | **Status:** Accepted
+
+**Context:** [sdata#88](https://github.com/jlries61/sdata/issues/88), filed as a deliberate
+out-of-scope adjacent finding surfaced by ADR-064's code review (same file, different bug shape:
+`Token_Bad` printed a diagnostic and silently continued, but the double- and single-quoted
+string-literal scanners in `src/lexer/sdata-lexer.adb` had **no unterminated-string detection at
+all**). Confirmed empirically: `printf 'LET X = "unterminated\nRUN\n' | sdata` consumed the rest of
+the source — potentially spanning multiple lines, since neither loop had a newline guard — as the
+string's content and returned a normal `Token_String_Literal` as if nothing were wrong.
+
+**Design decision needed first.** design.md's Literals section documented no multi-line string
+feature, and a `grep` for an embedded raw newline between matching quotes across all 515 `.cmd`
+integration tests found none outside comment lines — nothing in the existing corpus relies on a
+string literal spanning more than one line. Backtick-quoted identifiers, in the same file and
+immediately adjacent in the source, already draw exactly this line: `` unterminated or newline-
+containing backtick sequences are lexical errors `` (design.md, quoted-identifiers bullet). Applying
+the identical single-line convention to `"`/`'` string literals is therefore consistent with both
+the existing corpus and the file's own established sibling rule, not a new precedent.
+
+**Decision.** Both the double-quoted loop (`sdata-lexer.adb`, `elsif C = '"'`) and the single-quoted
+loop (`elsif C = '''`) now stop at `ASCII.LF` in addition to end-of-source, and raise `Script_Error
+with "unterminated string literal at line" & T.Line'Image` (`T.Line` is the string's *starting*
+line, set before the branch dispatch) whenever the loop exits without having consumed a genuine
+closing quote. The double-quoted loop needed a `Terminated` flag rather than a bare post-loop
+`Is_End_Of_Source` check, because its existing doubled-quote-escape handling (`""` → literal `"`,
+issue #52) already treats "provisionally consumed a `"`, then hit end-of-source" as a valid
+terminator — collapsing that into the same boolean the loop already needed to distinguish "found
+the true closing quote" from "ran off the end/hit a newline first" required no other restructuring.
+The single-quoted loop, having no escape handling, needed only the added `/= ASCII.LF` loop
+condition and replacing its unconditional `Advance` with a check ahead of it.
+
+**Consequences:** sdata-only (`src/lexer/sdata-lexer.adb`; lexer is sdata-only per ADR-040) — no
+sdata-core or data-vandal change. design.md's Character Literals bullet (§3.6) gained one line
+documenting the single-line-only rule, matching the sibling bullet already present for backtick
+identifiers. Four new regression tests: unterminated double-quoted and single-quoted literals in
+batch mode (both assert exit 1 via a `.exitcode` file, matching ADR-064's convention), a
+nested-in-expression case (`LET Y$ = "bad" + "unterminated`, proving the error isn't confined to a
+statement's leading token), and a `.repl`-marked REPL-mode recovery test modeled directly on
+`quoted_id_bad_repl_recovery.cmd`, confirming the session resets cleanly and keeps working
+afterward. No existing test needed rework — the pre-existing `string_doubled_quote.cmd`,
+`empty_string_roundtrip.cmd`, and similar well-formed-literal tests were unaffected, confirmed by a
+full `make check` run (520/520 integration tests, all unit-test suites) before and after.
+
+**Alternatives rejected:** treating true EOF as the only error condition and allowing raw newlines
+inside an otherwise-unterminated string (i.e., only detecting the "ran off the end of the file with
+no closing quote at all" case the issue's own suggested-fix section raised as an open question) —
+rejected because it would leave the exact multi-line-spanning behavior the issue's repro
+demonstrated (a string silently absorbing subsequent script lines as literal content) intact for
+any script that happens to reach EOF with *some* unmatched quote still open, which is a strictly
+worse failure mode than an immediate, precisely-located error at the line the string started on.

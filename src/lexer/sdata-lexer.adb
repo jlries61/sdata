@@ -339,7 +339,10 @@ package body SData.Lexer is
                end if;
             end;
 
-         --  Identify String Literals.
+         --  Identify String Literals.  String literals are single-line (like
+         --  the backtick-quoted identifier below); a newline or EOF reached
+         --  before the closing quote is a lex error (issue #88), not a
+         --  silently-accepted multi-line literal or a silently-truncated one.
          elsif C = '"' then
             T.Kind := Token_String_Literal;
             Advance (Ctx); -- skip opening quote
@@ -350,34 +353,53 @@ package body SData.Lexer is
             --  ("""x"), end ("y"""), and a string that is only an escaped
             --  quote ("""") -- and leaves the empty string ("") intact
             --  (issue #52).  The closing quote is consumed inside the loop.
-            while not Is_End_Of_Source (Ctx) loop
-               if Current_Char (Ctx) = '"' then
-                  Advance (Ctx); -- consume the quote
-                  exit when Is_End_Of_Source (Ctx)
-                     or else Current_Char (Ctx) /= '"';
-                  --  Second consecutive quote: an escaped literal ".
-                  T.Length := T.Length + 1;
-                  T.Text (T.Length) := '"';
-                  Advance (Ctx); -- consume it and continue within the string
-               else
-                  T.Length := T.Length + 1;
-                  T.Text (T.Length) := Current_Char (Ctx);
-                  Advance (Ctx);
+            declare
+               Terminated : Boolean := False;
+            begin
+               while not Is_End_Of_Source (Ctx)
+                 and then Current_Char (Ctx) /= ASCII.LF
+               loop
+                  if Current_Char (Ctx) = '"' then
+                     Advance (Ctx); -- consume the quote
+                     if Is_End_Of_Source (Ctx)
+                       or else Current_Char (Ctx) /= '"'
+                     then
+                        Terminated := True;
+                        exit;
+                     end if;
+                     --  Second consecutive quote: an escaped literal ".
+                     T.Length := T.Length + 1;
+                     T.Text (T.Length) := '"';
+                     Advance (Ctx); -- consume it, continue within the string
+                  else
+                     T.Length := T.Length + 1;
+                     T.Text (T.Length) := Current_Char (Ctx);
+                     Advance (Ctx);
+                  end if;
+               end loop;
+               if not Terminated then
+                  raise Script_Error with
+                    "unterminated string literal at line" & T.Line'Image;
                end if;
-            end loop;
+            end;
 
          --  Single-quoted string literals.
          elsif C = ''' then
             T.Kind := Token_String_Literal;
             Advance (Ctx); -- skip opening quote
-            while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= ''' loop
+            while not Is_End_Of_Source (Ctx)
+              and then Current_Char (Ctx) /= '''
+              and then Current_Char (Ctx) /= ASCII.LF
+            loop
                T.Length := T.Length + 1;
                T.Text (T.Length) := Current_Char (Ctx);
                Advance (Ctx);
             end loop;
-            if not Is_End_Of_Source (Ctx) then
-               Advance (Ctx); -- skip closing quote
+            if Is_End_Of_Source (Ctx) or else Current_Char (Ctx) = ASCII.LF then
+               raise Script_Error with
+                 "unterminated string literal at line" & T.Line'Image;
             end if;
+            Advance (Ctx); -- skip closing quote
 
          --  Backtick-quoted identifier: `name`. Lets users reference column
          --  names that collide with reserved keywords or contain spaces/dots.

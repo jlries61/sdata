@@ -326,6 +326,7 @@ Usage with LET/SET:
 
   - Surrounded by single or double quotes.
   - The character missing value is the empty string (*""*); an empty character literal denotes missing.
+  - Single-line only: a closing quote must appear before the end of the line or end of source. An unterminated string literal is a lexical error.
 
 ## 4. FILE I/O
 
