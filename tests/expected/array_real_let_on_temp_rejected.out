@@ -1,0 +1,2 @@
+Error: LET statement cannot modify temporary element "T(1)" of array "T"; use SET, or UNSET the underlying variable to convert it to permanent
+RUN complete. 1 records and 0 variables processed.

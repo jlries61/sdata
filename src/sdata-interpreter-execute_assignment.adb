@@ -6,23 +6,45 @@ separate (SData.Interpreter)
 procedure Execute_Assignment (Stmt : Statement_Access) is
 
    --  Array assignment: single-index, slice (Lo:Hi), or list (i,j,k).
-   --  Ownership rules (LET/SET vs permanent/temporary) are checked here.
+   --  Ownership rules (LET/SET vs permanent/temporary) are checked here, per
+   --  element (ADR-0023): a virtual array's constituents can differ in
+   --  storage class, so the array-level Is_Temporary_Array flag (always
+   --  False for virtual arrays) cannot decide this for them. A Real_Array's
+   --  elements share one class uniformly by construction, so per-element
+   --  and array-level agree there -- see
+   --  SData_Core.Variables.Array_Element_Is_Temporary's own contract.
    procedure Execute_Array_Assignment
      (Stmt     : Statement_Access;
       Var_Name : String;
       Result   : Value)
    is
       Prefix : constant String := (if Stmt.Kind = Stmt_LET then "LET " else "SET ");
+
+      function Element_Ref (Idx : Integer) return String is
+        (Var_Name & "(" & Ada.Strings.Fixed.Trim (Integer'Image (Idx), Ada.Strings.Both) & ")");
+
+      --  Raises if Idx's own constituent doesn't match the verb in use.
+      --  Called for every index in the target set before any write in the
+      --  same statement happens, so a slice/list spanning constituents of
+      --  mixed storage class fails atomically rather than partially.
+      procedure Validate_Element (Idx : Integer) is
+      begin
+         if Stmt.Kind = Stmt_LET and then Array_Element_Is_Temporary (Var_Name, Idx) then
+            raise Script_Error with
+              "LET statement cannot modify temporary element """ & Element_Ref (Idx)
+              & """ of array """ & Var_Name
+              & """; use SET, or UNSET the underlying variable to convert it to permanent";
+         elsif Stmt.Kind = Stmt_SET and then not Array_Element_Is_Temporary (Var_Name, Idx) then
+            raise Script_Error with
+              "SET statement cannot modify permanent element """ & Element_Ref (Idx)
+              & """ of array """ & Var_Name
+              & """; use LET, or DROP the underlying variable (effective after the next RUN) "
+              & "to convert it to temporary";
+         end if;
+      end Validate_Element;
    begin
       if not Has_Array (Var_Name) then
          raise Script_Error with "Array """ & Var_Name & """ is not defined";
-      end if;
-      if Stmt.Kind = Stmt_LET and then Is_Temporary_Array (Var_Name) then
-         raise Script_Error with
-           "LET statement cannot modify individual elements of temporary array """ & Var_Name & """";
-      elsif Stmt.Kind = Stmt_SET and then not Is_Temporary_Array (Var_Name) then
-         raise Script_Error with
-           "SET statement cannot modify individual elements of permanent or virtual array """ & Var_Name & """";
       end if;
 
       if Stmt.Arr_Idx_List /= null then
@@ -42,6 +64,9 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
                else raise Script_Error with "Array slice upper bound for """ & Var_Name & """ must be numeric";
                end if;
                for I in Lo .. Hi loop
+                  Validate_Element (I);
+               end loop;
+               for I in Lo .. Hi loop
                   Set_Array_Element (Var_Name, I, Result);
                end loop;
                Debug_Trace (Prefix & Var_Name & "("
@@ -51,11 +76,15 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
                             & ") = " & Debug_Value (Result), 3);
             end;
          else
-            --  List assignment: ARR(1,3,5) = value
+            --  List assignment: ARR(1,3,5) = value. Indices are evaluated
+            --  once into Indices (not re-evaluated for the write pass) so
+            --  validation and writing agree on the exact same target set.
             declare
+               package Index_Vectors is new Ada.Containers.Vectors (Positive, Integer);
                Node    : Expression_List := Stmt.Arr_Idx_List;
                Idx_Val : Value;
                Idx     : Integer;
+               Indices : Index_Vectors.Vector;
             begin
                while Node /= null loop
                   Idx_Val := Evaluate (Node.Expr);
@@ -63,8 +92,14 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
                   elsif Idx_Val.Kind = Val_Numeric then Idx := Integer (Real'Floor (Idx_Val.Num_Val));
                   else raise Script_Error with "Array index for """ & Var_Name & """ must be numeric";
                   end if;
-                  Set_Array_Element (Var_Name, Idx, Result);
+                  Indices.Append (Idx);
                   Node := Node.Next;
+               end loop;
+               for I of Indices loop
+                  Validate_Element (I);
+               end loop;
+               for I of Indices loop
+                  Set_Array_Element (Var_Name, I, Result);
                end loop;
                Debug_Trace (Prefix & Var_Name & "(...) = " & Debug_Value (Result), 3);
             end;
@@ -82,6 +117,7 @@ procedure Execute_Assignment (Stmt : Statement_Access) is
                   & """ must be numeric, not "
                   & (if Idx_Val.Kind = Val_Missing then "missing" else "a string");
             end if;
+            Validate_Element (Idx);
             Set_Array_Element (Var_Name, Idx, Result);
             Debug_Trace (Prefix & Var_Name & "("
                          & Ada.Strings.Fixed.Trim (Integer'Image (Idx), Ada.Strings.Both)
