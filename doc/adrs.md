@@ -68,6 +68,11 @@ that might relitigate a settled question.
 | ADR-056 | Declarative statement inside FOR/WHILE/DO-UNTIL: warn once per occurrence, don't reject | 2026-08-05 | Accepted |
 | ADR-057 | `.i`/`-.i`/`.n` typed literals construct Infinity/NaN directly; NaN's existing "never survives arithmetic" policy is preserved, not relaxed | 2026-08-08 | Accepted |
 | ADR-058 | SUBMIT inside a loop gets the same ADR-056 declarative-in-loop warning as inline use, deduplicated by submitted file path since SUBMIT re-parses fresh each call | 2026-08-24 | Accepted |
+| ADR-059 | NOTE — an Immediate-tier counterpart to PRINT that unconditionally rejects permanent variables | 2026-08-29 | Accepted |
+| ADR-060 | Parser errors raise Script_Error instead of printing and silently continuing | 2026-08-29 | Accepted |
+| ADR-061 | `Run_REPL` echoes each input line unconditionally, closing design.md's "Statement Echo" gap | 2026-08-31 | Accepted |
+| ADR-062 | Declarative/Immediate-tier expressions get the same unknown-function/arity checking as Deferred, by reusing `Check_Statement` — not by duplicating it | 2026-09-03 | Accepted |
+| ADR-063 | NOTE's permanent-variable rejection checks the resolved array *element*, not the array's declared class | 2026-09-05 | Accepted |
 
 ---
 

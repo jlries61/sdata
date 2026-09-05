@@ -159,7 +159,7 @@ tests/
   *.cmd                       -- integration test scripts (510)
 doc/
   SOFTWARE_STANDARDS_REVIEW.md  -- living standards audit (annotated)
-  adrs.md                     -- 61 ADRs (ADR-001 through ADR-061; contiguous)
+  adrs.md                     -- 63 ADRs (ADR-001 through ADR-063; contiguous)
   architecture.md             -- package map, execution model, repo layout
   specs/                      -- design specs for completed features
   plans/                      -- implementation plans (step-by-step task lists)
@@ -219,7 +219,7 @@ before implementing or modifying any language-visible behaviour.
 
 **Architecture Decision Records** — `doc/adrs.md`
 
-Markdown; read directly. Documents 61 ADRs (ADR-001 through ADR-061,
+Markdown; read directly. Documents 63 ADRs (ADR-001 through ADR-063,
 contiguous) with rationale and status. ADRs 039–043 cover the sdata-core /
 data-vandal split. Check for a relevant ADR before proposing a design change.
 
