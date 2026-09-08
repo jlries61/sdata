@@ -1,3 +1,9 @@
+sdata (0.26.0-1) unstable; urgency=medium
+
+  * Fix single-target SAVE (IF=...) silently ignoring its filter (#82); fix unterminated double/single-quoted string literals having no diagnostic (#88).
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 08 Sep 2026 10:00:45 -0700
+
 sdata (0.25.0-1) unstable; urgency=medium
 
   * Fix OUTPUT-file transcript dropping status messages under -q (ADR-065, closes #81)
