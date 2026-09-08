@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.26.0
+Version:        0.27.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Sep 08 2026 John L. Ries <john@theyarnbard.com> - 0.27.0-1
+- Format STATS' default text output as a SAS PROC MEANS-style boxed table instead of the generic DISPLAY row dump (ADR-068).
+
 * Tue Sep 08 2026 John L. Ries <john@theyarnbard.com> - 0.26.0-1
 - Fix single-target SAVE (IF=...) silently ignoring its filter (#82); fix unterminated double/single-quoted string literals having no diagnostic (#88).
 
