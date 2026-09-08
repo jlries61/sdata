@@ -77,6 +77,7 @@ that might relitigate a settled question.
 | ADR-065 | Status/bookkeeping messages reach the OUTPUT-file transcript unconditionally, matching design.md sec6.1 | 2026-09-05 | Accepted |
 | ADR-066 | Single-target SAVE (IF=...) routes through the multi-target registration path instead of the legacy fast-path, so its IF= filter is honored on auto-flush | 2026-09-05 | Accepted |
 | ADR-067 | String literals are single-line; an unterminated `"`/`'` string raises Script_Error instead of silently spanning lines or truncating at EOF | 2026-09-05 | Accepted |
+| ADR-068 | STATS' default text output is a SAS PROC MEANS-style "minimal box" table (Display_Stats_Table) instead of the generic DISPLAY row dump | 2026-09-08 | Accepted |
 
 ---
 
@@ -2117,3 +2118,93 @@ rejected because it would leave the exact multi-line-spanning behavior the issue
 demonstrated (a string silently absorbing subsequent script lines as literal content) intact for
 any script that happens to reach EOF with *some* unmatched quote still open, which is a strictly
 worse failure mode than an immediate, precisely-located error at the line the string started on.
+
+### ADR-068: STATS' default text output is a SAS PROC MEANS-style "minimal box" table instead of the generic DISPLAY row dump
+
+**Date:** 2026-09-08 | **Status:** Accepted
+
+**Context:** User request (not from the audit backlog). design.md §7.1 and ADR-048 already frame
+`STATS` as "SData's PROC MEANS analogue," but its default printed output (unless `/NOPRINT`) was
+always the generic `Display_All_Columns` renderer shared with bare `DISPLAY` — a `REC#`-numbered,
+unpadded, space-separated row dump with no visual structure:
+
+```
+REC# CATEGORY$ _NAME_$ N MIN MEAN MAX STD
+1 A VAL1 2 1.00000 2.50000 4.00000 2.12132
+2 B VAL1 3 7.00000 10.00000 13.00000 3.00000
+3 C VAL1 1 16.00000 16.00000 16.00000 .
+```
+
+No renderer anywhere in sdata produced fixed-width, right-aligned, box-ruled columns — confirmed via
+`Display_All_Columns` and `TABLES`' own frequency-table printer, both unpadded and single-space-
+separated.
+
+**Decision.** A new procedure, `Display_Stats_Table` (`src/sdata-interpreter.adb`), replaces the
+`Display_All_Columns` call in `Execute_Stats`. It renders a "minimal box" style — chosen by the user
+from three mockup options (a full-fidelity style with a "The MEANS Procedure" title banner and a
+centered BY-group banner; this minimal style; and a light-touch rule-lines-only variant on the old
+layout):
+
+```
+CATEGORY$ = A
+Variable  N       MIN      MEAN       MAX      STD
+--------------------------------------------------
+VAL1      2   1.00000   2.50000   4.00000  2.12132
+--------------------------------------------------
+
+CATEGORY$ = B
+Variable  N       MIN      MEAN       MAX      STD
+--------------------------------------------------
+VAL1      3   7.00000  10.00000  13.00000  3.00000
+--------------------------------------------------
+```
+
+- A left-justified `Variable` column (from the result table's `_NAME_$` column, renamed only in the
+  printed header — the underlying schema/column name is untouched) plus one right-justified column
+  per requested statistic, **in the caller's own `/STATS=` order** — never re-sorted to SAS's
+  canonical `N`/`Mean`/`Std Dev`/`Min`/`Max` order or restricted to SAS's five statistics, since
+  `STATS` already supports statistics PROC MEANS doesn't (`SUM`, `GMEAN`, `HMEAN`, `MEDIAN`, `VAR`,
+  `NMISS`).
+- No title banner. An active `BY` group gets a plain `KEY = value[, KEY2 = value2...]` label line
+  above its own box (comma-joined for 2+ BY variables); a blank line separates consecutive boxes.
+- The `_NAME_$` column is located **by name**, not via the interpreter's live `By_Var_Count` —
+  `STATS` clears the active `BY` as part of its own teardown before this print step ever runs
+  (already documented in §7.1; empirically confirmed by `tests/stats_by_cleared.cmd`), so
+  `By_Var_Count` can already read 0 even when the just-built result table does have BY-key columns.
+  Everything before `_NAME_$` in the schema is a BY-key column; everything after it is a stat
+  column, matching `SData_Core.Commands.Execute_STATS`'s own emission order
+  (`sdata-core/src/sdata_core-commands.adb`), confirmed strictly group-major/variable-minor (no
+  re-sort needed to detect group boundaries by contiguous-row comparison).
+- Column widths are computed **once, globally** across the whole result table, not per BY-group, so
+  every group's box shares identical column widths — verified with a new regression test
+  (`tests/stats_width_consistency.cmd`) using two BY-groups with visibly different value
+  magnitudes.
+- Reuses `SData_Core.Values.To_String_Formatted` for every cell — no new numeric-formatting code;
+  precision, `NaN`/`Inf`, and the missing-value `.` all come for free and render correctly padded
+  in a right-justified column.
+- `Display_All_Columns` itself is untouched — confirmed via `grep -rn "Display_All_Columns"
+  src/*.adb` (exactly 2 call sites; the other, bare `DISPLAY`, is unaffected) and via a byte-
+  identical diff on two existing non-STATS `DISPLAY` tests. Zero sdata-core involvement —
+  `Execute_STATS` (sdata-core) only builds the result table; the print step is entirely sdata-side.
+
+**Consequences:** §7.1's STATS entry gained one sentence describing the new default printed layout
+(previously it documented only the result schema, never how it was rendered). No HELP or man-page
+change — both describe only STATS' syntax/schema, never its printed layout, confirmed by direct
+inspection before deciding no update was needed. 17 existing STATS-output tests re-baselined to the
+new format (underlying values confirmed unchanged — `Execute_STATS` itself was not touched, so
+re-baselining is purely a rendering change); 2 new regression tests added (array-expansion + active
+`BY` combined, not covered by any prior fixture; and the cross-group width-consistency case above).
+STATS over zero result rows (e.g. a `SELECT` excluding every row) now prints `"(No rows to display)"`
+instead of the old bare header with nothing under it — a gap the original algorithm didn't address,
+resolved during implementation as a clearer message, not a spec deviation. A multi-BY-variable (or
+character-valued single-BY) group label line joins `"<Name> = <value>"` pairs with `", "` with no
+quoting or escaping; a category value that itself contains a literal `", "` or `" = "` is
+theoretically ambiguous in the printed label, matching `TABLES`' own unescaped category-value
+printing — cosmetic only, not tracked by a test, and not expected to be reached in practice.
+
+Version bump: minor, matching the established precedent (ADR-060/064/065/066/067) for a
+documented-default-behavior change — STATS' default printed output shape changes for every user, not
+an internal-only fix. Full SSD rail: brief → architect → systems-designer (`block_conditions_met:
+true`) → coder → code-reviewer (round 1, 0 BLOCKER/MAJOR, 2 non-blocking SUGGESTIONs, `gate_pass:
+true`). Full review trail: `.ssd/features/stats-proc-means-format/{00-brief,01-architect,
+02-systems-designer,03-coder-status,04-code-review}.md`.

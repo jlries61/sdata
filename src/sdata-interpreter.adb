@@ -958,10 +958,11 @@ package body SData.Interpreter is
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context) is separate;
 
    --  Render every column of the current (filtered) table to console, in the
-   --  DISPLAY format (REC# header + one line per logical row).  Shared by the
-   --  bare DISPLAY command (Execute_Metadata) and by STATS' default printout
-   --  (Execute_Stats).  Declared here, before the Execute_Metadata stub, so the
-   --  metadata subunit can call it.
+   --  DISPLAY format (REC# header + one line per logical row).  Used by the
+   --  bare DISPLAY command (Execute_Metadata).  Declared here, before the
+   --  Execute_Metadata stub, so the metadata subunit can call it.  STATS has
+   --  its own renderer, Display_Stats_Table below, since ADR-068 -- the two
+   --  are no longer shared.
    procedure Display_All_Columns is
       V    : Name_Vectors.Vector;
       Rows : constant Natural := SData_Core.Table.Logical_Row_Count;
@@ -992,6 +993,147 @@ package body SData.Interpreter is
          end;
       end loop;
    end Display_All_Columns;
+
+   --  STATS' own default printout (ADR-068): a SAS PROC MEANS-style "minimal
+   --  box" table -- a left-justified Variable column (from the result
+   --  table's _NAME_$ column) plus one right-justified column per requested
+   --  statistic, in Execute_STATS' own emission order (the caller's /STATS=
+   --  order, never re-sorted to a SAS canonical order).  When BY variables
+   --  are active, each contiguous run of rows sharing the same BY-key
+   --  values gets a plain "KEY = value[, KEY2 = value2...]" label line
+   --  before its own box, with a blank line between consecutive boxes.
+   --
+   --  The result table's schema is always [BY columns] _NAME_$ [stat
+   --  columns] (SData_Core.Commands.Execute_STATS, sdata-core).  This
+   --  procedure locates _NAME_$ by name rather than trusting the
+   --  interpreter's live By_Var_Count, because STATS clears the active BY
+   --  as part of its own teardown before this print step ever runs
+   --  (design.md sec7.1; empirically confirmed by tests/stats_by_cleared.cmd)
+   --  -- By_Var_Count could already read 0 by now even when the just-built
+   --  result table does have BY-key columns.
+   --
+   --  Column widths are computed once, globally across the whole result
+   --  table, not per BY-group, so every group's box lines up identically.
+   procedure Display_Stats_Table is
+      Name_Col : Natural := 0;
+   begin
+      for I in 1 .. Column_Count loop
+         if To_Upper (Column_Name (I)) = "_NAME_$" then
+            Name_Col := I;
+            exit;
+         end if;
+      end loop;
+
+      if Name_Col = 0 then
+         Put_Line ("STATS: internal error - _NAME_$ column not found in result table");
+         return;
+      end if;
+
+      declare
+         Rows       : constant Natural := SData_Core.Table.Logical_Row_Count;
+         Stat_First : constant Positive := Name_Col + 1;
+         Stat_Count : constant Natural := Column_Count - Name_Col;
+         Gap        : constant String := "  ";
+         Var_Header : constant String := "Variable";
+
+         --  Widths (0) is the Variable column; Widths (1 .. Stat_Count)
+         --  are the stat columns, indexed by (table column - Name_Col).
+         Widths : array (0 .. Stat_Count) of Natural;
+
+         function Var_Cell (R : Positive) return String is
+           (To_String_Formatted
+              (Get_Value_Upper (Logical_To_Physical (R), Column_Name (Name_Col))));
+
+         function Stat_Cell (R : Positive; Col : Positive) return String is
+           (To_String_Formatted
+              (Get_Value_Upper (Logical_To_Physical (R), Column_Name (Col))));
+
+         function Group_Key (R : Positive) return String is
+            S : Unbounded_String;
+         begin
+            for I in 1 .. Name_Col - 1 loop
+               if I > 1 then
+                  Append (S, ", ");
+               end if;
+               Append (S, Column_Name (I) & " = " &
+                          To_String_Formatted
+                            (Get_Value_Upper (Logical_To_Physical (R), Column_Name (I))));
+            end loop;
+            return To_String (S);
+         end Group_Key;
+
+         Rule_Width : Natural;
+
+         procedure Print_Rule is
+         begin
+            Put_Line ((1 .. Rule_Width => '-'));
+         end Print_Rule;
+
+         procedure Print_Header is
+         begin
+            Put (Ada.Strings.Fixed.Head (Var_Header, Widths (0)));
+            for C in Stat_First .. Column_Count loop
+               Put (Gap & Ada.Strings.Fixed.Tail (Column_Name (C), Widths (C - Name_Col)));
+            end loop;
+            New_Line;
+         end Print_Header;
+
+         Prev_Key    : Unbounded_String;
+         First_Group : Boolean := True;
+      begin
+         if Rows = 0 then
+            Put_Line ("(No rows to display)");
+            return;
+         end if;
+
+         --  Pass 1: compute column widths from headers and every cell.
+         Widths (0) := Var_Header'Length;
+         for C in Stat_First .. Column_Count loop
+            Widths (C - Name_Col) := Column_Name (C)'Length;
+         end loop;
+         for R in 1 .. Rows loop
+            Widths (0) := Natural'Max (Widths (0), Var_Cell (R)'Length);
+            for C in Stat_First .. Column_Count loop
+               Widths (C - Name_Col) :=
+                 Natural'Max (Widths (C - Name_Col), Stat_Cell (R, C)'Length);
+            end loop;
+         end loop;
+
+         Rule_Width := Widths (0);
+         for Idx in 1 .. Stat_Count loop
+            Rule_Width := Rule_Width + Gap'Length + Widths (Idx);
+         end loop;
+
+         --  Pass 2: print, grouping contiguous rows that share a BY-key.
+         for R in 1 .. Rows loop
+            declare
+               Key : constant String := Group_Key (R);
+            begin
+               if R = 1 or else Key /= To_String (Prev_Key) then
+                  if not First_Group then
+                     Print_Rule;
+                     New_Line;
+                  end if;
+                  First_Group := False;
+                  if Name_Col > 1 then
+                     Put_Line (Key);
+                  end if;
+                  Print_Header;
+                  Print_Rule;
+                  Prev_Key := To_Unbounded_String (Key);
+               end if;
+            end;
+
+            Put (Ada.Strings.Fixed.Head (Var_Cell (R), Widths (0)));
+            for C in Stat_First .. Column_Count loop
+               Put (Gap & Ada.Strings.Fixed.Tail (Stat_Cell (R, C), Widths (C - Name_Col)));
+            end loop;
+            New_Line;
+         end loop;
+
+         Print_Rule;
+      end;
+   end Display_Stats_Table;
 
    --  KEEP / DROP / HOLD / UNHOLD / UNSET / RENAME / ARRAY / DIM / NAMES.
    procedure Execute_Metadata (Stmt : Statement_Access) is separate;
@@ -1608,9 +1750,9 @@ package body SData.Interpreter is
 
    --  STATS (immediate).  Converts the AST lists into the core Stats_Options,
    --  delegates to SData_Core.Commands.Execute_STATS, then prints the result
-   --  table via the DISPLAY renderer unless /NOPRINT was given.  Issue #70 /
-   --  ADR-055: a pending program is no longer rejected here -- see
-   --  Execute_Aggregate's comment.
+   --  table via Display_Stats_Table (ADR-068) unless /NOPRINT was given.
+   --  Issue #70 / ADR-055: a pending program is no longer rejected here --
+   --  see Execute_Aggregate's comment.
    procedure Execute_Stats (Stmt : Statement_Access) is
       Opts : SData_Core.Commands.Stats_Options;
    begin
@@ -1638,7 +1780,7 @@ package body SData.Interpreter is
       SData_Core.Commands.Execute_STATS (Opts);
 
       if not Stmt.Stats_No_Print then
-         Display_All_Columns;
+         Display_Stats_Table;
       end if;
 
       declare

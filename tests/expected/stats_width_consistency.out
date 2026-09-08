@@ -1,0 +1,13 @@
+Dataset opened: tests/data/stats_width_consistency.csv
+CAT$ = A
+Variable        MEAN
+--------------------
+VAL          1.50000
+--------------------
+
+CAT$ = B
+Variable        MEAN
+--------------------
+VAL       1500.00000
+--------------------
+STATS complete. 2 records and 3 variables processed.

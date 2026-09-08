@@ -215,7 +215,8 @@ begin
 
       when Stmt_DISPLAY =>
          if Stmt.Vars = null then
-            --  Bare DISPLAY: render every column (shared with STATS).
+            --  Bare DISPLAY: render every column.  STATS has its own
+            --  renderer (Display_Stats_Table, ADR-068) -- no longer shared.
             Display_All_Columns;
             return;
          end if;
