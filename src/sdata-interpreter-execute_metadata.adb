@@ -215,14 +215,14 @@ begin
 
       when Stmt_DISPLAY =>
          if Stmt.Vars = null then
-            --  Bare DISPLAY: render every column.  STATS has its own
-            --  renderer (Display_Stats_Table, ADR-068) -- no longer shared.
+            --  Bare DISPLAY: render every column via the "all columns"
+            --  entry point (Display_All_Columns, itself a thin delegation
+            --  to the shared Display_Table renderer since ADR-069).
             Display_All_Columns;
             return;
          end if;
          declare
-            V    : Name_Vectors.Vector;
-            Rows : constant Natural := SData_Core.Table.Logical_Row_Count;
+            V : Name_Vectors.Vector;
          begin
             declare
                   Curr : Variable_List := Stmt.Vars;
@@ -264,26 +264,9 @@ begin
                   end loop;
                end;
 
-            if V.Is_Empty then
-               Put_Line ("(No columns to display)");
-               return;
-            end if;
-
-            Put ("REC# ");
-            for Name of V loop Put (To_String (Name) & " "); end loop;
-            New_Line;
-
-            for R in 1 .. Rows loop
-               declare
-                  Phys_R : constant Positive := SData_Core.Table.Logical_To_Physical (R);
-               begin
-                  Put (Ada.Strings.Fixed.Trim (R'Image, Ada.Strings.Both) & " ");
-                  for Name of V loop
-                     Put (To_String_Formatted (Get_Value_Upper (Phys_R, To_String (Name))) & " ");
-                  end loop;
-                  New_Line;
-               end;
-            end loop;
+            --  Display_Table (ADR-069) prints "(No columns to display)"
+            --  itself when V is empty -- no separate check needed here.
+            Display_Table (V);
          end;
       when others => null;
    end case;

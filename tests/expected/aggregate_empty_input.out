@@ -1,3 +1,5 @@
 Dataset opened: tests/data/sample.csv
 AGGREGATE complete. 0 records and 3 variables processed.
-REC# CATEGORY$ NREC TOT 
+Obs  CATEGORY$  NREC  TOT
+-------------------------
+-------------------------

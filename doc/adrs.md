@@ -78,6 +78,7 @@ that might relitigate a settled question.
 | ADR-066 | Single-target SAVE (IF=...) routes through the multi-target registration path instead of the legacy fast-path, so its IF= filter is honored on auto-flush | 2026-09-05 | Accepted |
 | ADR-067 | String literals are single-line; an unterminated `"`/`'` string raises Script_Error instead of silently spanning lines or truncating at EOF | 2026-09-05 | Accepted |
 | ADR-068 | STATS' default text output is a SAS PROC MEANS-style "minimal box" table (Display_Stats_Table) instead of the generic DISPLAY row dump | 2026-09-08 | Accepted |
+| ADR-069 | DISPLAY's two default-print code paths are consolidated into one shared Display_Table renderer producing a SAS PROC PRINT-style boxed table (Obs column, left/right-justified per column type) | 2026-09-08 | Accepted |
 
 ---
 
@@ -2208,3 +2209,74 @@ an internal-only fix. Full SSD rail: brief → architect → systems-designer (`
 true`) → coder → code-reviewer (round 1, 0 BLOCKER/MAJOR, 2 non-blocking SUGGESTIONs, `gate_pass:
 true`). Full review trail: `.ssd/features/stats-proc-means-format/{00-brief,01-architect,
 02-systems-designer,03-coder-status,04-code-review}.md`.
+
+### ADR-069: DISPLAY's two default-print code paths are consolidated into one shared Display_Table renderer producing a SAS PROC PRINT-style boxed table
+
+**Date:** 2026-09-08 | **Status:** Accepted
+
+**Context:** User request, direct follow-on from ADR-068 (STATS modeled on PROC MEANS): model
+`DISPLAY`'s output on SAS PROC PRINT. `DISPLAY` had **two separate code paths** producing the same
+unpadded, `REC#`-numbered, space-separated flat format: bare `DISPLAY` via `Display_All_Columns`
+(`src/sdata-interpreter.adb`), and `DISPLAY <varlist>` via a near-duplicate inline block in
+`src/sdata-interpreter-execute_metadata.adb` — identical print logic, differing only in which
+column-name list was iterated. Unlike `STATS`, `DISPLAY` is not `BY`-grouped (confirmed: design.md's
+DISPLAY entry never mentions `BY`, and neither code path ever inspected `By_Var_Count`) — a
+materially simpler design than ADR-068's.
+
+**Decision.** A new procedure, `Display_Table (Cols : Name_Vectors.Vector)`
+(`src/sdata-interpreter.adb`), replaces both print loops. `Display_All_Columns` is kept as a named
+"all columns" entry point — a thin wrapper (build the full column list, delegate) rather than
+deleted — since it remains a meaningful, independently-nameable concept. The `DISPLAY <varlist>`
+block's existing `Resolve` logic (bare names, `A-Z` ranges, colon-ranges) is **entirely unchanged**;
+only its final print loop is replaced with a call to `Display_Table`.
+
+```
+Obs  CATEGORY$      VAL1      VAL2      VAL3
+--------------------------------------------
+  1  A           1.00000   2.00000   3.00000
+  2  A           4.00000   5.00000   6.00000
+  3  B           7.00000   8.00000   9.00000
+```
+
+- An `Obs` column (renamed from `REC#`, same `1 .. Logical_Row_Count` numbering — a pure label
+  change, no logic change) plus one column per displayed variable.
+- **Right-justified for numeric/integer columns, left-justified for character columns**, via
+  `SData_Core.Table.Get_Column_Type`. `Get_Column_Type` raises `Constraint_Error` for a column name
+  that doesn't exist — but a `DISPLAY` varlist may legitimately name one (a typo), which today
+  silently prints `.` via `Get_Value_Upper`'s own missing-value fallback, no error at all. Every
+  `Get_Column_Type` call is guarded with `Has_Column` first (confirmed exception-free); an unknown
+  column defaults to right-justified rather than crashing where the old flat renderer never did.
+- Column widths computed once, globally, across the whole displayed row set — same two-pass
+  approach as `Display_Stats_Table` (ADR-068).
+- **A zero-row result still prints an empty box** (header + rule + rule, no data rows) — the
+  **opposite** of ADR-068's `"(No rows to display)"` message for `STATS`. Deliberate, not
+  inconsistent: `STATS` computing zero result rows is an unusual edge case where a bare header
+  reads as truncated output; `DISPLAY` showing zero rows (a `SELECT`-filtered or freshly-empty
+  table) is an ordinary, expected outcome of browsing data, and printing the empty box preserves
+  `DISPLAY`'s own long-established "you can see the column layout even with no data" behavior,
+  just in the new boxed shape. The pre-existing `"(No columns to display)"` guard (zero *columns*,
+  a different condition) is untouched.
+
+**Consequences:** design.md's DISPLAY entry gained a sentence describing the new boxed layout and
+the `Obs` column, replacing the stale "record-number column" phrasing. No HELP or man-page change —
+both describe only syntax, never `REC#` or any layout detail, confirmed by direct inspection. 52
+existing tests re-baselined (underlying values confirmed unchanged via a token-level diff excluding
+the `REC#`/`Obs` header word and rule lines — zero true mismatches across all 52, not just spot-
+checked). 3 new regression tests: an unknown-column-in-varlist crash guard (`DISPLAY VAL1
+BOGUSVAR`, confirming no `Constraint_Error` and the same `.` output as before), an explicit
+character-vs-numeric justification pin, and the empty-box case (`SELECT` filtering out every row,
+then `DISPLAY`). Zero sdata-core involvement — both code paths read the table directly via
+`SData_Core.Table` accessors; confirmed via direct inspection, matching ADR-068's own shape.
+
+**Incidental finding, explicitly out of scope**: while testing the empty-box case, confirmed that
+`DISPLAY` immediately after `SELECT` with no intervening `RUN` does **not** see the filter take
+effect — not a bug, but CLAUDE.md's own documented architecture (`SELECT`'s `Filter_Map` is rebuilt
+at the start of each `Run_One_Step`, i.e. on `RUN`, not when `SELECT` itself executes). Confirmed
+pre-existing via a stashed-and-rebuilt comparison against the pre-ADR-069 binary — identical
+behavior before and after this change. Not a `DISPLAY`/ADR-069 concern; noted for the record only
+because it was surfaced by this workstream's own testing, not because anything here caused or fixes
+it.
+
+Version bump: minor, matching the established documented-default-behavior precedent
+(ADR-060/064/065/066/067/068).
+

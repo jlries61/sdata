@@ -906,7 +906,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>DISPLAY</em></td>
 <td><em>DISPLAY</em> [&lt;<em>varname</em>&gt;...]</td>
 <td>Immediate Execution</td>
-<td>Show the current Data Table as a formatted table with a record-number column. With no arguments all columns are shown; with a variable list only those columns appear. Column ranges are supported (e.g. <em>DISPLAY A-Z</em>). Respects any active <em>SELECT</em> filter.</td>
+<td>Show the current Data Table as a boxed, one-row-per-record table (SAS PROC PRINT-style: an <em>Obs</em> column plus one right-justified column per numeric/integer variable and one left-justified column per character variable, with header and rule lines). With no arguments all columns are shown; with a variable list only those columns appear. Column ranges are supported (e.g. <em>DISPLAY A-Z</em>). Respects any active <em>SELECT</em> filter.</td>
 </tr>
 <tr>
 <td><em>DO</em>/<em>UNTIL</em></td>

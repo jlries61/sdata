@@ -1,3 +1,5 @@
 Dataset opened: tests/data/transpose_simple.csv
 TRANSPOSE complete. 0 records and 1 variables processed.
-REC# _NAME_$ 
+Obs  _NAME_$
+------------
+------------

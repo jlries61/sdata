@@ -957,41 +957,132 @@ package body SData.Interpreter is
    --  IF / WHILE / FOR / LOOP_REPEAT / SELECT — all control flow constructs.
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context) is separate;
 
-   --  Render every column of the current (filtered) table to console, in the
-   --  DISPLAY format (REC# header + one line per logical row).  Used by the
-   --  bare DISPLAY command (Execute_Metadata).  Declared here, before the
-   --  Execute_Metadata stub, so the metadata subunit can call it.  STATS has
-   --  its own renderer, Display_Stats_Table below, since ADR-068 -- the two
-   --  are no longer shared.
-   procedure Display_All_Columns is
-      V    : Name_Vectors.Vector;
-      Rows : constant Natural := SData_Core.Table.Logical_Row_Count;
+   --  Shared renderer for DISPLAY (ADR-069): a SAS PROC PRINT-style boxed
+   --  table -- an Obs column (sequential over the SELECT-filtered logical
+   --  row order, the same numbering the old REC# column used) plus one
+   --  column per name in Cols, right-justified for numeric/integer columns
+   --  and left-justified for character columns.  Column widths are
+   --  computed once, globally, before any output is written (same two-pass
+   --  approach as Display_Stats_Table).
+   --
+   --  Unlike Display_Stats_Table, DISPLAY has no BY-grouping (design.md's
+   --  DISPLAY entry never mentions BY, and neither call site below ever
+   --  inspected By_Var_Count) -- this always renders exactly one box.  A
+   --  zero-row result still prints the header + rule + rule with no data
+   --  rows -- deliberately the opposite of ADR-068's "(No rows to
+   --  display)" message for STATS; see ADR-069's Consequences for why the
+   --  two commands' zero-row cases read differently to a user.
+   --
+   --  SData_Core.Table.Get_Column_Type raises Constraint_Error for a
+   --  column name that doesn't exist, but a DISPLAY varlist may name one
+   --  (a typo) -- Has_Column guards every call so an unknown column
+   --  degrades to right-justified rather than crashing, matching the
+   --  pre-existing silent "." behaviour Get_Value_Upper already gives a
+   --  missing column (see Execute_Metadata's Resolve, which never
+   --  validates a varlist name against the schema either).
+   procedure Display_Table (Cols : Name_Vectors.Vector) is
    begin
-      for I in 1 .. Column_Count loop
-         V.Append (To_Unbounded_String (Column_Name (I)));
-      end loop;
-
-      if V.Is_Empty then
+      if Cols.Is_Empty then
          Put_Line ("(No columns to display)");
          return;
       end if;
 
-      Put ("REC# ");
-      for Name of V loop Put (To_String (Name) & " "); end loop;
-      New_Line;
+      declare
+         Rows       : constant Natural := SData_Core.Table.Logical_Row_Count;
+         Col_Count  : constant Positive := Positive (Cols.Length);
+         Gap        : constant String := "  ";
+         Obs_Header : constant String := "Obs";
 
-      for R in 1 .. Rows loop
-         declare
-            Phys_R : constant Positive := SData_Core.Table.Logical_To_Physical (R);
+         Widths       : array (0 .. Col_Count) of Natural;
+         Left_Justify : array (1 .. Col_Count) of Boolean;
+
+         function Col_Name (I : Positive) return String is
+           (To_String (Cols.Element (I)));
+
+         function Cell (R : Positive; I : Positive) return String is
+           (To_String_Formatted
+              (Get_Value_Upper (Logical_To_Physical (R), Col_Name (I))));
+
+         function Obs_Cell (R : Positive) return String is
+           (Ada.Strings.Fixed.Trim (R'Image, Ada.Strings.Both));
+
+         Rule_Width : Natural;
+
+         procedure Print_Rule is
          begin
-            Put (Ada.Strings.Fixed.Trim (R'Image, Ada.Strings.Both) & " ");
-            for Name of V loop
-               Put (To_String_Formatted
-                      (Get_Value_Upper (Phys_R, To_String (Name))) & " ");
+            Put_Line ((1 .. Rule_Width => '-'));
+         end Print_Rule;
+
+         procedure Print_Header is
+         begin
+            Put (Ada.Strings.Fixed.Tail (Obs_Header, Widths (0)));
+            for I in 1 .. Col_Count loop
+               Put (Gap);
+               if Left_Justify (I) then
+                  Put (Ada.Strings.Fixed.Head (Col_Name (I), Widths (I)));
+               else
+                  Put (Ada.Strings.Fixed.Tail (Col_Name (I), Widths (I)));
+               end if;
             end loop;
             New_Line;
-         end;
+         end Print_Header;
+
+      begin
+         for I in 1 .. Col_Count loop
+            Left_Justify (I) :=
+              Has_Column (Col_Name (I))
+              and then Get_Column_Type (Col_Name (I)) = Col_String;
+         end loop;
+
+         --  Pass 1: compute column widths from headers and every cell.
+         Widths (0) := Obs_Header'Length;
+         for I in 1 .. Col_Count loop
+            Widths (I) := Col_Name (I)'Length;
+         end loop;
+         for R in 1 .. Rows loop
+            Widths (0) := Natural'Max (Widths (0), Obs_Cell (R)'Length);
+            for I in 1 .. Col_Count loop
+               Widths (I) := Natural'Max (Widths (I), Cell (R, I)'Length);
+            end loop;
+         end loop;
+
+         Rule_Width := Widths (0);
+         for I in 1 .. Col_Count loop
+            Rule_Width := Rule_Width + Gap'Length + Widths (I);
+         end loop;
+
+         --  Pass 2: print.  Header + rule + rule always appear, even with
+         --  zero rows (design decision -- see procedure header comment).
+         Print_Header;
+         Print_Rule;
+         for R in 1 .. Rows loop
+            Put (Ada.Strings.Fixed.Tail (Obs_Cell (R), Widths (0)));
+            for I in 1 .. Col_Count loop
+               Put (Gap);
+               if Left_Justify (I) then
+                  Put (Ada.Strings.Fixed.Head (Cell (R, I), Widths (I)));
+               else
+                  Put (Ada.Strings.Fixed.Tail (Cell (R, I), Widths (I)));
+               end if;
+            end loop;
+            New_Line;
+         end loop;
+         Print_Rule;
+      end;
+   end Display_Table;
+
+   --  "All columns" entry point for bare DISPLAY -- kept as its own named
+   --  procedure (rather than inlined at the one call site) since it is a
+   --  meaningful, independently-nameable concept.  Since ADR-069, this is
+   --  a thin delegation to the shared Display_Table renderer above, not
+   --  its own copy of the print logic.
+   procedure Display_All_Columns is
+      Cols : Name_Vectors.Vector;
+   begin
+      for I in 1 .. Column_Count loop
+         Cols.Append (To_Unbounded_String (Column_Name (I)));
       end loop;
+      Display_Table (Cols);
    end Display_All_Columns;
 
    --  STATS' own default printout (ADR-068): a SAS PROC MEANS-style "minimal
