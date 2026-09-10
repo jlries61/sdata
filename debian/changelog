@@ -1,3 +1,9 @@
+sdata (0.28.0-1) unstable; urgency=medium
+
+  * Model DISPLAY's text output on SAS PROC PRINT (ADR-069).
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 10 Sep 2026 08:29:12 -0700
+
 sdata (0.27.0-1) unstable; urgency=medium
 
   * Format STATS' default text output as a SAS PROC MEANS-style boxed table instead of the generic DISPLAY row dump (ADR-068).

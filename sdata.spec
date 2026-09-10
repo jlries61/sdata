@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.27.0
+Version:        0.28.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Sep 10 2026 John L. Ries <john@theyarnbard.com> - 0.28.0-1
+- Model DISPLAY's text output on SAS PROC PRINT (ADR-069).
+
 * Tue Sep 08 2026 John L. Ries <john@theyarnbard.com> - 0.27.0-1
 - Format STATS' default text output as a SAS PROC MEANS-style boxed table instead of the generic DISPLAY row dump (ADR-068).
 
