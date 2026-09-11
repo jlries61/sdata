@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.28.0
+Version:        0.28.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Fri Sep 11 2026 John L. Ries <john@theyarnbard.com> - 0.28.1-1
+- DISPLAY now rebuilds the SELECT filter map itself (ADR-070), so a SELECT with no intervening RUN takes effect immediately; closes sdata#89
+
 * Thu Sep 10 2026 John L. Ries <john@theyarnbard.com> - 0.28.0-1
 - Model DISPLAY's text output on SAS PROC PRINT (ADR-069).
 
