@@ -79,6 +79,7 @@ that might relitigate a settled question.
 | ADR-067 | String literals are single-line; an unterminated `"`/`'` string raises Script_Error instead of silently spanning lines or truncating at EOF | 2026-09-05 | Accepted |
 | ADR-068 | STATS' default text output is a SAS PROC MEANS-style "minimal box" table (Display_Stats_Table) instead of the generic DISPLAY row dump | 2026-09-08 | Accepted |
 | ADR-069 | DISPLAY's two default-print code paths are consolidated into one shared Display_Table renderer producing a SAS PROC PRINT-style boxed table (Obs column, left/right-justified per column type) | 2026-09-08 | Accepted |
+| ADR-070 | DISPLAY rebuilds the SELECT filter map itself (Execute_Rebuild_Filter) instead of relying on the next RUN, so a SELECT with no intervening RUN takes effect immediately | 2026-09-11 | Accepted |
 
 ---
 
@@ -2279,4 +2280,47 @@ it.
 
 Version bump: minor, matching the established documented-default-behavior precedent
 (ADR-060/064/065/066/067/068).
+
+### ADR-070: DISPLAY rebuilds the SELECT filter map itself instead of relying on the next RUN
+
+**Date:** 2026-09-11 | **Status:** Accepted
+
+**Context:** Closes [sdata#89](https://github.com/jlries61/sdata/issues/89), the incidental finding
+ADR-069 surfaced and scoped out: `DISPLAY` issued right after `SELECT` with no intervening `RUN`
+showed the unfiltered table, because `SELECT`'s logical→physical `Filter_Map` is normally rebuilt
+only at the start of `Run_One_Step` (i.e. on `RUN`), and `Display_Table`
+(`src/sdata-interpreter.adb`) — the shared renderer behind both `DISPLAY` surface forms since
+ADR-069 — read `SData_Core.Table.Logical_Row_Count`/`Logical_To_Physical` directly with no rebuild
+call anywhere in its path. Investigation confirmed `DISPLAY` was the *only* affected Immediate-tier
+reader: `AGGREGATE`/`STATS`/`TRANSPOSE`/`TABLES` all go through the shared `Group_Boundaries`
+(`sdata_core-commands.adb`), which already calls `Rebuild_Filter_Map` unconditionally before every
+scan. Independently, `data-vandal`'s own `DISPLAY` implementation
+(`data_vandal-interpreter.adb`) already solves the identical problem the identical way, with a
+comment explaining sdata's own gap from the other side — strong pre-existing validation that this
+fix is correct, not merely plausible.
+
+**Decision.** `Display_Table` now calls `SData_Core.Commands.Execute_Rebuild_Filter` — a procedure
+that already existed for exactly this purpose (`sdata_core-commands.ads`: *"Front ends call this at
+the start of a data step... so the filter map is current for the initial record set"*) — as the
+first statement in its body, before either the empty-columns guard or the row-count read. No
+sdata-core change: `Execute_Rebuild_Filter` was already public, already `with`'d in
+`src/sdata-interpreter.adb`, and is already a documented no-op when no `SELECT` is active, so the
+added cost is zero for the common case and, when a `SELECT` is active, identical to the cost every
+`RUN`/`AGGREGATE`/`STATS`/`TRANSPOSE`/`TABLES` call already pays unconditionally.
+
+Deliberately **not** in scope: giving `DISPLAY` the implicit-RUN-on-pending-deferred-statements
+behavior `STATS`/`AGGREGATE`/`TRANSPOSE` have, or the "refuse if statements are pending" behavior
+`TABLES` has. `DISPLAY` has never had either, and adding one here would be unreviewed scope creep
+beyond the user's chosen direction (force a `Filter_Map` rebuild — nothing more).
+
+**Consequences:** `doc/design.md`'s `DISPLAY` entry needed no change — it already read "Respects
+any active SELECT filter" with no RUN-timing caveat; the implementation, not the doc, was out of
+sync, so this fix makes the code match already-correct documentation. 2 new regression tests
+(`tests/display_select_no_run.cmd`, `tests/display_varlist_select_no_run.cmd`) cover both `DISPLAY`
+surface forms issued right after `SELECT` with no `RUN`; all 525 pre-existing tests re-verified
+unchanged (the fix is a no-op on every path that already issues `RUN` before `DISPLAY`, since
+`Filter_Map` is already current in that case).
+
+Version bump: patch — a bug fix restoring already-documented, already-promised behavior, not a new
+documented-default-behavior change.
 

@@ -982,6 +982,16 @@ package body SData.Interpreter is
    --  validates a varlist name against the schema either).
    procedure Display_Table (Cols : Name_Vectors.Vector) is
    begin
+      --  ADR-070: a SELECT with no intervening RUN leaves Filter_Map stale
+      --  (it is normally rebuilt at the start of Run_One_Step). DISPLAY is
+      --  an Immediate-tier command and may run before any RUN, so it must
+      --  rebuild the map itself before reading the logical row set.
+      --  Execute_Rebuild_Filter is a documented no-op with no SELECT
+      --  active, so this is safe (and cheap) to call unconditionally --
+      --  data-vandal's own DISPLAY (data_vandal-interpreter.adb) already
+      --  does exactly this, for the identical reason.
+      SData_Core.Commands.Execute_Rebuild_Filter;
+
       if Cols.Is_Empty then
          Put_Line ("(No columns to display)");
          return;
