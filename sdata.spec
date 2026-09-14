@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.28.1
+Version:        0.29.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Sep 14 2026 John L. Ries <john@theyarnbard.com> - 0.29.0-1
+- TABLES /SAVE option: write the crosstab to an external dataset without touching the internal table (ADR-071)
+
 * Fri Sep 11 2026 John L. Ries <john@theyarnbard.com> - 0.28.1-1
 - DISPLAY now rebuilds the SELECT filter map itself (ADR-070), so a SELECT with no intervening RUN takes effect immediately; closes sdata#89
 

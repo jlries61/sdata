@@ -1,0 +1,34 @@
+Dataset opened: tests/data/freq.csv
+Frequency table for REGION$
+
+REGION$ Frequency Percent
+East 3 50.00
+West 3 50.00
+Total 6 100.00
+
+TABLES complete.
+REGION$,FREQUENCY,PERCENT
+East,3,50
+West,3,50
+Frequency table for REGION$
+
+REGION$ Frequency Cum_Freq
+East 3 3
+West 3 6
+Total 6
+
+TABLES complete.
+REGION$,FREQUENCY,CUM_FREQ
+East,3,3
+West,3,6
+Frequency table for REGION$
+
+REGION$ Frequency
+East 3
+West 3
+Total 6
+
+TABLES complete.
+REGION$,FREQUENCY
+East,3
+West,3

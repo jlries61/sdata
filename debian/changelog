@@ -1,3 +1,9 @@
+sdata (0.29.0-1) unstable; urgency=medium
+
+  * TABLES /SAVE option: write the crosstab to an external dataset without touching the internal table (ADR-071)
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 14 Sep 2026 13:02:01 -0700
+
 sdata (0.28.1-1) unstable; urgency=medium
 
   * DISPLAY now rebuilds the SELECT filter map itself (ADR-070), so a SELECT with no intervening RUN takes effect immediately; closes sdata#89

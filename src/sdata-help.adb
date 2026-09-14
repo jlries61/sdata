@@ -333,6 +333,8 @@ package body SData.Help is
    begin
       Put_Line ("Command: TABLES request [request ...] [/CHISQ] [/MISSING] [/LIST]");
       Put_Line ("                [/ORDER=FREQ] [/NOCUM] [/NOPERCENT]");
+      Put_Line ("                [/SAVE=filename [/FMT=fmt] [/CHARSET=cs] [/HEADER=y|n]");
+      Put_Line ("                 [/DLM=dlm] [/DECIMALS=n] [/CHISQFILE=filename]]");
       Put_Line ("Print frequency and crosstabulation reports (SAS PROC FREQ analogue).");
       Put_Line ("A request is one variable (one-way table) or variables joined by '*'");
       Put_Line ("(A*B two-way; A*B*C multiway). Multiple requests per statement are");
@@ -348,9 +350,26 @@ package body SData.Help is
       Put_Line ("  /LIST       render a two-way table in list form (default for 3+ way).");
       Put_Line ("  /NOCUM      suppress cumulative columns (one-way / list).");
       Put_Line ("  /NOPERCENT  suppress the overall cell percent.");
+      Put_Line ("  /SAVE=file  write the crosstab to an external dataset -- a direct,");
+      Put_Line ("              one-shot write unrelated to the SAVE command; does not");
+      Put_Line ("              touch the internal table. Requires exactly one request.");
+      Put_Line ("              One row per observed combination: BY vars (if any),");
+      Put_Line ("              the request's variable(s), Frequency, Percent, Cum_Freq,");
+      Put_Line ("              Cum_Percent (/NOCUM//NOPERCENT drop the same columns");
+      Put_Line ("              here as in the printed report).");
+      Put_Line ("  /FMT= /CHARSET= /HEADER= /DLM= /DECIMALS=  same as SAVE's own");
+      Put_Line ("              options; require /SAVE.");
+      Put_Line ("  /CHISQFILE=file  with /SAVE and /CHISQ (1-way/2-way only), also");
+      Put_Line ("              write the chi-square statistics to this file (default:");
+      Put_Line ("              <filename>_chisq.<ext>).");
+      Put_Line ("A BY or crossing variable sharing its name with a computed /SAVE column");
+      Put_Line ("(Frequency, Percent, Cum_Freq, Cum_Percent, or, for the /CHISQ file,");
+      Put_Line ("Statistic$/DF/Value/Prob) is a runtime error -- rename it, or drop the");
+      Put_Line ("option that would add the colliding column.");
       Put_Line ("Honors the active SELECT filter and produces one table set per active");
       Put_Line ("BY group. Refuses to run while un-run deferred statements are pending.");
-      Put_Line ("Execution: Immediate (print-only). See man page sdata(1).");
+      Put_Line ("Execution: Immediate (print-only, except for the direct /SAVE write).");
+      Put_Line ("See man page sdata(1).");
    end Help_TABLES;
 
    procedure Help_NEW is

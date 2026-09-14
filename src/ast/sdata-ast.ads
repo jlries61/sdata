@@ -340,6 +340,34 @@ package SData.AST is
             Table_NOCUM     : Boolean := False;
             Table_NOPERCENT : Boolean := False;
             Table_Order_Freq : Boolean := False;   --  /ORDER=FREQ
+            --  /SAVE=<filename> (ADR-071): write the crosstab to an
+            --  external dataset.  Table_Save_Len = 0 means /SAVE was not
+            --  given; every field below it is meaningless in that case.
+            --  Requires exactly one request in the statement (parser
+            --  enforces).
+            Table_Save_Len          : Natural := 0;
+            Table_Save_File         : String (1 .. Max_Path_Len) :=
+                                          (others => ' ');
+            Table_Save_Fmt_Specified : Boolean := False;
+            Table_Save_Fmt          : SData_Core.Config.Format_Type :=
+                                          SData_Core.Config.CSV;
+            Table_Save_Charset_Len  : Natural := 0;
+            Table_Save_Charset      : String (1 .. Max_Charset_Len) :=
+                                          (others => ' ');
+            Table_Save_Header_Specified : Boolean := False;
+            Table_Save_Header       : Boolean := True;
+            Table_Save_DLM_Len      : Natural := 0;
+            Table_Save_DLM          : String (1 .. Max_Delimiter_Len) :=
+                                          (others => ' ');
+            Table_Save_Decimals_Specified : Boolean := False;
+            Table_Save_Decimals     : Natural := 0;
+            --  /CHISQFILE=<filename>: overrides the default
+            --  "<base>_chisq<.ext>" name for the /CHISQ statistics file.
+            --  Length 0 = not given (auto-derive).  Valid only with both
+            --  /SAVE and /CHISQ (parser enforces).
+            Table_Chisq_File_Len    : Natural := 0;
+            Table_Chisq_File        : String (1 .. Max_Path_Len) :=
+                                          (others => ' ');
          when Stmt_PROGRAM_INSERT =>
             Insert_At_End : Boolean := True;   --  True = append at end ($/bare)
             Insert_Line   : Natural := 0;      --  cursor after line N (0 = start)

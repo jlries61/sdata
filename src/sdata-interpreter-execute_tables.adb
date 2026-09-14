@@ -82,6 +82,27 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    Order_Freq      : constant Boolean := Stmt.Table_Order_Freq;
    Include_Missing : constant Boolean := Stmt.Table_MISSING;
 
+   --  /SAVE (ADR-071).  Save_Active implies exactly one request (parser
+   --  enforces).  Chisq_Buf accumulates one row per computed chi-square
+   --  statistic per BY group -- deferred (not written via the Output_*
+   --  staging API until after the whole group loop) because the main
+   --  crosstab table occupies that same single staging area while the
+   --  group loop runs; First_Phys lets the BY-var values be re-read from
+   --  the (untouched) real table afterward, the same way Put_By_Header
+   --  already does.
+   Save_Active : constant Boolean := Stmt.Table_Save_Len > 0;
+   type Chisq_Buf_Row is record
+      First_Phys : Positive;
+      Statistic  : Unbounded_String;
+      Has_DF     : Boolean;
+      DF         : Natural;
+      Stat_Value : Real;
+      Has_Prob   : Boolean;
+      Prob       : Real;
+   end record;
+   package Chisq_Buf_Vectors is new Ada.Containers.Vectors (Positive, Chisq_Buf_Row);
+   Chisq_Buf : Chisq_Buf_Vectors.Vector;
+
    --  Display-text -> Natural map, used both for O(1) level-membership during
    --  accumulation (Build_Levels) and O(1) value->index lookup on a sorted
    --  level vector (Index_Map), plus the two-way cell counts.
@@ -402,6 +423,431 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       IO.Put_Line (To_String (H));
    end Put_By_Header;
 
+   -----------------------------------------------------------------
+   --  /SAVE support (ADR-071) -- builds an Output_* staging table
+   --  from the same counting-engine primitives the printers above use,
+   --  and buffers chi-square statistic rows for a deferred second write.
+   -----------------------------------------------------------------
+
+   --  Insert "_chisq" before the last '.' extension in Full (matching the
+   --  directory-boundary-aware scan Full_Path's own Has_Extension uses),
+   --  or append it at the end if Full has no extension.
+   function Derive_Chisq_Name (Full : String) return String is
+   begin
+      for I in reverse Full'Range loop
+         if Full (I) = '.' then
+            return Full (Full'First .. I - 1) & "_chisq" & Full (I .. Full'Last);
+         elsif Full (I) = '/' or else Full (I) = '\' then
+            exit;
+         end if;
+      end loop;
+      return Full & "_chisq";
+   end Derive_Chisq_Name;
+
+   --  True if Reserved (a /SAVE-computed column name: FREQUENCY, PERCENT,
+   --  CUM_FREQ, CUM_PERCENT, STATISTIC$, DF, VALUE, or PROB) matches an
+   --  active BY variable's name, or (when Req /= null) one of Req's own
+   --  crossing variable names -- case-insensitively, matching how
+   --  SData_Core.Table.Add_Output_Column's own key canonicalization would
+   --  otherwise silently treat them as the same column (see BLOCKER-1,
+   --  04-code-review.md: Add_Output_Column no-ops on an existing name, so
+   --  an unguarded collision here does not raise -- it silently drops the
+   --  reserved column and lets the crossing/BY variable's own later write
+   --  clobber the computed value, or vice versa).  Req is null for
+   --  Write_Chisq_Save_File's schema, which has no crossing variables of
+   --  its own to check.
+   function Reserved_Name_Collision
+     (Reserved : String; Req : Table_Request) return Boolean
+   is
+      Up : constant String := To_Upper (Reserved);
+   begin
+      for I in 1 .. SData_Core.Table.By_Var_Count loop
+         if To_Upper (SData_Core.Table.By_Var_Name (I)) = Up then
+            return True;
+         end if;
+      end loop;
+      if Req /= null then
+         declare
+            C : Variable_List := Req.Vars;
+         begin
+            while C /= null loop
+               if To_Upper (C.Var.Start_Name (1 .. C.Var.Start_Len)) = Up then
+                  return True;
+               end if;
+               C := C.Next;
+            end loop;
+         end;
+      end if;
+      return False;
+   end Reserved_Name_Collision;
+
+   --  Raises a clear, actionable error for a reserved-name collision
+   --  (BLOCKER-1's fix: loud failure instead of Add_Output_Column's own
+   --  silent no-op, matching this project's established preference --
+   --  e.g. the Output_Is_Spilled guard earlier in this same file, and
+   --  ADR-0021's CHARSET hard-fail before it).
+   procedure Check_Reserved_Name (Name : String; Req : Table_Request) is
+   begin
+      if Reserved_Name_Collision (Name, Req) then
+         raise SData_Core.Script_Error with
+           "TABLES: /SAVE column name '" & Name & "' collides with a BY "
+           & "or crossing variable of the same name -- rename the "
+           & "variable, or drop the option that would add this column "
+           & "(e.g. /NOCUM, /NOPERCENT)";
+      end if;
+   end Check_Reserved_Name;
+
+   --  Declares the Output_* staging schema for the /SAVE crosstab dataset:
+   --  active BY vars, then the (single, parser-enforced) request's
+   --  crossing variable(s), then Frequency/[Percent]/[Cum_Freq]/
+   --  [Cum_Percent] -- the same column set /NOCUM//NOPERCENT would leave
+   --  in the printed list-form report (00-brief.md decision 3, revised).
+   procedure Init_Save_Schema (Req : Table_Request) is
+   begin
+      SData_Core.Table.Initialize_Output_Table;
+      for I in 1 .. SData_Core.Table.By_Var_Count loop
+         declare
+            Nm : constant String := SData_Core.Table.By_Var_Name (I);
+         begin
+            SData_Core.Table.Add_Output_Column
+              (Nm, SData_Core.Table.Get_Column_Type (Nm));
+         end;
+      end loop;
+      declare
+         C : Variable_List := Req.Vars;
+      begin
+         while C /= null loop
+            declare
+               Nm : constant String :=
+                 C.Var.Start_Name (1 .. C.Var.Start_Len);
+            begin
+               SData_Core.Table.Add_Output_Column
+                 (Nm, SData_Core.Table.Get_Column_Type (Nm));
+            end;
+            C := C.Next;
+         end loop;
+      end;
+      Check_Reserved_Name ("FREQUENCY", Req);
+      SData_Core.Table.Add_Output_Column
+        ("FREQUENCY", SData_Core.Table.Col_Integer);
+      if not Stmt.Table_NOPERCENT then
+         Check_Reserved_Name ("PERCENT", Req);
+         SData_Core.Table.Add_Output_Column
+           ("PERCENT", SData_Core.Table.Col_Numeric);
+      end if;
+      if not Stmt.Table_NOCUM then
+         Check_Reserved_Name ("CUM_FREQ", Req);
+         SData_Core.Table.Add_Output_Column
+           ("CUM_FREQ", SData_Core.Table.Col_Integer);
+         if not Stmt.Table_NOPERCENT then
+            Check_Reserved_Name ("CUM_PERCENT", Req);
+            SData_Core.Table.Add_Output_Column
+              ("CUM_PERCENT", SData_Core.Table.Col_Numeric);
+         end if;
+      end if;
+   end Init_Save_Schema;
+
+   --  Appends one Output_* row per observed combination for this group,
+   --  to the schema Init_Save_Schema already declared.  Deliberately a
+   --  near-duplicate of Render_List's tuple-enumeration (rather than a
+   --  refactor of it to also return data) -- Render_List's job is
+   --  formatted text, this procedure's is a dataset; keeping them
+   --  separate avoids entangling two different concerns in one function.
+   procedure Save_Request_Rows (Rows : Row_Index_Vectors.Vector; Req : Table_Request) is
+      type Name_Arr is array (Positive range <>) of Unbounded_String;
+      K          : Natural := 0;
+      C          : Variable_List := Req.Vars;
+      First_Phys : constant Positive := Rows.First_Element;
+   begin
+      while C /= null loop K := K + 1; C := C.Next; end loop;
+      declare
+         Names  : Name_Arr (1 .. K);
+         Levels : array (1 .. K) of Level_Vectors.Vector;
+         Pos    : array (1 .. K) of Count_Maps.Map;
+         Seen   : Count_Maps.Map;
+         Grand  : Natural := 0;
+
+         type Idx_Array is array (1 .. K) of Positive;
+         type Tuple_Rec is record
+            Idx   : Idx_Array;
+            Count : Natural;
+         end record;
+         package Tuple_Vectors is new Ada.Containers.Vectors (Positive, Tuple_Rec);
+         Present : Tuple_Vectors.Vector;
+
+         function Tuple_Less (A, B : Tuple_Rec) return Boolean is
+         begin
+            for I in 1 .. K loop
+               if A.Idx (I) /= B.Idx (I) then
+                  return A.Idx (I) < B.Idx (I);
+               end if;
+            end loop;
+            return False;
+         end Tuple_Less;
+         package Tuple_Sorting is new Tuple_Vectors.Generic_Sorting ("<" => Tuple_Less);
+      begin
+         C := Req.Vars;
+         for I in 1 .. K loop
+            Names (I) := To_Unbounded_String
+              (C.Var.Start_Name (1 .. C.Var.Start_Len));
+            Levels (I) := Build_Levels (Rows, To_String (Names (I)));
+            Pos (I)    := Index_Map (Levels (I));
+            C := C.Next;
+         end loop;
+
+         for P of Rows loop
+            declare
+               Key : Unbounded_String;
+               Tup : Idx_Array;
+               OK  : Boolean := True;
+            begin
+               for I in 1 .. K loop
+                  declare
+                     V : constant Values.Value :=
+                       SData_Core.Table.Get_Value (P, To_String (Names (I)));
+                  begin
+                     if not Is_Present (V, Include_Missing) then
+                        OK := False; exit;
+                     end if;
+                     Tup (I) := Pos (I)(To_String (Disp_Of (V)));
+                     if I > 1 then Append (Key, "|"); end if;
+                     Append (Key, Trim (Tup (I)'Image, Both));
+                  end;
+               end loop;
+               if OK then
+                  declare
+                     Ks : constant String := To_String (Key);
+                  begin
+                     if Seen.Contains (Ks) then
+                        declare
+                           R : Tuple_Rec := Present (Seen (Ks));
+                        begin
+                           R.Count := R.Count + 1;
+                           Present.Replace_Element (Seen (Ks), R);
+                        end;
+                     else
+                        Present.Append ((Idx => Tup, Count => 1));
+                        Seen.Insert (Ks, Present.Last_Index);
+                     end if;
+                  end;
+                  Grand := Grand + 1;
+               end if;
+            end;
+         end loop;
+
+         Tuple_Sorting.Sort (Present);
+         declare
+            Cum : Natural := 0;
+         begin
+            for R of Present loop
+               declare
+                  F       : constant Natural := R.Count;
+                  Pct     : constant Real :=
+                    (if Grand = 0 then 0.0 else 100.0 * Real (F) / Real (Grand));
+                  Out_Row : Positive;
+               begin
+                  Cum := Cum + F;
+                  SData_Core.Table.Add_Output_Row;
+                  Out_Row := SData_Core.Table.Output_Row_Count;
+                  for BI in 1 .. SData_Core.Table.By_Var_Count loop
+                     declare
+                        BNm : constant String := SData_Core.Table.By_Var_Name (BI);
+                     begin
+                        SData_Core.Table.Set_Output_Value
+                          (Out_Row, BNm,
+                           SData_Core.Table.Get_Value (First_Phys, BNm));
+                     end;
+                  end loop;
+                  for I in 1 .. K loop
+                     SData_Core.Table.Set_Output_Value
+                       (Out_Row, To_String (Names (I)), Levels (I)(R.Idx (I)).Val);
+                  end loop;
+                  SData_Core.Table.Set_Output_Value
+                    (Out_Row, "FREQUENCY",
+                     (Kind => Values.Val_Integer, Int_Val => Values.Int (F)));
+                  if not Stmt.Table_NOPERCENT then
+                     SData_Core.Table.Set_Output_Value
+                       (Out_Row, "PERCENT",
+                        (Kind => Values.Val_Numeric, Num_Val => Pct));
+                  end if;
+                  if not Stmt.Table_NOCUM then
+                     SData_Core.Table.Set_Output_Value
+                       (Out_Row, "CUM_FREQ",
+                        (Kind => Values.Val_Integer, Int_Val => Values.Int (Cum)));
+                     if not Stmt.Table_NOPERCENT then
+                        SData_Core.Table.Set_Output_Value
+                          (Out_Row, "CUM_PERCENT",
+                           (Kind => Values.Val_Numeric,
+                            Num_Val =>
+                              (if Grand = 0 then 0.0
+                               else 100.0 * Real (Cum) / Real (Grand))));
+                     end if;
+                  end if;
+               end;
+            end loop;
+         end;
+      end;
+   end Save_Request_Rows;
+
+   --  Buffers the same one-way goodness-of-fit chi-square Put_Chisq_1Way
+   --  prints, for this group -- computed a second time rather than shared
+   --  with the printer, deliberately: TABLES is not a hot path, and
+   --  keeping "what prints" and "what /SAVE writes" as two independent
+   --  computations avoids entangling the print path with /SAVE's schema.
+   procedure Save_Chisq_1Way (Rows : Row_Index_Vectors.Vector; Col : String) is
+      L   : constant Level_Vectors.Vector := Build_Levels (Rows, Col);
+      V   : SData_Core.Statistics.Count_Vector (1 .. Natural (L.Length));
+      Idx : Positive := 1;
+   begin
+      for Lv of L loop
+         V (Idx) := Lv.Count;
+         Idx := Idx + 1;
+      end loop;
+      declare
+         R : constant SData_Core.Statistics.GOF_Result :=
+           SData_Core.Statistics.Goodness_Of_Fit (V);
+      begin
+         if R.Valid then
+            Chisq_Buf.Append
+              ((First_Phys => Rows.First_Element,
+                Statistic  => To_Unbounded_String ("Chi-Square"),
+                Has_DF     => True, DF => R.DF,
+                Stat_Value => R.Stat,
+                Has_Prob   => True, Prob => R.P));
+         end if;
+      end;
+   end Save_Chisq_1Way;
+
+   --  Buffers the same chi-square family Put_Chisq_2Way prints, for this
+   --  group.  See Save_Chisq_1Way for why this duplicates the computation
+   --  rather than sharing it with the printer.
+   procedure Save_Chisq_2Way (Rows : Row_Index_Vectors.Vector; V1, V2 : String) is
+      JT : constant Joint_Table := Build_Joint (Rows, V1, V2);
+      M  : constant SData_Core.Statistics.Count_Matrix := Build_Count_Matrix (JT);
+      R  : constant SData_Core.Statistics.Chi_Square_Result :=
+        SData_Core.Statistics.Chi_Square_Tests (M);
+      FP : constant Positive := Rows.First_Element;
+
+      procedure Add (Name : String; Has_DF : Boolean; DF : Natural;
+                     Stat_Value : Real; Has_Prob : Boolean; Prob : Real) is
+      begin
+         Chisq_Buf.Append
+           ((First_Phys => FP, Statistic => To_Unbounded_String (Name),
+             Has_DF => Has_DF, DF => DF, Stat_Value => Stat_Value,
+             Has_Prob => Has_Prob, Prob => Prob));
+      end Add;
+   begin
+      if not R.Valid then
+         return;
+      end if;
+      Add ("Chi-Square", True, R.DF, R.Pearson_Stat, True, R.Pearson_P);
+      Add ("Likelihood-Ratio_Chi-Square", True, R.DF, R.LR_Stat, True, R.LR_P);
+      if R.Has_Yates then
+         Add ("Continuity-Adj._Chi-Square", True, 1, R.Yates_Stat, True, R.Yates_P);
+      end if;
+      Add ("Mantel-Haenszel_Chi-Square", True, 1, R.MH_Stat, True, R.MH_P);
+      Add ("Phi_Coefficient", False, 0, R.Phi, False, 0.0);
+      Add ("Contingency_Coefficient", False, 0, R.Contingency, False, 0.0);
+      Add ("Cramers_V", False, 0, R.Cramers_V, False, 0.0);
+      Add ("Sample_Size", False, 0, Real (R.N), False, 0.0);
+   end Save_Chisq_2Way;
+
+   --  Builds the second Output_* staging table from Chisq_Buf (BY vars +
+   --  Statistic$ + DF + Value + Prob, one row per buffered statistic) and
+   --  writes it via Open_Output.  Called once, after the main crosstab has
+   --  already been fully written -- see the two-pass note at the main
+   --  /SAVE dispatch below.
+   procedure Write_Chisq_Save_File (File_Name : String) is
+   begin
+      if Chisq_Buf.Is_Empty then
+         return;
+      end if;
+      SData_Core.Table.Initialize_Output_Table;
+      for I in 1 .. SData_Core.Table.By_Var_Count loop
+         declare
+            Nm : constant String := SData_Core.Table.By_Var_Name (I);
+         begin
+            SData_Core.Table.Add_Output_Column
+              (Nm, SData_Core.Table.Get_Column_Type (Nm));
+         end;
+      end loop;
+      Check_Reserved_Name ("STATISTIC$", null);
+      SData_Core.Table.Add_Output_Column ("STATISTIC$", SData_Core.Table.Col_String);
+      Check_Reserved_Name ("DF", null);
+      SData_Core.Table.Add_Output_Column ("DF", SData_Core.Table.Col_Integer);
+      Check_Reserved_Name ("VALUE", null);
+      SData_Core.Table.Add_Output_Column ("VALUE", SData_Core.Table.Col_Numeric);
+      Check_Reserved_Name ("PROB", null);
+      SData_Core.Table.Add_Output_Column ("PROB", SData_Core.Table.Col_Numeric);
+      for Row of Chisq_Buf loop
+         declare
+            Out_Row : Positive;
+         begin
+            SData_Core.Table.Add_Output_Row;
+            Out_Row := SData_Core.Table.Output_Row_Count;
+            for BI in 1 .. SData_Core.Table.By_Var_Count loop
+               declare
+                  BNm : constant String := SData_Core.Table.By_Var_Name (BI);
+               begin
+                  SData_Core.Table.Set_Output_Value
+                    (Out_Row, BNm,
+                     SData_Core.Table.Get_Value (Row.First_Phys, BNm));
+               end;
+            end loop;
+            SData_Core.Table.Set_Output_Value
+              (Out_Row, "STATISTIC$",
+               (Kind => Values.Val_String, Str_Val => Row.Statistic));
+            if Row.Has_DF then
+               SData_Core.Table.Set_Output_Value
+                 (Out_Row, "DF",
+                  (Kind => Values.Val_Integer, Int_Val => Values.Int (Row.DF)));
+            else
+               SData_Core.Table.Set_Output_Value
+                 (Out_Row, "DF", (Kind => Values.Val_Missing));
+            end if;
+            SData_Core.Table.Set_Output_Value
+              (Out_Row, "VALUE",
+               (Kind => Values.Val_Numeric, Num_Val => Row.Stat_Value));
+            if Row.Has_Prob then
+               SData_Core.Table.Set_Output_Value
+                 (Out_Row, "PROB",
+                  (Kind => Values.Val_Numeric, Num_Val => Row.Prob));
+            else
+               SData_Core.Table.Set_Output_Value
+                 (Out_Row, "PROB", (Kind => Values.Val_Missing));
+            end if;
+         end;
+      end loop;
+      if SData_Core.Table.Output_Is_Spilled then
+         raise SData_Core.Script_Error with
+           "TABLES: /SAVE not supported -- the /CHISQ statistics result is "
+           & "too large (exceeds the configured spill threshold)";
+      end if;
+      begin
+         SData_Core.File_IO.Open_Output
+           (File_Name => File_Name,
+            Fmt        => Stmt.Table_Save_Fmt,
+            Delimiter  => (if Stmt.Table_Save_DLM_Len > 0
+                           then Stmt.Table_Save_DLM (1 .. Stmt.Table_Save_DLM_Len)
+                           else ","),
+            Write_Header => Stmt.Table_Save_Header,
+            Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
+            Charset      => (if Stmt.Table_Save_Charset_Len > 0
+                             then Stmt.Table_Save_Charset (1 .. Stmt.Table_Save_Charset_Len)
+                             else ""),
+            Decimals     => (if Stmt.Table_Save_Decimals_Specified
+                             then Stmt.Table_Save_Decimals else -1),
+            View         => SData_Core.Table.Output_View);
+      exception
+         --  Write_CSV already prints "SAVE aborted -- file already exists:
+         --  ..." before raising -- swallow here rather than let it surface a
+         --  second, unhandled-exception-shaped message, matching the SAVE
+         --  command's own call sites (sdata-interpreter.adb, sdata_core-
+         --  commands.adb).
+         when SData_Core.File_IO.Save_Refused => null;
+      end;
+   end Write_Chisq_Save_File;
+
    --  ---- one-way renderer ----
    procedure Render_One_Way (Rows : Row_Index_Vectors.Vector; Col : String) is
       Levels   : constant Level_Vectors.Vector := Build_Levels (Rows, Col);
@@ -665,6 +1111,9 @@ procedure Execute_Tables (Stmt : Statement_Access) is
             Render_One_Way (Rows, Col);
             if Stmt.Table_CHISQ then
                Put_Chisq_1Way (Rows, Col);
+               if Save_Active then
+                  Save_Chisq_1Way (Rows, Col);
+               end if;
             end if;
          end;
       elsif K = 2 then
@@ -682,6 +1131,9 @@ procedure Execute_Tables (Stmt : Statement_Access) is
             end if;
             if Stmt.Table_CHISQ then
                Put_Chisq_2Way (Rows, V1, V2);
+               if Save_Active then
+                  Save_Chisq_2Way (Rows, V1, V2);
+               end if;
             end if;
          end;
       else
@@ -729,6 +1181,15 @@ begin
       end loop;
    end;
 
+   --  /SAVE (ADR-071): declare the Output_* staging schema once, before the
+   --  group loop, so every group's rows accumulate into the same table
+   --  (matching STATS/AGGREGATE's own "one combined output table" BY
+   --  convention) -- Stmt.Table_Save_Len > 0 implies exactly one request
+   --  (parser-enforced), so Stmt.Requests names it unambiguously.
+   if Save_Active then
+      Init_Save_Schema (Stmt.Requests);
+   end if;
+
    --  Group_Boundaries rebuilds the SELECT filter map internally, so an active
    --  SELECT filter is honored with no separate Execute_Rebuild_Filter call.
    --  It is a read-only view/grouping query -- it does not mutate the table,
@@ -749,11 +1210,78 @@ begin
          begin
             while Req /= null loop
                Render_Request (G, Req);
+               if Save_Active then
+                  Save_Request_Rows (G, Req);
+               end if;
                IO.New_Line;
                Req := Req.Next;
             end loop;
          end;
       end loop;
    end;
+
+   --  /SAVE (ADR-071): write the accumulated crosstab now that every group
+   --  has been processed, then -- a second, independent pass, since the
+   --  single Output_* staging area cannot hold both tables at once -- the
+   --  /CHISQ statistics file if one was requested and any group actually
+   --  produced a computed (R.Valid) statistic.  Neither write disturbs
+   --  Data_Table (SData_Core.Table.Table_View, ADR-071): TABLES stays
+   --  print-only.
+   if Save_Active then
+      if SData_Core.Table.Output_Is_Spilled then
+         raise SData_Core.Script_Error with
+           "TABLES: /SAVE not supported -- the crosstab result is too "
+           & "large (exceeds the configured spill threshold)";
+      end if;
+      declare
+         Full_Save  : constant String :=
+           Full_Path (Stmt.Table_Save_File (1 .. Stmt.Table_Save_Len), "SAVE");
+         Main_Saved : Boolean := False;
+      begin
+         begin
+            SData_Core.File_IO.Open_Output
+              (File_Name => Full_Save,
+               Fmt        => Stmt.Table_Save_Fmt,
+               Delimiter  => (if Stmt.Table_Save_DLM_Len > 0
+                              then Stmt.Table_Save_DLM (1 .. Stmt.Table_Save_DLM_Len)
+                              else ","),
+               Write_Header => Stmt.Table_Save_Header,
+               Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
+               Charset      => (if Stmt.Table_Save_Charset_Len > 0
+                                then Stmt.Table_Save_Charset
+                                       (1 .. Stmt.Table_Save_Charset_Len)
+                                else ""),
+               Decimals     => (if Stmt.Table_Save_Decimals_Specified
+                                then Stmt.Table_Save_Decimals else -1),
+               View         => SData_Core.Table.Output_View);
+            Main_Saved := True;
+         exception
+            --  Write_CSV already prints "SAVE aborted -- file already
+            --  exists: ..." before raising -- swallow here rather than let
+            --  it surface a second, unhandled-exception-shaped message,
+            --  matching the SAVE command's own call sites.  Main_Saved
+            --  stays False, so the /CHISQ file (below) is skipped too --
+            --  a refused main write means /SAVE as a whole did not happen.
+            when SData_Core.File_IO.Save_Refused => null;
+         end;
+
+         if Main_Saved
+           and then Stmt.Table_CHISQ
+           and then not Chisq_Buf.Is_Empty
+         then
+            declare
+               Chisq_Name : constant String :=
+                 (if Stmt.Table_Chisq_File_Len > 0
+                  then Full_Path
+                         (Stmt.Table_Chisq_File (1 .. Stmt.Table_Chisq_File_Len),
+                          "SAVE")
+                  else Derive_Chisq_Name (Full_Save));
+            begin
+               Write_Chisq_Save_File (Chisq_Name);
+            end;
+         end if;
+      end;
+   end if;
+
    IO.Put_Line ("TABLES complete.");
 end Execute_Tables;

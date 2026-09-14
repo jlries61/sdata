@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-09-11" "sdata 0.28.1" "User Commands"
+.TH SDATA 1 "2026-09-14" "sdata 0.29.0" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -794,7 +794,7 @@ is associated with this command's own result, not written by the implicit
 See also
 .BR AGGREGATE .
 .TP
-.B TABLES\fR \fIrequest\fR [\fIrequest\fR ...] [\fB/CHISQ\fR] [\fB/MISSING\fR] [\fB/ORDER=FREQ\fR] [\fB/LIST\fR] [\fB/NOCUM\fR] [\fB/NOPERCENT\fR]
+.B TABLES\fR \fIrequest\fR [\fIrequest\fR ...] [\fB/CHISQ\fR] [\fB/MISSING\fR] [\fB/ORDER=FREQ\fR] [\fB/LIST\fR] [\fB/NOCUM\fR] [\fB/NOPERCENT\fR] [\fB/SAVE=\fIfilename\fR [\fB/FMT=\fR...] [\fB/CHARSET=\fR...] [\fB/HEADER=\fR...] [\fB/DLM=\fR...] [\fB/DECIMALS=\fR...] [\fB/CHISQFILE=\fIfilename\fR]]
 Print frequency and crosstabulation reports (SAS PROC FREQ analogue).
 A
 .I request
@@ -841,6 +841,78 @@ Suppress cumulative frequency and cumulative percent columns
 .TP
 .B /NOPERCENT
 Suppress the overall cell percent figure.
+.TP
+.B /SAVE=\fIfilename
+Write the (single, required) request's crosstab to an external dataset \-\-
+a direct, one\-shot write that does not touch the internal table and does
+not interact with the
+.B SAVE
+command or its pending\-write registration.
+Requires exactly one
+.I request
+in the statement (a parse\-time error otherwise).
+The saved dataset has one row per observed combination \-\- the same
+list\-form shape described below, regardless of grid or
+.B /LIST
+presentation \-\- with columns: the active
+.B BY
+variables (if any), the request's variable(s), Frequency, Percent, Cum
+Freq, and Cum Percent;
+.B /NOCUM
+and
+.B /NOPERCENT
+suppress the same columns here as in the printed report.
+The filename is resolved the same way as the
+.B SAVE
+command's filename (relative to the active
+.BR FPATH ).
+.TP
+.BR /FMT=\fIfmt ,\  /CHARSET=\fIcs ,\  /HEADER=\fIy\-or\-n ,\  /DLM=\fIdlm ,\  /DECIMALS=\fIn
+Behave exactly as the identically\-named
+.B SAVE
+options; each is a parse\-time error without
+.BR /SAVE .
+.TP
+.B /CHISQFILE=\fIfilename
+With
+.B /SAVE
+and
+.B /CHISQ
+for a one\-way or two\-way request, also write the computed chi\-square
+statistics to
+.IR filename ,
+overriding the default
+.IR "filename_chisq.ext" .
+A parse\-time error without both
+.B /SAVE
+and
+.BR /CHISQ .
+One row per statistic, columns: the active
+.B BY
+variables (if any),
+.IR Statistic$ ,
+.IR DF ,
+.IR Value ,
+and
+.I Prob
+(the last two blank where not applicable \-\- Phi, Contingency
+Coefficient, Cram\['e]r's V, and Sample Size).
+No file is written for a three\-or\-more\-way request, or when chi\-square
+could not be computed.
+It is a runtime error for a
+.B BY
+or crossing variable to share its name with one of the computed columns
+.B /SAVE
+would add
+.RI ( Frequency ", " Percent ", " "Cum Freq" ", " "Cum Percent" ,
+or, for the
+.B /CHISQ
+file,
+.IR Statistic$ / DF / Value / Prob )
+\-\- rename the variable, or drop the option that would add the colliding
+column (e.g.
+.BR /NOCUM ,
+.BR /NOPERCENT ).
 .RE
 .PP
 One\-way output: level, Frequency, Percent, Cum Freq, Cum Percent, and a Total row.

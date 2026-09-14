@@ -2177,6 +2177,9 @@ package body SData.Parser is
    --    #3  duplicate option flag
    --    #4  /ORDER missing '=' or bad value
    --    #5  unknown slash-option
+   --    #6  /SAVE given with more than one request (ADR-071)
+   --    #7  /FMT, /CHARSET, /HEADER, /DLM, /DECIMALS, or /CHISQFILE given
+   --        without /SAVE (/CHISQFILE also requires /CHISQ)
    procedure Parse_TABLES
      (Ctx  : in out Parser_Context;
       Stmt : Statement_Access)
@@ -2269,11 +2272,191 @@ package body SData.Parser is
                      raise Script_Error with "TABLES: /ORDER= must be FREQ or INTERNAL";
                   end if;
                end;
+
+            --  /SAVE=<filename> and its suboptions (ADR-071).  All share
+            --  TABLES's existing flat /KEY=value slash-loop grammar --
+            --  there is no nested paren clause the way USE/SAVE's own
+            --  Dataset_Spec/Save_Spec syntax has, since a request already
+            --  precedes these options positionally.
+            elsif Flag = "SAVE" then
+               --  REVIEW: an unquoted absolute path (e.g. /SAVE=/tmp/x.csv)
+               --  fails to parse as one filename token -- the leading '/'
+               --  reads as a new slash-option, same as SAVE's own filename
+               --  parsing today (SAVE /tmp/x.csv fails identically, with a
+               --  different but equally unhelpful message). Not a
+               --  regression, not fixed here -- flagging in case a follow-up
+               --  issue against SAVE/TABLES's shared filename-token grammar
+               --  is wanted. Quoted and relative unquoted paths both work.
+               if Stmt.Table_Save_Len > 0 then
+                  raise Script_Error with "TABLES: /SAVE may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "TABLES: expected '=' after /SAVE";
+               end if;
+               declare Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx); pragma Unreferenced (Eq);
+                       Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       VLen : constant Natural :=
+                          Natural'Min (Val_Tok.Length, Max_Path_Len);
+               begin
+                  Stmt.Table_Save_File (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                  Stmt.Table_Save_Len := VLen;
+               end;
+
+            elsif Flag = "FMT" then
+               if Stmt.Table_Save_Fmt_Specified then
+                  raise Script_Error with "TABLES: /FMT may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "TABLES: expected '=' after /FMT";
+               end if;
+               declare Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx); pragma Unreferenced (Eq);
+                       Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       Val : constant String := To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+               begin
+                  Stmt.Table_Save_Fmt_Specified := True;
+                  if Val = "CSV" then
+                     Stmt.Table_Save_Fmt := SData_Core.Config.CSV;
+                  elsif Val = "ODF" or else Val = "ODS" then
+                     Stmt.Table_Save_Fmt := SData_Core.Config.ODF;
+                  elsif Val = "OOXML" or else Val = "XLSX" then
+                     Stmt.Table_Save_Fmt := SData_Core.Config.OOXML;
+                  else
+                     raise Script_Error with
+                        "TABLES: /FMT= must be CSV, ODF, or OOXML";
+                  end if;
+               end;
+
+            elsif Flag = "CHARSET" then
+               if Stmt.Table_Save_Charset_Len > 0 then
+                  raise Script_Error with "TABLES: /CHARSET may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "TABLES: expected '=' after /CHARSET";
+               end if;
+               declare Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx); pragma Unreferenced (Eq);
+                       Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       VLen : constant Natural :=
+                          Natural'Min (Val_Tok.Length, Max_Charset_Len);
+               begin
+                  Stmt.Table_Save_Charset (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                  Stmt.Table_Save_Charset_Len := VLen;
+               end;
+
+            elsif Flag = "HEADER" then
+               if Stmt.Table_Save_Header_Specified then
+                  raise Script_Error with "TABLES: /HEADER may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "TABLES: expected '=' after /HEADER";
+               end if;
+               declare Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx); pragma Unreferenced (Eq);
+                       Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       Val : constant String := To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+               begin
+                  if Val /= "YES" and then Val /= "NO" then
+                     raise Script_Error with "TABLES: /HEADER= must be YES or NO";
+                  end if;
+                  Stmt.Table_Save_Header_Specified := True;
+                  Stmt.Table_Save_Header := (Val = "YES");
+               end;
+
+            elsif Flag = "DLM" then
+               if Stmt.Table_Save_DLM_Len > 0 then
+                  raise Script_Error with "TABLES: /DLM may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "TABLES: expected '=' after /DLM";
+               end if;
+               declare Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx); pragma Unreferenced (Eq);
+                       Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       VLen : constant Natural :=
+                          Natural'Min (Val_Tok.Length, Max_Delimiter_Len);
+               begin
+                  Stmt.Table_Save_DLM (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                  Stmt.Table_Save_DLM_Len := VLen;
+               end;
+
+            elsif Flag = "DECIMALS" then
+               if Stmt.Table_Save_Decimals_Specified then
+                  raise Script_Error with "TABLES: /DECIMALS may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "TABLES: expected '=' after /DECIMALS";
+               end if;
+               declare Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx); pragma Unreferenced (Eq);
+                       Peek : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+               begin
+                  if Peek.Kind = Token_Minus then
+                     raise Script_Error with
+                        "TABLES: /DECIMALS= requires a non-negative integer";
+                  end if;
+                  declare
+                     Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     begin
+                        Stmt.Table_Save_Decimals :=
+                           Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                     exception
+                        when Constraint_Error =>
+                           raise Script_Error with
+                              "TABLES: /DECIMALS= requires a non-negative integer";
+                     end;
+                     Stmt.Table_Save_Decimals_Specified := True;
+                  end;
+               end;
+
+            elsif Flag = "CHISQFILE" then
+               if Stmt.Table_Chisq_File_Len > 0 then
+                  raise Script_Error with "TABLES: /CHISQFILE may be specified at most once";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                  raise Script_Error with "TABLES: expected '=' after /CHISQFILE";
+               end if;
+               declare Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx); pragma Unreferenced (Eq);
+                       Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       VLen : constant Natural :=
+                          Natural'Min (Val_Tok.Length, Max_Path_Len);
+               begin
+                  Stmt.Table_Chisq_File (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                  Stmt.Table_Chisq_File_Len := VLen;
+               end;
+
             else
                raise Script_Error with "TABLES: unknown option '/" & Flag & "'";
             end if;
          end;
       end loop;
+
+      --  Post-loop validation (ADR-071).
+      if Stmt.Table_Save_Len > 0 then
+         if First_Req.Next /= null then
+            raise Script_Error with "TABLES: /SAVE requires exactly one request";
+         end if;
+      else
+         if Stmt.Table_Save_Fmt_Specified then
+            raise Script_Error with "TABLES: /FMT requires /SAVE";
+         end if;
+         if Stmt.Table_Save_Charset_Len > 0 then
+            raise Script_Error with "TABLES: /CHARSET requires /SAVE";
+         end if;
+         if Stmt.Table_Save_Header_Specified then
+            raise Script_Error with "TABLES: /HEADER requires /SAVE";
+         end if;
+         if Stmt.Table_Save_DLM_Len > 0 then
+            raise Script_Error with "TABLES: /DLM requires /SAVE";
+         end if;
+         if Stmt.Table_Save_Decimals_Specified then
+            raise Script_Error with "TABLES: /DECIMALS requires /SAVE";
+         end if;
+      end if;
+      if Stmt.Table_Chisq_File_Len > 0 then
+         if Stmt.Table_Save_Len = 0 then
+            raise Script_Error with "TABLES: /CHISQFILE requires /SAVE";
+         end if;
+         if not Stmt.Table_CHISQ then
+            raise Script_Error with "TABLES: /CHISQFILE requires /CHISQ";
+         end if;
+      end if;
    end Parse_TABLES;
 
    ---------------------

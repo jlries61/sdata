@@ -80,6 +80,7 @@ that might relitigate a settled question.
 | ADR-068 | STATS' default text output is a SAS PROC MEANS-style "minimal box" table (Display_Stats_Table) instead of the generic DISPLAY row dump | 2026-09-08 | Accepted |
 | ADR-069 | DISPLAY's two default-print code paths are consolidated into one shared Display_Table renderer producing a SAS PROC PRINT-style boxed table (Obs column, left/right-justified per column type) | 2026-09-08 | Accepted |
 | ADR-070 | DISPLAY rebuilds the SELECT filter map itself (Execute_Rebuild_Filter) instead of relying on the next RUN, so a SELECT with no intervening RUN takes effect immediately | 2026-09-11 | Accepted |
+| ADR-071 | TABLES gains a /SAVE option, writing its crosstab to an external dataset via a new SData_Core.Table.Table_View (not the SAVE command's build-and-swap), preserving ADR-049's no-mutation guarantee | 2026-09-14 | Accepted |
 
 ---
 
@@ -2323,4 +2324,108 @@ unchanged (the fix is a no-op on every path that already issues `RUN` before `DI
 
 Version bump: patch — a bug fix restoring already-documented, already-promised behavior, not a new
 documented-default-behavior change.
+
+### ADR-071: TABLES gains a /SAVE option, writing its crosstab via a new Table_View rather than the SAVE command's build-and-swap
+
+**Date:** 2026-09-14 | **Status:** Accepted
+
+**Context:** User request. `TABLES` (ADR-049, SAS `PROC FREQ` analogue) is deliberately print-only:
+it never replaces the table, alters the PDV, flushes a pending `SAVE`, or clears `SELECT`/`BY`.
+There was no way to get a `TABLES` crosstab's counts into an external file — the only options were
+to eyeball the printed report or reimplement the same tabulation via `AGGREGATE`. The user
+explicitly did not want to reuse the `SAVE` command's own build-and-swap machinery (the mechanism
+`STATS`/`AGGREGATE`/`TRANSPOSE` use to write their output), since that mechanism works by
+*replacing the internal table* with the result before writing it — exactly the state mutation
+ADR-049 committed `TABLES` to avoiding; the user wanted to keep using the real table after
+`TABLES ... /SAVE=...` runs, the same as after any other `TABLES` call.
+
+**Decision explored and rejected first.** A "swap the singleton, write, restore" design (snapshot
+`Data_Table`, temporarily install the crosstab, call the existing `File_IO` writers unchanged,
+restore the snapshot) was designed first, since it reuses `Write_CSV`/`Write_ODF`/`Write_OOXML`
+completely unchanged. Systems-designer review found this design's required pre-swap snapshot of
+`Data_Table` is a full **O(real-table-cell-count) deep copy** — `SData_Core.Columns.Column_Maps` is
+`Ada.Containers.Indefinite_Hashed_Maps`, and `:=` duplicates every column's `Value_Vectors.Vector`
+— a cost with **no equivalent** in `STATS`/`AGGREGATE`/`TRANSPOSE`'s own build-and-swap, since those
+commands only ever install a new (small) result table over the old one and let the old one's
+storage be reclaimed; they never retain a copy of the table they replace. Against a large `USE`d
+table (exactly the case sdata's disk-spill machinery exists for), the swap design would pay 2-3x
+the unavoidable single-pass scan cost and roughly double peak memory for the duration of the call —
+a real, avoidable regression this project's own precedent (ADR-0011's EAV disk-spill work) treats
+seriously.
+
+**Decision.** A new `SData_Core.Table.Table_View` type: a read-only view onto a table's
+columns/rows, defaulting (`Default_View`) to the existing singleton-reading behavior every current
+caller keeps unchanged. `Column_Count`, `Column_Name`, `Logical_Row_Count`, `Logical_To_Physical`,
+`Get_Value_Upper` (and, via it, `Get_Value`) — the complete set `Write_CSV`/`Write_ODF`/`Write_OOXML`
+call, confirmed by direct read of `Write_CSV`'s body — gain an optional `View` parameter, as does
+`File_IO.Open_Output`, threaded straight through. A non-default view (`Output_View`, onto the
+existing `Output_Data_Table`/`Output_Column_Order`/`Output_Table_Row_Count` staging area `STATS`/
+`AGGREGATE`/`TRANSPOSE` already use to build their result tables) takes `'Access` only — O(1), no
+copy of any column data — and is never SELECT-filtered (`Logical_Row_Count`/`Logical_To_Physical`
+are identity over `Row_Count` for it: an ephemeral view has no independent filter concept, and
+`Filter_Map`'s indices belong to `Data_Table`'s row space, not the view's) and never consults
+`Backing_Store` (a non-default view is always fully in-memory by contract — see `Output_Is_Spilled`
+below — so the `Backing_Store.Is_Active` global flag, which reflects whichever table last spilled,
+can never leak into an ephemeral view's reads). `Data_Table` is never touched by any of this:
+`TABLES`'s no-mutation guarantee holds by construction, not by careful restore-on-every-path
+discipline.
+
+**`TABLES` syntax** (design.md, HELP, man page all updated): `/SAVE=<filename>` (plus `/FMT=`,
+`/CHARSET=`, `/HEADER=`, `/DLM=`, `/DECIMALS=`, parse errors without `/SAVE`) writes the crosstab to
+an external dataset. Requires exactly one `request` in the statement (`/SAVE requires exactly one
+request`, parse-time error otherwise) — a statement like `TABLES sex race sex*race` can name
+differently-shaped tables, and `/SAVE` needs one unambiguous schema. The saved dataset is always the
+list-form row shape (one row per observed combination, matching `Render_List`'s own tuple
+enumeration, duplicated rather than refactored into a shared function since printing and dataset-
+building are different concerns) with columns: active `BY` variables (if any), the request's
+crossing variable(s), then Frequency/Percent/Cum Freq/Cum Percent — `/NOCUM`/`/NOPERCENT` suppress
+the same columns here as in the printed report (a design decision revised mid-session from an
+initial "always save all columns" to keep one column set rather than two to reason about).
+`/CHISQ` + `/SAVE` (one-way/two-way only — three-or-more-way already skips `/CHISQ` with a warning)
+additionally writes a second file, one row per computed statistic (`Statistic$`, `DF`, `Value`,
+`Prob`, the last two blank where not applicable — Phi/Contingency Coefficient/Cramér's V/Sample
+Size), by default `<filename-without-extension>_chisq<.ext>`, overridable via `/CHISQFILE=<filename>`
+(requires both `/SAVE` and `/CHISQ`). No chi-square file is written when chi-square could not be
+computed (a zero row/column total, or fewer than two one-way categories) — no sentinel row. The
+filename (and the chi-square filename) resolve the same way as the `SAVE` command's own filename
+(`Full_Path (..., "SAVE")`, already declared in `sdata-interpreter.adb`, visible to the `Execute_
+Tables` subunit with no new with-clause). `/SAVE`'s write honors `OPTIONS SAVEOVERWRT` identically
+to the `SAVE` command (found missing during manual verification of this feature, not anticipated by
+either design phase — the first `Open_Output` call was left at its own default `Allow_Overwrite =>
+True`, silently bypassing the overwrite guard); a refused overwrite is caught and swallowed at the
+call site (`SData_Core.File_IO.Save_Refused => null;`), matching the `SAVE` command's own call
+sites, so a refused write reports the file-writer's own clean message once rather than a second,
+unhandled-exception-shaped line.
+
+**Spill edge case, deliberately out of scope.** The `Output_*` staging area can itself spill to the
+SQLite backing store under the same `Config.Max_Table_Cells` threshold `Add_Row` uses (`Add_Output_
+Row`'s own doc comment already states this) — an extremely unlikely case for a crosstab summary
+(bounded by observed combinations, not source row count) but not impossible for, e.g., a two-way
+crossing of two high-cardinality continuous variables. A non-default `Table_View` never consults
+`Backing_Store`, so reading a spilled `Output_Data_Table` through one would silently return missing
+values rather than the real data. `SData_Core.Table.Output_Is_Spilled` (new, trivial — the same
+`Output_Segment_Start > 1` condition `Commit_Output_Table` already checks internally) is checked
+before both `/SAVE` writes; if true, `TABLES` raises `Script_Error` rather than writing wrong data.
+Extending `Table_View`/`Get_Value_Upper` to read a spilled `Output_Data_Table` correctly (a new
+`Backing_Store` entry point keyed to the `"output_data"` SQL table, mirroring the existing `"data"`-
+keyed `Fetch`) is real, scoped, follow-up work — not attempted here; the hard-fail keeps this
+version correct (loud failure, not silent wrong output) rather than silently correct only in the
+common case.
+
+**Consequences:** sdata-core 0.14.4 → 0.15.0 (additive: new `Table_View` type, new `Output_View`/
+`Output_Is_Spilled` functions, new optional parameters on 5 existing accessors and on `File_IO.
+Open_Output`/`Write_CSV`/`Write_ODF`/`Write_OOXML` — every existing call site's behavior is
+unchanged, confirmed by the full sdata `make check` suite passing unmodified before the new /SAVE-
+specific tests were added). sdata floor `^0.14.4` → `^0.15.0`; data-vandal floor `^0.14.0` →
+`^0.15.0` (floor-bump-only — `TABLES` has no data-vandal analogue, confirmed via `grep -rn TABLES
+~/Develop/data-vandal/src` returning nothing). `docs/api/reference.html` regenerated. 10 new sdata
+regression tests (basic /SAVE, BY-group combination, /NOCUM//NOPERCENT column suppression matching
+the printed report, /CHISQ default-derived and /CHISQFILE-overridden chi-square file, three parse-
+time error guards, the no-mutation guarantee under an active SELECT, and the SAVEOVERWRT refusal
+path) plus `tests/expected/help_all.out` resynced; `make check` 527 → 537, all green. Full three-way
+gate verified: sdata-core `alr build` clean, sdata `make check` 537/537, data-vandal `make check`
+149/149 unchanged.
+
+Version bump: minor (new option, documented-default-behavior addition), matching the `TABLES`/
+`STATS`/`AGGREGATE`/`TRANSPOSE`-precedent for new commands/options.
 
