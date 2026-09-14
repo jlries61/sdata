@@ -562,6 +562,12 @@ package body SData.Help is
    begin
       Put_Line ("Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]");
       Put_Line ("Conditional execution. Supports single-line and multi-line block forms.");
+      Put_Line ("The single-line form (a clause right after THEN) is a complete statement");
+      Put_Line ("as soon as it's typed -- a later ELSEIF/ELSE on its own line is parsed as");
+      Put_Line ("a new, unrelated statement, not a continuation, and is rejected. Only the");
+      Put_Line ("block form (THEN left bare, nothing else on that line) signals an");
+      Put_Line ("incomplete statement awaiting ELSEIF/ELSE/END IF -- use it whenever");
+      Put_Line ("ELSEIF or ELSE is needed:");
       Put_Line ("Example:");
       Put_Line ("  IF AGE < 18 THEN");
       Put_Line ("    LET STATUS$ = ""MINOR""");

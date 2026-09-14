@@ -954,7 +954,13 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>IF</em>/<em>THEN</em>/<em>ELSE</em>/<em>ELSEIF</em>/<em>END IF</em></td>
 <td></td>
 <td>Deferred Execution</td>
-<td>Standard conditional execution, extending Bywater BASIC's single-line <em>IF value THEN line1 [ELSE line2]</em> form with a multi-line block form terminated by <em>END IF</em> and multi-way branching via <em>ELSEIF</em>. May be nested. Also usable as a three-argument function, <em>IF(condition, true_value, false_value)</em>, returning <em>true_value</em> when <em>condition</em> is non-zero/non-empty, else <em>false_value</em>.</td>
+<td>Standard conditional execution, extending Bywater BASIC's single-line <em>IF value THEN line1 [ELSE line2]</em> form with a multi-line block form terminated by <em>END IF</em> and multi-way branching via <em>ELSEIF</em>. May be nested. Also usable as a three-argument function, <em>IF(condition, true_value, false_value)</em>, returning <em>true_value</em> when <em>condition</em> is non-zero/non-empty, else <em>false_value</em>. <strong>The single-line form is a complete statement the moment a clause follows <em>THEN</em> on the same line</strong> — an <em>ELSEIF</em> or <em>ELSE</em> on a following line is parsed as a new, unrelated statement, not a continuation, and (having no meaning outside an open block) is rejected. Only the block form — <em>THEN</em> left bare, with nothing else on that line — signals an incomplete statement awaiting <em>ELSEIF</em>/<em>ELSE</em>/<em>END IF</em>; this is also what the interactive REPL's continuation prompt keys on. Use the block form whenever <em>ELSEIF</em> or <em>ELSE</em> is needed:<pre>IF AGE &lt; 18 THEN
+  LET STATUS$ = "MINOR"
+ELSEIF AGE &lt; 65 THEN
+  LET STATUS$ = "ADULT"
+ELSE
+  LET STATUS$ = "SENIOR"
+END IF</pre></td>
 </tr>
 <tr>
 <td><em>INSERT</em></td>

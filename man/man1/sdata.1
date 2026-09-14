@@ -1126,6 +1126,23 @@ Conditional execution.
 Block form (terminated by
 .BR "END IF" )
 is also supported.
+The single-line form (a clause directly after
+.BR THEN )
+is a complete statement as soon as it is typed \(em a later
+.B ELSEIF
+or
+.B ELSE
+on its own line is parsed as a new, unrelated statement and rejected, not treated
+as a continuation.
+Only the block form (
+.B THEN
+left bare, nothing else on that line) signals an incomplete statement awaiting
+.BR ELSEIF / ELSE / "END IF" ;
+use it whenever
+.B ELSEIF
+or
+.B ELSE
+is needed.
 .TP
 .B SELECT [\fIexpr\fR] CASE \fIval\fR : \fIstmt\fR ... END SELECT
 Multi\-way branch.

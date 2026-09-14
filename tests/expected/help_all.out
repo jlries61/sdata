@@ -358,6 +358,12 @@ Execution: Declarative -- takes effect at once.
 
 Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]
 Conditional execution. Supports single-line and multi-line block forms.
+The single-line form (a clause right after THEN) is a complete statement
+as soon as it's typed -- a later ELSEIF/ELSE on its own line is parsed as
+a new, unrelated statement, not a continuation, and is rejected. Only the
+block form (THEN left bare, nothing else on that line) signals an
+incomplete statement awaiting ELSEIF/ELSE/END IF -- use it whenever
+ELSEIF or ELSE is needed:
 Example:
   IF AGE < 18 THEN
     LET STATUS$ = "MINOR"
