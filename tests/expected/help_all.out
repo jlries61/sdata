@@ -358,12 +358,17 @@ Execution: Declarative -- takes effect at once.
 
 Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]
 Conditional execution. Supports single-line and multi-line block forms.
-The single-line form (a clause right after THEN) is a complete statement
-as soon as it's typed -- a later ELSEIF/ELSE on its own line is parsed as
-a new, unrelated statement, not a continuation, and is rejected. Only the
-block form (THEN left bare, nothing else on that line) signals an
-incomplete statement awaiting ELSEIF/ELSE/END IF -- use it whenever
-ELSEIF or ELSE is needed:
+In a script file (run directly or via SUBMIT), ELSEIF/ELSE reaches
+across a following physical line automatically, since the whole file
+is one continuous token stream. In the interactive REPL, a single-line
+THEN-clause is submitted and executed as soon as it's typed, so a
+following ELSEIF/ELSE is instead parsed as a new, unrelated statement
+and rejected -- unless the THEN-clause's line ends with a trailing
+comma, a general REPL line-continuation marker that buffers it
+together with the next line first, restoring the same chaining a
+script file gets for free. Only the block form (THEN left bare,
+nothing else on that line) is REPL-friendly by construction -- it
+always waits for ELSEIF/ELSE/END IF, in every execution mode:
 Example:
   IF AGE < 18 THEN
     LET STATUS$ = "MINOR"

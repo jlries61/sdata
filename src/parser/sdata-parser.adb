@@ -273,6 +273,18 @@ package body SData.Parser is
       else
          --  Inline form.
          S.Then_Branch := Parse_Statement (Ctx);
+         --  A trailing comma after the THEN-clause is a continuation marker
+         --  (design.md sec5.4; ADR-072), not a statement terminator -- it makes
+         --  the following line part of the *same* logical line, so ELSEIF/ELSE
+         --  must remain reachable exactly as if there had been no line break at
+         --  all. Skip it (and any further continuation commas) before checking
+         --  for ELSEIF/ELSE; a plain newline with no such comma still ends the
+         --  inline form here, leaving ELSEIF/ELSE on a following line to be
+         --  rejected as an unrelated statement, per the documented single-line-
+         --  form contract.
+         while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+         end loop;
          if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_ELSEIF then
             declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
             S.Else_Branch := Parse_If_Statement (Ctx);

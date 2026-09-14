@@ -1126,23 +1126,44 @@ Conditional execution.
 Block form (terminated by
 .BR "END IF" )
 is also supported.
-The single-line form (a clause directly after
-.BR THEN )
-is a complete statement as soon as it is typed \(em a later
+Whether a single-line
+.B THEN
+clause's
 .B ELSEIF
 or
 .B ELSE
-on its own line is parsed as a new, unrelated statement and rejected, not treated
-as a continuation.
+reaches across a following physical line depends on execution mode.
+A script file (run directly or via
+.BR SUBMIT )
+is parsed as one continuous token stream, so
+.BR ELSEIF / ELSE
+on the next line chains normally with no special marking.
+The interactive REPL instead submits and executes each line as soon as it is
+typed, so a single-line
+.B THEN
+clause is already a complete statement once entered \(em a following
+.B ELSEIF
+or
+.B ELSE
+is parsed as a new, unrelated statement and rejected, not treated as a
+continuation \(em
+.I unless
+the
+.B THEN
+clause's own line ends with a trailing comma, a general REPL
+line-continuation marker that buffers the next line together with it before
+parsing, restoring the same chaining a script file gets for free.
 Only the block form (
 .B THEN
-left bare, nothing else on that line) signals an incomplete statement awaiting
-.BR ELSEIF / ELSE / "END IF" ;
+left bare, nothing else on that line) is REPL-friendly by construction: it
+always signals an incomplete statement awaiting
+.BR ELSEIF / ELSE / "END IF" ,
+regardless of execution mode;
 use it whenever
 .B ELSEIF
 or
 .B ELSE
-is needed.
+is needed and REPL-friendliness matters.
 .TP
 .B SELECT [\fIexpr\fR] CASE \fIval\fR : \fIstmt\fR ... END SELECT
 Multi\-way branch.

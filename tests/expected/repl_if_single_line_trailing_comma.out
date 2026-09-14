@@ -1,14 +1,13 @@
 sdata> -- REPL-mode companion to if_single_line_trailing_comma.cmd: the trailing
-sdata> -- comma still triggers the "..>" continuation prompt (design.md sec5.4
-sdata> -- applies unconditionally), even though the resulting merged statement then
-sdata> -- fails for the same, separate, expected reason (ELSEIF cannot follow a
-sdata> -- single-line IF).
+sdata> -- comma triggers the "..>" continuation prompt (design.md sec5.4), buffering
+sdata> -- the ELSEIF line together with the THEN-clause line before parsing -- so the
+sdata> -- merged statement chains normally, exactly as it would if typed on one line
+sdata> -- (or in a script file, where this always works with no comma needed).
 sdata> LET inlrn=1
 sdata> RUN
 RUN complete. 1 records and 1 variables processed.
 sdata> if inlrn then let sample$="Learn",
 ..>   elseif 0 then let sample$="Test"
-Error: Unrecognized command "elseif" at line  2 — type HELP for a list of commands
 sdata> run
-RUN complete. 1 records and 1 variables processed.
+RUN complete. 1 records and 2 variables processed.
 sdata> quit

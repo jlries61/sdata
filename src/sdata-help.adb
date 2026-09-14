@@ -562,12 +562,17 @@ package body SData.Help is
    begin
       Put_Line ("Command: IF condition THEN stmt [ELSEIF cond THEN stmt] [ELSE stmt]");
       Put_Line ("Conditional execution. Supports single-line and multi-line block forms.");
-      Put_Line ("The single-line form (a clause right after THEN) is a complete statement");
-      Put_Line ("as soon as it's typed -- a later ELSEIF/ELSE on its own line is parsed as");
-      Put_Line ("a new, unrelated statement, not a continuation, and is rejected. Only the");
-      Put_Line ("block form (THEN left bare, nothing else on that line) signals an");
-      Put_Line ("incomplete statement awaiting ELSEIF/ELSE/END IF -- use it whenever");
-      Put_Line ("ELSEIF or ELSE is needed:");
+      Put_Line ("In a script file (run directly or via SUBMIT), ELSEIF/ELSE reaches");
+      Put_Line ("across a following physical line automatically, since the whole file");
+      Put_Line ("is one continuous token stream. In the interactive REPL, a single-line");
+      Put_Line ("THEN-clause is submitted and executed as soon as it's typed, so a");
+      Put_Line ("following ELSEIF/ELSE is instead parsed as a new, unrelated statement");
+      Put_Line ("and rejected -- unless the THEN-clause's line ends with a trailing");
+      Put_Line ("comma, a general REPL line-continuation marker that buffers it");
+      Put_Line ("together with the next line first, restoring the same chaining a");
+      Put_Line ("script file gets for free. Only the block form (THEN left bare,");
+      Put_Line ("nothing else on that line) is REPL-friendly by construction -- it");
+      Put_Line ("always waits for ELSEIF/ELSE/END IF, in every execution mode:");
       Put_Line ("Example:");
       Put_Line ("  IF AGE < 18 THEN");
       Put_Line ("    LET STATUS$ = ""MINOR""");

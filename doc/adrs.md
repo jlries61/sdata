@@ -2548,3 +2548,55 @@ regression tests (`tests/orphan_continuation_comma.cmd` — a valid next stateme
 comma executes normally, not just "no spurious error"; `tests/if_single_line_trailing_comma.cmd` and
 its REPL-mode companion — the `IF`/`ELSEIF` case verbatim). `make check`: 546 → 549, all green.
 
+**Second amendment (2026-09-14): the skip-loop fix above suppressed the spurious error but did not
+restore the actual continuation — `IF`'s own `ELSEIF`/`ELSE` lookahead still couldn't reach past the
+comma; and the "single-line form always rejects a following `ELSEIF`" doc text from the same day
+turned out to describe REPL behavior only, not sdata generally.**
+
+User re-tested the identical scenario directly at the interactive prompt and reported: *"HELP says
+ELSEIF can be part of a single line IF, which is exactly how I am using it."* Investigation traced
+this to two compounding problems, one behavioral and one documentary:
+
+1. **The real root cause the first amendment didn't reach.** `Parse_If_Statement`'s inline-form branch
+   (`src/parser/sdata-parser.adb`) decides whether a single-line `THEN`-clause chains into `ELSEIF`/
+   `ELSE` by peeking at the *very next* token once the clause's own statement finishes parsing. With a
+   continuation comma present, that next token is the comma itself (now a real `Token_Comma` per this
+   ADR's main decision) — never `Token_ELSEIF`/`Token_ELSE` — so the peek always failed and the chain
+   was never taken, regardless of the first amendment's dispatcher-level fix. That fix only stopped the
+   comma from raising an error of its own; it never made `IF`'s own lookahead tolerant of it. Fixed by
+   adding a `while Peek_Next_Token (...).Kind = Token_Comma loop ... end loop;` immediately before both
+   the `ELSEIF` and `ELSE` peek checks in the inline-form branch — the same skip-before-check pattern as
+   the dispatcher fix, applied at the one other call site that independently peeks past a continuation
+   comma.
+
+2. **The doc text this session had already written (design.md/HELP/man page, same day, "IF single-line
+   vs block form" work) was wrong in a way neither amendment above had tested for.** It claimed the
+   single-line form is "a complete statement the moment a clause follows `THEN`" and that a following
+   `ELSEIF`/`ELSE` "is parsed as a new, unrelated statement... and is rejected" — stated as if true
+   unconditionally. Direct testing (`./bin/sdata a-script-file.cmd`, no REPL) showed this is **false**
+   for batch/file execution (including `SUBMIT`): the entire file is one continuous token stream from
+   the start, so `Parse_If_Statement`'s lookahead already reaches across a following physical line into
+   `ELSEIF`/`ELSE` with no comma needed at all — it always could. The restriction is REPL-only: the
+   interactive loop submits and executes each line as its own unit as soon as it's typed, so `ELSEIF`
+   genuinely has not been typed yet at the moment the single-line `THEN`-clause is judged complete —
+   unless a continuation comma tells the REPL to buffer the next line first, which is exactly what fix
+   (1) above now makes work correctly. The original bug report (documented that same day as "1 for
+   now," doc-only) was itself run at the interactive prompt, so its finding was accurate for what was
+   tested — it was the generalization to "sdata" broadly, not to "the REPL specifically," that
+   overreached. design.md, `src/sdata-help.adb` (`Help_IF`), and `man/man1/sdata.1` corrected to state
+   the mode-dependent behavior explicitly rather than a blanket rule.
+
+New regression coverage closing both gaps: a batch-mode test confirming `ELSEIF` on a following
+physical line chains with no comma present (`tests/if_elseif_batch_no_comma_continuation.cmd`, always
+worked, previously unverified by any committed test); a REPL-mode test confirming `ELSEIF` on a
+following line without a continuation comma still correctly rejects
+(`tests/repl_if_elseif_no_continuation_error.cmd`, pins down the genuine REPL-only restriction that
+was previously asserted only by manual demonstration, per the "1 for now" decision). The two existing
+comma-continuation tests (`tests/if_single_line_trailing_comma.cmd` and its REPL companion) had their
+expected outputs regenerated: both now succeed (`ELSEIF` chains, no error) instead of erroring, since
+the comma-skip fix in this amendment makes the lookahead succeed in both modes.
+
+Version bump: patch — see the version-bump note on the first amendment; this is a further bug fix on
+the same not-yet-released fix, not a new documented-default-behavior change relative to the corrected
+design.md text.
+
