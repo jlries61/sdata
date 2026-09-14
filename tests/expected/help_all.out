@@ -21,7 +21,10 @@ Per-dataset options (in parentheses after a filename):
                            values (float to integer truncates toward
                            zero); a numeric<->character change ($ added
                            or removed) is rejected and the whole RENAME
-                           is aborted.
+                           is aborted -- sdata does not parse a character
+                           column's values as numbers (or format numeric
+                           values as text) on rename, it only checks the
+                           name suffix.
 Merge (two or more comma-separated datasets):
   USE a, b                 Positional merge (combine rows by position).
   USE a, b /BY=var ...     Match merge (full outer; auto-sorted by BY).
@@ -59,7 +62,9 @@ Multiple targets (comma-separated) with per-target options:
                            DROP).  A suffix change retypes the column:
                            float<->integer converts values (float to
                            integer truncates toward zero); a
-                           numeric<->character change is rejected.
+                           numeric<->character change is rejected -- no
+                           value parsing/formatting is attempted, only
+                           the name suffix is checked.
   (IF=expr)                Write a record to this target only when expr
                            is true (use with WRITE for per-record routing).
   These options also apply to a single-target SAVE.

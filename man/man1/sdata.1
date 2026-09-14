@@ -338,7 +338,9 @@ is retyped: a change within the numeric family converts the values (float to
 integer truncates toward zero).
 A rename crossing the numeric/character boundary (a "$" suffix added to or
 removed from a numeric column, or removed from a character column) is rejected
-and the entire RENAME is aborted with no change applied.
+and the entire RENAME is aborted with no change applied. This is purely a
+name-suffix check: sdata does not parse a character column's values as
+numbers, or format a numeric column's values as text, as part of a rename.
 .TP
 .BI IN= varname
 Create a temporary integer variable set to 1 for records that originate from
@@ -418,7 +420,9 @@ If the new name's type suffix differs from the column's current type, the column
 is retyped in the output: a change within the numeric family converts the values
 (float to integer truncates toward zero).
 A rename crossing the numeric/character boundary is rejected and the entire
-RENAME is aborted with no change applied.
+RENAME is aborted with no change applied. This is purely a name-suffix
+check: sdata does not parse a character column's values as numbers, or
+format a numeric column's values as text, as part of a rename.
 .TP
 .BI IF= expr
 Row-level filter for this target.

@@ -20,7 +20,10 @@ Per-dataset options (in parentheses after a filename):
                            values (float to integer truncates toward
                            zero); a numeric<->character change ($ added
                            or removed) is rejected and the whole RENAME
-                           is aborted.
+                           is aborted -- sdata does not parse a character
+                           column's values as numbers (or format numeric
+                           values as text) on rename, it only checks the
+                           name suffix.
 Merge (two or more comma-separated datasets):
   USE a, b                 Positional merge (combine rows by position).
   USE a, b /BY=var ...     Match merge (full outer; auto-sorted by BY).

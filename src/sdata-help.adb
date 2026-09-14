@@ -85,7 +85,10 @@ package body SData.Help is
       Put_Line ("                           values (float to integer truncates toward");
       Put_Line ("                           zero); a numeric<->character change ($ added");
       Put_Line ("                           or removed) is rejected and the whole RENAME");
-      Put_Line ("                           is aborted.");
+      Put_Line ("                           is aborted -- sdata does not parse a character");
+      Put_Line ("                           column's values as numbers (or format numeric");
+      Put_Line ("                           values as text) on rename, it only checks the");
+      Put_Line ("                           name suffix.");
       Put_Line ("Merge (two or more comma-separated datasets):");
       Put_Line ("  USE a, b                 Positional merge (combine rows by position).");
       Put_Line ("  USE a, b /BY=var ...     Match merge (full outer; auto-sorted by BY).");
@@ -126,7 +129,9 @@ package body SData.Help is
       Put_Line ("                           DROP).  A suffix change retypes the column:");
       Put_Line ("                           float<->integer converts values (float to");
       Put_Line ("                           integer truncates toward zero); a");
-      Put_Line ("                           numeric<->character change is rejected.");
+      Put_Line ("                           numeric<->character change is rejected -- no");
+      Put_Line ("                           value parsing/formatting is attempted, only");
+      Put_Line ("                           the name suffix is checked.");
       Put_Line ("  (IF=expr)                Write a record to this target only when expr");
       Put_Line ("                           is true (use with WRITE for per-record routing).");
       Put_Line ("  These options also apply to a single-target SAVE.");
