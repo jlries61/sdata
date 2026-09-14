@@ -2507,7 +2507,21 @@ package body SData.Parser is
       Tok : Token := Get_Next_Token (Ctx.Lex_Ctx);
       Stmt : Statement_Access;
    begin
-      while Tok.Kind = Token_Colon or else Tok.Kind = Token_Newline loop
+      --  A trailing comma before a newline is always a continuation marker
+      --  (design.md sec5.4; ADR-072) -- it survives as a real Token_Comma
+      --  so a comma-delimited grammar (USE's dataset list, function
+      --  arguments, KEEP=/DROP= lists) can consume it as the separator it
+      --  already is there. When nothing consumes it -- the continuation
+      --  followed a statement whose own grammar has no comma role at all,
+      --  e.g. LET's assignment -- it reaches here, at the top of the next
+      --  statement, with no meaning. A bare comma is never the valid start
+      --  of any statement, so skipping it can never mask a real error;
+      --  treat it exactly like the leading Token_Colon/Token_Newline noise
+      --  already skipped below, rather than raising "Unrecognized command
+      --  ','" for what was only ever a continuation marker.
+      while Tok.Kind = Token_Colon or else Tok.Kind = Token_Newline
+         or else Tok.Kind = Token_Comma
+      loop
          Tok := Get_Next_Token (Ctx.Lex_Ctx);
       end loop;
 

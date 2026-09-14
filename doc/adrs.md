@@ -2517,3 +2517,34 @@ pre-existing suite at every stage.
 Version bump: patch — a bug fix restoring behavior consistent with the already-correct documented
 contract (same classification as ADR-070), not a new documented-default-behavior change.
 
+**Amendment (2026-09-14): an orphaned continuation comma must not itself raise an error.**
+User-reported: `if inlrn then let sample$="Learn",` followed by `elseif intst then ...` on the next
+line produced **two** errors — `Unrecognized command ","` (new, from this ADR's own fix) followed by
+`Unrecognized command "elseif"` (pre-existing and expected: a single-line `IF`'s `THEN`-clause is a
+complete statement the moment it's typed, per the note added to design.md/HELP/the man page the same
+day — only the block form, `THEN` left bare, supports a following `ELSEIF`/`ELSE`). `LET`'s assignment
+grammar has no comma role at all, so the continuation comma — now surviving as a real token per this
+ADR's main decision — reached the top-level statement dispatcher (`Parse_Statement`) with nothing
+left to consume it, and was rejected as an unrecognized statement start.
+
+User's explicit direction, matching design.md §5.4's own wording exactly ("Statement ending with
+comma shall be continued to next line" — unconditional, no carve-out for whether the comma has a
+grammatical role): *"A terminal comma should always be taken as a continuation mark, even if it is
+also taken as a list separator; and even if comma would not be otherwise expected."* Fixed by adding
+`Token_Comma` to `Parse_Statement`'s existing leading skip-loop (`src/parser/sdata-parser.adb`) —
+the same loop that already discards leading `Token_Colon`/`Token_Newline` as pure statement-separator
+noise before dispatching. A bare comma is never the valid start of any statement, so skipping it here
+can never mask a real error; it only removes the spurious second error for a comma whose one and only
+job was signaling the continuation.
+
+This is a narrow, additive change to the top-level dispatcher only — it does not touch, and was
+verified not to regress, the code-review-round-1 fix (`Parse_Filename_Into`/`Parse_Filename_Into_Save`
+rejecting a real subsequent statement swallowed as a bogus filename): that fix's own comma is consumed
+inside `Parse_USE_Stmt`'s/`Parse_SAVE_Stmt`'s own list loop and never reaches this dispatcher at all,
+so the two fixes operate on disjoint code paths by construction. Re-ran
+`tests/use_trailing_comma_next_stmt_error.cmd`, `tests/use_same_line_trailing_comma_error.cmd`, and
+`tests/save_trailing_comma_next_stmt_error.cmd` to confirm directly, not just reasoned about. 3 new
+regression tests (`tests/orphan_continuation_comma.cmd` — a valid next statement after an orphaned
+comma executes normally, not just "no spurious error"; `tests/if_single_line_trailing_comma.cmd` and
+its REPL-mode companion — the `IF`/`ELSEIF` case verbatim). `make check`: 546 → 549, all green.
+
