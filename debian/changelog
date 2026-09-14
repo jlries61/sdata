@@ -1,3 +1,9 @@
+sdata (0.29.2-1) unstable; urgency=medium
+
+  * Fix trailing-comma continuation reaching IF's single-line ELSEIF/ELSE and an orphaned-comma dispatch error; document IF single-line vs block form and USE/SAVE per-spec options
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 14 Sep 2026 16:48:38 -0700
+
 sdata (0.29.1-1) unstable; urgency=medium
 
   * Fix trailing-comma line continuation silently dropping the comma (sdata#90, ADR-072)

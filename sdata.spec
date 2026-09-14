@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.29.1
+Version:        0.29.2
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Sep 14 2026 John L. Ries <john@theyarnbard.com> - 0.29.2-1
+- Fix trailing-comma continuation reaching IF's single-line ELSEIF/ELSE and an orphaned-comma dispatch error; document IF single-line vs block form and USE/SAVE per-spec options
+
 * Mon Sep 14 2026 John L. Ries <john@theyarnbard.com> - 0.29.1-1
 - Fix trailing-comma line continuation silently dropping the comma (sdata#90, ADR-072)
 
