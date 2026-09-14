@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.29.0
+Version:        0.29.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Sep 14 2026 John L. Ries <john@theyarnbard.com> - 0.29.1-1
+- Fix trailing-comma line continuation silently dropping the comma (sdata#90, ADR-072)
+
 * Mon Sep 14 2026 John L. Ries <john@theyarnbard.com> - 0.29.0-1
 - TABLES /SAVE option: write the crosstab to an external dataset without touching the internal table (ADR-071)
 

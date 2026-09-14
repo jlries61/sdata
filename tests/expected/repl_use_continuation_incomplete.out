@@ -1,0 +1,9 @@
+sdata> -- sdata#90 regression guard: this is the exact scenario that regressed
+sdata> -- during this fix's own development -- a comma-delimited list (USE's
+sdata> -- dataset list) left dangling with nothing following the continuation
+sdata> -- comma must still make the REPL prompt "..>" and wait, not silently
+sdata> -- treat the statement as complete (and, worse, not surface a raw parse
+sdata> -- error instead of the graceful prompt). No QUIT below is deliberate:
+sdata> -- stdin simply runs out while still awaiting the continuation.
+sdata> USE "tests/data/freq.csv",
+..> 

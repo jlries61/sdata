@@ -93,6 +93,15 @@ private
       --  Set when an EOF token is produced right after a trailing-comma
       --  continuation was consumed with no following content.
       Continued_At_EOF : Boolean := False;
+      --  Set immediately after Get_Next_Token_Internal returns a
+      --  Token_Comma that came from a confirmed line continuation
+      --  (sdata#90: the comma now survives as a real token instead of
+      --  being discarded).  Read and cleared at the top of the *next*
+      --  call so Continued_At_EOF still reports correctly -- the comma
+      --  and a possible following EOF are no longer necessarily detected
+      --  within the same call the way the old discard-based
+      --  implementation had them.
+      Just_Emitted_Continuation_Comma : Boolean := False;
    end record;
 
 end SData.Lexer;

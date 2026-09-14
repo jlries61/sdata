@@ -1,3 +1,9 @@
+sdata (0.29.1-1) unstable; urgency=medium
+
+  * Fix trailing-comma line continuation silently dropping the comma (sdata#90, ADR-072)
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 14 Sep 2026 15:09:58 -0700
+
 sdata (0.29.0-1) unstable; urgency=medium
 
   * TABLES /SAVE option: write the crosstab to an external dataset without touching the internal table (ADR-071)

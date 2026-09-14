@@ -1260,6 +1260,35 @@ package body SData.Parser is
       procedure Parse_Filename_Into (Spec : Dataset_Spec_Access) is
          File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
       begin
+         --  sdata#90 (BLOCKER-1, 04-code-review.md round 1): this used to
+         --  accept ANY token kind here, blindly copying its Text/Length as
+         --  if it were filename text -- including a reserved-keyword token
+         --  like Token_QUIT.  Harmless before ADR-072 made the continuation
+         --  comma a real, persistent token (a bare trailing comma was
+         --  simply discarded, so USE's dataset-list loop never called this
+         --  a second time unless the user deliberately wrote a same-line
+         --  "USE a, QUIT"); afterwards, an utterly ordinary trailing comma
+         --  at the end of a USE line, followed by the next statement on
+         --  the next line, silently swallowed that next statement as a
+         --  bogus second dataset spec instead of raising anything.  Reject
+         --  anything that isn't shaped like a filename, loudly, instead.
+         --  Token_EOF is deliberately exempted: that's the legitimate
+         --  "still awaiting a continuation line" case in the REPL (an
+         --  incomplete comma-delimited list left dangling at end of
+         --  input) -- raising here would propagate out of Parse_Program
+         --  before Run_REPL ever gets to check Ended_With_Continuation,
+         --  turning a graceful "..>" prompt into a hard error. Letting it
+         --  through preserves the pre-existing (harmless-if-silent)
+         --  empty-filename-spec behavior for that one case; every other
+         --  wrong-shaped token still raises.
+         if File_Tok.Kind /= Token_MOCK
+           and then File_Tok.Kind /= Token_String_Literal
+           and then File_Tok.Kind /= Token_Identifier
+           and then File_Tok.Kind /= Token_EOF
+         then
+            raise Script_Error with
+              "Expected a filename in USE at line" & File_Tok.Line'Image;
+         end if;
          if File_Tok.Kind = Token_MOCK then
             Spec.Is_Mock  := True;
             Spec.File_Len := 0;
@@ -1578,6 +1607,18 @@ package body SData.Parser is
       procedure Parse_Filename_Into_Save (Spec : Save_Spec_Access) is
          File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
       begin
+         --  sdata#90 (BLOCKER-1, 04-code-review.md round 1): same guard as
+         --  Parse_Filename_Into (USE) -- see its comment for the full
+         --  explanation, including why Token_EOF is deliberately exempted
+         --  (the REPL's own graceful continuation-prompt case). SAVE has
+         --  no MOCK case.
+         if File_Tok.Kind /= Token_String_Literal
+           and then File_Tok.Kind /= Token_Identifier
+           and then File_Tok.Kind /= Token_EOF
+         then
+            raise Script_Error with
+              "Expected a filename in SAVE at line" & File_Tok.Line'Image;
+         end if;
          Spec.File_Len := File_Tok.Length;
          Spec.File_Path (1 .. File_Tok.Length) :=
             File_Tok.Text (1 .. File_Tok.Length);

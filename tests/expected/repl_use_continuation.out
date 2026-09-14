@@ -1,0 +1,15 @@
+sdata> -- sdata#90: USE's comma-delimited dataset list must also continue
+sdata> -- correctly across the REPL's "..>" prompt boundary, the same as it
+sdata> -- already did (via the comma being invisible) for PRINT's space-separated
+sdata> -- list in repl_continuation.cmd -- confirming the fix's call-boundary
+sdata> -- design (Just_Emitted_Continuation_Comma) doesn't just work in batch mode.
+sdata> USE "tests/data/freq.csv",
+..> "tests/data/freq.csv" /APPEND
+Dataset opened: tests/data/freq.csv
+Dataset opened: tests/data/freq.csv
+sdata> NAMES
+Permanent Variables (Table Columns):
+REGION$ PRODUCT$ 
+Session Variables (SET):
+(none)
+sdata> QUIT

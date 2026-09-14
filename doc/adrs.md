@@ -81,6 +81,7 @@ that might relitigate a settled question.
 | ADR-069 | DISPLAY's two default-print code paths are consolidated into one shared Display_Table renderer producing a SAS PROC PRINT-style boxed table (Obs column, left/right-justified per column type) | 2026-09-08 | Accepted |
 | ADR-070 | DISPLAY rebuilds the SELECT filter map itself (Execute_Rebuild_Filter) instead of relying on the next RUN, so a SELECT with no intervening RUN takes effect immediately | 2026-09-11 | Accepted |
 | ADR-071 | TABLES gains a /SAVE option, writing its crosstab to an external dataset via a new SData_Core.Table.Table_View (not the SAVE command's build-and-swap), preserving ADR-049's no-mutation guarantee | 2026-09-14 | Accepted |
+| ADR-072 | Trailing-comma line continuation now returns the comma as a real token instead of silently discarding it, fixing comma-delimited lists (USE, function arguments, KEEP=/DROP=/RENAME=) split across a continuation | 2026-09-15 | Accepted |
 
 ---
 
@@ -2428,4 +2429,91 @@ gate verified: sdata-core `alr build` clean, sdata `make check` 537/537, data-va
 
 Version bump: minor (new option, documented-default-behavior addition), matching the `TABLES`/
 `STATS`/`AGGREGATE`/`TRANSPOSE`-precedent for new commands/options.
+
+### ADR-072: Trailing-comma line continuation returns the comma as a real token instead of discarding it
+
+**Date:** 2026-09-15 | **Status:** Accepted
+
+**Context:** User-reported ([sdata#90](https://github.com/jlries61/sdata/issues/90)), found while
+experimenting with the just-shipped `TABLES /SAVE` feature (unrelated to it): `USE spec1(...),\n
+spec2(...) /APPEND` failed with `Error: Unrecognized command "<spec2>"`, while the identical
+statement on one line worked. Traced to `src/lexer/sdata-lexer.adb`'s trailing-comma
+line-continuation feature (design.md §5.4: *"A statement ending with a comma shall be continued to
+the next line"*): when the lexer found a `,` immediately before a newline, it consumed **both** the
+comma and the newline and emitted neither — the comma was discarded entirely, not merely made
+invisible. Harmless for space-separated grammars (`PRINT`'s argument list already tolerates a literal
+comma identically to whitespace — confirmed empirically: `PRINT X, Y, Z` on one line produces
+identical output to `PRINT X Y Z`), which is why `tests/repl_continuation.cmd` had passed all along
+despite the underlying defect. Broken for every comma-*delimited* grammar split across a
+continuation: `USE`'s dataset list (this issue's repro), function-call arguments (`SUM(1, 2,\n3, 4)`
+— independently re-confirmed this session, matching an old, never-fixed test-comment observation from
+the `ADR-054` era), and `KEEP=`/`DROP=`/`RENAME=` lists.
+
+**Decision.** `Get_Next_Token_Internal` now returns the comma as a real `Token_Comma` (at its own
+source line/column) when a continuation is confirmed, instead of `goto`-ing past it. The newline(s)/
+comments/blank lines that make it a continuation are still fully suppressed, exactly as before — only
+the comma itself now survives. A new `Lexer_Context` field, `Just_Emitted_Continuation_Comma`, carries
+"a continuation comma was just returned" across the boundary between separate calls to
+`Get_Next_Token_Internal`, since the comma and a possible immediately-following end-of-source (the
+REPL's `Ended_With_Continuation`/`Continued_At_EOF` trigger, consumed by `src/sdata_main.adb`'s
+`Run_REPL`) are no longer necessarily detected within the same call the way the old
+discard-and-`goto`-based implementation had them atomically.
+
+**A real regression was found and fixed during this same implementation, not just designed around in
+the abstract**: the first version of this fix reset `Continued_At_EOF` unconditionally at the top of
+every call, which meant a *second* query at end-of-source within the same parse (e.g. the parser
+checking "any more statements?" immediately after finishing one) silently clobbered the flag back to
+`False` — confirmed via `tests/repl_continuation.cmd` itself regressing (`PRINT X Y,` / `Z` stopped
+continuing and instead threw `Unrecognized command "Z"`). Fixed by special-casing "already at
+end-of-source when this call starts": such a repeat query leaves `Continued_At_EOF` exactly as an
+earlier call set it, touching it only when this specific call is the first one to observe
+end-of-source (real forward progress was made this call, or the immediately-prior call just returned
+the continuation comma). `tests/repl_continuation.cmd` passes byte-for-byte unchanged after the fix.
+This is the kind of interaction `02-systems-designer.md`'s own review had already flagged as the
+highest-risk part of the design (parser call-ordering around `Ended_With_Continuation`) — the specific
+failure mode it materialized as (repeat-EOF-query clobbering, not a raised exception) was found by
+testing, not anticipated in the design doc itself.
+
+**Deliberately unchanged**: the pre-existing "multiple commas allowed for multi-line continuation"
+inner-loop behavior (a bare comma alone on its own bare continuation line, immediately following the
+first) continues to be silently swallowed rather than also emitted as a token — only the *first*
+comma, the one with real content before it, is preserved. No test or real usage pattern for that
+sub-case was found by either the architect or systems-designer passes.
+
+**Consequences:** sdata-only (`src/lexer/sdata-lexer.ads`/`.adb`); no sdata-core, no parser change
+needed — every comma-delimited grammar checked (`Parse_USE_Stmt`'s dataset-spec loop,
+`Parse_Variable_List` backing `KEEP=`/`DROP=`/`BY=`, function-call argument parsing via `SUM`) already
+knew how to consume `Token_Comma` between list elements, since that's exactly what the non-continuation
+(one-line) case already exercised. 4 new regression tests: `tests/use_multi_dataset_continuation.cmd`
+and `tests/sum_arg_continuation.cmd` (batch mode, the two originally-suspected-broken grammars) plus
+`tests/repl_use_continuation.cmd` and `tests/repl_use_continuation_incomplete.cmd` (REPL mode,
+`.repl`-marked — the second specifically pins the regression found and fixed during this
+implementation: an incomplete comma-delimited continuation must still produce the `"..> "` prompt, not
+an error). `doc/design.md` needed no wording change (§5.4's existing text never claimed the comma
+disappears); `HELP`/the man page were checked and don't describe this mechanism at a level of detail
+requiring any change either.
+
+**Code review (round 1) found a second, more serious real bug, confirmed by direct execution, not
+speculation**: making the continuation comma a real, persistent token widens a pre-existing, unguarded
+token-consumption defect in `Parse_Filename_Into` (`USE`) and `Parse_Filename_Into_Save` (`SAVE`) —
+both blindly accepted *any* token kind as filename text. `USE "a.csv",` followed by `QUIT` on the next
+line silently opened a bogus `"QUIT.CSV"` and `QUIT` never ran; identically for `SAVE "out.csv",`
+followed by `NAMES`. The underlying defect was pre-existing (a deliberate same-line `USE "a.csv",
+QUIT` triggered it before this ADR too), but this fix made the far more mundane "stray trailing comma
+at end of a `USE`/`SAVE` line, ordinary next statement follows" case trigger it as well, silently and
+without any error. **Fixed in round 2**: both routines now reject any token kind that isn't
+`Token_MOCK` (`USE` only), `Token_String_Literal`, or `Token_Identifier`, raising a clear `"Expected a
+filename in USE/SAVE at line N"` instead — closing both the newly-widened continuation case and the
+pre-existing same-line variant in the same change. `Token_EOF` is deliberately exempted from the
+guard (a second regression found and fixed within the same round: an unqualified guard broke the
+REPL's own graceful `"..> "` continuation prompt, since raising there propagates out of
+`Parse_Program` before `Run_REPL` ever checks `Ended_With_Continuation`). 3 more regression tests
+(`tests/use_trailing_comma_next_stmt_error.cmd`, `tests/use_same_line_trailing_comma_error.cmd`,
+`tests/save_trailing_comma_next_stmt_error.cmd`).
+
+`make check`: 539 → 543 (round 1) → 546 (round 2), all green, zero unexplained diffs across the full
+pre-existing suite at every stage.
+
+Version bump: patch — a bug fix restoring behavior consistent with the already-correct documented
+contract (same classification as ADR-070), not a new documented-default-behavior change.
 

@@ -68,11 +68,43 @@ package body SData.Lexer is
    --  and identifies the next token.
    function Get_Next_Token_Internal (Ctx : in out Lexer_Context) return Token is
       T : Token;
-      Saw_Continuation : Boolean := False;
+      --  Captures whether the PREVIOUS call emitted a continuation comma
+      --  (sdata#90 fix) -- consumed immediately so Continued_At_EOF still
+      --  reports correctly if nothing follows, even though that comma was
+      --  already returned as a real token last call rather than detected
+      --  in this one.
+      Prior_Continuation : constant Boolean := Ctx.Just_Emitted_Continuation_Comma;
    begin
-      --  A fresh scan: clear any stale continuation-at-EOF marker.  It is
-      --  re-asserted below only if this call consumes a trailing-comma
-      --  continuation and then runs into end-of-source.
+      Ctx.Just_Emitted_Continuation_Comma := False;
+
+      --  Already at end-of-source when this call starts (a *repeat* query
+      --  -- e.g. the parser checking "any more statements?" after already
+      --  consuming the EOF token once): nothing new to decide, and
+      --  Continued_At_EOF must NOT be reset here.  It was set correctly by
+      --  whichever earlier call first reached this exact end-of-source
+      --  position (see below), and since Is_End_Of_Source only ever
+      --  becomes true and stays true for a given buffer (Advance never
+      --  moves backwards), every subsequent repeat query must leave that
+      --  earlier verdict alone rather than blindly re-deriving it from
+      --  this call's own (empty) local state -- sdata#90's REPL regression
+      --  was exactly this: a second, later call at EOF was unconditionally
+      --  resetting the flag straight back to False.
+      if Is_End_Of_Source (Ctx) then
+         T.Kind := Token_EOF;
+         T.Line := Ctx.Line;
+         T.Column := Ctx.Column;
+         T.Length := 0;
+         if Prior_Continuation then
+            Ctx.Continued_At_EOF := True;
+         end if;
+         return T;
+      end if;
+
+      --  Real progress is being made (not already at EOF) -- fresh scan,
+      --  clear any stale continuation-at-EOF marker from a much earlier
+      --  point in this same buffer.  Re-asserted below only if *this*
+      --  call consumes a trailing-comma continuation and then runs
+      --  straight into end-of-source.
       Ctx.Continued_At_EOF := False;
       --  Skip whitespace and handle line continuations/comments.
       loop
@@ -143,9 +175,26 @@ package body SData.Lexer is
                end if;
 
                if Found_Newline then
-                  --  Continuation detected, restart skipping whitespace for the next token.
-                  Saw_Continuation := True;
-                  goto Continue_Loop;
+                  --  Continuation confirmed (sdata#90 fix): the comma is
+                  --  still a real token -- return it now, at its own
+                  --  source position, with Ctx already advanced past the
+                  --  swallowed newline(s)/comments/extra bare continuation
+                  --  commas so the *next* call resumes tokenizing right at
+                  --  the real content that follows.  (Formerly this
+                  --  discarded the comma via `goto Continue_Loop`, which
+                  --  is why comma-delimited lists split across a
+                  --  continuation -- USE's dataset list, function-call
+                  --  arguments, KEEP=/DROP=/RENAME= lists -- lost their
+                  --  separator; space-separated grammars like PRINT's
+                  --  argument list never noticed, since they already
+                  --  tolerate a literal comma identically to whitespace.)
+                  T.Kind := Token_Comma;
+                  T.Line := Saved_Line;
+                  T.Column := Saved_Col;
+                  T.Text (1) := ',';
+                  T.Length := 1;
+                  Ctx.Just_Emitted_Continuation_Comma := True;
+                  return T;
                else
                   --  Just a normal comma, backtrack to it and return it as a token later.
                   Ctx.Pos := Saved_Pos;
@@ -194,10 +243,11 @@ package body SData.Lexer is
 
       if Is_End_Of_Source (Ctx) then
          T.Kind := Token_EOF;
-         --  Remember if we got here only by consuming a trailing-comma
-         --  continuation with nothing following it; the REPL treats this
-         --  as an incomplete statement awaiting its continuation line.
-         Ctx.Continued_At_EOF := Saw_Continuation;
+         --  Remember if we got here only because a trailing-comma
+         --  continuation was returned last call with nothing following
+         --  it (Prior_Continuation); the REPL treats this as an
+         --  incomplete statement awaiting its continuation line.
+         Ctx.Continued_At_EOF := Prior_Continuation;
          return T;
       end if;
 
