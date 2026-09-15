@@ -2634,6 +2634,61 @@ TABLES's own syntax reference names no comma role to begin with, so there is not
 Version bump: patch — see the version-bump note on the first amendment; the same not-yet-released fix,
 extended to a grammar the earlier rounds hadn't yet checked.
 
+**Fourth amendment (2026-09-14): the third amendment's TABLES-only fix was itself an instance of a
+wider gap — every "/flag"-style or bare space-separated option loop in the parser needed the same
+treatment, not just TABLES's.**
+
+User asked directly, after the third amendment shipped: *"Are there any more commands we should check
+for this?"* Prompted a systematic audit (`grep` for every `exit when ... /= Token_Slash`,
+`while ... = Token_Slash`, and bare identifier-list loop in `src/parser/sdata-parser.adb`) rather than
+waiting for further one-off reports. Found and confirmed by direct testing — not just inspected — five
+more instances of the exact same defect class as the third amendment's: a bespoke Peek-based
+"is there more?" loop with no comma role of its own, left unable to see past a continuation comma.
+
+- `Parse_AGGREGATE`'s outvar`=`func`(`...`)` list (space-separated, no comma role): `AGGREGATE
+  total=SUM(x),\n  count=N()` → `Unrecognized command "count"`.
+- `Parse_TRANSPOSE`'s `/option` loop: `TRANSPOSE /ID=NAME$,\n  /KEEP=SALARY` → `Unrecognized command
+  ""`.
+- `Parse_STATS`'s `/option` loop — but only when a *flag-only* option (`/NOPRINT`, nothing to consume
+  via `Parse_Variable_List`) precedes the comma: `/STATS=<list>,\n  /NOPRINT` had *already* worked by
+  accident, since `Parse_Variable_List`'s own per-item comma-eating (unrelated to continuation — it
+  independently accepts a comma-separated form of the same list) silently absorbed the continuation
+  comma before `Parse_STATS`'s own loop ever saw it. Reversing the order
+  (`/NOPRINT,\n  /STATS=MEAN`) exposed the same `Unrecognized command ""` the other three show. This
+  accidental masking is why testing beat inspection here: reading the loop alone would have looked
+  "probably fine" for the common ordering.
+- `Parse_USE_Stmt`'s *whole-statement* `/flag` loop (`/BY=`, `/APPEND`, `/INTERLEAVE`, `/JOIN` — distinct
+  from the dataset-list loop fixed earlier in this ADR, which already uses comma as its own native
+  separator and was never at risk) — same accidental-masking trap: `/BY=ID,\n  /INTERLEAVE` worked
+  (the comma vanished into `/BY=`'s own `Parse_Variable_List` call), but `/INTERLEAVE,\n  /BY=ID` did
+  not — and failed with a *misleading* error (`"/INTERLEAVE and /JOIN require /BY= in USE"`, since
+  `/BY=ID` was silently left unparsed rather than never given at all), not a generic parse error.
+- `Parse_SAVE_Stmt`'s legacy single-target whole-statement `/flag` loop (`/HEADER=`, `/DECIMALS=`, etc.):
+  same pattern as USE's.
+
+**Decision.** Hoisted the third amendment's local `Skip_Continuation_Comma` out of `Parse_TABLES` into
+a single package-level procedure (`src/parser/sdata-parser.adb`, declared near `Identifier_Text` so
+every later `Parse_*` procedure in the file can see it), and called it before each of the five newly
+-found loops' own Peek-based continuation checks, in addition to `Parse_TABLES`'s own three call sites
+(now referencing the shared procedure instead of a duplicate local copy). One new regression test per
+fixed grammar (`tests/aggregate_trailing_comma_continuation.cmd`,
+`tests/transpose_trailing_comma_continuation.cmd`, `tests/stats_trailing_comma_continuation.cmd` —
+flag-first ordering, to pin the case `Parse_Variable_List` can't accidentally mask —
+`tests/use_flag_trailing_comma_continuation.cmd`, `tests/save_legacy_trailing_comma_continuation.cmd`).
+`make check`: 555 → 560, all green.
+
+**Consequences:** sdata-only (`src/parser/sdata-parser.adb`); no sdata-core, no design.md/HELP/man-page
+change (same rationale as the third amendment — §5.4's rule already covers every grammar uniformly, and
+none of these five commands' own syntax references a comma role to begin with, so nothing to correct).
+`Parse_Spec_Options` (USE/SAVE per-dataset/per-target parenthesized options) was checked and confirmed
+*not* to need this: unlike the five fixed above, its own grammar already uses comma as its real option
+separator (`"(" option { "," option } ")"`), so a continuation comma there is indistinguishable from —
+and behaves identically to — an ordinary list separator, the same already-safe class as `USE`'s dataset
+list and `Parse_Variable_List`/`Parse_Rename_List`'s shared per-item loops.
+
+Version bump: patch — see the version-bump note on the first amendment; the same not-yet-released fix,
+now covering every affected grammar found by systematic audit rather than one report at a time.
+
 ### ADR-073: USE's IN= provenance variable is genuinely temporary, not a permanent table column
 
 **Date:** 2026-09-14 | **Status:** Accepted

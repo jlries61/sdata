@@ -1,0 +1,6 @@
+Generating mock data...
+TRANSPOSE complete. 1 records and 4 variables processed.
+Obs  _NAME_$        ALICE          BOB      CHARLIE
+---------------------------------------------------
+  1  SALARY   50000.00000  60000.00000  70000.00000
+---------------------------------------------------

@@ -48,6 +48,24 @@ package body SData.Parser is
    function Identifier_Text (T : Token) return String is
      (T.Text (1 .. T.Length));
 
+   --  A terminal comma is always a continuation marker (design.md sec5.4;
+   --  ADR-072), even in a grammar that has no comma role of its own
+   --  (space/star-separated TABLES requests, "/flag"-style option loops for
+   --  TABLES/TRANSPOSE/STATS/USE/SAVE, AGGREGATE's outvar=func(...) list).
+   --  Call before every Peek-based "is there more?" decision in such a
+   --  grammar, so a statement split across lines with a trailing comma
+   --  doesn't leave that comma sitting in front of the next real token,
+   --  where it would otherwise be misread as ending the statement one
+   --  token too early.
+   procedure Skip_Continuation_Comma (Ctx : in out Parser_Context) is
+   begin
+      while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
+         declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                 pragma Unreferenced (Discard);
+         begin null; end;
+      end loop;
+   end Skip_Continuation_Comma;
+
    ------------------
    -- Initialize --
    ------------------
@@ -1446,6 +1464,7 @@ package body SData.Parser is
       --  Parse whole-statement slash-options.
       --  -----------------------------------------------------------------------
       loop
+         Skip_Continuation_Comma (Ctx);
          Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
          exit when Peeked.Kind /= Token_Slash;
 
@@ -1754,6 +1773,7 @@ package body SData.Parser is
       --  paren block (backward compatibility with legacy single-target SAVE).
       --  -----------------------------------------------------------------------
       loop
+         Skip_Continuation_Comma (Ctx);
          Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
          exit when Peeked.Kind /= Token_Slash;
 
@@ -1856,7 +1876,9 @@ package body SData.Parser is
          return False;
       end Already_Seen;
    begin
-      while Is_Identifier_Token (Peek_Next_Token (Ctx.Lex_Ctx)) loop
+      loop
+         Skip_Continuation_Comma (Ctx);
+         exit when not Is_Identifier_Token (Peek_Next_Token (Ctx.Lex_Ctx));
          declare
             Out_Tok : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
             Outvar  : constant String := Identifier_Text (Out_Tok);
@@ -1999,6 +2021,7 @@ package body SData.Parser is
       Saw_ARRAY : Boolean := False;
    begin
       loop
+         Skip_Continuation_Comma (Ctx);
          Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
          exit when Peeked.Kind /= Token_Slash;
 
@@ -2175,6 +2198,7 @@ package body SData.Parser is
       Stmt.Stats_Vars := Parse_Variable_List (Ctx);
 
       loop
+         Skip_Continuation_Comma (Ctx);
          exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Slash;
          declare
             Discard   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '/'
@@ -2240,26 +2264,10 @@ package body SData.Parser is
       First_Req  : Table_Request := null;
       Last_Req   : Table_Request := null;
       Saw_ORDER  : Boolean := False;
-
-      --  A terminal comma is always a continuation marker (design.md sec5.4;
-      --  ADR-072), even in a grammar like TABLES's own that has no comma
-      --  role of its own (space/star-separated requests, slash-delimited
-      --  options). Called before every Peek-based "is there more?" decision
-      --  below, so a request list, a crossing chain, or an options list can
-      --  each be split across a continuation without the leftover comma
-      --  reaching the top-level dispatcher as a bogus next statement.
-      procedure Skip_Continuation_Comma is
-      begin
-         while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
-            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                    pragma Unreferenced (Discard);
-            begin null; end;
-         end loop;
-      end Skip_Continuation_Comma;
    begin
       --  One or more requests, each: ident (* ident)*
       loop
-         Skip_Continuation_Comma;
+         Skip_Continuation_Comma (Ctx);
          exit when not Is_Identifier_Token (Peek_Next_Token (Ctx.Lex_Ctx));
          declare
             Req  : constant Table_Request := new Table_Request_Node;
@@ -2276,7 +2284,7 @@ package body SData.Parser is
             declare T : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin V1 := New_Var (T); VL := V1; end;
             --  crossing: * ident ...
-            Skip_Continuation_Comma;
+            Skip_Continuation_Comma (Ctx);
             while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Star loop
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                        pragma Unreferenced (Discard);
@@ -2284,7 +2292,7 @@ package body SData.Parser is
                   --  A continuation comma may fall right after '*' too
                   --  (e.g. "ID*,\n  SALARY") -- not just between complete
                   --  "*ident" pairs.
-                  Skip_Continuation_Comma;
+                  Skip_Continuation_Comma (Ctx);
                   declare T2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                   begin
                      if not Is_Identifier_Token (T2) then
@@ -2295,7 +2303,7 @@ package body SData.Parser is
                      VL := VL.Next;
                   end;
                end;
-               Skip_Continuation_Comma;
+               Skip_Continuation_Comma (Ctx);
             end loop;
             Req.Vars := V1;
             if First_Req = null then First_Req := Req; else Last_Req.Next := Req; end if;
@@ -2310,7 +2318,7 @@ package body SData.Parser is
 
       --  Options: /CHISQ /MISSING /LIST /NOCUM /NOPERCENT /ORDER=FREQ|INTERNAL
       loop
-         Skip_Continuation_Comma;
+         Skip_Continuation_Comma (Ctx);
          exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Slash;
          declare
             Discard  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '/'
