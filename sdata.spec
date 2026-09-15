@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.29.2
+Version:        0.29.3
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Sep 14 2026 John L. Ries <john@theyarnbard.com> - 0.29.3-1
+- Fix USE's IN= provenance variable leaking into saved output and NAMES (now genuinely temporary); fix trailing-comma continuation gaps in TABLES, AGGREGATE, TRANSPOSE, STATS, USE, and SAVE option/list parsing
+
 * Mon Sep 14 2026 John L. Ries <john@theyarnbard.com> - 0.29.2-1
 - Fix trailing-comma continuation reaching IF's single-line ELSEIF/ELSE and an orphaned-comma dispatch error; document IF single-line vs block form and USE/SAVE per-spec options
 
