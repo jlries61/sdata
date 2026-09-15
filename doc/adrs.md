@@ -82,6 +82,7 @@ that might relitigate a settled question.
 | ADR-070 | DISPLAY rebuilds the SELECT filter map itself (Execute_Rebuild_Filter) instead of relying on the next RUN, so a SELECT with no intervening RUN takes effect immediately | 2026-09-11 | Accepted |
 | ADR-071 | TABLES gains a /SAVE option, writing its crosstab to an external dataset via a new SData_Core.Table.Table_View (not the SAVE command's build-and-swap), preserving ADR-049's no-mutation guarantee | 2026-09-14 | Accepted |
 | ADR-072 | Trailing-comma line continuation now returns the comma as a real token instead of silently discarding it, fixing comma-delimited lists (USE, function arguments, KEEP=/DROP=/RENAME=) split across a continuation | 2026-09-15 | Accepted |
+| ADR-073 | USE's IN= provenance variable is now genuinely temporary (auto-dropped after the next RUN, never written by a deferred SAVE) instead of a permanent table column, matching design.md's own contract | 2026-09-14 | Accepted |
 
 ---
 
@@ -2599,4 +2600,77 @@ the comma-skip fix in this amendment makes the lookahead succeed in both modes.
 Version bump: patch — see the version-bump note on the first amendment; this is a further bug fix on
 the same not-yet-released fix, not a new documented-default-behavior change relative to the corrected
 design.md text.
+
+### ADR-073: USE's IN= provenance variable is genuinely temporary, not a permanent table column
+
+**Date:** 2026-09-14 | **Status:** Accepted
+
+**Context.** User-reported while re-testing `adultmrg.cmd`: `USE adultdata1(IN=inlrn),
+adulttest1(IN=intst) /append` followed by `SAVE "adult.ods"` wrote `INLRN`/`INTST` into the saved
+output file, and `NAMES` listed them as permanent variables surviving past the `RUN` that used them.
+design.md has always said otherwise: *"IN=\<varname\> creates a **temporary** integer provenance
+variable... for use with /BY=."* Traced to
+`src/sdata-interpreter-execute_declarative.adb`'s multi-dataset merge path: the IN= column was created
+via `Combined.Add_Column (IN_Name, Col_Integer)` — a genuine permanent table column, populated 1/0 from
+the merge's provenance bitmask and registered read-only (`Register_Readonly_IN_Name`) so `LET`/`SET`
+can't overwrite it, but otherwise indistinguishable from any other column: `NAMES` lists it, `SAVE`
+writes it, `KEEP`/`DROP` manage it like real data.
+
+design.md's own definitions of "Permanent" vs. "Temporary" (§3.5) make "temporary" mean the `SET`
+namespace — never part of the table, never written by `SAVE`, gone once the `RUN` that uses it
+completes. But a genuine `SET` variable is a static scalar that "retains its value until explicitly
+changed"; it has no existing per-record refresh hook the way a permanent variable does from its input
+column. Inventing one — a new mechanism for a read-only, row-varying value living in the temporary
+namespace — was considered and rejected in favor of reusing the table's existing per-row storage and
+the interpreter's existing `KEEP`/`DROP` "pending modification" machinery
+(`Pending_Mods`/`Apply_Pending_Mods` in `src/sdata-interpreter.adb`, applied once per `RUN` at
+`Commit_Step`, *before* any deferred `SAVE` is flushed): the column still exists as an ordinary table
+column throughout the `RUN` that follows `USE` (so `LET`/`IF` read it exactly as before, and nothing
+new was needed there), but is scheduled for automatic removal the moment that `RUN` finishes — which,
+because `Commit_Step` calls `Apply_Pending_Mods` before `Execute_Commit_Step`'s `SAVE` flush, means a
+deferred `SAVE` naturally never sees it either. This satisfies the *intent* of "temporary" (ephemeral,
+not part of the durable output) using infrastructure this codebase already trusts, rather than
+introducing a new variable class for one narrow case.
+
+**Decision.** A new package-level registry, `Auto_Drop_IN_Names` (`src/sdata-interpreter.adb`, sibling
+to the existing `Readonly_IN_Names`), records every IN= column name at creation time
+(`Register_Auto_Drop_IN_Name`, called alongside the existing `Register_Readonly_IN_Name` in
+`execute_declarative.adb`). `Apply_Pending_Mods` gained a third pass, after its existing two
+(`Execute_KEEP` then `Execute_DROP`): for each registered name, if it is *not* named in this cycle's
+`KEEP` list and still exists as a column, drop it directly (`Has_Column` + `Drop_Column`) — silently,
+with no validation-raise. Registry cleared on `NEW` and at the start of every `USE` (single- or
+multi-dataset), mirroring `Readonly_IN_Names`'s own lifecycle exactly.
+
+**Why not just add the name to `Drop_Names` and let `Execute_DROP` handle it (Pass 2)?** Tried first;
+rejected on inspection, not just in the abstract. `Execute_DROP` validates every name's existence
+*before* dropping anything, raising `Script_Error` if any is missing — correct for a real user-typed
+`DROP` naming a column that turns out not to exist, but wrong here: `Execute_KEEP` (Pass 1) already
+drops every column *not* named in an active `KEEP`, including any IN= column the user didn't happen to
+mention. So *any* unrelated `KEEP` issued in the same cycle (`KEEP AGE SAMPLE$`, naming neither
+provenance variable) would have Pass 1 remove the IN= columns first, then Pass 2 try to drop the
+now-already-gone names again and raise "variable does not exist" — a regression that would have made
+IN= unusable together with any ordinary `KEEP`. The dedicated third pass sidesteps this by never
+routing through `Execute_DROP`'s raising validation: it simply checks `Has_Column` first, so a name
+`Execute_KEEP` already removed is a silent no-op, not an error. This also gives "explicit `KEEP` of the
+IN= name promotes it to permanent" (design.md §3.5's "Temporary → Permanent via KEEP") for free — a
+name present in `Keep_Names` is excluded from the third pass by construction, so `Execute_KEEP`'s own
+retention of it stands unmodified.
+
+**Consequences:** sdata-only (`src/sdata-interpreter.adb`, `src/sdata-interpreter-execute_declarative.adb`);
+no sdata-core change. 5 pre-existing tests (`use_merge_append_with_in.cmd`,
+`use_merge_in_interleave.cmd`, `use_merge_in_join.cmd`, `use_merge_in_match.cmd`,
+`use_merge_in_positional.cmd`) had their expected "N variables processed" counts regenerated — per-record
+output for all five is byte-for-byte unchanged, confirming the columns remain fully usable during the
+`RUN` and only the post-`RUN` accounting changed. 3 new regression tests:
+`use_merge_in_not_saved.cmd` (the reported scenario — reads the saved file back to confirm neither
+provenance column is in its header), `use_merge_in_keep_promotes.cmd` (explicit `KEEP` of one IN= name
+promotes it to permanent and saves it; the other, un-kept, is still auto-dropped), and
+`use_merge_in_unrelated_keep.cmd` (a `KEEP` naming neither IN= variable must not raise the
+Pass-1/Pass-2 conflict described above). design.md, `src/sdata-help.adb`, and `man/man1/sdata.1` amended
+to spell out the auto-drop timing and the `KEEP`-promotion escape hatch — design.md's core claim
+("temporary... provenance variable") was already correct and needed no correction, only elaboration.
+`make check`: 551 → 554, all green.
+
+Version bump: patch — a bug fix bringing the implementation into line with design.md's own
+already-documented contract, not a new documented-default-behavior change.
 

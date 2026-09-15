@@ -30,7 +30,10 @@ Merge (two or more comma-separated datasets):
   ... /INTERLEAVE          Interleave all rows in BY-sorted order.
   ... /JOIN                Cartesian inner join within each BY group.
   USE a, b /APPEND         Stack rows vertically (union of columns).
-  IN=name marks a 0/1 provenance column, e.g. USE a(IN=ina), b(IN=inb).
+  IN=name marks a temporary 0/1 provenance variable, e.g.
+    USE a(IN=ina), b(IN=inb) -- usable in LET/IF during the RUN that
+    follows, auto-dropped afterward; KEEP it explicitly to make it a
+    permanent variable instead.
 Formula cells (ODF/OOXML):
   sdata has no built-in formula evaluator.
   If LibreOffice (soffice) is on PATH, it is invoked to recalculate

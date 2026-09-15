@@ -345,6 +345,16 @@ numbers, or format a numeric column's values as text, as part of a rename.
 .BI IN= varname
 Create a temporary integer variable set to 1 for records that originate from
 this dataset and 0 for records padded from other datasets.
+It is usable in
+.BR LET / IF
+during the
+.B RUN
+that follows and is automatically removed once that
+.B RUN
+completes; naming it explicitly in a
+.B KEEP
+statement first cancels the removal, promoting it to a permanent variable
+like any other column.
 .TP
 .BI FMT= format
 Override the input format for this dataset

@@ -161,9 +161,11 @@ begin
                   end;
                end if;
 
-               --  Single-dataset USE: clear any IN= read-only names from a
-               --  prior multi-dataset USE.  No IN= columns are created here.
+               --  Single-dataset USE: clear any IN= read-only names (and
+               --  their auto-drop registration) from a prior multi-dataset
+               --  USE.  No IN= columns are created here.
                Clear_Readonly_IN_Names;
+               Clear_Auto_Drop_IN_Names;
                --  Cache column names from the file so future bookkeeping can
                --  tell the difference between original and derived columns.
                Input_File_Columns.Clear;
@@ -258,9 +260,11 @@ begin
                      Convert_Variable_List (Stmt.By_Vars, By_Names);
                   end if;
 
-                  --  Clear the read-only IN= name set at the start of every
-                  --  multi-dataset USE.  Single-dataset USE clears it below.
+                  --  Clear the read-only IN= name set (and its auto-drop
+                  --  registration) at the start of every multi-dataset USE.
+                  --  Single-dataset USE clears it below.
                   Clear_Readonly_IN_Names;
+                  Clear_Auto_Drop_IN_Names;
 
                   begin
                      --  Process each dataset spec.
@@ -476,8 +480,14 @@ begin
                                        end;
                                     end loop;
                                     --  Register as read-only so LET/SET
-                                    --  assignments are rejected.
+                                    --  assignments are rejected, and schedule
+                                    --  automatic removal after the next RUN
+                                    --  (design.md: IN= is a "temporary"
+                                    --  provenance variable -- see
+                                    --  Auto_Drop_IN_Names's declaration
+                                    --  comment for the full mechanism).
                                     Register_Readonly_IN_Name (IN_Upper);
+                                    Register_Auto_Drop_IN_Name (IN_Upper);
                                  end;
                               end if;
                            end;
@@ -874,6 +884,7 @@ begin
             Clear_Target_Buffers;
             Clear_Registered_Saves;
             Clear_Readonly_IN_Names;
+            Clear_Auto_Drop_IN_Names;
             Clear_Warned_Submit_Paths;
             SData_Core.Commands.Execute_NEW;
          end if;

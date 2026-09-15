@@ -95,7 +95,10 @@ package body SData.Help is
       Put_Line ("  ... /INTERLEAVE          Interleave all rows in BY-sorted order.");
       Put_Line ("  ... /JOIN                Cartesian inner join within each BY group.");
       Put_Line ("  USE a, b /APPEND         Stack rows vertically (union of columns).");
-      Put_Line ("  IN=name marks a 0/1 provenance column, e.g. USE a(IN=ina), b(IN=inb).");
+      Put_Line ("  IN=name marks a temporary 0/1 provenance variable, e.g.");
+      Put_Line ("    USE a(IN=ina), b(IN=inb) -- usable in LET/IF during the RUN that");
+      Put_Line ("    follows, auto-dropped afterward; KEEP it explicitly to make it a");
+      Put_Line ("    permanent variable instead.");
       Put_Line ("Formula cells (ODF/OOXML):");
       Put_Line ("  sdata has no built-in formula evaluator.");
       Put_Line ("  If LibreOffice (soffice) is on PATH, it is invoked to recalculate");

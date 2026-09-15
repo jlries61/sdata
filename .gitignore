@@ -47,6 +47,8 @@ tests/data/save_keep.csv
 tests/data/save_rename.csv
 tests/data/save_bracket_out.ods
 tests/data/rename_retype_out.csv
+tests/data/use_merge_in_not_saved_out.csv
+tests/data/use_merge_in_keep_promotes_out.csv
 tests/data/perf_regression_a.csv
 tests/data/perf_regression_b.csv
 tests/data/perf_regression_c.csv

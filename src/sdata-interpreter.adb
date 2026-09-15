@@ -292,6 +292,34 @@ package body SData.Interpreter is
       return Readonly_IN_Names.Contains (To_Upper (Name));
    end Is_Readonly_IN_Name;
 
+   --  Names of IN= variables scheduled for automatic removal once the next
+   --  RUN completes -- design.md calls IN= a "temporary" provenance
+   --  variable, and this is what makes that true: usable in LET/IF during
+   --  the upcoming RUN (nothing consults this set before then), gone
+   --  afterward, and never written by a deferred SAVE (Commit_Step applies
+   --  pending mods, this set included, before it flushes any pending SAVE).
+   --  Consumed by Apply_Pending_Mods via a silent, Has_Column-guarded drop
+   --  distinct from Execute_DROP's user-facing validate-and-raise path, so
+   --  an unrelated KEEP that already removed the column (Execute_KEEP drops
+   --  everything not named) never causes a spurious "does not exist" error;
+   --  a KEEP that names the IN= variable explicitly leaves it alone, so it
+   --  becomes a genuine permanent variable (design.md sec3.5's "Temporary ->
+   --  Permanent via KEEP"), same as any other column. Cleared on NEW, at
+   --  the start of every USE (single- or multi-dataset), and by
+   --  Apply_Pending_Mods itself once consumed -- same lifecycle as
+   --  Readonly_IN_Names above.
+   Auto_Drop_IN_Names : Name_Sets.Set;
+
+   procedure Register_Auto_Drop_IN_Name (Name : String) is
+   begin
+      Auto_Drop_IN_Names.Include (To_Upper (Name));
+   end Register_Auto_Drop_IN_Name;
+
+   procedure Clear_Auto_Drop_IN_Names is
+   begin
+      Auto_Drop_IN_Names.Clear;
+   end Clear_Auto_Drop_IN_Names;
+
    --  Reset per record; set True by any WRITE that fires during the
    --  iteration; consulted at end-of-record to decide whether to
    --  auto-flush.
@@ -645,12 +673,16 @@ package body SData.Interpreter is
       Pending_Mods_Tail := null;
    end Clear_Pending_Mods;
 
-   --  Apply_Pending_Mods — two-pass KEEP-then-DROP logic.
+   --  Apply_Pending_Mods — two-pass KEEP-then-DROP logic, plus a third pass
+   --  for auto-scheduled IN= removal.
    --  Pass 1: if any Mod_Keep entry exists, gather the keep list into a
    --          Name_Vectors.Vector and delegate to Execute_KEEP (which drops
    --          every column NOT in the list).
    --  Pass 2: gather Mod_Drop entries and delegate to Execute_DROP.
    --  This ordering ensures KEEP and DROP can coexist without surprises.
+   --  Pass 3: silently drop any still-present Auto_Drop_IN_Names entry not
+   --          named in this cycle's KEEP (see that set's own declaration
+   --          comment for why this can't reuse Pass 2's Execute_DROP call).
    procedure Apply_Pending_Mods is
       Keep_Names : Name_Vectors.Vector;
       Drop_Names : Name_Vectors.Vector;
@@ -667,6 +699,14 @@ package body SData.Interpreter is
                Drop_Names.Append (To_Unbounded_String (Name));
          end case;
       end Append_Name;
+
+      function Kept (Name : String) return Boolean is
+      begin
+         for K of Keep_Names loop
+            if To_String (K) = Name then return True; end if;
+         end loop;
+         return False;
+      end Kept;
    begin
       while Curr /= null loop
          if not Curr.Is_Range then
@@ -705,6 +745,15 @@ package body SData.Interpreter is
       if not Drop_Names.Is_Empty then
          SData_Core.Commands.Execute_DROP (Drop_Names);
       end if;
+
+      for Name of Auto_Drop_IN_Names loop
+         if not (Has_Keep and then Kept (Name))
+            and then Has_Column (Name)
+         then
+            Drop_Column (Name);
+         end if;
+      end loop;
+      Clear_Auto_Drop_IN_Names;
 
       Clear_Pending_Mods;
    end Apply_Pending_Mods;
