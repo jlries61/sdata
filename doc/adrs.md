@@ -2601,6 +2601,39 @@ Version bump: patch — see the version-bump note on the first amendment; this i
 the same not-yet-released fix, not a new documented-default-behavior change relative to the corrected
 design.md text.
 
+**Third amendment (2026-09-14): TABLES has its own comma-free grammar, and had never been checked
+against the same continuation-comma requirement as USE/SAVE/IF.**
+
+User-reported while re-running `adultmrg.cmd` in batch mode: `TABLES sample$ educ$*educ_num ... income$,`
+followed by `    /list /missing` on the next line failed with `Error: Unrecognized command "" at line
+16` — the empty quoted text because the offending token was a bare `Token_Slash`, which carries no
+`.Text`. Root cause: `Parse_TABLES` (`src/parser/sdata-parser.adb`) has three internal Peek-based
+"is there more?" decisions — continue the space-separated request list, continue a `*`-crossing chain,
+and continue the `/option` list — and none of them tolerated a leftover continuation comma sitting in
+front of the next real token. Unlike USE's dataset list (comma-delimited by its own grammar) or IF's
+inline ELSEIF/ELSE check (this ADR's second amendment), TABLES has *no* comma role anywhere in its own
+syntax, so the very first amendment's dispatcher-level fix never applied here either: the comma survived
+past all three of Parse_TABLES's own checks untouched, then reached the top-level dispatcher on the
+*next* statement attempt only after `/list` (a `Token_Slash`) had already been misread as that next
+statement's start — one token too late to be swept up as ordinary continuation noise.
+
+Fixed by a `Skip_Continuation_Comma` local procedure, called before each of the three decisions:
+leading the request-list loop (letting a split like `TABLES A,\nB` continue the same list), before the
+crossing-chain `while ... = Token_Star` check (letting `A*B,\nC` continue the crossing chain), inside the
+crossing chain immediately after consuming `*` and before reading the next identifier (letting
+`A*,\nB` split right after the operator itself — a narrower position the first two calls alone did not
+cover, found by testing the fix's own edge rather than assumed sufficient), and leading the `/option`
+loop (this issue's exact repro). One new regression test
+(`tests/tables_trailing_comma_continuation.cmd`) exercises all three split points in one script.
+`make check`: 554 → 555, all green.
+
+**Consequences:** sdata-only (`src/parser/sdata-parser.adb`, `Parse_TABLES`); no sdata-core, no
+design.md/HELP/man-page change (§5.4's existing text already covers this with no per-grammar carve-out;
+TABLES's own syntax reference names no comma role to begin with, so there is nothing to correct there).
+
+Version bump: patch — see the version-bump note on the first amendment; the same not-yet-released fix,
+extended to a grammar the earlier rounds hadn't yet checked.
+
 ### ADR-073: USE's IN= provenance variable is genuinely temporary, not a permanent table column
 
 **Date:** 2026-09-14 | **Status:** Accepted

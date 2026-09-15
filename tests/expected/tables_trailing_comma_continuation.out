@@ -1,0 +1,17 @@
+Generating mock data...
+Frequency table for NAME$
+
+NAME$ Frequency Percent Cum_Freq Cum_Percent
+Alice 1 33.33 1 33.33
+Bob 1 33.33 2 66.67
+Charlie 1 33.33 3 100.00
+Total 3 100.00
+
+Table of ID by SALARY
+
+ID SALARY Frequency Percent Cum_Freq Cum_Percent
+1 50000.00000 1 33.33 1 33.33
+2 60000.00000 1 33.33 2 66.67
+3 70000.00000 1 33.33 3 100.00
+
+TABLES complete.
