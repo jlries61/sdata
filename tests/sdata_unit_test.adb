@@ -1140,6 +1140,68 @@ begin
       Check ("TT-27c Sort_By row 3 = 3", Integer (VV.Int_Val), 3);
    end;
 
+   --  TT-30: Snapshot_From_Current's Include parameter (ADR-074/sdata#92)
+   --  filters rows during the copy instead of copying every row.
+   declare
+      T   : SData.Transient_Table.Table;
+      Inc : SData.Transient_Table.Boolean_Vectors.Vector;
+      VV  : SData_Core.Values.Value;
+   begin
+      SData_Core.Table.Clear;
+      SData_Core.Table.Add_Column ("A", SData_Core.Table.Col_Integer);
+      SData_Core.Table.Add_Row;
+      SData_Core.Table.Set_Value
+        (1, "A", (Kind => SData_Core.Values.Val_Integer, Int_Val => 10));
+      SData_Core.Table.Add_Row;
+      SData_Core.Table.Set_Value
+        (2, "A", (Kind => SData_Core.Values.Val_Integer, Int_Val => 20));
+      SData_Core.Table.Add_Row;
+      SData_Core.Table.Set_Value
+        (3, "A", (Kind => SData_Core.Values.Val_Integer, Int_Val => 30));
+
+      --  Keep rows 1 and 3 only.
+      Inc.Append (True);
+      Inc.Append (False);
+      Inc.Append (True);
+      T := SData.Transient_Table.Snapshot_From_Current (Include => Inc);
+      Check ("TT-30 Include filters to 2 rows", T.Row_Count, 2);
+      VV := T.Get_Value (1, "A");
+      Check ("TT-30b Include row 1 = source row 1 (A=10)",
+             Integer (VV.Int_Val), 10);
+      VV := T.Get_Value (2, "A");
+      Check ("TT-30c Include row 2 = source row 3 (A=30), not row 2",
+             Integer (VV.Int_Val), 30);
+   end;
+
+   --  TT-31: Snapshot_From_Current's Include contract -- a length that
+   --  doesn't match Row_Count is a programming error, not a user-facing
+   --  one; raises Constraint_Error rather than silently truncating or
+   --  padding. (No script-level path can trigger this -- the only caller,
+   --  Build_IF_Include in sdata-interpreter-execute_declarative.adb,
+   --  always builds Include to exactly Row_Count -- so this is the sole
+   --  direct exercise of that contract.)
+   declare
+      Inc     : SData.Transient_Table.Boolean_Vectors.Vector;
+      Raised  : Boolean := False;
+      Discard : SData.Transient_Table.Table;
+      pragma Unreferenced (Discard);
+   begin
+      SData_Core.Table.Clear;
+      SData_Core.Table.Add_Column ("A", SData_Core.Table.Col_Integer);
+      SData_Core.Table.Add_Row;
+      SData_Core.Table.Add_Row;
+      Inc.Append (True);  --  length 1, Row_Count is 2 -- mismatch
+      begin
+         Discard := SData.Transient_Table.Snapshot_From_Current
+                       (Include => Inc);
+      exception
+         when Constraint_Error =>
+            Raised := True;
+      end;
+      Check ("TT-31 Include length mismatch raises Constraint_Error",
+             Raised, True);
+   end;
+
    ---------------------------------------------------------------------------
    --  ── SData.Merge: Combine_Positional ──────────────────────────────────────
    ---------------------------------------------------------------------------

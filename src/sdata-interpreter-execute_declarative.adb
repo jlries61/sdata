@@ -56,6 +56,54 @@ begin
                end loop;
             end Convert_Rename_List;
 
+            --  Build a per-physical-row inclusion vector for a dataset
+            --  spec's IF= filter (ADR-074/sdata#92). Must be called with
+            --  the just-loaded raw singleton table still in place
+            --  (original column names, before RENAME=/KEEP=/DROP=) --
+            --  i.e. right after SData_Core.Commands.Execute_USE loads this
+            --  spec's file and before Snapshot_From_Current copies it out.
+            --  Check_Undefined => True: unlike SAVE's IF= (which uses
+            --  False -- see ADR-062), USE's IF= has no later-statement
+            --  completion window, so a variable that isn't a real column
+            --  of this specific input is unconditionally an error here.
+            function Build_IF_Include
+              (Expr : Expression_Access)
+              return SData.Transient_Table.Boolean_Vectors.Vector
+            is
+               Result : SData.Transient_Table.Boolean_Vectors.Vector;
+            begin
+               --  Rebuild the PDV from scratch against THIS spec's raw
+               --  schema BEFORE checking or scanning. Execute_USE's own
+               --  internal Refresh_PDV_Names is additive-only (by design,
+               --  for the normal USE-then-RUN flow, where Run_One_Step's
+               --  own Initialize_PDV call is what actually resets the PDV
+               --  before any expression is evaluated) -- it never removes
+               --  a PRIOR spec's stale names, so a later spec's own column
+               --  names would otherwise be appended at new PDV slots while
+               --  Load_PDV_From_Table (which walks slots 1..Column_Count)
+               --  keeps writing into the earlier spec's stale slots,
+               --  silently resolving this spec's column references to
+               --  Missing. This must run BEFORE Check_Expr too, not just
+               --  before the scan: Is_Defined/SData_Core.Variables.Defined
+               --  consult the live PDV_Index, so a stale entry surviving
+               --  from a prior spec (e.g. this spec's merge_c has no "X",
+               --  but a prior spec's "X" is still in PDV_Index) would make
+               --  Check_Undefined => True silently pass on a name that
+               --  isn't actually a column of THIS input. Harmless to reset
+               --  here: Initialize_PDV touches only the PDV_Names/
+               --  PDV_Index/PDV_Vec mapping (not Temp_Symbols), and the
+               --  next RUN calls Initialize_PDV itself regardless, so
+               --  nothing downstream depends on the mapping this scan
+               --  leaves behind.
+               SData_Core.Variables.Initialize_PDV;
+               Check_Expr (Expr, Check_Undefined => True);
+               for R in 1 .. SData_Core.Table.Row_Count loop
+                  Load_PDV_From_Table (R);
+                  Result.Append (Is_True (Evaluate (Expr)));
+               end loop;
+               return Result;
+            end Build_IF_Include;
+
             procedure Execute_USE_Single is
             begin
                --  -------------------------------------------------------
@@ -119,11 +167,18 @@ begin
                      if Spec.Opts.Rename_Pairs /= null
                         or else Spec.Opts.Keep_Vars /= null
                         or else Spec.Opts.Drop_Vars /= null
+                        or else Spec.Opts.IF_Expr /= null
                      then
                         declare
                            Snap : SData.Transient_Table.Table :=
-                                    SData.Transient_Table
-                                       .Snapshot_From_Current;
+                                    (if Spec.Opts.IF_Expr /= null
+                                     then SData.Transient_Table
+                                            .Snapshot_From_Current
+                                              (Include =>
+                                                 Build_IF_Include
+                                                   (Spec.Opts.IF_Expr))
+                                     else SData.Transient_Table
+                                            .Snapshot_From_Current);
                         begin
                            if Spec.Opts.Rename_Pairs /= null then
                               declare
@@ -319,9 +374,20 @@ begin
                               Nscan_Rows  => Spec.Opts.NSCAN_Val,
                               Is_Mock     => Spec.Is_Mock);
 
-                           --  Snapshot the global table into a transient copy.
+                           --  Snapshot the global table into a transient
+                           --  copy -- filtered by this spec's IF=, if any
+                           --  (ADR-074/sdata#92). Build_IF_Include must run
+                           --  here, while the just-loaded raw table (this
+                           --  spec's original column names) is still the
+                           --  active singleton -- before this copy, and
+                           --  before RENAME=/KEEP=/DROP= below mutate it.
                            Snap_Ptr.all :=
-                              SData.Transient_Table.Snapshot_From_Current;
+                              (if Spec.Opts.IF_Expr /= null
+                               then SData.Transient_Table.Snapshot_From_Current
+                                      (Include =>
+                                         Build_IF_Include (Spec.Opts.IF_Expr))
+                               else SData.Transient_Table
+                                      .Snapshot_From_Current);
 
                            --  Apply per-dataset RENAME / KEEP / DROP.
                            if Spec.Opts.Keep_Vars /= null

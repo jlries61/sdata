@@ -12,6 +12,14 @@ Options:
                Default is auto-detected from file extension.
   /NSCAN=n     Number of rows to scan for type detection (default: 20).
 Per-dataset options (in parentheses after a filename):
+  (IF=expr)                Include a row from this input only when expr
+                           is true, tested as the row comes off this
+                           input (SAS WHERE=-style) -- against this
+                           input's ORIGINAL column names, before this
+                           spec's own RENAME=/KEEP=/DROP=/IN= and before
+                           the row reaches any merge (/BY=, /INTERLEAVE,
+                           /JOIN, /APPEND, positional). A non-matching row
+                           behaves as if never present in that input.
   (KEEP=name ...)          Keep only the named columns.
   (DROP=name ...)          Drop the named columns.
   (RENAME=(old=new ...))   Rename columns (applied before KEEP/DROP);
@@ -70,6 +78,9 @@ Multiple targets (comma-separated) with per-target options:
                            the name suffix is checked.
   (IF=expr)                Write a record to this target only when expr
                            is true (use with WRITE for per-record routing).
+                           USE has a per-dataset IF= too (HELP USE) -- same
+                           grammar, but it tests a row arriving from an
+                           external input, not one already in the table.
   These options also apply to a single-target SAVE.
 Execution: Declarative -- the file is written at the end of the next RUN.
 

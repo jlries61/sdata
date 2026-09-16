@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-09-14" "sdata 0.29.3" "User Commands"
+.TH SDATA 1 "2026-09-16" "sdata 0.30.0" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -314,6 +314,23 @@ for BY-sorted stacking).
 \fBPer-dataset options\fR (inside the parenthesis block for each \fIspec\fR):
 .RS
 .TP
+.BI IF= expr
+Row-level filter for this input, modeled on SAS's
+.B WHERE=
+dataset option (not a data-step
+.BR IF ).
+A row from this input is included only when
+.I expr
+is true, tested as the row comes off this specific input, against this
+input's
+.B original
+column names \(em before this spec's own
+.BR RENAME= / KEEP= / DROP= / IN=
+and before the row participates in anything else the statement does with
+that input (positional combine,
+.BR /BY= " match-merge, " /INTERLEAVE ", " /JOIN ", or " /APPEND ).
+A non-matching row behaves as though it were never present in that input.
+.TP
 .BI KEEP= "name ..."
 Retain only the named columns from this input.
 .TP
@@ -329,7 +346,9 @@ Rename columns in this input.
 All pairs are applied simultaneously (based on original names), matching SAS
 semantics.
 .B RENAME
-is applied before
+is applied after
+.B IF=
+and before
 .B KEEP
 and
 .BR DROP .
@@ -442,6 +461,12 @@ is true.
 Absent
 .B IF=
 means always write.
+.B USE
+has a per-dataset
+.B IF=
+too (see above), with the same expression grammar; it tests a row
+arriving from an external input rather than one already loaded into the
+internal table.
 .TP
 .BI FMT= format
 Output format for this target

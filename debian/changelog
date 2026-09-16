@@ -1,3 +1,9 @@
+sdata (0.30.0-1) unstable; urgency=medium
+
+  * USE gains a per-dataset IF= option, modeled on SAS's WHERE= dataset option (ADR-074, closes #92).
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 16 Sep 2026 10:15:38 -0700
+
 sdata (0.29.3-1) unstable; urgency=medium
 
   * Fix USE's IN= provenance variable leaking into saved output and NAMES (now genuinely temporary); fix trailing-comma continuation gaps in TABLES, AGGREGATE, TRANSPOSE, STATS, USE, and SAVE option/list parsing

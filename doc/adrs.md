@@ -2762,3 +2762,115 @@ to spell out the auto-drop timing and the `KEEP`-promotion escape hatch — desi
 Version bump: patch — a bug fix bringing the implementation into line with design.md's own
 already-documented contract, not a new documented-default-behavior change.
 
+### ADR-074: USE gains a per-dataset IF= option, modeled on SAS's WHERE= dataset option
+
+**Date:** 2026-09-16 | **Status:** Accepted
+
+**Context.** User request (sdata#92): `SAVE`'s per-target options already support `IF=<expr>` — a
+row-level filter applied when writing to that target. `USE`'s per-dataset options did not:
+`Parse_USE_Stmt` called the shared option parser (`Parse_Spec_Options`) with `Allow_IF => False`, a
+deliberate, clean rejection rather than a bug. The user wanted `IF=` supported symmetrically on
+`USE`, so a multi-dataset `USE` (positional merge, `/BY=` match-merge, `/INTERLEAVE`, `/JOIN`,
+`/APPEND`) could include only a subset of one input's rows without a separate pre-filtering pass —
+e.g. `USE a(IF=year=2026), b(IF=year=2025) /APPEND`.
+
+The user's clarifying comment on the issue settled the evaluation-context question the issue itself
+had left open: `USE`'s `IF=` behaves like SAS's `WHERE=` dataset option, not like a data-step `IF`
+statement. A row is tested against the filter **as it comes off this specific input**, using that
+input's **original** column names (before this spec's own `RENAME=`), and a non-matching row is
+dropped before it ever reaches the merge logic (`/BY=` match-merge, `/INTERLEAVE`, `/JOIN`,
+`/APPEND`, or positional combine) — as if the row were never present in that input at all.
+
+**Decision.** Parser: `Parse_USE_Stmt`'s call to `Parse_Spec_Options` flips `Allow_IF` from `False`
+to `True` (`src/parser/sdata-parser.adb`). No new AST field is needed — `Spec_Options.IF_Expr :
+Expression_Access` already existed, shared with `SAVE`'s per-target `IF=`.
+
+Execution (both sdata-only, `src/sdata-interpreter-execute_declarative.adb`): a new
+`Build_IF_Include` function, called once per dataset spec when that spec's `Opts.IF_Expr /= null`,
+runs immediately after `SData_Core.Commands.Execute_USE` loads that spec's raw file into the global
+`SData_Core.Table` singleton — i.e. while that input's *original* column names are still what the
+singleton and PDV reflect, before `RENAME=`/`KEEP=`/`DROP=` run on the snapshot copy taken afterward.
+It first runs `Check_Expr (Expr, Check_Undefined => True)` — unlike `SAVE`'s `IF=` (ADR-062, which
+uses `Check_Undefined => False` because a variable may legitimately be defined by a later statement
+before the first `WRITE` flush), `USE`'s `IF=` has no such later-statement window: a variable that
+isn't a real column of this specific input is unconditionally an error, evaluated once, immediately.
+It then walks every physical row (`SData_Core.Table.Row_Count`), calling `Load_PDV_From_Table` +
+`Evaluate` + `Is_True` per row — the same pattern `sdata-interpreter.adb`'s existing `Should_Write`
+(`SAVE`'s `IF=`) already uses — and returns a `Boolean_Vectors.Vector` of per-row inclusion flags.
+
+`SData.Transient_Table.Snapshot_From_Current` (`src/sdata-transient_table.ads/.adb`) gained a new
+optional `Include : Boolean_Vectors.Vector := Empty_Vector` parameter: when non-empty (length must
+equal `Row_Count`, else `Constraint_Error`), only physical row `R` is copied when `Include (R)` is
+`True`; an empty `Include` (every existing call site, unchanged) copies every row exactly as before.
+Filtering happens *inside* the existing per-row copy loop, so a dropped row is never materialized
+into the `Transient_Table` snapshot that `Apply_Rename`/`Apply_Keep`/`Apply_Drop`/`Sort_By`/
+`SData.Merge.Combine_*` subsequently operate on — every merge mode sees a filtered-out row exactly as
+if it were absent from that input, with no merge-mode-specific code needed. Both `Execute_USE_Single`
+(the legacy single-dataset path, which already runs an equivalent `Snapshot_From_Current` → mutate →
+`Install_To_Current` sequence for `RENAME=`/`KEEP=`/`DROP=`) and `Execute_USE_Multi` call
+`Build_IF_Include` and pass its result identically.
+
+**Why a precomputed `Boolean_Vectors.Vector` instead of an access-to-subprogram row predicate?**
+Considered first, rejected on inspection: a predicate implemented as a subprogram nested inside
+`execute_declarative.adb` (itself `separate (SData.Interpreter)`, itself nested inside
+`SData.Interpreter`'s body) has a strictly deeper accessibility level than a general
+access-to-subprogram type declared at `SData.Transient_Table`'s library level — Ada rejects
+`Predicate'Access` there at compile time. A plain data value sidesteps the accessibility problem
+entirely, and keeps `SData.Transient_Table` free of any dependency on `Is_True`/`Evaluate` (evaluator
+machinery it has no other reason to import) — the row-by-row scan stays entirely in
+`execute_declarative.adb`, which already has that visibility via `SData.Interpreter`'s context
+clauses.
+
+**A real bug found and fixed during implementation itself, not anticipated by the design phase**
+(same class as ADR-063's `RANDOM()` determinism fix and ADR-072's coder-phase self-caught
+`Continued_At_EOF` regression): `Build_IF_Include` was first written calling `Check_Expr` *before*
+resetting the PDV, matching the design docs' pseudocode exactly. Direct testing of two dataset specs
+in the same `USE` — one filtered, the schema-disjoint one loaded afterward — showed the second
+spec's own column references resolving to `Missing` (a comparison against them was always false),
+even though `SData_Core.Table.Has_Column` correctly reported the column as present. Root cause,
+confirmed by tracing both refresh paths directly: `SData_Core.Commands.Execute_USE`'s internal
+`Refresh_PDV_Names` (`sdata_core-variables.adb`) is **additive-only** — it appends a newly-loaded
+column's name to `PDV_Names`/`PDV_Index` only if not already present, but never removes a *prior*
+spec's stale names. `Load_PDV_From_Table` then walks slots `1 .. Column_Count`, overwriting the
+*first* `Column_Count` slots — which, after a schema change, are still named after the *previous*
+spec's columns — while the new spec's own column names sit at newly-appended slots that
+`Load_PDV_From_Table` never touches, permanently `Missing`. This is invisible in every existing
+normal `USE`-then-`RUN` script because `Run_One_Step` unconditionally calls
+`SData_Core.Variables.Initialize_PDV` (a full rebuild, not additive) before evaluating anything —
+`Build_IF_Include` is the first caller in this codebase to evaluate an expression against a
+freshly-loaded schema *outside* that normal `RUN`-time reset. Worse, the same staleness silently
+defeated the `Check_Undefined => True` safety check itself: `Is_Defined` → `SData_Core.Variables.
+Defined` consults the live `PDV_Index` (`PDV_Index.Contains(Name) or else Temp_Symbols.Contains
+(Name)`), so a name that was a real column of an *earlier* spec in the same statement — but not of
+the spec actually being checked — read back as "defined," silently passing a check meant to catch
+exactly that mistake. Fixed by moving `SData_Core.Variables.Initialize_PDV` to run first, before
+both `Check_Expr` and the row-scan loop, in `Build_IF_Include`. Confirmed via a repro constructed
+from a two-spec `USE ... /APPEND` where the second spec's `IF=` names a column that exists only on
+the first spec (`tests/use_if_undefined_cross_spec.cmd`): raised `Script_Error` correctly after the
+fix, silently passed (and produced wrong filtering) before it. `Initialize_PDV` is safe to call here
+— it touches only the `PDV_Names`/`PDV_Index`/`PDV_Vec` mapping (not `Temp_Symbols`), and the `RUN`
+that eventually follows calls it again anyway, so nothing downstream depends on the mapping this
+ad-hoc scan leaves behind.
+
+**Consequences:** sdata-only (`src/parser/sdata-parser.adb`, `src/sdata-interpreter-
+execute_declarative.adb`, `src/sdata-transient_table.ads/.adb`, `src/ast/sdata-ast.ads` comment
+only); confirmed no sdata-core or data-vandal change — `data-vandal` has no multi-dataset `USE`
+feature at all (`Dataset_List`/`Parse_USE_Stmt`/`Parse_Spec_Options`/`Allow_IF`/`Allow_IN` all return
+zero hits under its `src/`), and `SData_Core.Commands.Execute_USE` (the thin single-file loader it
+does call) is untouched — including its own `Refresh_PDV_Names`, whose additive-only contract is
+unchanged and correct for its own normal callers; `Build_IF_Include` simply doesn't rely on it.
+`doc/design.md`'s `USE` and `SAVE` per-dataset/per-target option paragraphs, `HELP USE`/`HELP SAVE`
+(`src/sdata-help.adb`), and `man/man1/sdata.1` all updated to document the new option and
+cross-reference the two `IF=`s against each other (same expression grammar and row-test semantics;
+different timing — `USE`'s tests a row arriving from an external input, `SAVE`'s tests a row already
+loaded into the internal table/PDV). 14 new regression tests covering single-dataset and all five
+merge modes (positional/`/BY=`/`/INTERLEAVE`/`/JOIN`/`/APPEND`), the `IF=`-before-`RENAME=` evaluation
+order, an empty-contributor case under both `/APPEND` and `/BY=`, `IF=` on some but not all specs in
+one statement (guarding against a stale-`Include`-vector class of bug, per systems-designer review),
+`MOCK(IF=...)`, and the two error classes (unknown function; undefined variable, including the
+cross-spec false-positive this section describes). `make check`: 560 → 574, all green; data-vandal
+149/149 unaffected.
+
+Version bump: minor — a new option, documented-default-behavior addition, matching the `TABLES`/
+`STATS`/`AGGREGATE`/`TRANSPOSE`/`SAVE`-`IF=` precedent for new commands/options.
+

@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.29.3
+Version:        0.30.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Sep 16 2026 John L. Ries <john@theyarnbard.com> - 0.30.0-1
+- USE gains a per-dataset IF= option, modeled on SAS's WHERE= dataset option (ADR-074, closes #92).
+
 * Mon Sep 14 2026 John L. Ries <john@theyarnbard.com> - 0.29.3-1
 - Fix USE's IN= provenance variable leaking into saved output and NAMES (now genuinely temporary); fix trailing-comma continuation gaps in TABLES, AGGREGATE, TRANSPOSE, STATS, USE, and SAVE option/list parsing
 

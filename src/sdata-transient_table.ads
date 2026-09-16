@@ -46,6 +46,13 @@ package SData.Transient_Table is
       Col : String;
       Val : SData_Core.Values.Value);
 
+   --  Per-physical-row inclusion flags, indexed 1 .. N to match
+   --  SData_Core.Table.Row_Count. Used by Snapshot_From_Current's Include
+   --  parameter (ADR-074/sdata#92) to filter rows during the copy instead
+   --  of copying-then-deleting.
+   package Boolean_Vectors is new Ada.Containers.Vectors
+     (Index_Type => Positive, Element_Type => Boolean);
+
    --  Snapshot bridges to/from the singleton SData_Core.Table.
    --  Snapshot_From_Current: capture the current state of the global
    --     SData_Core.Table into a new Transient_Table value. Does not
@@ -53,7 +60,15 @@ package SData.Transient_Table is
    --  Install_To_Current: replace the global SData_Core.Table state
    --     with the contents of the given Transient_Table. The global
    --     table is Clear-ed first.
-   function Snapshot_From_Current return Table;
+   --
+   --  Include (ADR-074/sdata#92): when non-empty, its length must equal
+   --  SData_Core.Table.Row_Count (Constraint_Error otherwise); only
+   --  physical row R is copied when Include (R) is True. An empty Include
+   --  (the default) copies every row -- today's behavior, unchanged, for
+   --  every pre-existing call site.
+   function Snapshot_From_Current
+     (Include : Boolean_Vectors.Vector := Boolean_Vectors.Empty_Vector)
+     return Table;
    procedure Install_To_Current (T : Table);
 
    --  Column projection / mutation

@@ -81,7 +81,7 @@ package SData.AST is
       Rename_Pairs     : Rename_List;
       IN_Name          : String (1 .. Max_Name_Len) := (others => ' ');
       IN_Name_Len      : Natural := 0;          --  USE only; 0 = not set
-      IF_Expr          : Expression_Access;     --  SAVE only; null = not set
+      IF_Expr          : Expression_Access;     --  USE and SAVE; null = not set
    end record;
 
    type Dataset_Spec is record

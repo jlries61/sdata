@@ -165,11 +165,22 @@ package body SData.Transient_Table is
    --  Snapshot bridges
    ---------------------------------------------------------------------------
 
-   function Snapshot_From_Current return Table is
+   function Snapshot_From_Current
+     (Include : Boolean_Vectors.Vector := Boolean_Vectors.Empty_Vector)
+     return Table
+   is
       Result : Table;
       N      : constant Natural := SData_Core.Table.Column_Count;
       Rows   : constant Natural := SData_Core.Table.Row_Count;
    begin
+      if Natural (Include.Length) > 0
+        and then Natural (Include.Length) /= Rows
+      then
+         raise Constraint_Error
+           with "Snapshot_From_Current: Include length"
+                & Natural (Include.Length)'Image
+                & " does not match Row_Count" & Rows'Image;
+      end if;
       for I in 1 .. N loop
          declare
             Name : constant String := SData_Core.Table.Column_Name (I);
@@ -179,15 +190,18 @@ package body SData.Transient_Table is
          end;
       end loop;
       for R in 1 .. Rows loop
-         Result.Add_Row;
-         for I in 1 .. N loop
-            declare
-               Name : constant String := SData_Core.Table.Column_Name (I);
-            begin
-               Result.Set_Value
-                 (R, Name, SData_Core.Table.Get_Value (R, Name));
-            end;
-         end loop;
+         if Natural (Include.Length) = 0 or else Include (R) then
+            Result.Add_Row;
+            for I in 1 .. N loop
+               declare
+                  Name : constant String := SData_Core.Table.Column_Name (I);
+                  Dest_Row : constant Positive := Result.Row_Count;
+               begin
+                  Result.Set_Value
+                    (Dest_Row, Name, SData_Core.Table.Get_Value (R, Name));
+               end;
+            end loop;
+         end if;
       end loop;
       return Result;
    end Snapshot_From_Current;

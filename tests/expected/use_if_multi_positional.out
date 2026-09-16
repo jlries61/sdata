@@ -1,0 +1,5 @@
+Dataset opened: tests/data/use_if_a.csv
+Dataset opened: tests/data/use_if_b.csv
+2.00000 20.00000 1.00000 100.00000
+3.00000 30.00000 2.00000 200.00000
+RUN complete. 2 records and 6 variables processed.

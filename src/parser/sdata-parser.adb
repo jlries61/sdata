@@ -738,7 +738,7 @@ package body SData.Parser is
    --    DROP   = name_list
    --    RENAME = ( old=new { "," old=new } )
    --    IN     = identifier        (USE only; error if Allow_IN is False)
-   --    IF     = expression        (SAVE only; error if Allow_IF is False)
+   --    IF     = expression        (USE and SAVE; error if Allow_IF is False)
    --    HEADER = YES|NO
    --    FMT    = CSV|ODF|ODS|OOXML|XLSX
    --    CHARSET = string           (may be multi-token: e.g. UTF-16 LE)
@@ -1426,11 +1426,16 @@ package body SData.Parser is
                   if Stmt.Dataset_List.Is_Empty then
                      First_Had_Paren_Block := True;
                   end if;
+                  --  ADR-074/sdata#92: IF= is now allowed as a per-dataset
+                  --  USE option (SAS WHERE=-style row filter, applied
+                  --  before RENAME=/KEEP=/DROP= -- see
+                  --  Execute_USE_Single/Execute_USE_Multi in
+                  --  sdata-interpreter-execute_declarative.adb).
                   Parse_Spec_Options
                     (Ctx,
                      Spec.Opts,
                      Allow_IN       => True,
-                     Allow_IF       => False,
+                     Allow_IF       => True,
                      Allow_USE_Only => True);
                end if;
 

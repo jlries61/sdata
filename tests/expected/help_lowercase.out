@@ -11,6 +11,14 @@ Options:
                Default is auto-detected from file extension.
   /NSCAN=n     Number of rows to scan for type detection (default: 20).
 Per-dataset options (in parentheses after a filename):
+  (IF=expr)                Include a row from this input only when expr
+                           is true, tested as the row comes off this
+                           input (SAS WHERE=-style) -- against this
+                           input's ORIGINAL column names, before this
+                           spec's own RENAME=/KEEP=/DROP=/IN= and before
+                           the row reaches any merge (/BY=, /INTERLEAVE,
+                           /JOIN, /APPEND, positional). A non-matching row
+                           behaves as if never present in that input.
   (KEEP=name ...)          Keep only the named columns.
   (DROP=name ...)          Drop the named columns.
   (RENAME=(old=new ...))   Rename columns (applied before KEEP/DROP);

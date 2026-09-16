@@ -76,6 +76,14 @@ package body SData.Help is
       Put_Line ("               Default is auto-detected from file extension.");
       Put_Line ("  /NSCAN=n     Number of rows to scan for type detection (default: 20).");
       Put_Line ("Per-dataset options (in parentheses after a filename):");
+      Put_Line ("  (IF=expr)                Include a row from this input only when expr");
+      Put_Line ("                           is true, tested as the row comes off this");
+      Put_Line ("                           input (SAS WHERE=-style) -- against this");
+      Put_Line ("                           input's ORIGINAL column names, before this");
+      Put_Line ("                           spec's own RENAME=/KEEP=/DROP=/IN= and before");
+      Put_Line ("                           the row reaches any merge (/BY=, /INTERLEAVE,");
+      Put_Line ("                           /JOIN, /APPEND, positional). A non-matching row");
+      Put_Line ("                           behaves as if never present in that input.");
       Put_Line ("  (KEEP=name ...)          Keep only the named columns.");
       Put_Line ("  (DROP=name ...)          Drop the named columns.");
       Put_Line ("  (RENAME=(old=new ...))   Rename columns (applied before KEEP/DROP);");
@@ -137,6 +145,9 @@ package body SData.Help is
       Put_Line ("                           the name suffix is checked.");
       Put_Line ("  (IF=expr)                Write a record to this target only when expr");
       Put_Line ("                           is true (use with WRITE for per-record routing).");
+      Put_Line ("                           USE has a per-dataset IF= too (HELP USE) -- same");
+      Put_Line ("                           grammar, but it tests a row arriving from an");
+      Put_Line ("                           external input, not one already in the table.");
       Put_Line ("  These options also apply to a single-target SAVE.");
       Put_Line ("Execution: Declarative -- the file is written at the end of the next RUN.");
    end Help_SAVE;
