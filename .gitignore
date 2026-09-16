@@ -127,6 +127,11 @@ tests/data/empty_rt.csv
 tests/data/charset_ascii_save_out.csv
 tests/data/charset_ascii_save_reject_out.csv
 
+# tables_save_chisqfile_collision_error: main crosstab file is written
+# successfully before the chi-square /SAVE write aborts on the DF collision,
+# so the script never reaches a SYSTEM rm cleanup step
+tests/data/tables_save_dfcollide_out.csv
+
 # Python bytecode cache (scripts/*.py)
 __pycache__/
 *.pyc
