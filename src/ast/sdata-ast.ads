@@ -129,11 +129,34 @@ package SData.AST is
       Invar_Name     : String (1 .. Max_Name_Len) := (others => ' ');
       Invar_Name_Len : Natural := 0;
       Invar_Index    : Natural := 0;
+      Has_Pctl_Value : Boolean := False;  --  PCTL(<invar>, <p>); ADR-075/sdata#93
+      Pctl_Value     : Natural := 0;      --  0 .. 100; meaningful only when
+                                           --  Has_Pctl_Value is True
    end record;
    type Aggregate_Spec_Access is access all Aggregate_Spec;
 
    package Aggregate_Spec_Vectors is new Ada.Containers.Vectors
      (Index_Type => Positive, Element_Type => Aggregate_Spec_Access);
+
+   --  One entry of a STATS statement's "/STATS=" list (ADR-075/sdata#93).
+   --  Mirrors SData_Core.Commands.Stat_Request; the interpreter converts a
+   --  Stat_Request_List into the core Stat_Request_Vectors.Vector at
+   --  dispatch. A dedicated list type rather than reusing the shared,
+   --  ranged Variable_List (KEEP/DROP/SORT's own list type) -- systems-
+   --  designer's 02-systems-designer.md finding: don't widen a mechanism
+   --  shared by unrelated callers for one command's own need.
+   type Stat_Request is record
+      Name           : String (1 .. Max_Name_Len) := (others => ' ');
+      Name_Len       : Natural := 0;
+      Has_Pctl_Value : Boolean := False;
+      Pctl_Value     : Natural := 0;
+   end record;
+   type Stat_Request_Node;
+   type Stat_Request_List is access Stat_Request_Node;
+   type Stat_Request_Node is record
+      Stat : Stat_Request;
+      Next : Stat_Request_List;
+   end record;
 
    type Merge_Mode is (MM_Single, MM_Positional, MM_Match,
                        MM_Interleave, MM_Join, MM_Append);
@@ -330,7 +353,7 @@ package SData.AST is
             Has_Array    : Boolean := False;
          when Stmt_STATS =>
             Stats_Vars     : Variable_List;   --  analysis vars (empty = all numeric)
-            Stats_Stats    : Variable_List;   --  statistics (empty = N MIN MEAN MAX STD)
+            Stats_Stats    : Stat_Request_List; --  statistics (empty = N MIN MEAN MAX STD)
             Stats_No_Print : Boolean := False;
          when Stmt_TABLES =>
             Requests        : Table_Request;

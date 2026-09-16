@@ -1,0 +1,1 @@
+Error: AGGREGATE: percentile argument to 'PCTL' must be an integer literal (0..100), not '25.5'

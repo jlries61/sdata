@@ -8,6 +8,7 @@ package body SData.AST is
 
    procedure Free_Var_Node      is new Ada.Unchecked_Deallocation (Variable_List_Node,   Variable_List);
    procedure Free_Ren_Node      is new Ada.Unchecked_Deallocation (Rename_Pair_Node,     Rename_List);
+   procedure Free_Stat_Req_Node is new Ada.Unchecked_Deallocation (Stat_Request_Node,    Stat_Request_List);
    procedure Free_Br_Node       is new Ada.Unchecked_Deallocation (Case_Branch_Node,     Case_Branch);
    procedure Free_Stmt_Node     is new Ada.Unchecked_Deallocation (Statement,            Statement_Access);
    procedure Free_Dataset_Spec  is new Ada.Unchecked_Deallocation (Dataset_Spec,         Dataset_Spec_Access);
@@ -19,6 +20,7 @@ package body SData.AST is
    --    Free(Statement_Access) <-> Free_Program
    procedure Free (List     : in out Variable_List);
    procedure Free (List     : in out Rename_List);
+   procedure Free (List     : in out Stat_Request_List);
    procedure Free (Branches : in out Case_Branch);
    procedure Free (Stmt     : in out Statement_Access);
 
@@ -89,6 +91,16 @@ package body SData.AST is
       while List /= null loop
          Next := List.Next;
          Free_Ren_Node (List);
+         List := Next;
+      end loop;
+   end Free;
+
+   procedure Free (List : in out Stat_Request_List) is
+      Next : Stat_Request_List;
+   begin
+      while List /= null loop
+         Next := List.Next;
+         Free_Stat_Req_Node (List);
          List := Next;
       end loop;
    end Free;

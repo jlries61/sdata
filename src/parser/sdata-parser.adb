@@ -1987,6 +1987,69 @@ package body SData.Parser is
                      end if;
                   end;
 
+                  --  ADR-075/sdata#93: an optional second, comma-separated
+                  --  argument -- "PCTL(<invar>, <p>)"'s percentile. Gated on
+                  --  the function name: a comma here for any OTHER function
+                  --  (e.g. "SUM(x, 5)") must be a clear parse error, not
+                  --  silently accepted and passed through to Emit_Group's
+                  --  trailing-sentinel append -- every non-PCTL handler
+                  --  (Handle_Sum, etc.) has no concept of a percentile
+                  --  sentinel and would silently fold the "5" into its own
+                  --  computation as if it were one more data value.
+                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma
+                    and then To_Upper (Fn) /= "PCTL"
+                  then
+                     raise Script_Error with
+                       "AGGREGATE: function '" & Fn &
+                       "' does not take a second argument";
+                  end if;
+                  --  The converse: PCTL *without* a comma-percentile must
+                  --  also be a clear error, not silently fall through to
+                  --  Handle_Pctl treating the LAST data value as if it were
+                  --  the percentile (confirmed reachable: an integer-typed
+                  --  invar whose last group value happens to fall in
+                  --  0..100 would otherwise silently compute a nonsensical
+                  --  result instead of raising anything).
+                  if To_Upper (Fn) = "PCTL"
+                    and then Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Comma
+                  then
+                     raise Script_Error with
+                       "AGGREGATE: function 'PCTL' requires a percentile " &
+                       "argument, e.g. PCTL(x, 50)";
+                  end if;
+                  if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
+                     declare
+                        Discard  : constant Token :=
+                          Get_Next_Token (Ctx.Lex_Ctx);  --  ','
+                        Pct_Tok  : constant Token :=
+                          Get_Next_Token (Ctx.Lex_Ctx);
+                        pragma Unreferenced (Discard);
+                     begin
+                        if Pct_Tok.Kind /= Token_Numeric_Literal
+                          or else (for some C of
+                                     Pct_Tok.Text (1 .. Pct_Tok.Length) =>
+                                       C = '.')
+                        then
+                           raise Script_Error with
+                             "AGGREGATE: percentile argument to '" & Fn &
+                             "' must be an integer literal (0..100), not '" &
+                             Pct_Tok.Text (1 .. Pct_Tok.Length) & "'";
+                        end if;
+                        declare
+                           P : constant Integer :=
+                             Integer'Value (Pct_Tok.Text (1 .. Pct_Tok.Length));
+                        begin
+                           if P < 0 or else P > 100 then
+                              raise Script_Error with
+                                "AGGREGATE: percentile argument to '" & Fn &
+                                "' must be between 0 and 100, got" & P'Image;
+                           end if;
+                           Spec.Has_Pctl_Value := True;
+                           Spec.Pctl_Value     := P;
+                        end;
+                     end;
+                  end if;
+
                   if Get_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Right_Paren then
                      raise Script_Error with
                        "AGGREGATE: expected ')' to close '" & Fn & "('";
@@ -2198,6 +2261,107 @@ package body SData.Parser is
    is
       Saw_STATS    : Boolean := False;
       Saw_NOPRINT  : Boolean := False;
+
+      --  Parses "/STATS="'s list: a mix of bare statistic names (as before)
+      --  and NAME "(" <integer 0..100> ")" call forms (ADR-075/sdata#93 --
+      --  "PCTL(p)"; the grammar itself doesn't special-case the name, any
+      --  registered statistic could in principle take this shape). Stops at
+      --  '/' or end of statement, matching Parse_Variable_List's own
+      --  termination rule. A dedicated list type (Stat_Request_List), not a
+      --  reuse of the shared, ranged Variable_List KEEP/DROP/SORT use --
+      --  see Stat_Request's own declaration comment in sdata-ast.ads.
+      function Parse_Stat_Request_List return Stat_Request_List is
+         First : Stat_Request_List := null;
+         Last  : Stat_Request_List := null;
+         Tok   : Token;
+      begin
+         loop
+            Tok := Peek_Next_Token (Ctx.Lex_Ctx);
+            exit when not Is_Identifier_Token (Tok);
+            Tok := Get_Next_Token (Ctx.Lex_Ctx);
+            declare
+               Name  : constant String := Identifier_Text (Tok);
+               Node  : constant Stat_Request_List := new Stat_Request_Node;
+            begin
+               Node.Stat.Name (1 .. Tok.Length) := Name;
+               Node.Stat.Name_Len := Tok.Length;
+
+               --  ADR-075/sdata#93: the "NAME(<integer>)" call form is
+               --  gated to "PCTL" specifically -- "SUM(5)" or similar for
+               --  any other statistic must be a clear parse error, not
+               --  silently accepted and folded into that statistic's own
+               --  computation as an extra data value (Handle_Sum etc. have
+               --  no concept of a trailing percentile sentinel).
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren
+                 and then To_Upper (Name) /= "PCTL"
+               then
+                  raise Script_Error with
+                    "STATS: statistic '" & Name &
+                    "' does not take an argument";
+               end if;
+               --  The converse: bare "PCTL" (no parenthesized percentile)
+               --  must also be a clear error, not silently fall through to
+               --  Handle_Pctl treating the LAST group value as if it were
+               --  the percentile (confirmed reachable: an integer-typed
+               --  analysis variable whose last group value happens to fall
+               --  in 0..100 would otherwise silently compute a nonsensical
+               --  result instead of raising anything).
+               if To_Upper (Name) = "PCTL"
+                 and then Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Left_Paren
+               then
+                  raise Script_Error with
+                    "STATS: statistic 'PCTL' requires a percentile " &
+                    "argument, e.g. PCTL(50)";
+               end if;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren then
+                  declare
+                     Discard : constant Token :=
+                       Get_Next_Token (Ctx.Lex_Ctx);  --  '('
+                     Pct_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                     pragma Unreferenced (Discard);
+                  begin
+                     if Pct_Tok.Kind /= Token_Numeric_Literal
+                       or else (for some C of
+                                  Pct_Tok.Text (1 .. Pct_Tok.Length) =>
+                                    C = '.')
+                     then
+                        raise Script_Error with
+                          "STATS: percentile argument to '" & Name &
+                          "' must be an integer literal (0..100), not '" &
+                          Pct_Tok.Text (1 .. Pct_Tok.Length) & "'";
+                     end if;
+                     declare
+                        P : constant Integer :=
+                          Integer'Value (Pct_Tok.Text (1 .. Pct_Tok.Length));
+                     begin
+                        if P < 0 or else P > 100 then
+                           raise Script_Error with
+                             "STATS: percentile argument to '" & Name &
+                             "' must be between 0 and 100, got" & P'Image;
+                        end if;
+                        Node.Stat.Has_Pctl_Value := True;
+                        Node.Stat.Pctl_Value     := P;
+                     end;
+                     if Get_Next_Token (Ctx.Lex_Ctx).Kind
+                       /= Token_Right_Paren
+                     then
+                        raise Script_Error with
+                          "STATS: expected ')' after percentile argument to '"
+                          & Name & "'";
+                     end if;
+                  end;
+               end if;
+
+               if First = null then
+                  First := Node;
+               else
+                  Last.Next := Node;
+               end if;
+               Last := Node;
+            end;
+         end loop;
+         return First;
+      end Parse_Stat_Request_List;
    begin
       --  Optional bare variable list (stops at '/' or end of statement).
       Stmt.Stats_Vars := Parse_Variable_List (Ctx);
@@ -2225,7 +2389,7 @@ package body SData.Parser is
                   Eat : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '='
                   pragma Unreferenced (Eat);
                begin
-                  Stmt.Stats_Stats := Parse_Variable_List (Ctx);
+                  Stmt.Stats_Stats := Parse_Stat_Request_List;
                end;
                if Stmt.Stats_Stats = null then
                   raise Script_Error with

@@ -1,0 +1,19 @@
+Dataset opened: tests/data/sample.csv
+CATEGORY$ = A
+Variable  N    PCTL50
+---------------------
+VAL1      2   2.50000
+---------------------
+
+CATEGORY$ = B
+Variable  N    PCTL50
+---------------------
+VAL1      3  10.00000
+---------------------
+
+CATEGORY$ = C
+Variable  N    PCTL50
+---------------------
+VAL1      1  16.00000
+---------------------
+STATS complete. 3 records and 4 variables processed.

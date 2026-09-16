@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-09-16" "sdata 0.30.0" "User Commands"
+.TH SDATA 1 "2026-09-16" "sdata 0.31.0" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -677,8 +677,9 @@ group, computing an aggregate
 .BR NMISS ,
 .BR GMEAN ,
 .BR HMEAN ,
+.BR MEDIAN ,
 or
-.BR MEDIAN )
+.BR PCTL )
 over each input column.
 With no active
 .B BY
@@ -689,6 +690,20 @@ or an array element such as
 .IR x(1) ;
 .B N()
 with no argument is the group row count.
+.BI PCTL( invar , \  p )
+takes a second argument, the percentile
+.I p
+as an integer literal from 0 to 100 (checked at parse time), and computes the
+.IR p -th
+percentile of
+.I invar
+by linear interpolation between order statistics \(em the same rule
+.B MEDIAN
+uses, generalized:
+.B PCTL(\fIx\fB, 50)
+and
+.B MEDIAN(\fIx\fB)
+always agree.
 The active
 .B SELECT
 filter is respected during the scan; a pending
@@ -794,12 +809,31 @@ The result replaces the data table.
 Statistics to compute; default
 .BR "N MIN MEAN MAX STD" .
 Any registered aggregate
-.RB ( SUM ", " MEAN ", " STD ", " VAR ", " MIN ", " MAX ", " N ", " NMISS ", " GMEAN ", " HMEAN ", " MEDIAN ).
+.RB ( SUM ", " MEAN ", " STD ", " VAR ", " MIN ", " MAX ", " N ", " NMISS ", " GMEAN ", " HMEAN ", " MEDIAN ", " PCTL ).
 Only
 .B N
 and
 .B NMISS
 may be applied to a character variable.
+.B PCTL
+is written
+.BI PCTL( p )
+in the list, where
+.I p
+is an integer literal from 0 to 100 (e.g.\&
+.BR "/STATS=N MIN PCTL(25) MEDIAN PCTL(75) MAX" );
+the list may contain more than one
+.BI PCTL( p )
+entry with different percentiles, but two entries requesting the
+.B same
+percentile are rejected as a duplicate statistic. The output column for a
+.BI PCTL( p )
+entry is named
+.BI PCTL p
+(e.g.\&
+.BR PCTL25 ),
+not the bare function name, since the bare name alone would collide across
+multiple percentile requests.
 .TP
 .B /NOPRINT
 Replace the table (and write a pending
@@ -1434,7 +1468,7 @@ Degree variants:
 .SS Base conversion
 .BR HEX$ (n),\  OCT$ (n),\  BIN$ (n)
 .SS Aggregate (row\-wise, across argument list)
-.BR SUM ,\  MEAN ,\  GMEAN ,\  HMEAN ,\  STD ,\  VAR ,\  MIN ,\  MAX ,\  MEDIAN ,\  N ,\  NMISS
+.BR SUM ,\  MEAN ,\  GMEAN ,\  HMEAN ,\  STD ,\  VAR ,\  MIN ,\  MAX ,\  MEDIAN ,\  N ,\  NMISS ,\  PCTL
 .PP
 .B STD
 and
@@ -1445,6 +1479,22 @@ fewer than two non\-missing values are supplied.
 returns missing if any argument is \(<= 0.
 .B HMEAN
 returns missing if any argument is zero.
+.BI PCTL( invar , \  p )
+takes an extra, final argument \(em the percentile
+.I p
+as an integer 0\(en100 \(em and computes it by linear interpolation between
+order statistics, the same rule
+.B MEDIAN
+generalizes:
+.B PCTL(\fIx\fB, 50)
+and
+.B MEDIAN(\fIx\fB)
+always agree. Usable outside
+.B AGGREGATE
+/
+.B STATS
+too, against a whole array argument, like every other aggregate function
+in this list.
 .SS Record navigation
 All of the following operate in
 .I logical

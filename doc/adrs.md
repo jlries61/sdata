@@ -2874,3 +2874,115 @@ cross-spec false-positive this section describes). `make check`: 560 → 574, al
 Version bump: minor — a new option, documented-default-behavior addition, matching the `TABLES`/
 `STATS`/`AGGREGATE`/`TRANSPOSE`/`SAVE`-`IF=` precedent for new commands/options.
 
+### ADR-075: STATS and AGGREGATE gain a general PCTL percentile aggregate
+
+**Date:** 2026-09-16 | **Status:** Accepted
+
+**Context.** User request (sdata#93): `STATS`/`AGGREGATE` support a fixed registry of aggregate
+functions (`SUM`, `MEAN`, `STD`, `VAR`, `MIN`, `MAX`, `N`, `NMISS`, `GMEAN`, `HMEAN`, `MEDIAN`).
+`MEDIAN` (the 50th percentile) was the only quantile-family statistic available; there was no way
+to request an arbitrary percentile (25th/75th for a quartile summary, 90th/95th/99th for tail
+behavior) from either command. The issue offered two designs: a fixed set of named percentile
+functions (`P25`, `P50`, ...) needing no parser change, or a general `PCTL(var, p)` function
+accepting an arbitrary percentile as an argument, needing real parser work. The user chose the
+general form (via `AskUserQuestion`), prioritizing arbitrary-percentile flexibility over the
+lower-risk fixed-list alternative — then, in a second `AskUserQuestion` round once the actual
+scope difference was traced, chose full `STATS`/`AGGREGATE` symmetry (`PCTL(p)` inside `STATS`'s
+`/STATS=` list) over a `STATS`-side fixed percentile list.
+
+**The central architectural tension.** `SData_Core.Evaluator`'s `Dispatch_Table` handler type,
+`Fn_Handler = access function (Name : String; Vals : Value_Vectors.Vector) return Value`, is shared
+by every registered function in the evaluator — not just aggregates — confirmed by tracing both of
+its call sites (`Call_Function`, the generic public entry point; and `Evaluate_Function`'s internal
+dispatch, used for ordinary expression function calls). There is no room in that two-parameter
+signature for an arbitrary, runtime-supplied percentile value, and widening it would touch every
+function across every function family for the sake of one function — the same class of "don't widen
+a deeply shared mechanism for one function family's need" judgment this project's own ADR-046
+already made for aggregate metadata (a dedicated `Aggregate_Meta_Table` side-table instead of
+widening `Dispatch_Table`'s value type).
+
+**Decision.** The percentile is threaded through the existing, unmodified `Fn_Handler`/
+`Call_Function`/`Dispatch_Table` mechanism by appending it as the **trailing element** of the
+`Value_Array`/`Value_Vectors.Vector` already passed to the handler, at the two places that actually
+assemble that vector for aggregate use: `Execute_AGGREGATE`'s `Emit_Group` (per `Aggregate_Spec`)
+and `Execute_STATS`'s per-`(group × variable)` dispatch loop (per `Stat_Request`) — both via
+non-destructive Ada array concatenation (`&`), which never mutates the shared `Vals`/`Group_Values`
+result other entries in the same loop iteration also read (verified: `Execute_STATS`'s `Vals` is
+declared `constant`, so an in-place mutation isn't even something the compiler would accept — the
+concatenation approach was correct by construction, not just by discipline). `Handle_Pctl` (new,
+`sdata_core-evaluator-aggregate_fns.adb`) pops the last element as `P`, treats the remainder as
+data, and delegates to a new shared `Compute_Percentile (P, Vals)` core: linear interpolation
+between order statistics (rank = `P`/100·(`N`-1)+1, interpolating between the values at
+`floor(rank)` and `ceil(rank)`). This is a direct generalization of the existing `Handle_Median`'s
+own formula — verified algebraically (and independently re-verified during systems-designer review)
+to reduce to it exactly at `P` = 50 for both odd and even `N`, and to correctly return the minimum
+at `P` = 0, the maximum at `P` = 100, and the single value for `N` = 1, all as exact order-statistic
+positions requiring no interpolation. `MEDIAN` keeps its own handler rather than delegating to
+`Compute_Percentile`, per the issue's own scope (not asked to alias them) — `PCTL(x, 50)` and
+`MEDIAN(x)` are guaranteed to agree by the shared formula, not by one calling the other.
+
+**Scope decision made during implementation, not by the design docs: `PCTL`'s percentile argument
+must be an integer literal, 0–100 inclusive** — found necessary, not just convenient, while
+implementing `STATS`'s side: `STATS`'s output column for a plain statistic is named after the
+statistic itself (`Table.Add_Output_Column`), and two `PCTL` entries would otherwise both produce a
+column literally named `PCTL`, silently colliding (`Add_Output_Column` no-ops on a duplicate name),
+misaligning every later column's index against the `/STATS=` list's own length — a real correctness
+bug, not a cosmetic one, for the issue's own five-number-summary motivating example (`PCTL(25)` and
+`PCTL(75)` in the same list). Resolved by naming a `PCTL(p)` entry's output column `PCTL` & `p`
+(e.g. `PCTL25`) — restricting `p` to an integer keeps this name a valid identifier without a decimal
+point, which the language's identifier grammar doesn't allow. (`AGGREGATE`'s own `PCTL(var, p)` has
+no equivalent collision risk — its output column is always the user's own `outvar`, already
+uniqueness-checked — but the integer restriction applies uniformly to both forms for one consistent
+rule.) A duplicate `PCTL(p)` request with the *same* `p` in one `/STATS=` list is rejected explicitly
+(`Stat_Display_Name` collision check) rather than silently dropped, matching `AGGREGATE`'s own
+parse-time duplicate-outvar precedent in spirit, though this check runs at `STATS` execution time
+rather than parse time (the display name depends on the resolved `Stat_Request` list, not something
+the parser computes) — a deliberate, lower-severity asymmetry, not an oversight.
+
+**A precision gap found and closed during design, not coding**: `STATS`'s own AST field
+(`Stmt.Stats_Stats`) previously reused the shared, ranged `Variable_List` type (`Parse_Variable_List`,
+also used by `KEEP`/`DROP`/`SORT`'s own bare-name-or-range lists). Extending that shared type with a
+percentile field would have repeated the exact mistake this ADR's own `Fn_Handler` decision avoided,
+one level down. `Parse_STATS` instead gained a dedicated `Stat_Request_List` (a small linked list of
+`{Name, Has_Pctl_Value, Pctl_Value}`, mirroring `SData_Core.Commands.Stat_Request` on the sdata-core
+side) via a new local `Parse_Stat_Request_List` parsing loop, leaving `Variable_List`/
+`Parse_Variable_List` completely untouched for every other caller.
+
+**Confirmed side effect, not separately requested**: `PCTL(var, p)` is usable in ordinary `PRINT`/
+`LET` expressions wherever `var` is a live array, exactly like every other aggregate function already
+registered in the same `Dispatch_Table` — `Evaluate_Function`'s existing generic argument-flattening
+loop produces the identical "data-then-percentile" `Vals` shape for free (array argument expands to
+its elements, the trailing scalar literal is appended last), and `Register_Arity ("PCTL", 2, 2)`
+makes `Check_Expr`'s static arity check accept the two-argument call — confirmed by direct testing
+(`PCTL(V, 50)` against a `DIM`'d array agreeing exactly with `MEDIAN(V)`, and a genuinely
+interpolated `PCTL(V, 25)` matching hand-computed arithmetic) and by tracing `Function_Arity`'s sole
+call site (`sdata-interpreter.adb`'s `Check_Expr`) to confirm this registration has no effect on
+`Execute_AGGREGATE`/`Execute_STATS`'s own direct dispatch, which never consults it.
+
+**Breaking public sdata-core API change**: `SData_Core.Commands.Stats_Options.Stat_List` changes
+type from a flat `SData_Core.Table.Name_Vectors.Vector` of plain names to a new
+`Stat_Request_Vectors.Vector` of `{Name, Has_Pctl_Value, Pctl_Value}` records. `Aggregate_Spec`
+gains two new fields (`Has_Pctl_Value`, `Pctl_Value`), additive only. Confirmed sdata is the sole
+consumer of `Stats_Options` (data-vandal has neither `STATS` nor `AGGREGATE` — `grep -rln
+"STATS\|AGGREGATE" ~/Develop/data-vandal/src` returns nothing), but the type change still required
+a coordinated sdata-core version bump under this project's cross-crate convention.
+
+**Consequences:** spans both crates — `src/sdata_core-evaluator-aggregate_fns.adb`,
+`src/sdata_core-commands.ads/.adb` (sdata-core); `src/parser/sdata-parser.adb`,
+`src/ast/sdata-ast.ads/.adb`, `src/sdata-interpreter.adb` (sdata). Zero data-vandal design work
+needed; the standard cross-crate gate (`data-vandal make check`) confirms zero regression. `doc/
+design.md`'s `AGGREGATE`/`STATS` entries, `HELP AGGREGATE`/`HELP STATS` (`src/sdata-help.adb`,
+`tests/expected/help_all.out` regenerated), and `man/man1/sdata.1` all updated with the new function,
+its interpolation rule, the integer-percentile restriction, and (for `STATS`) the output-column-
+naming and duplicate-request rules. 13 new regression tests: `STATS`/`AGGREGATE` basic percentile
+computation (hand-verified interpolated and exact-order-statistic values), `BY`-group behavior
+across odd/even/singleton group sizes, whole-array input (element-wise), all-missing-input →
+missing, out-of-range and non-integer percentile parse errors (both commands), the `STATS`
+duplicate-percentile execution error, the ordinary-expression side-capability, and the
+`Function_Arity`-driven wrong-arity error. `make check`: 574 → 587, all green; sdata-core `alr
+build` clean; `data-vandal make check` 149/149 unaffected.
+
+Version bump: minor for both crates — a new function, documented-default-behavior addition, matching
+the `TABLES`/`STATS`/`AGGREGATE`/`TRANSPOSE`/`SAVE`-`IF=`/`USE`-`IF=` precedent; sdata-core's bump is
+additionally justified by the `Stats_Options.Stat_List` breaking type change.
+

@@ -291,8 +291,12 @@ package body SData.Help is
       Put_Line ("Collapses the Data Table to one row per active BY group, computing");
       Put_Line ("aggregate functions over the chosen input columns. With no active BY,");
       Put_Line ("the whole (SELECT-filtered) table is one group.");
-      Put_Line ("Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN.");
+      Put_Line ("Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN,");
+      Put_Line ("           PCTL.");
       Put_Line ("  N() with no argument yields the group row count.");
+      Put_Line ("  PCTL(invar, p) computes the p-th percentile (p an integer 0..100,");
+      Put_Line ("    literal only) via linear interpolation between order statistics --");
+      Put_Line ("    the same rule MEDIAN uses, generalized: PCTL(x, 50) = MEDIAN(x).");
       Put_Line ("Input may be a scalar column, a whole array (applied element-wise), or");
       Put_Line ("an array element such as x(1). The active SELECT filter is respected; a");
       Put_Line ("pending SAVE is written; the active SELECT and BY are then cleared.");
@@ -336,7 +340,11 @@ package body SData.Help is
       Put_Line ("            array name expands to its elements.");
       Put_Line ("  /STATS=   statistics to compute (default: N MIN MEAN MAX STD).");
       Put_Line ("            Any registered aggregate: SUM MEAN STD VAR MIN MAX N NMISS");
-      Put_Line ("            GMEAN HMEAN MEDIAN. Only N/NMISS apply to character vars.");
+      Put_Line ("            GMEAN HMEAN MEDIAN PCTL. Only N/NMISS apply to character vars.");
+      Put_Line ("            PCTL(p) computes the p-th percentile (integer 0..100, e.g.");
+      Put_Line ("            /STATS=N MIN PCTL(25) MEDIAN PCTL(75) MAX); the output column");
+      Put_Line ("            is named PCTLp (e.g. PCTL25), and two entries requesting the");
+      Put_Line ("            same p are rejected as a duplicate statistic.");
       Put_Line ("  /NOPRINT  replace the table (and write a pending SAVE) without");
       Put_Line ("            printing the result.");
       Put_Line ("Respects the active SELECT filter; flushes a pending SAVE; clears the");

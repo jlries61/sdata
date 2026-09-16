@@ -1819,7 +1819,9 @@ package body SData.Interpreter is
             C.Fn_Name     := To_Unbounded_String (A.Fn_Name (1 .. A.Fn_Name_Len));
             C.Invar_Name  :=
               To_Unbounded_String (A.Invar_Name (1 .. A.Invar_Name_Len));
-            C.Invar_Index := A.Invar_Index;
+            C.Invar_Index    := A.Invar_Index;
+            C.Has_Pctl_Value := A.Has_Pctl_Value;
+            C.Pctl_Value     := A.Pctl_Value;
             case A.Invar_Kind is
                when Invar_Empty         =>
                   C.Invar_Kind := SData_Core.Commands.Invar_Empty;
@@ -1918,11 +1920,15 @@ package body SData.Interpreter is
       end;
 
       declare
-         Curr : Variable_List := Stmt.Stats_Stats;
+         Curr : Stat_Request_List := Stmt.Stats_Stats;
       begin
          while Curr /= null loop
             Opts.Stat_List.Append
-              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
+              (SData_Core.Commands.Stat_Request'
+                 (Name           => To_Unbounded_String
+                                       (Curr.Stat.Name (1 .. Curr.Stat.Name_Len)),
+                  Has_Pctl_Value => Curr.Stat.Has_Pctl_Value,
+                  Pctl_Value     => Curr.Stat.Pctl_Value));
             Curr := Curr.Next;
          end loop;
       end;

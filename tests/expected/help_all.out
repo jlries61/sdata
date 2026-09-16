@@ -182,8 +182,12 @@ Command: AGGREGATE outvar=fn(invar) [outvar=fn(invar) ...]
 Collapses the Data Table to one row per active BY group, computing
 aggregate functions over the chosen input columns. With no active BY,
 the whole (SELECT-filtered) table is one group.
-Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN.
+Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN,
+           PCTL.
   N() with no argument yields the group row count.
+  PCTL(invar, p) computes the p-th percentile (p an integer 0..100,
+    literal only) via linear interpolation between order statistics --
+    the same rule MEDIAN uses, generalized: PCTL(x, 50) = MEDIAN(x).
 Input may be a scalar column, a whole array (applied element-wise), or
 an array element such as x(1). The active SELECT filter is respected; a
 pending SAVE is written; the active SELECT and BY are then cleared.
@@ -220,7 +224,11 @@ replaces the Data Table.
             array name expands to its elements.
   /STATS=   statistics to compute (default: N MIN MEAN MAX STD).
             Any registered aggregate: SUM MEAN STD VAR MIN MAX N NMISS
-            GMEAN HMEAN MEDIAN. Only N/NMISS apply to character vars.
+            GMEAN HMEAN MEDIAN PCTL. Only N/NMISS apply to character vars.
+            PCTL(p) computes the p-th percentile (integer 0..100, e.g.
+            /STATS=N MIN PCTL(25) MEDIAN PCTL(75) MAX); the output column
+            is named PCTLp (e.g. PCTL25), and two entries requesting the
+            same p are rejected as a duplicate statistic.
   /NOPRINT  replace the table (and write a pending SAVE) without
             printing the result.
 Respects the active SELECT filter; flushes a pending SAVE; clears the

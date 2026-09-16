@@ -1,0 +1,1 @@
+Error: STATS: statistic 'PCTL' requires a percentile argument, e.g. PCTL(50)

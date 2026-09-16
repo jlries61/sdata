@@ -1,0 +1,6 @@
+Dataset opened: tests/data/sample.csv
+Variable  N      MIN    PCTL0   PCTL25   MEDIAN    PCTL75   PCTL100       MAX
+-----------------------------------------------------------------------------
+VAL1      6  1.00000  1.00000  4.75000  8.50000  12.25000  16.00000  16.00000
+-----------------------------------------------------------------------------
+STATS complete. 1 records and 9 variables processed.

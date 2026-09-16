@@ -1,0 +1,6 @@
+Dataset opened: tests/data/sample.csv
+AGGREGATE complete. 1 records and 4 variables processed.
+Obs       Q1      MED        Q3  MEDCHECK
+-----------------------------------------
+  1  4.75000  8.50000  12.25000   8.50000
+-----------------------------------------
