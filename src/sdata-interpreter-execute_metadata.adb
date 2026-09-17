@@ -178,12 +178,18 @@ begin
          begin
             Put_Line ("Permanent Variables (Table Columns):");
             if N_Cols > 0 then
-               for I in 1 .. N_Cols loop Put (Column_Name (I) & " "); end loop;
+               for I in 1 .. N_Cols loop
+                  if I > 1 then Put (" "); end if;
+                  Put (Column_Name (I));
+               end loop;
                New_Line;
             else Put_Line ("(none)"); end if;
             Put_Line ("Session Variables (SET):");
             if S_Names /= null and then S_Names'Length > 0 then
-               for I in S_Names'Range loop Put (S_Names (I).all & " "); end loop;
+               for I in S_Names'Range loop
+                  if I > S_Names'First then Put (" "); end if;
+                  Put (S_Names (I).all);
+               end loop;
                New_Line;
             else Put_Line ("(none)"); end if;
             if S_Names /= null then declare Old : String_List_Access := S_Names; begin GNAT.Strings.Free (Old); end; end if;

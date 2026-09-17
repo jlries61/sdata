@@ -4,11 +4,11 @@ Dataset saved: tests/data/multi_out_q.csv
 RUN complete. 2 records and 2 variables processed.
 Dataset opened: tests/data/multi_out_p.csv
 Permanent Variables (Table Columns):
-1 10 
+1 10
 Session Variables (SET):
 (none)
 Dataset opened: tests/data/multi_out_q.csv
 Permanent Variables (Table Columns):
-ID X 
+ID X
 Session Variables (SET):
 (none)

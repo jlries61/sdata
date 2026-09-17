@@ -2,6 +2,6 @@ Dataset opened: tests/data/merge_a.csv
 Dataset opened: tests/data/merge_b.csv
 RUN complete. 4 records and 3 variables processed.
 Permanent Variables (Table Columns):
-ID X Y 
+ID X Y
 Session Variables (SET):
 (none)

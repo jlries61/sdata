@@ -3,12 +3,12 @@ Dataset opened: tests/data/merge_b.csv
 Dataset saved: tests/data/use_merge_in_keep_promotes_out.csv
 RUN complete. 4 records and 2 variables processed.
 Permanent Variables (Table Columns):
-ID FROMA 
+ID FROMA
 Session Variables (SET):
 (none)
 Dataset opened: tests/data/use_merge_in_keep_promotes_out.csv
 Permanent Variables (Table Columns):
-ID FROMA 
+ID FROMA
 Session Variables (SET):
 (none)
 RUN complete. 4 records and 2 variables processed.

@@ -1,10 +1,10 @@
 Generating mock data...
 Permanent Variables (Table Columns):
-ID NAME$ SALARY 
+ID NAME$ SALARY
 Session Variables (SET):
 (none)
 Permanent Variables (Table Columns):
-IDENT NAME$ SALARY_NEW 
+IDENT NAME$ SALARY_NEW
 Session Variables (SET):
 (none)
 Original Names:
@@ -15,7 +15,7 @@ Original Names:
 After Rename:
 RUN complete. 3 records and 2 variables processed.
 Permanent Variables (Table Columns):
-IDENT NAME$ 
+IDENT NAME$
 Session Variables (SET):
 (none)
 After Keep IDENT, NAME$ and RUN:
@@ -23,7 +23,7 @@ After Keep IDENT, NAME$ and RUN:
 After Keep IDENT, NAME$ and RUN:
 RUN complete. 3 records and 1 variables processed.
 Permanent Variables (Table Columns):
-IDENT 
+IDENT
 Session Variables (SET):
 (none)
 After Drop NAME$ and RUN:

@@ -3,6 +3,6 @@ warning: column "AS" matches a reserved keyword; reference it as `AS` or rename 
 warning: column "USE" matches a reserved keyword; reference it as `USE` or rename it
 RUN complete. 2 records and 1 variables processed.
 Permanent Variables (Table Columns):
-AS 
+AS
 Session Variables (SET):
 (none)

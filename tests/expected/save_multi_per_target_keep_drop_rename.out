@@ -5,16 +5,16 @@ Dataset saved: tests/data/save_rename.csv
 RUN complete. 2 records and 2 variables processed.
 Dataset opened: tests/data/save_keep.csv
 Permanent Variables (Table Columns):
-ID 
+ID
 Session Variables (SET):
 (none)
 Dataset opened: tests/data/save_drop.csv
 Permanent Variables (Table Columns):
-X 
+X
 Session Variables (SET):
 (none)
 Dataset opened: tests/data/save_rename.csv
 Permanent Variables (Table Columns):
-ID Y 
+ID Y
 Session Variables (SET):
 (none)
