@@ -1,0 +1,7 @@
+Dataset opened: tests/data/display_rows.csv
+RUN complete. 5 records and 3 variables processed.
+Obs       ID
+------------
+  1  1.00000
+  2  2.00000
+------------

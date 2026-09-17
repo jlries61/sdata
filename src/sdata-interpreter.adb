@@ -1030,7 +1030,12 @@ package body SData.Interpreter is
    --  pre-existing silent "." behaviour Get_Value_Upper already gives a
    --  missing column (see Execute_Metadata's Resolve, which never
    --  validates a varlist name against the schema either).
-   procedure Display_Table (Cols : Name_Vectors.Vector) is
+   procedure Display_Table
+     (Cols      : Name_Vectors.Vector;
+      By_Cols   : Name_Vectors.Vector := Name_Vectors.Empty_Vector;
+      Has_First : Boolean := False; First_N : Natural := 0;
+      Has_Last  : Boolean := False; Last_N  : Natural := 0)
+   is
    begin
       --  ADR-070: a SELECT with no intervening RUN leaves Filter_Map stale
       --  (it is normally rebuilt at the start of Run_One_Step). DISPLAY is
@@ -1046,6 +1051,18 @@ package body SData.Interpreter is
          Put_Line ("(No columns to display)");
          return;
       end if;
+
+      --  ADR-078: /BY= names must exist -- validated up front, before any
+      --  output, matching TABLES's own "validate every crossing variable
+      --  up front" precedent (a mistyped name raises a clean error instead
+      --  of silently sorting on missing values, which would be a
+      --  no-op-shaped bug rather than a loud one).
+      for Name of By_Cols loop
+         if not Has_Column (To_String (Name)) then
+            raise SData_Core.Script_Error with
+              "DISPLAY: unknown variable '" & To_String (Name) & "'";
+         end if;
+      end loop;
 
       declare
          Rows       : constant Natural := SData_Core.Table.Logical_Row_Count;
@@ -1087,6 +1104,75 @@ package body SData.Interpreter is
             New_Line;
          end Print_Header;
 
+         --  ADR-078: the row ORDER to display -- a permutation (and
+         --  possibly a truncation) of the logical row numbers, computed
+         --  without touching the Data Table, the SELECT filter, or any
+         --  subsequent command (unlike the real SORT command, which
+         --  reorders the table in place -- confirmed the wrong tool for a
+         --  print-time-only reorder). Order (Natural range <>) rather than
+         --  Positive range <> so Rows = 0 still yields a legal empty array
+         --  (a Positive index subtype cannot represent the null range
+         --  1 .. 0, since 0 is not a valid Positive value).
+         type Row_Order_Array is array (Natural range <>) of Positive;
+
+         function Row_Less (R1, R2 : Positive) return Boolean is
+         begin
+            for Name of By_Cols loop
+               declare
+                  Col : constant String := To_String (Name);
+                  V1  : constant Value := Get_Value_Upper (Logical_To_Physical (R1), Col);
+                  V2  : constant Value := Get_Value_Upper (Logical_To_Physical (R2), Col);
+                  Num1 : constant Boolean := V1.Kind = Val_Numeric or else V1.Kind = Val_Integer;
+                  Num2 : constant Boolean := V2.Kind = Val_Numeric or else V2.Kind = Val_Integer;
+               begin
+                  if Num1 and then Num2 then
+                     declare
+                        R1v : constant Real := (if V1.Kind = Val_Integer
+                                                 then Real (V1.Int_Val) else V1.Num_Val);
+                        R2v : constant Real := (if V2.Kind = Val_Integer
+                                                 then Real (V2.Int_Val) else V2.Num_Val);
+                     begin
+                        if R1v /= R2v then
+                           return R1v < R2v;
+                        end if;
+                     end;
+                  else
+                     declare
+                        S1 : constant String := To_String_Formatted (V1);
+                        S2 : constant String := To_String_Formatted (V2);
+                     begin
+                        if S1 /= S2 then
+                           return S1 < S2;
+                        end if;
+                     end;
+                  end if;
+               end;
+            end loop;
+            --  Every /BY= key tied (or no /BY= given, so the loop above
+            --  never ran): fall back to original row order, guaranteeing a
+            --  deterministic, reproducible result even though
+            --  Ada.Containers.Generic_Sorting is not itself guaranteed
+            --  stable.
+            return R1 < R2;
+         end Row_Less;
+
+         package Row_Order_Vectors is new Ada.Containers.Vectors (Positive, Positive);
+         package Row_Order_Sorting is new Row_Order_Vectors.Generic_Sorting ("<" => Row_Less);
+
+         Order_Vec : Row_Order_Vectors.Vector;
+
+         --  Included (P) marks whether the P'th element of the (possibly
+         --  /BY=-sorted) Order_Vec is displayed. /FIRST= and /LAST= may
+         --  BOTH be given (user-directed revision, mid-implementation --
+         --  not mutually exclusive): the result is the UNION of "the
+         --  first First_N positions" and "the last Last_N positions",
+         --  naturally deduplicated when the two ranges overlap or cover
+         --  the whole table, with no separator between the two blocks.
+         --  1 .. Rows on a Natural-typed Rows resolves to a Natural index
+         --  subtype (not Positive), so Rows = 0 still yields the legal
+         --  null range 1 .. 0.
+         Included  : array (1 .. Rows) of Boolean := (others => False);
+         Sel_Count : Natural := 0;
       begin
          for I in 1 .. Col_Count loop
             Left_Justify (I) :=
@@ -1094,40 +1180,96 @@ package body SData.Interpreter is
               and then Get_Column_Type (Col_Name (I)) = Col_String;
          end loop;
 
-         --  Pass 1: compute column widths from headers and every cell.
-         Widths (0) := Obs_Header'Length;
-         for I in 1 .. Col_Count loop
-            Widths (I) := Col_Name (I)'Length;
-         end loop;
+         --  Build the natural order, then /BY=-sort it if requested.
          for R in 1 .. Rows loop
-            Widths (0) := Natural'Max (Widths (0), Obs_Cell (R)'Length);
-            for I in 1 .. Col_Count loop
-               Widths (I) := Natural'Max (Widths (I), Cell (R, I)'Length);
-            end loop;
+            Order_Vec.Append (R);
+         end loop;
+         if not By_Cols.Is_Empty then
+            Row_Order_Sorting.Sort (Order_Vec);
+         end if;
+
+         --  Mark which (sorted) positions to display. "n larger than
+         --  Rows" clamps rather than errors, matching USE /MAXROWS='s own
+         --  established behavior. Neither option given -> show everything
+         --  (today's pre-ADR-078 default, unchanged).
+         if not Has_First and then not Has_Last then
+            Included := (others => True);
+         else
+            if Has_First then
+               for P in 1 .. Natural'Min (First_N, Rows) loop
+                  Included (P) := True;
+               end loop;
+            end if;
+            if Has_Last then
+               for P in Rows - Natural'Min (Last_N, Rows) + 1 .. Rows loop
+                  Included (P) := True;
+               end loop;
+            end if;
+         end if;
+         for P in Included'Range loop
+            if Included (P) then
+               Sel_Count := Sel_Count + 1;
+            end if;
          end loop;
 
-         Rule_Width := Widths (0);
-         for I in 1 .. Col_Count loop
-            Rule_Width := Rule_Width + Gap'Length + Widths (I);
-         end loop;
-
-         --  Pass 2: print.  Header + rule + rule always appear, even with
-         --  zero rows (design decision -- see procedure header comment).
-         Print_Header;
-         Print_Rule;
-         for R in 1 .. Rows loop
-            Put (Ada.Strings.Fixed.Tail (Obs_Cell (R), Widths (0)));
-            for I in 1 .. Col_Count loop
-               Put (Gap);
-               if Left_Justify (I) then
-                  Put (Ada.Strings.Fixed.Head (Cell (R, I), Widths (I)));
-               else
-                  Put (Ada.Strings.Fixed.Tail (Cell (R, I), Widths (I)));
+         declare
+            --  1-based (not 0-based) so Sel_Count = 0 yields the legal
+            --  null range 1 .. 0 -- Natural's own range includes 0 but
+            --  not -1, so a 0-based "0 .. Sel_Count - 1" would raise
+            --  Constraint_Error computing the upper bound at Sel_Count = 0.
+            Order : Row_Order_Array (1 .. Sel_Count);
+            J     : Natural := 0;
+         begin
+            for P in Included'Range loop
+               if Included (P) then
+                  J := J + 1;
+                  Order (J) := Order_Vec.Element (P);
                end if;
             end loop;
-            New_Line;
-         end loop;
-         Print_Rule;
+
+            --  Pass 1: compute column widths from headers and every
+            --  DISPLAYED cell (not every logical row -- a value in a row
+            --  /FIRST=//LAST= excludes must not widen the table).
+            Widths (0) := Obs_Header'Length;
+            for I in 1 .. Col_Count loop
+               Widths (I) := Col_Name (I)'Length;
+            end loop;
+            for Idx of Order loop
+               Widths (0) := Natural'Max (Widths (0), Obs_Cell (Idx)'Length);
+               for I in 1 .. Col_Count loop
+                  Widths (I) := Natural'Max (Widths (I), Cell (Idx, I)'Length);
+               end loop;
+            end loop;
+
+            Rule_Width := Widths (0);
+            for I in 1 .. Col_Count loop
+               Rule_Width := Rule_Width + Gap'Length + Widths (I);
+            end loop;
+
+            --  Pass 2: print.  Header + rule + rule always appear, even
+            --  with zero displayed rows (design decision -- see procedure
+            --  header comment; ADR-078 must not add a separate "empty
+            --  order" message here, preserving that behavior exactly).
+            Print_Header;
+            Print_Rule;
+            for Idx of Order loop
+               --  Obs always names the row's REAL logical position
+               --  (Idx), never a 1..k relabeling of the display order --
+               --  so a user can still cross-reference "row 47" after a
+               --  /BY= resort or a /LAST= truncation.
+               Put (Ada.Strings.Fixed.Tail (Obs_Cell (Idx), Widths (0)));
+               for I in 1 .. Col_Count loop
+                  Put (Gap);
+                  if Left_Justify (I) then
+                     Put (Ada.Strings.Fixed.Head (Cell (Idx, I), Widths (I)));
+                  else
+                     Put (Ada.Strings.Fixed.Tail (Cell (Idx, I), Widths (I)));
+                  end if;
+               end loop;
+               New_Line;
+            end loop;
+            Print_Rule;
+         end;
       end;
    end Display_Table;
 
@@ -1136,13 +1278,17 @@ package body SData.Interpreter is
    --  meaningful, independently-nameable concept.  Since ADR-069, this is
    --  a thin delegation to the shared Display_Table renderer above, not
    --  its own copy of the print logic.
-   procedure Display_All_Columns is
+   procedure Display_All_Columns
+     (By_Cols   : Name_Vectors.Vector := Name_Vectors.Empty_Vector;
+      Has_First : Boolean := False; First_N : Natural := 0;
+      Has_Last  : Boolean := False; Last_N  : Natural := 0)
+   is
       Cols : Name_Vectors.Vector;
    begin
       for I in 1 .. Column_Count loop
          Cols.Append (To_Unbounded_String (Column_Name (I)));
       end loop;
-      Display_Table (Cols);
+      Display_Table (Cols, By_Cols, Has_First, First_N, Has_Last, Last_N);
    end Display_All_Columns;
 
    --  Print_Ruled_Table (ADR-076) -- shared two-pass width/alignment/rule
@@ -1850,7 +1996,7 @@ package body SData.Interpreter is
             end;
             Check_Body (S.Otherwise_Part, Check_Undefined);
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET
-            | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
+            | Stmt_ARRAY | Stmt_DIM =>
             Check_Expr (S.Arr_Start_Expr, Check_Undefined);
             Check_Expr (S.Arr_End_Expr,   Check_Undefined);
          when others =>

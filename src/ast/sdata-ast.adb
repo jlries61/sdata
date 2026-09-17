@@ -157,11 +157,14 @@ package body SData.AST is
             end loop;
             Stmt.Save_List.Clear;
          when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD
-            | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
+            | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM =>
             Free (Stmt.Vars);
             Free (Stmt.Arr_Vars);
             SData_Core.Evaluator.Free_Expression (Stmt.Arr_Start_Expr);
             SData_Core.Evaluator.Free_Expression (Stmt.Arr_End_Expr);
+         when Stmt_DISPLAY =>
+            Free (Stmt.Display_Vars);
+            Free (Stmt.Display_By_Vars);
          when Stmt_RENAME =>
             Free (Stmt.Rename_Pairs);
          when Stmt_IF =>

@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-09-16" "sdata 0.32.1" "User Commands"
+.TH SDATA 1 "2026-09-16" "sdata 0.33.0" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -1025,7 +1025,7 @@ Reports
 .I "(Empty program buffer)"
 when nothing is queued.
 .TP
-.B DISPLAY [\fIvar\fR ...]
+.B "DISPLAY [\fIvar\fR ...] [/ [FIRST=\fIn\fR] [LAST=\fIn\fR] [BY=\fIvar\fR ...]]"
 Show the current Data Table as a formatted table with a record\-number column.
 With no arguments all columns are shown; with a variable list only those
 columns appear.
@@ -1034,6 +1034,40 @@ Column ranges are supported:
 Respects any active
 .B SELECT
 filter.
+.RS
+.TP
+.BI FIRST= n
+Print only the first
+.I n
+records.
+.I n
+larger than the actual row count clamps rather than erroring.
+.TP
+.BI LAST= n
+Print only the last
+.IR n .
+May be combined with
+.B FIRST=
+in the same statement, in which case the printed rows are the
+.I union
+of "the first \fIn\fR" and "the last \fIn\fR" (deduplicated when the two
+ranges overlap or together cover the whole table, with no separator
+between the two blocks); each option may still be given only once.
+.TP
+.BI BY= "var ..."
+Sort the printed order by one or more variables, which need not be among
+the displayed columns \(em ascending only, applied before
+.B FIRST=
+/
+.BR LAST= .
+Print\-time only: does not affect the Data Table, the active
+.B SELECT
+filter, or any later command.
+The
+.B Obs
+column always shows each row's real logical position, never a
+renumbering of the sorted/truncated display order.
+.RE
 .TP
 .BR "REMOVE " \fIn\fR [ \fB\-\fIm\fR ]
 Remove program buffer entries

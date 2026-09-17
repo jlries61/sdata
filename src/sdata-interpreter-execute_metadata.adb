@@ -220,59 +220,79 @@ begin
          end if;
 
       when Stmt_DISPLAY =>
-         if Stmt.Vars = null then
-            --  Bare DISPLAY: render every column via the "all columns"
-            --  entry point (Display_All_Columns, itself a thin delegation
-            --  to the shared Display_Table renderer since ADR-069).
-            Display_All_Columns;
-            return;
-         end if;
          declare
-            V : Name_Vectors.Vector;
-         begin
-            declare
-                  Curr : Variable_List := Stmt.Vars;
-                  procedure Resolve (R : Variable_Range) is
-                     U_Start : constant String := To_Upper (R.Start_Name (1 .. R.Start_Len));
-                     U_End   : constant String := (if R.Is_Range then To_Upper (R.End_Name (1 .. R.End_Len)) else "");
-                     S_Idx, E_Idx : Natural := 0;
-                  begin
-                     if not R.Is_Range then
-                        V.Append (To_Unbounded_String (U_Start));
-                     elsif R.Is_Colon_Range then
-                        declare
-                           Names : constant Name_Vectors.Vector :=
-                              Expand_Colon_Names (U_Start, U_End, Create_Missing => False);
-                        begin
-                           for N of Names loop V.Append (N); end loop;
-                        end;
-                     else
-                        for I in 1 .. Column_Count loop
-                           declare Name : constant String := Column_Name (I); begin
-                              if Name = U_Start then S_Idx := I; end if;
-                              if Name = U_End   then E_Idx := I; end if;
-                           end;
-                        end loop;
-                        if S_Idx > 0 and E_Idx > 0 then
-                           if S_Idx > E_Idx then
-                              declare T : constant Natural := S_Idx; begin S_Idx := E_Idx; E_Idx := T; end;
-                           end if;
-                           for I in S_Idx .. E_Idx loop
-                              V.Append (To_Unbounded_String (Column_Name (I)));
-                           end loop;
-                        end if;
-                     end if;
-                  end Resolve;
+            --  ADR-078: factored out of the old inline "Resolve" closure so
+            --  the same varname/range/colon-range expansion serves both
+            --  the printed column list (Stmt.Display_Vars, unchanged meaning) and
+            --  the new /BY= sort-key list (Stmt.Display_By_Vars) -- the two
+            --  are independent Name_Vectors.Vectors; naming the same
+            --  column in both is legal and does nothing special (sorting
+            --  by a column and printing it are unrelated operations that
+            --  simply happen to name the same column).
+            function Resolve_Var_List (VL : Variable_List) return Name_Vectors.Vector is
+               Result : Name_Vectors.Vector;
+               Curr   : Variable_List := VL;
+               procedure Resolve (R : Variable_Range) is
+                  U_Start : constant String := To_Upper (R.Start_Name (1 .. R.Start_Len));
+                  U_End   : constant String := (if R.Is_Range then To_Upper (R.End_Name (1 .. R.End_Len)) else "");
+                  S_Idx, E_Idx : Natural := 0;
                begin
-                  while Curr /= null loop
-                     Resolve (Curr.Var);
-                     Curr := Curr.Next;
-                  end loop;
-               end;
+                  if not R.Is_Range then
+                     Result.Append (To_Unbounded_String (U_Start));
+                  elsif R.Is_Colon_Range then
+                     declare
+                        Names : constant Name_Vectors.Vector :=
+                           Expand_Colon_Names (U_Start, U_End, Create_Missing => False);
+                     begin
+                        for N of Names loop Result.Append (N); end loop;
+                     end;
+                  else
+                     for I in 1 .. Column_Count loop
+                        declare Name : constant String := Column_Name (I); begin
+                           if Name = U_Start then S_Idx := I; end if;
+                           if Name = U_End   then E_Idx := I; end if;
+                        end;
+                     end loop;
+                     if S_Idx > 0 and E_Idx > 0 then
+                        if S_Idx > E_Idx then
+                           declare T : constant Natural := S_Idx; begin S_Idx := E_Idx; E_Idx := T; end;
+                        end if;
+                        for I in S_Idx .. E_Idx loop
+                           Result.Append (To_Unbounded_String (Column_Name (I)));
+                        end loop;
+                     end if;
+                  end if;
+               end Resolve;
+            begin
+               while Curr /= null loop
+                  Resolve (Curr.Var);
+                  Curr := Curr.Next;
+               end loop;
+               return Result;
+            end Resolve_Var_List;
+
+            By_Cols : constant Name_Vectors.Vector := Resolve_Var_List (Stmt.Display_By_Vars);
+         begin
+            if Stmt.Display_Vars = null then
+               --  Bare DISPLAY: render every column via the "all columns"
+               --  entry point (Display_All_Columns, itself a thin
+               --  delegation to the shared Display_Table renderer since
+               --  ADR-069) -- ADR-078 threads /FIRST=/LAST=/BY= through
+               --  here too, so a bare "DISPLAY /FIRST=3" isn't silently
+               --  ignored (the options apply to ALL columns, not just an
+               --  explicit printed list).
+               Display_All_Columns
+                 (By_Cols, Stmt.Has_First_N, Stmt.First_N,
+                  Stmt.Has_Last_N, Stmt.Last_N);
+               return;
+            end if;
 
             --  Display_Table (ADR-069) prints "(No columns to display)"
-            --  itself when V is empty -- no separate check needed here.
-            Display_Table (V);
+            --  itself when the resolved list is empty -- no separate
+            --  check needed here.
+            Display_Table
+              (Resolve_Var_List (Stmt.Display_Vars), By_Cols,
+               Stmt.Has_First_N, Stmt.First_N, Stmt.Has_Last_N, Stmt.Last_N);
          end;
       when others => null;
    end case;

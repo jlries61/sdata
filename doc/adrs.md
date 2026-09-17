@@ -3112,3 +3112,113 @@ kind, touching nothing about quoted paths). `make check`: 597 → 599.
 Version bump: patch (a pure bug fix restoring already-documented, already-implemented-elsewhere
 behavior — no new syntax, no behavior change beyond correcting the case of generated file names).
 
+### ADR-078: DISPLAY gains /FIRST=, /LAST=, and /BY= options
+
+**Date:** 2026-09-17 | **Status:** Accepted
+
+**Context.** User request (direct ask, no GitHub issue): `DISPLAY` had no way to limit or reorder
+which rows it shows — it always printed every row in the active `SELECT`-filtered logical order.
+The user wanted a way to show only the first or last `n` records, and to sort the printed order by
+one or more variables independent of which columns are actually shown. Naming resolved via
+`AskUserQuestion` before design started: `/FIRST=<n>` (this project's own recommendation, chosen
+over the user's original `/N=<n>` and over `USE`'s existing, differently-scoped `/MAXROWS=<n>`,
+for symmetric self-explanatory pairing with `/LAST=<n>`); `/LAST=<n>` and `/BY=<varlist>` are the
+user's own original proposals, kept — `/BY=` already has direct precedent as a per-statement,
+non-grouping variable list via `USE`'s own multi-file-merge `/BY=`.
+
+**Decision.** `Display_Table` (the shared `DISPLAY` renderer, `ADR-069`) gains an internal
+row-order computation: a permutation of logical row numbers, optionally `/BY=`-sorted (ascending
+only, numeric-else-string comparison per key, tie-broken by the next key and finally by original
+row order for a deterministic result — mirroring `TABLES`'s own `Level_Less` comparator, entirely
+within `sdata`, no `sdata-core` change), then optionally restricted to the union of the first and/or
+last `n` elements (see the "Revised mid-implementation" addendum below — `n` beyond the row count
+clamps rather than erroring, matching `USE /MAXROWS=`'s own precedent). This is deliberately **not** built on the real
+`SORT` command's `SData_Core.Sorting.Sort` — confirmed destructive, reordering the table in place —
+since `/BY=` must be print-time-only, touching neither the Data Table, the active `SELECT` filter,
+nor any later command. The `Obs` column always names each displayed row's real logical position,
+never a `1..k` relabeling of the sorted/truncated display order, so a user can still cross-reference
+"row 47" after a `/LAST=` truncation or a `/BY=` resort — flagged repeatedly during design as the
+one detail most likely to be built backwards.
+
+`Stmt_DISPLAY` was split out of the AST variant branch it previously shared with `KEEP`/`DROP`/
+`HOLD`/`UNHOLD`/`UNSET`/`ARRAY`/`DIM`, so the three new fields (`Display_By_Vars`, `Has_First_N`/
+`First_N`, `Has_Last_N`/`Last_N`) don't bloat seven unrelated statement kinds — the same "don't
+widen a shared mechanism for one caller's need" principle this project has applied repeatedly. The
+printed-column field was renamed `Display_Vars` (was `Vars`) in the process: Ada requires component
+names to be distinct across *every* variant of a record, not just within one branch, so it could not
+keep the same name as the remaining `KEEP`/`DROP`/.../`DIM` branch's own `Vars` field — confirmed by
+a real compile error (`"Vars" conflicts with declaration at line 291`) during implementation, not
+assumed from general Ada knowledge. Splitting the branch required two small, precisely-identified
+edits elsewhere: `sdata-ast.adb`'s `Free` procedure (removed `Stmt_DISPLAY` from the old combined
+arm, which freed fields — `Arr_Vars`, `Arr_Start_Expr`, `Arr_End_Expr` — `Stmt_DISPLAY` no longer
+has; added a dedicated arm freeing `Display_Vars`/`Display_By_Vars`) and `sdata-interpreter.adb`'s
+`Check_Statement` (removed `Stmt_DISPLAY` from a combined arm that called `Check_Expr` on those same
+now-absent fields; no replacement needed, since `Display_By_Vars` is a bare variable-name list, not
+an expression tree). Every other place `Stmt_DISPLAY` appears alongside other statement kinds (the
+`Is_Immediate` membership check, `Execute_Metadata`'s own dispatch) only touches the discriminant
+itself or the still-present `Display_Vars`/dispatch, and needed no change.
+
+**A real, blocking gap found during design, not left as an implementation surprise**: a bare
+`DISPLAY` (no explicit column list) short-circuits to `Display_All_Columns` in `Execute_Metadata`.
+That early-return predates this feature and had no reason to know about `/FIRST=`/`/LAST=`/`/BY=` —
+left unfixed, `DISPLAY /FIRST=3` (no column list) would have silently done nothing, the "silent
+misbehavior" class this project explicitly tries to avoid elsewhere (`ADR-071`'s `BLOCKER-1`, etc.).
+Fixed by giving `Display_All_Columns` the same new parameters and threading them through from both
+of `Display_Table`'s two call sites, not just the explicit-varlist one.
+
+`/BY=` naming an unknown variable is a runtime `Script_Error` (matching `TABLES`'s own "unknown
+variable" wording) — a **deliberate, new-code-only** stricter convention than the printed varlist's
+own pre-existing silent-degrade behavior in the same statement (unchanged, out of scope). `/BY=`
+has no `DESC`/per-variable direction syntax, matching `SORT`'s own existing scope exactly (`design.md`:
+"Sort the output dataset by the variables named" — no direction keyword exists there either).
+
+**Consequences:** sdata-only; confirmed zero `sdata-core`/`data-vandal` changes (`data-vandal` has
+its own independent `DISPLAY`, per `ADR-069`/`ADR-070`'s own history, untouched by this feature).
+`HELP DISPLAY` (`src/sdata-help.adb`), `design.md`'s `DISPLAY` entry, and `man/man1/sdata.1` all
+updated with the new syntax; `tests/expected/help_all.out` regenerated. 13 new regression tests:
+`/FIRST=`/`/LAST=` basic behavior (with `Obs` showing real row numbers, not a renumbering),
+`/BY=` sorting (including a `/BY=` variable not among the printed columns, and one that also *is*
+printed), `/BY=` composed with `/LAST=` (sort-then-truncate), a repeated `/FIRST=`,
+an unknown `/BY=` variable, a negative `/FIRST=` value, `/FIRST=0`'s zero-row shape (preserving
+`ADR-069`'s header+rule+rule-with-no-data-rows exactly), `/FIRST=` clamped above the row count, the
+bare-`DISPLAY` blocking fix, and a trailing-comma continuation into the new slash-option loop
+(mirroring `Parse_STATS`'s own established structure, which this grammar is modeled on directly).
+`make check`: 599 → 615 (see addendum below for the post-design test-count revision).
+
+Version bump: minor (new language syntax, matching the `use-if-dataset-option`/
+`percentile-aggregate-function`/`tables-stats-format-parity` precedent for a user-visible addition).
+
+**Revised mid-implementation (2026-09-17, same day, during `/ssd gate`).** The design above
+specified `/FIRST=`/`/LAST=` as mutually exclusive, parser-enforced. The user overturned this
+during the gate's adversarial review: "Actually, both /FIRST and /LAST should be permitted...
+[selecting] Union: first n rows, then last m rows... at the same time, that is." The shipped
+behavior is therefore a **union**, not a mutual-exclusion error: `/FIRST=<n>` and `/LAST=<m>` may
+both appear on one `DISPLAY`, and the printed rows are the union of "the first `n` positions" and
+"the last `m` positions" of the (possibly `/BY=`-sorted) order, deduplicated when the two ranges
+overlap or together cover the whole table, with **no separator** between the two blocks. A
+duplicate of the *same* flag (`/FIRST=5 /FIRST=3`) is still a parse-time error — that check is
+orthogonal to the mutual-exclusion rule that was removed, and remained correct throughout.
+
+This revision also fixed a real bug found by adversarial testing during the same gate pass, before
+the user's design change arrived: the original combined check reported the confusing
+`"/FIRST and /LAST may not both be specified"` even when the *same* flag was repeated (no `/LAST=`
+ever given). The duplicate-flag check was split out with its own correct wording
+(`"/<FLAG> may be specified at most once"`) independent of the mutual-exclusion check — and when
+the mutual-exclusion check was then removed entirely per the union design, the duplicate-flag
+check (already correctly worded) needed no further change.
+
+Implementation: `Display_Table`'s row-order computation now marks inclusion via a
+`Included : array (1 .. Rows) of Boolean` per-position marker (set for the first-`n` and last-`m`
+position ranges independently, both allowed to apply), rather than the mutually-exclusive
+`Sel_First`/`Sel_Count` contiguous slice originally designed; a final ascending scan over
+`Included` produces the deduplicated, order-preserving row list. The parser's `/FIRST=`/`/LAST=`
+handling had its mutual-exclusion check removed, keeping only the (corrected) duplicate-same-flag
+check. `doc/design.md`, `man/man1/sdata.1`, and `src/sdata-help.adb`'s `HELP DISPLAY` text updated
+to describe the union instead of mutual exclusion; `tests/expected/help_all.out` regenerated
+again. The now-incorrect `display_first_last_error.cmd` test (which asserted the old
+mutual-exclusion error) was removed and replaced with four tests reflecting the shipped behavior:
+`display_first_duplicate_error` (the corrected same-flag duplicate error),
+`display_first_last_union` (non-overlapping union), `display_first_last_union_overlap`
+(overlapping/full-coverage union with deduplication), and `display_by_first_last_union` (union
+computed over the `/BY=`-sorted order). `make check`: 612 → 615 (net +3 after the one removal).
+

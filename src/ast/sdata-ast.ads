@@ -287,7 +287,7 @@ package SData.AST is
             Save_List      : Save_Spec_Vectors.Vector;
          when Stmt_REPEAT =>
             Count : Natural;
-         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM | Stmt_DISPLAY =>
+         when Stmt_KEEP | Stmt_DROP | Stmt_HOLD | Stmt_UNHOLD | Stmt_UNSET | Stmt_ARRAY | Stmt_DIM =>
             Vars         : Variable_List;
             All_Flag     : Boolean := False; -- For UNSET /ALL
             Arr_Name     : String (1 .. Max_Name_Len);
@@ -298,6 +298,22 @@ package SData.AST is
             Arr_End_Expr   : Expression_Access;  -- For DIM array upper bound
             Is_Custom_Subscripts : Boolean := False; -- For DIM arrays (e.g., (0:11))
             Is_Temporary_Dim     : Boolean := False; -- For DIM arrays /TEMP flag
+         when Stmt_DISPLAY =>
+            --  ADR-078: split out of the shared KEEP/DROP/.../DIM branch above so
+            --  /FIRST=, /LAST=, /BY= don't bloat seven unrelated statement kinds.
+            --  Named Display_Vars, not Vars -- Ada requires component names to be
+            --  distinct across EVERY variant of a record, not just within one
+            --  branch, so it cannot reuse the "Vars" name the KEEP/DROP/... branch
+            --  above already declares (confirmed by a real compile error: "Vars
+            --  conflicts with declaration at line 291" -- Ada variant-record
+            --  components share one flat name space across all branches, they do
+            --  not shadow like a case-statement's own local scopes would).
+            Display_Vars    : Variable_List;       --  printed columns (unchanged meaning)
+            Display_By_Vars : Variable_List;       --  /BY= sort keys; null = none given
+            Has_First_N     : Boolean := False;
+            First_N         : Natural := 0;
+            Has_Last_N      : Boolean := False;
+            Last_N          : Natural := 0;
          when Stmt_RENAME =>
             Rename_Pairs : Rename_List;
          when Stmt_IF =>

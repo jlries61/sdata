@@ -1,0 +1,7 @@
+Dataset opened: tests/data/display_rows.csv
+RUN complete. 5 records and 3 variables processed.
+Obs       ID     SCORE
+----------------------
+  1  1.00000  30.00000
+  4  4.00000  40.00000
+----------------------

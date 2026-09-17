@@ -3763,7 +3763,102 @@ package body SData.Parser is
 
          when Token_DISPLAY =>
             Stmt := new Statement (Stmt_DISPLAY);
-            Stmt.Vars := Parse_Variable_List (Ctx);
+            --  Optional bare variable list (stops at '/' or end of
+            --  statement), then optional slash-options -- modeled directly
+            --  on Parse_STATS's own structure (the closest existing
+            --  precedent: STATS also parses an optional bare leading
+            --  varlist before its own slash-options).
+            Stmt.Display_Vars := Parse_Variable_List (Ctx);
+
+            loop
+               Skip_Continuation_Comma (Ctx);
+               exit when Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Slash;
+               declare
+                  Discard   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '/'
+                  Flag_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  Flag_Name : constant String :=
+                    To_Upper (Flag_Tok.Text (1 .. Flag_Tok.Length));
+                  pragma Unreferenced (Discard);
+               begin
+                  if Flag_Name = "FIRST" or else Flag_Name = "LAST" then
+                     --  /FIRST and /LAST may both be given in one statement
+                     --  (user-directed revision, mid-implementation: a
+                     --  "head + tail" union, not mutually exclusive -- see
+                     --  ADR-078 and Display_Table's Compute_Display_Order).
+                     --  A duplicate of the SAME flag ("/FIRST=5 /FIRST=3")
+                     --  is still rejected -- a different mistake from
+                     --  giving both flags, and one that deserves its own,
+                     --  correctly-worded message rather than a mutual-
+                     --  exclusion message that no longer even applies
+                     --  (found during code review: the original combined
+                     --  check reported a confusing "/FIRST and /LAST may
+                     --  not both be specified" even for a same-flag
+                     --  duplicate, which was simply wrong; removing the
+                     --  mutual-exclusion rule entirely per this revision
+                     --  makes that specific wording moot too, but the
+                     --  underlying "don't silently accept a repeated
+                     --  option" principle still holds).
+                     if (Flag_Name = "FIRST" and then Stmt.Has_First_N)
+                       or else (Flag_Name = "LAST" and then Stmt.Has_Last_N)
+                     then
+                        raise Script_Error with
+                          "DISPLAY: /" & Flag_Name & " may be specified at most once";
+                     end if;
+                     if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                        raise Script_Error with
+                          "DISPLAY: expected '=' after /" & Flag_Name;
+                     end if;
+                     declare
+                        Eq   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '='
+                        Peek : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+                        pragma Unreferenced (Eq);
+                     begin
+                        if Peek.Kind = Token_Minus then
+                           raise Script_Error with
+                             "DISPLAY: /" & Flag_Name & "= requires a non-negative integer";
+                        end if;
+                        declare
+                           Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                           N       : Natural;
+                        begin
+                           begin
+                              N := Natural'Value (Val_Tok.Text (1 .. Val_Tok.Length));
+                           exception
+                              when Constraint_Error =>
+                                 raise Script_Error with
+                                   "DISPLAY: /" & Flag_Name & "= requires a non-negative integer";
+                           end;
+                           if Flag_Name = "FIRST" then
+                              Stmt.Has_First_N := True;
+                              Stmt.First_N     := N;
+                           else
+                              Stmt.Has_Last_N := True;
+                              Stmt.Last_N     := N;
+                           end if;
+                        end;
+                     end;
+                  elsif Flag_Name = "BY" then
+                     if Stmt.Display_By_Vars /= null then
+                        raise Script_Error with "DISPLAY: /BY may be specified at most once";
+                     end if;
+                     if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Equal then
+                        raise Script_Error with "DISPLAY: expected '=' after /BY";
+                     end if;
+                     declare
+                        Eq : constant Token := Get_Next_Token (Ctx.Lex_Ctx);  --  '='
+                        pragma Unreferenced (Eq);
+                     begin
+                        Stmt.Display_By_Vars := Parse_Variable_List (Ctx);
+                     end;
+                     if Stmt.Display_By_Vars = null then
+                        raise Script_Error with
+                          "DISPLAY: /BY= requires at least one variable";
+                     end if;
+                  else
+                     raise Script_Error with "DISPLAY: unknown option '/" & Flag_Name & "'";
+                  end if;
+               end;
+            end loop;
 
          when Token_END | Token_QUIT | Token_NAMES | Token_LIST | Token_NEW | Token_HELP =>
             declare

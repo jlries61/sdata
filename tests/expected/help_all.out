@@ -294,13 +294,25 @@ See also: DISPLAY to show Data Table records.
           REMOVE n[-m] to remove program buffer entries.
           INSERT [n|$] to set where new statements are inserted.
 
-Command: DISPLAY [variable(s)]
+Command: DISPLAY [variable(s)] [/FIRST=n] [/LAST=n] [/BY=varlist]
 Execution: Immediate
 Displays the current Data Table as a formatted table.
   DISPLAY         -- show all columns.
   DISPLAY varlist -- show only the named columns.
 Respects any active SELECT filter (only visible records are shown).
 Column ranges are supported:  DISPLAY A-Z
+  /FIRST=n  print only the first n records (n a non-negative integer;
+            larger than the row count clamps rather than errors).
+  /LAST=n   print only the last n records. /FIRST and /LAST may both
+            be given: the result is the union of the first n and last
+            n records (deduplicated if they overlap); each option may
+            still be given only once.
+  /BY=varlist  sort the printed order by one or more variables
+            (ascending only; need not be among the printed columns).
+            Applied before /FIRST=/LAST=. Print-time only -- does not
+            touch the Data Table, SELECT, or any subsequent command.
+            The Obs column always shows each row's real logical
+            position, never a renumbering of the display order.
 
 Command: NAMES
 Lists currently defined permanent and temporary variables.

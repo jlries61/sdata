@@ -422,13 +422,25 @@ package body SData.Help is
 
    procedure Help_DISPLAY is
    begin
-      Put_Line ("Command: DISPLAY [variable(s)]");
+      Put_Line ("Command: DISPLAY [variable(s)] [/FIRST=n] [/LAST=n] [/BY=varlist]");
       Put_Line ("Execution: Immediate");
       Put_Line ("Displays the current Data Table as a formatted table.");
       Put_Line ("  DISPLAY         -- show all columns.");
       Put_Line ("  DISPLAY varlist -- show only the named columns.");
       Put_Line ("Respects any active SELECT filter (only visible records are shown).");
       Put_Line ("Column ranges are supported:  DISPLAY A-Z");
+      Put_Line ("  /FIRST=n  print only the first n records (n a non-negative integer;");
+      Put_Line ("            larger than the row count clamps rather than errors).");
+      Put_Line ("  /LAST=n   print only the last n records. /FIRST and /LAST may both");
+      Put_Line ("            be given: the result is the union of the first n and last");
+      Put_Line ("            n records (deduplicated if they overlap); each option may");
+      Put_Line ("            still be given only once.");
+      Put_Line ("  /BY=varlist  sort the printed order by one or more variables");
+      Put_Line ("            (ascending only; need not be among the printed columns).");
+      Put_Line ("            Applied before /FIRST=/LAST=. Print-time only -- does not");
+      Put_Line ("            touch the Data Table, SELECT, or any subsequent command.");
+      Put_Line ("            The Obs column always shows each row's real logical");
+      Put_Line ("            position, never a renumbering of the display order.");
    end Help_DISPLAY;
 
    procedure Help_NAMES is
