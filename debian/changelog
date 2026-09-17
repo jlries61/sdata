@@ -1,3 +1,9 @@
+sdata (0.32.0-1) unstable; urgency=medium
+
+  * TABLES output reformatted to match STATS's column-aligned, ruled style (ADR-076)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 16 Sep 2026 18:35:08 -0700
+
 sdata (0.31.0-1) unstable; urgency=medium
 
   * STATS and AGGREGATE gain a general PCTL percentile function (ADR-075, closes #93).

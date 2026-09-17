@@ -5,23 +5,13 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    use Ada.Strings;
    use Ada.Strings.Fixed;
 
-   --  Two-decimal float formatter (e.g. 50.00).
-   function Fmt2 (X : Real) return String is
-      package F_IO is new Ada.Text_IO.Float_IO (Real);
-      Buf : String (1 .. 32);
-   begin
-      F_IO.Put (Buf, X, Aft => 2, Exp => 0);
-      return Trim (Buf, Both);
-   end Fmt2;
-
-   --  Four-decimal float formatter (e.g. 0.6667) for /CHISQ statistics.
-   function Fmt4 (X : Real) return String is
-      package F_IO is new Ada.Text_IO.Float_IO (Real);
-      Buf : String (1 .. 32);
-   begin
-      F_IO.Put (Buf, X, Aft => 4, Exp => 0);
-      return Trim (Buf, Both);
-   end Fmt4;
+   --  DIGITS-aware float formatter (ADR-076) -- replaces the old fixed-
+   --  precision Fmt2 (2 decimals) / Fmt4 (4 decimals) so TABLES honors the
+   --  DIGITS option the same way STATS already does via To_String_Formatted,
+   --  instead of a hardcoded, TABLES-only precision.
+   function Fmt (X : Real) return String is
+     (Values.To_String_Formatted
+        (Values.Value'(Kind => Values.Val_Numeric, Num_Val => X)));
 
    --  ---- counting-engine types (reused by Tasks 6-10) ----
    type Level is record
@@ -243,74 +233,200 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       return JT;
    end Build_Joint;
 
+   --  Two-way grid, modeled on SAS PROC FREQ's classic ASCII crosstab layout
+   --  (ADR-076, revised per explicit user direction after the first design
+   --  pass -- see 01-architect.md's "Two-Way Grid: Modeled on SAS PROC
+   --  FREQ").  A stacked corner-cell legend (Frequency/[Percent]/
+   --  Row_Percent/Col_Percent, replacing the old standalone "Cell
+   --  contents: ..." line) names the statistics vertically; each V1 level
+   --  is a row-BLOCK spanning one print line per statistic; "|" delimits
+   --  column boundaries and "-"/"+" rule lines separate blocks.  Each data
+   --  column (each V2 level, plus Total) has ONE width shared by every
+   --  statistic line in that column -- NOT shared across columns (the one
+   --  detail most likely to be gotten backwards; see the asymmetric-width
+   --  regression test this ADR requires).  Margin cells (the Total row and
+   --  the Total column) stay single-valued (Frequency only, matching this
+   --  project's own pre-existing computed values -- real PROC FREQ shows
+   --  percentages on its margins too, deliberately not replicated here),
+   --  and the Total row gets no closing rule (PROC FREQ's own convention,
+   --  not STATS'/Print_Ruled_Table's).
    procedure Render_Two_Way_Grid (Rows : Row_Index_Vectors.Vector;
                                   V1, V2 : String) is
-      JT      : constant Joint_Table := Build_Joint (Rows, V1, V2);
-      L1      : Level_Vectors.Vector renames JT.L1;
-      L2      : Level_Vectors.Vector renames JT.L2;
-      Joint   : Count_Maps.Map renames JT.Cells;
-      Grand   : Natural renames JT.Grand;
-      Missing : Natural renames JT.Missing;
+      JT       : constant Joint_Table := Build_Joint (Rows, V1, V2);
+      L1       : Level_Vectors.Vector renames JT.L1;
+      L2       : Level_Vectors.Vector renames JT.L2;
+      Joint    : Count_Maps.Map renames JT.Cells;
+      Grand    : Natural renames JT.Grand;
+      Missing  : Natural renames JT.Missing;
       Show_Pct : constant Boolean := not Stmt.Table_NOPERCENT;
+
+      Num_Stats : constant Positive := (if Show_Pct then 4 else 3);
+      --  Line index within a row-block for each statistic (0 = absent).
+      S_Freq    : constant Positive := 1;
+      S_Pct     : constant Natural  := (if Show_Pct then 2 else 0);
+      S_RowPct  : constant Positive := (if Show_Pct then 3 else 2);
+      S_ColPct  : constant Positive := (if Show_Pct then 4 else 3);
+      Stat_Names : Row_Cells (1 .. Num_Stats);
+
+      Num_Data_Cols : constant Positive := Natural (L2.Length) + 1;
+      Total_Col     : constant Positive := Num_Data_Cols;
+
+      function Col_Header (C : Positive) return String is
+        (if C = Total_Col then "Total"
+         else V2 & "=" & To_String (L2 (C).Disp));
+
+      --  Frequency for (V1 level I, column C) -- C = Total_Col yields the
+      --  row total, matching the Total column's single-valued shape.
+      function Freq_At (I, C : Positive) return Natural is
+        (if C = Total_Col then L1 (I).Count
+         elsif Joint.Contains (Cell_Key (I, C)) then Joint (Cell_Key (I, C))
+         else 0);
+
+      --  Column total -- C = Total_Col yields the grand total.
+      function Col_Total (C : Positive) return Natural is
+        (if C = Total_Col then Grand else L2 (C).Count);
+
+      function Pct_At (I, C : Positive) return Real is
+        (if Grand = 0 then 0.0 else 100.0 * Real (Freq_At (I, C)) / Real (Grand));
+
+      function Row_Pct_At (I, C : Positive) return Real is
+        (if L1 (I).Count = 0 then 0.0
+         else 100.0 * Real (Freq_At (I, C)) / Real (L1 (I).Count));
+
+      function Col_Pct_At (I, C : Positive) return Real is
+        (if C = Total_Col or else L2 (C).Count = 0 then 0.0
+         else 100.0 * Real (Freq_At (I, C)) / Real (L2 (C).Count));
+
+      Corner_W : Natural := 0;
+      Col_W    : array (1 .. Num_Data_Cols) of Natural;
+
+      procedure Print_Rule is
+         Line : Unbounded_String :=
+           To_Unbounded_String (String'(1 .. Corner_W => '-'));
+      begin
+         for C in 1 .. Num_Data_Cols loop
+            Append (Line, "+" & String'(1 .. Col_W (C) => '-'));
+         end loop;
+         IO.Put_Line (To_String (Line));
+      end Print_Rule;
    begin
+      Stat_Names (S_Freq) := To_Unbounded_String ("Frequency");
+      if Show_Pct then
+         Stat_Names (S_Pct) := To_Unbounded_String ("Percent");
+      end if;
+      Stat_Names (S_RowPct) := To_Unbounded_String ("Row_Percent");
+      Stat_Names (S_ColPct) := To_Unbounded_String ("Col_Percent");
+
       IO.Put_Line ("Table of " & V1 & " by " & V2);
       IO.New_Line;
-      IO.Put_Line ("Cell contents: Frequency" &
-                   (if Show_Pct then " Percent" else "") &
-                   " Row_Percent Col_Percent");
-      IO.New_Line;
-      --  Column header
-      declare
-         H : Unbounded_String := To_Unbounded_String (V1);
-      begin
-         for C of L2 loop
-            Append (H, " " & V2 & "=" & To_String (C.Disp));
-         end loop;
-         Append (H, " Total");
-         IO.Put_Line (To_String (H));
-      end;
-      --  Data rows
+
+      --  Pass 1: column widths -- header text vs. every value the column
+      --  carries.  Total_Col only ever carries Frequency-shaped values.
+      for C in 1 .. Num_Data_Cols loop
+         Col_W (C) := Col_Header (C)'Length;
+      end loop;
       for I in L1.First_Index .. L1.Last_Index loop
+         for C in 1 .. Total_Col - 1 loop
+            Col_W (C) := Natural'Max
+              (Col_W (C), Trim (Freq_At (I, C)'Image, Both)'Length);
+            if Show_Pct then
+               Col_W (C) := Natural'Max (Col_W (C), Fmt (Pct_At (I, C))'Length);
+            end if;
+            Col_W (C) := Natural'Max (Col_W (C), Fmt (Row_Pct_At (I, C))'Length);
+            Col_W (C) := Natural'Max (Col_W (C), Fmt (Col_Pct_At (I, C))'Length);
+         end loop;
+         Col_W (Total_Col) := Natural'Max
+           (Col_W (Total_Col), Trim (L1 (I).Count'Image, Both)'Length);
+      end loop;
+      for C in 1 .. Total_Col - 1 loop
+         Col_W (C) := Natural'Max
+           (Col_W (C), Trim (Col_Total (C)'Image, Both)'Length);
+      end loop;
+      Col_W (Total_Col) := Natural'Max
+        (Col_W (Total_Col), Trim (Grand'Image, Both)'Length);
+
+      for S of Stat_Names loop
+         Corner_W := Natural'Max (Corner_W, Length (S));
+      end loop;
+      for L of L1 loop
+         Corner_W := Natural'Max (Corner_W, Length (L.Disp));
+      end loop;
+      Corner_W := Natural'Max (Corner_W, 5);  --  "Total"
+
+      --  Corner-legend header block; column headers appear only on the
+      --  LAST legend line (Col_Percent -- always present and always last).
+      for S in 1 .. Num_Stats loop
          declare
-            Line    : Unbounded_String := L1 (I).Disp;
-            Row_Tot : constant Natural := L1 (I).Count;
+            Line : Unbounded_String := To_Unbounded_String
+              (Ada.Strings.Fixed.Head (To_String (Stat_Names (S)), Corner_W) & "|");
          begin
-            for J in L2.First_Index .. L2.Last_Index loop
-               declare
-                  Key : constant String := Cell_Key (I, J);
-                  F   : constant Natural :=
-                    (if Joint.Contains (Key) then Joint (Key) else 0);
-                  Pct : constant Real :=
-                    (if Grand = 0 then 0.0
-                     else 100.0 * Real (F) / Real (Grand));
-                  RP  : constant Real :=
-                    (if L1 (I).Count = 0 then 0.0
-                     else 100.0 * Real (F) / Real (L1 (I).Count));
-                  CP  : constant Real :=
-                    (if L2 (J).Count = 0 then 0.0
-                     else 100.0 * Real (F) / Real (L2 (J).Count));
-               begin
-                  Append (Line, " " & Trim (F'Image, Both));
-                  if Show_Pct then
-                     Append (Line, " " & Fmt2 (Pct));
+            if S = Num_Stats then
+               for C in 1 .. Num_Data_Cols loop
+                  if C > 1 then
+                     Append (Line, "|");
                   end if;
-                  Append (Line, " " & Fmt2 (RP) & " " & Fmt2 (CP));
-               end;
-            end loop;
-            Append (Line, " " & Trim (Row_Tot'Image, Both));
+                  Append (Line, Ada.Strings.Fixed.Tail (Col_Header (C), Col_W (C)));
+               end loop;
+            end if;
             IO.Put_Line (To_String (Line));
          end;
       end loop;
-      --  Totals row
-      declare
-         T : Unbounded_String := To_Unbounded_String ("Total");
-      begin
-         for C of L2 loop
-            Append (T, " " & Trim (C.Count'Image, Both));
+      Print_Rule;
+
+      --  One row-BLOCK per V1 level (Num_Stats lines), each followed by a
+      --  rule (including the last block, immediately before the Total row).
+      for I in L1.First_Index .. L1.Last_Index loop
+         for S in 1 .. Num_Stats loop
+            declare
+               Label : constant String :=
+                 (if S = S_Freq then To_String (L1 (I).Disp) else "");
+               Line  : Unbounded_String := To_Unbounded_String
+                 (Ada.Strings.Fixed.Head (Label, Corner_W) & "|");
+            begin
+               for C in 1 .. Num_Data_Cols loop
+                  if C > 1 then
+                     Append (Line, "|");
+                  end if;
+                  declare
+                     Cell : Unbounded_String;
+                  begin
+                     if S = S_Freq then
+                        Cell := To_Unbounded_String
+                          (Trim (Freq_At (I, C)'Image, Both));
+                     elsif C = Total_Col then
+                        Cell := Null_Unbounded_String;
+                     elsif S = S_Pct then
+                        Cell := To_Unbounded_String (Fmt (Pct_At (I, C)));
+                     elsif S = S_RowPct then
+                        Cell := To_Unbounded_String (Fmt (Row_Pct_At (I, C)));
+                     else
+                        Cell := To_Unbounded_String (Fmt (Col_Pct_At (I, C)));
+                     end if;
+                     Append (Line, Ada.Strings.Fixed.Tail (To_String (Cell), Col_W (C)));
+                  end;
+               end loop;
+               IO.Put_Line (To_String (Line));
+            end;
          end loop;
-         Append (T, " " & Trim (Grand'Image, Both));
-         IO.Put_Line (To_String (T));
+         Print_Rule;
+      end loop;
+
+      --  Total row: single line, Frequency-only (margin cells stay
+      --  single-valued); no closing rule (PROC FREQ's own convention).
+      declare
+         Line : Unbounded_String := To_Unbounded_String
+           (Ada.Strings.Fixed.Head ("Total", Corner_W) & "|");
+      begin
+         for C in 1 .. Num_Data_Cols loop
+            if C > 1 then
+               Append (Line, "|");
+            end if;
+            Append (Line,
+                    Ada.Strings.Fixed.Tail (Trim (Col_Total (C)'Image, Both), Col_W (C)));
+         end loop;
+         IO.Put_Line (To_String (Line));
       end;
+
       if not Include_Missing and then Missing > 0 then
          IO.New_Line;
          IO.Put_Line ("Frequency Missing = " & Trim (Missing'Image, Both));
@@ -347,6 +463,10 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    --  computed from the SAME joint-derived cells the grid/list renders (any
    --  partial-missing row already excluded by Build_Joint), so the statistics
    --  and the displayed table always agree on levels, marginals, and N.
+   --  ADR-076: thin wrapper over the shared Print_Ruled_Table.  Phi/
+   --  Contingency/Cramer's V rows carry blank DF and Prob cells (matching
+   --  the /SAVE chi-square file's own established blank-cell convention
+   --  for these same three statistics, ADR-071).
    procedure Put_Chisq_2Way (Rows : Row_Index_Vectors.Vector; V1, V2 : String)
    is
       JT : constant Joint_Table := Build_Joint (Rows, V1, V2);
@@ -356,25 +476,51 @@ procedure Execute_Tables (Stmt : Statement_Access) is
         SData_Core.Statistics.Chi_Square_Tests (M);
    begin
       IO.New_Line;
-      IO.Put_Line ("Statistic DF Value Prob");
       if not R.Valid then
+         IO.Put_Line ("Statistic DF Value Prob");
          IO.Put_Line
            ("(chi-square not computed: a row or column total is zero)");
          return;
       end if;
-      IO.Put_Line ("Chi-Square " & Trim (R.DF'Image, Both) & " "
-                   & Fmt4 (R.Pearson_Stat) & " " & Fmt4 (R.Pearson_P));
-      IO.Put_Line ("Likelihood-Ratio_Chi-Square " & Trim (R.DF'Image, Both)
-                   & " " & Fmt4 (R.LR_Stat) & " " & Fmt4 (R.LR_P));
-      if R.Has_Yates then
-         IO.Put_Line ("Continuity-Adj._Chi-Square 1 "
-                      & Fmt4 (R.Yates_Stat) & " " & Fmt4 (R.Yates_P));
-      end if;
-      IO.Put_Line ("Mantel-Haenszel_Chi-Square 1 "
-                   & Fmt4 (R.MH_Stat) & " " & Fmt4 (R.MH_P));
-      IO.Put_Line ("Phi_Coefficient " & Fmt4 (R.Phi));
-      IO.Put_Line ("Contingency_Coefficient " & Fmt4 (R.Contingency));
-      IO.Put_Line ("Cramers_V " & Fmt4 (R.Cramers_V));
+
+      declare
+         Headers : constant Row_Cells (1 .. 4) :=
+           (To_Unbounded_String ("Statistic"),
+            To_Unbounded_String ("DF"),
+            To_Unbounded_String ("Value"),
+            To_Unbounded_String ("Prob"));
+         Out_Rows : Row_Cell_Vectors.Vector;
+         Keys     : Opt_String_Vectors.Vector;
+
+         procedure Add (Name, DF, Val, Prob : String) is
+         begin
+            Out_Rows.Append
+              ((To_Unbounded_String (Name), To_Unbounded_String (DF),
+                To_Unbounded_String (Val), To_Unbounded_String (Prob)));
+            Keys.Append (Null_Unbounded_String);
+         end Add;
+      begin
+         Add ("Chi-Square", Trim (R.DF'Image, Both),
+              Fmt (R.Pearson_Stat), Fmt (R.Pearson_P));
+         Add ("Likelihood-Ratio_Chi-Square", Trim (R.DF'Image, Both),
+              Fmt (R.LR_Stat), Fmt (R.LR_P));
+         if R.Has_Yates then
+            Add ("Continuity-Adj._Chi-Square", "1",
+                 Fmt (R.Yates_Stat), Fmt (R.Yates_P));
+         end if;
+         Add ("Mantel-Haenszel_Chi-Square", "1", Fmt (R.MH_Stat), Fmt (R.MH_P));
+         Add ("Phi_Coefficient", "", Fmt (R.Phi), "");
+         Add ("Contingency_Coefficient", "", Fmt (R.Contingency), "");
+         Add ("Cramers_V", "", Fmt (R.Cramers_V), "");
+
+         Print_Ruled_Table
+           (Num_Label_Cols => 1,
+            Headers        => Headers,
+            Rows           => Out_Rows,
+            Row_Group_Keys => Keys,
+            Show_Group_Key => False);
+      end;
+
       IO.New_Line;
       IO.Put_Line ("Sample_Size = " & Trim (R.N'Image, Both));
       if R.Pct_Expected_Lt_5 > 20.0 then
@@ -384,6 +530,9 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    end Put_Chisq_2Way;
 
    --  Emit the one-way equal-proportions goodness-of-fit chi-square for Col.
+   --  ADR-076: also a thin Print_Ruled_Table wrapper, gaining a proper
+   --  "Statistic DF Value Prob" header (the pre-ADR-076 one-way case had no
+   --  header line at all) for consistency with the two-way case above.
    procedure Put_Chisq_1Way (Rows : Row_Index_Vectors.Vector; Col : String) is
       L   : constant Level_Vectors.Vector := Build_Levels (Rows, Col);
       V   : SData_Core.Statistics.Count_Vector (1 .. Natural (L.Length));
@@ -400,8 +549,28 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          IO.New_Line;
          IO.Put_Line ("Chi-Square Goodness-of-Fit (equal proportions)");
          if R.Valid then
-            IO.Put_Line ("Chi-Square " & Trim (R.DF'Image, Both) & " "
-                         & Fmt4 (R.Stat) & " " & Fmt4 (R.P));
+            declare
+               Headers : constant Row_Cells (1 .. 4) :=
+                 (To_Unbounded_String ("Statistic"),
+                  To_Unbounded_String ("DF"),
+                  To_Unbounded_String ("Value"),
+                  To_Unbounded_String ("Prob"));
+               Out_Rows : Row_Cell_Vectors.Vector;
+               Keys     : Opt_String_Vectors.Vector;
+            begin
+               Out_Rows.Append
+                 ((To_Unbounded_String ("Chi-Square"),
+                   To_Unbounded_String (Trim (R.DF'Image, Both)),
+                   To_Unbounded_String (Fmt (R.Stat)),
+                   To_Unbounded_String (Fmt (R.P))));
+               Keys.Append (Null_Unbounded_String);
+               Print_Ruled_Table
+                 (Num_Label_Cols => 1,
+                  Headers        => Headers,
+                  Rows           => Out_Rows,
+                  Row_Group_Keys => Keys,
+                  Show_Group_Key => False);
+            end;
          else
             IO.Put_Line ("(not computed: fewer than two categories)");
          end if;
@@ -410,16 +579,21 @@ procedure Execute_Tables (Stmt : Statement_Access) is
 
    --  Emit the BY-group header line, e.g. "----- BY G$=p -----", using the
    --  first physical row of the group to read each BY variable's value.
+   --  ADR-076: matches STATS' own Group_Key format ("Col = val, Col2 =
+   --  val2") for full visual consistency, replacing the old TABLES-only
+   --  "----- BY Col=val -----" bracketed-dash format.
    procedure Put_By_Header (First_Phys : Positive) is
-      H : Unbounded_String := To_Unbounded_String ("----- BY");
+      H : Unbounded_String;
    begin
       for I in 1 .. SData_Core.Table.By_Var_Count loop
-         Append (H, " " & SData_Core.Table.By_Var_Name (I) & "="
+         if I > 1 then
+            Append (H, ", ");
+         end if;
+         Append (H, SData_Core.Table.By_Var_Name (I) & " = "
                  & Values.To_String_Formatted
                      (SData_Core.Table.Get_Value
                         (First_Phys, SData_Core.Table.By_Var_Name (I))));
       end loop;
-      Append (H, " -----");
       IO.Put_Line (To_String (H));
    end Put_By_Header;
 
@@ -849,6 +1023,12 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    end Write_Chisq_Save_File;
 
    --  ---- one-way renderer ----
+   --  ADR-076: thin wrapper over the shared Print_Ruled_Table.  The Total
+   --  row's Cum_Freq/Cum_Percent cells are left BLANK, matching the
+   --  pre-ADR-076 behavior exactly (the old code never appended those two
+   --  fields to the Total line at all, regardless of /NOCUM) -- preserving
+   --  that omission, not "completing" it, since computed/shown values are
+   --  a Non-Goal of this feature.
    procedure Render_One_Way (Rows : Row_Index_Vectors.Vector; Col : String) is
       Levels   : constant Level_Vectors.Vector := Build_Levels (Rows, Col);
       Total    : Natural := 0;
@@ -856,7 +1036,13 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       Cum      : Natural := 0;
       Show_Pct : constant Boolean := not Stmt.Table_NOPERCENT;
       Show_Cum : constant Boolean := not Stmt.Table_NOCUM;
+
+      Col_Count : Positive := 2;  --  Col, Frequency
    begin
+      if Show_Pct then Col_Count := Col_Count + 1; end if;
+      if Show_Cum then Col_Count := Col_Count + 1; end if;
+      if Show_Cum and then Show_Pct then Col_Count := Col_Count + 1; end if;
+
       for L of Levels loop
          Total := Total + L.Count;
       end loop;
@@ -871,54 +1057,84 @@ procedure Execute_Tables (Stmt : Statement_Access) is
 
       IO.Put_Line ("Frequency table for " & Col);
       IO.New_Line;
-      --  header
+
       declare
-         H : Unbounded_String := To_Unbounded_String (Col & " Frequency");
+         Headers  : Row_Cells (1 .. Col_Count);
+         Out_Rows : Row_Cell_Vectors.Vector;
+         Keys     : Opt_String_Vectors.Vector;
+         Idx      : Positive;
       begin
+         Idx := 1;
+         Headers (Idx) := To_Unbounded_String (Col); Idx := Idx + 1;
+         Headers (Idx) := To_Unbounded_String ("Frequency"); Idx := Idx + 1;
          if Show_Pct then
-            Append (H, " Percent");
+            Headers (Idx) := To_Unbounded_String ("Percent"); Idx := Idx + 1;
          end if;
          if Show_Cum then
-            Append (H, " Cum_Freq");
+            Headers (Idx) := To_Unbounded_String ("Cum_Freq"); Idx := Idx + 1;
          end if;
          if Show_Cum and then Show_Pct then
-            Append (H, " Cum_Percent");
+            Headers (Idx) := To_Unbounded_String ("Cum_Percent"); Idx := Idx + 1;
          end if;
-         IO.Put_Line (To_String (H));
-      end;
-      for L of Levels loop
-         Cum := Cum + L.Count;
+
+         for L of Levels loop
+            Cum := Cum + L.Count;
+            declare
+               Pct  : constant Real :=
+                 (if Total = 0 then 0.0
+                  else 100.0 * Real (L.Count) / Real (Total));
+               CPct : constant Real :=
+                 (if Total = 0 then 0.0
+                  else 100.0 * Real (Cum) / Real (Total));
+               Row : Row_Cells (1 .. Col_Count);
+               J   : Positive;
+            begin
+               J := 1;
+               Row (J) := L.Disp; J := J + 1;
+               Row (J) := To_Unbounded_String (Trim (L.Count'Image, Both)); J := J + 1;
+               if Show_Pct then
+                  Row (J) := To_Unbounded_String (Fmt (Pct)); J := J + 1;
+               end if;
+               if Show_Cum then
+                  Row (J) := To_Unbounded_String (Trim (Cum'Image, Both)); J := J + 1;
+               end if;
+               if Show_Cum and then Show_Pct then
+                  Row (J) := To_Unbounded_String (Fmt (CPct)); J := J + 1;
+               end if;
+               Out_Rows.Append (Row);
+               Keys.Append (Null_Unbounded_String);
+            end;
+         end loop;
+
+         --  Total row.
          declare
-            Line : Unbounded_String :=
-              L.Disp & " " & Trim (L.Count'Image, Both);
-            Pct  : constant Real :=
-              (if Total = 0 then 0.0
-               else 100.0 * Real (L.Count) / Real (Total));
-            CPct : constant Real :=
-              (if Total = 0 then 0.0
-               else 100.0 * Real (Cum) / Real (Total));
+            Row : Row_Cells (1 .. Col_Count);
+            J   : Positive;
          begin
+            J := 1;
+            Row (J) := To_Unbounded_String ("Total"); J := J + 1;
+            Row (J) := To_Unbounded_String (Trim (Total'Image, Both)); J := J + 1;
             if Show_Pct then
-               Append (Line, " " & Fmt2 (Pct));
+               Row (J) := To_Unbounded_String (Fmt (100.0)); J := J + 1;
             end if;
             if Show_Cum then
-               Append (Line, " " & Trim (Cum'Image, Both));
+               Row (J) := Null_Unbounded_String; J := J + 1;
             end if;
             if Show_Cum and then Show_Pct then
-               Append (Line, " " & Fmt2 (CPct));
+               Row (J) := Null_Unbounded_String; J := J + 1;
             end if;
-            IO.Put_Line (To_String (Line));
+            Out_Rows.Append (Row);
+            Keys.Append (Null_Unbounded_String);
          end;
-      end loop;
-      declare
-         T : Unbounded_String :=
-           To_Unbounded_String ("Total " & Trim (Total'Image, Both));
-      begin
-         if Show_Pct then
-            Append (T, " 100.00");
-         end if;
-         IO.Put_Line (To_String (T));
+
+         Print_Ruled_Table
+           (Num_Label_Cols => 1,
+            Headers        => Headers,
+            Rows           => Out_Rows,
+            Row_Group_Keys => Keys,
+            Show_Group_Key => False);
       end;
+
       if not Include_Missing and then Missing > 0 then
          IO.New_Line;
          IO.Put_Line ("Frequency Missing = " & Trim (Missing'Image, Both));
@@ -1035,55 +1251,84 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          end;
          IO.New_Line;
 
-         --  Header row.
+         --  ADR-076: thin wrapper over the shared Print_Ruled_Table, with
+         --  Num_Label_Cols => K crossing-variable columns.  No Total row
+         --  (list-form never had one).  Force_Header_When_Empty => True
+         --  preserves the pre-ADR-076 behavior of always showing the
+         --  header even with zero observed tuples (list-form never had a
+         --  "no rows" message, unlike STATS).
          declare
-            H : Unbounded_String;
+            Col_Count : constant Positive := K + 1
+              + (if Show_Pct then 1 else 0)
+              + (if Show_Cum then 1 else 0)
+              + (if Show_Cum and then Show_Pct then 1 else 0);
+            Headers  : Row_Cells (1 .. Col_Count);
+            Out_Rows : Row_Cell_Vectors.Vector;
+            Keys     : Opt_String_Vectors.Vector;
+            Idx      : Positive;
          begin
+            Idx := 1;
             for I in 1 .. K loop
-               Append (H, To_String (Names (I)) & " ");
+               Headers (Idx) := Names (I); Idx := Idx + 1;
             end loop;
-            Append (H, "Frequency");
-            if Show_Pct then Append (H, " Percent"); end if;
-            if Show_Cum then Append (H, " Cum_Freq"); end if;
-            if Show_Cum and then Show_Pct then Append (H, " Cum_Percent"); end if;
-            IO.Put_Line (To_String (H));
-         end;
+            Headers (Idx) := To_Unbounded_String ("Frequency"); Idx := Idx + 1;
+            if Show_Pct then
+               Headers (Idx) := To_Unbounded_String ("Percent"); Idx := Idx + 1;
+            end if;
+            if Show_Cum then
+               Headers (Idx) := To_Unbounded_String ("Cum_Freq"); Idx := Idx + 1;
+            end if;
+            if Show_Cum and then Show_Pct then
+               Headers (Idx) := To_Unbounded_String ("Cum_Percent"); Idx := Idx + 1;
+            end if;
 
-         --  Emit observed tuples in value order (Tuple_Less == the old odometer
-         --  order).  Cost is O(Present * log Present), never the Cartesian
-         --  product of level cardinalities.
-         Tuple_Sorting.Sort (Present);
-         declare
-            Cum : Natural := 0;
-         begin
-            for R of Present loop
-               declare
-                  F    : constant Natural := R.Count;
-                  Line : Unbounded_String;
-                  Pct  : constant Real :=
-                    (if Grand = 0 then 0.0
-                     else 100.0 * Real (F) / Real (Grand));
-               begin
-                  Cum := Cum + F;
-                  for I in 1 .. K loop
-                     Append (Line,
-                             To_String (Levels (I)(R.Idx (I)).Disp) & " ");
-                  end loop;
-                  Append (Line, Trim (F'Image, Both));
-                  if Show_Pct then
-                     Append (Line, " " & Fmt2 (Pct));
-                  end if;
-                  if Show_Cum then
-                     Append (Line, " " & Trim (Cum'Image, Both));
-                  end if;
-                  if Show_Cum and then Show_Pct then
-                     Append (Line, " " &
-                       Fmt2 (if Grand = 0 then 0.0
-                             else 100.0 * Real (Cum) / Real (Grand)));
-                  end if;
-                  IO.Put_Line (To_String (Line));
-               end;
-            end loop;
+            --  Emit observed tuples in value order (Tuple_Less == the old
+            --  odometer order).  Cost is O(Present * log Present), never
+            --  the Cartesian product of level cardinalities.
+            Tuple_Sorting.Sort (Present);
+            declare
+               Cum : Natural := 0;
+            begin
+               for R of Present loop
+                  declare
+                     F    : constant Natural := R.Count;
+                     Pct  : constant Real :=
+                       (if Grand = 0 then 0.0
+                        else 100.0 * Real (F) / Real (Grand));
+                     Row  : Row_Cells (1 .. Col_Count);
+                     J    : Positive;
+                  begin
+                     Cum := Cum + F;
+                     J := 1;
+                     for I in 1 .. K loop
+                        Row (J) := Levels (I)(R.Idx (I)).Disp; J := J + 1;
+                     end loop;
+                     Row (J) := To_Unbounded_String (Trim (F'Image, Both)); J := J + 1;
+                     if Show_Pct then
+                        Row (J) := To_Unbounded_String (Fmt (Pct)); J := J + 1;
+                     end if;
+                     if Show_Cum then
+                        Row (J) := To_Unbounded_String (Trim (Cum'Image, Both)); J := J + 1;
+                     end if;
+                     if Show_Cum and then Show_Pct then
+                        Row (J) := To_Unbounded_String
+                          (Fmt (if Grand = 0 then 0.0
+                                else 100.0 * Real (Cum) / Real (Grand)));
+                        J := J + 1;
+                     end if;
+                     Out_Rows.Append (Row);
+                     Keys.Append (Null_Unbounded_String);
+                  end;
+               end loop;
+            end;
+
+            Print_Ruled_Table
+              (Num_Label_Cols          => K,
+               Headers                 => Headers,
+               Rows                    => Out_Rows,
+               Row_Group_Keys          => Keys,
+               Show_Group_Key          => False,
+               Force_Header_When_Empty => True);
          end;
 
          if not Include_Missing and then Missing > 0 then

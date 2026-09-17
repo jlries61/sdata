@@ -20,10 +20,12 @@ RUN complete. 6 records and 3 variables processed.
 sdata> TABLES PRODUCT$
 Frequency table for PRODUCT$
 
-PRODUCT$ Frequency Percent Cum_Freq Cum_Percent
-A 3 50.00 3 50.00
-B 3 50.00 6 100.00
-Total 6 100.00
+PRODUCT$  Frequency    Percent  Cum_Freq  Cum_Percent
+-----------------------------------------------------
+A                 3   50.00000         3     50.00000
+B                 3   50.00000         6    100.00000
+Total             6  100.00000                       
+-----------------------------------------------------
 
 TABLES complete.
 sdata> QUIT

@@ -894,7 +894,7 @@ Commands control the flow of execution, manage data, and configure the interpret
 <td><em>DIGITS</em></td>
 <td><em>DIGITS n</em></td>
 <td>Declarative</td>
-<td><p>Sets the maximum number of decimal places to display (default = 5). This governs <em>PRINT</em>, the <em>LIST</em>/<em>DISPLAY</em>/<em>NAMES</em>/<em>TABLES</em> output, and the <em>STR$</em>/<em>NUM$</em> conversion functions. It does not affect values written by <em>SAVE</em> or <em>OUTPUT</em>, which are governed independently by the <em>DECIMALS=</em> option (see <em>OUTPUT</em>) or, when that option is omitted, by round-trip precision. <em>n</em> must be a non-negative integer; there is no explicit upper bound enforced.</p></td>
+<td><p>Sets the maximum number of decimal places to display (default = 5). This governs <em>PRINT</em>, the <em>LIST</em>/<em>DISPLAY</em>/<em>NAMES</em>/<em>STATS</em>/<em>TABLES</em> output, and the <em>STR$</em>/<em>NUM$</em> conversion functions. It does not affect values written by <em>SAVE</em> or <em>OUTPUT</em>, which are governed independently by the <em>DECIMALS=</em> option (see <em>OUTPUT</em>) or, when that option is omitted, by round-trip precision. <em>n</em> must be a non-negative integer; there is no explicit upper bound enforced.</p></td>
 </tr>
 <tr>
 <td><em>DIM</em></td>

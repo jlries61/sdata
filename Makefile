@@ -1,6 +1,6 @@
 # Makefile for SData
 
-VERSION          := 0.31.0
+VERSION          := 0.32.0
 ZIPADA_VERSION      := 61.0.0
 XMLADA_VERSION      := 26.0.0
 MATHPAQS_VERSION    := 20260205.0.0
@@ -163,7 +163,7 @@ check: build
 			rm -f tests/$$base.tmp; \
 			failures=$$((failures+1)); failed_list="$$failed_list $$f"; \
 		else \
-			diff -wu "$$exp" tests/$$base.tmp > tests/$$base.diff; \
+			diff --strip-trailing-cr -u "$$exp" tests/$$base.tmp > tests/$$base.diff; \
 			if [ $$? -eq 0 ]; then \
 				echo "PASSED"; \
 				rm -f tests/$$base.tmp tests/$$base.diff; \

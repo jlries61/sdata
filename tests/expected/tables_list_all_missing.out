@@ -1,0 +1,10 @@
+Generating mock data...
+RUN complete. 3 records and 6 variables processed.
+Table of A$ by B$ by C$
+
+A$  B$  C$  Frequency  Percent  Cum_Freq  Cum_Percent
+-----------------------------------------------------
+
+Frequency Missing = 3
+
+TABLES complete.

@@ -20,6 +20,7 @@ with SData_Core.IO;        use SData_Core.IO;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Containers.Indefinite_Hashed_Sets;
+with Ada.Containers.Indefinite_Vectors;
 with Ada.Containers.Vectors;
 with Ada.Strings.Hash;
 with Ada.Strings.Fixed;
@@ -1144,6 +1145,150 @@ package body SData.Interpreter is
       Display_Table (Cols);
    end Display_All_Columns;
 
+   --  Print_Ruled_Table (ADR-076) -- shared two-pass width/alignment/rule
+   --  renderer, generalized from STATS' own original "minimal box" table
+   --  (below) so both STATS and TABLES (one-way, list-form, /CHISQ --
+   --  src/sdata-interpreter-execute_tables.adb, a subunit of this package
+   --  body and therefore able to see this declaration, textually placed
+   --  before the "Execute_Tables ... is separate;" stub -- the same
+   --  parent-body-visible-to-subunit mechanism Row_Index_Vectors above
+   --  already relies on) get identical column-aligned, rule-bracketed
+   --  output.  The first Num_Label_Cols columns are left-aligned (Head,
+   --  pad right); every remaining column is right-aligned (Tail, pad
+   --  left).  Row_Group_Keys (one entry per row, ALWAYS provided -- a
+   --  caller with no real BY-style grouping passes the same constant value,
+   --  e.g. Null_Unbounded_String, for every row) drives the same
+   --  "start a new header block when the key changes" logic STATS' own
+   --  print step originated; Show_Group_Key controls whether that key is
+   --  also announced as its own line (STATS: only when BY variables are
+   --  active; TABLES: only when BY grouping is active -- both map to
+   --  "is there more than one group possible", not "is grouping supported
+   --  at all").
+   type Row_Cells is array (Positive range <>) of Unbounded_String;
+   package Row_Cell_Vectors is new Ada.Containers.Indefinite_Vectors
+     (Positive, Row_Cells);
+   package Opt_String_Vectors is new Ada.Containers.Vectors
+     (Positive, Unbounded_String);
+
+   procedure Print_Ruled_Table
+     (Num_Label_Cols        : Positive;
+      Headers               : Row_Cells;
+      Rows                  : Row_Cell_Vectors.Vector;
+      Row_Group_Keys        : Opt_String_Vectors.Vector;
+      Show_Group_Key        : Boolean;
+      Empty_Message         : String := "(No rows to display)";
+      --  When True, an empty Rows still prints Header/Rule/Rule (an empty
+      --  box) instead of Empty_Message -- TABLES' list-form never had a
+      --  "no rows" message pre-ADR-076 (its header always printed even
+      --  with zero observed tuples); STATS' own pre-ADR-076 special case
+      --  (Empty_Message, no header at all) stays the default so its
+      --  behavior is unchanged.
+      Force_Header_When_Empty : Boolean := False)
+   is
+      Col_Count  : constant Positive := Headers'Length;
+      Gap        : constant String := "  ";
+      Widths     : array (1 .. Col_Count) of Natural;
+      Rule_Width : Natural;
+
+      procedure Print_Rule is
+      begin
+         Put_Line ((1 .. Rule_Width => '-'));
+      end Print_Rule;
+
+      procedure Print_Header is
+      begin
+         for C in 1 .. Col_Count loop
+            if C > 1 then
+               Put (Gap);
+            end if;
+            if C <= Num_Label_Cols then
+               Put (Ada.Strings.Fixed.Head (To_String (Headers (C)), Widths (C)));
+            else
+               Put (Ada.Strings.Fixed.Tail (To_String (Headers (C)), Widths (C)));
+            end if;
+         end loop;
+         New_Line;
+      end Print_Header;
+
+      Prev_Key    : Unbounded_String;
+      First_Group : Boolean := True;
+   begin
+      if Rows.Is_Empty then
+         if Force_Header_When_Empty then
+            for C in 1 .. Col_Count loop
+               Widths (C) := Length (Headers (C));
+            end loop;
+            Rule_Width := Widths (1);
+            for C in 2 .. Col_Count loop
+               Rule_Width := Rule_Width + Gap'Length + Widths (C);
+            end loop;
+            Print_Header;
+            Print_Rule;
+         else
+            Put_Line (Empty_Message);
+         end if;
+         return;
+      end if;
+
+      --  Pass 1: compute column widths from headers and every cell.
+      for C in 1 .. Col_Count loop
+         Widths (C) := Length (Headers (C));
+      end loop;
+      for R in Rows.First_Index .. Rows.Last_Index loop
+         declare
+            Row : Row_Cells renames Rows (R);
+         begin
+            for C in 1 .. Col_Count loop
+               Widths (C) := Natural'Max (Widths (C), Length (Row (C)));
+            end loop;
+         end;
+      end loop;
+
+      Rule_Width := Widths (1);
+      for C in 2 .. Col_Count loop
+         Rule_Width := Rule_Width + Gap'Length + Widths (C);
+      end loop;
+
+      --  Pass 2: print, grouping contiguous rows that share a group key.
+      for R in Rows.First_Index .. Rows.Last_Index loop
+         declare
+            Key : constant Unbounded_String := Row_Group_Keys (R);
+         begin
+            if R = Rows.First_Index or else Key /= Prev_Key then
+               if not First_Group then
+                  Print_Rule;
+                  New_Line;
+               end if;
+               First_Group := False;
+               if Show_Group_Key then
+                  Put_Line (To_String (Key));
+               end if;
+               Print_Header;
+               Print_Rule;
+               Prev_Key := Key;
+            end if;
+         end;
+
+         declare
+            Row : Row_Cells renames Rows (R);
+         begin
+            for C in 1 .. Col_Count loop
+               if C > 1 then
+                  Put (Gap);
+               end if;
+               if C <= Num_Label_Cols then
+                  Put (Ada.Strings.Fixed.Head (To_String (Row (C)), Widths (C)));
+               else
+                  Put (Ada.Strings.Fixed.Tail (To_String (Row (C)), Widths (C)));
+               end if;
+            end loop;
+            New_Line;
+         end;
+      end loop;
+
+      Print_Rule;
+   end Print_Ruled_Table;
+
    --  STATS' own default printout (ADR-068): a SAS PROC MEANS-style "minimal
    --  box" table -- a left-justified Variable column (from the result
    --  table's _NAME_$ column) plus one right-justified column per requested
@@ -1164,6 +1309,10 @@ package body SData.Interpreter is
    --
    --  Column widths are computed once, globally across the whole result
    --  table, not per BY-group, so every group's box lines up identically.
+   --  Since ADR-076, this is a thin wrapper over the shared Print_Ruled_Table
+   --  -- its own output must stay byte-identical to the pre-ADR-076 version
+   --  (verified against the full STATS test suite, zero expected-output
+   --  changes).
    procedure Display_Stats_Table is
       Name_Col : Natural := 0;
    begin
@@ -1180,25 +1329,15 @@ package body SData.Interpreter is
       end if;
 
       declare
-         Rows       : constant Natural := SData_Core.Table.Logical_Row_Count;
+         Rows_Count : constant Natural := SData_Core.Table.Logical_Row_Count;
          Stat_First : constant Positive := Name_Col + 1;
-         Stat_Count : constant Natural := Column_Count - Name_Col;
-         Gap        : constant String := "  ";
-         Var_Header : constant String := "Variable";
+         Col_Count  : constant Positive := 1 + (Column_Count - Name_Col);
 
-         --  Widths (0) is the Variable column; Widths (1 .. Stat_Count)
-         --  are the stat columns, indexed by (table column - Name_Col).
-         Widths : array (0 .. Stat_Count) of Natural;
+         Headers : Row_Cells (1 .. Col_Count);
+         Rows    : Row_Cell_Vectors.Vector;
+         Keys    : Opt_String_Vectors.Vector;
 
-         function Var_Cell (R : Positive) return String is
-           (To_String_Formatted
-              (Get_Value_Upper (Logical_To_Physical (R), Column_Name (Name_Col))));
-
-         function Stat_Cell (R : Positive; Col : Positive) return String is
-           (To_String_Formatted
-              (Get_Value_Upper (Logical_To_Physical (R), Column_Name (Col))));
-
-         function Group_Key (R : Positive) return String is
+         function Group_Key_Text (R : Positive) return Unbounded_String is
             S : Unbounded_String;
          begin
             for I in 1 .. Name_Col - 1 loop
@@ -1209,79 +1348,42 @@ package body SData.Interpreter is
                           To_String_Formatted
                             (Get_Value_Upper (Logical_To_Physical (R), Column_Name (I))));
             end loop;
-            return To_String (S);
-         end Group_Key;
-
-         Rule_Width : Natural;
-
-         procedure Print_Rule is
-         begin
-            Put_Line ((1 .. Rule_Width => '-'));
-         end Print_Rule;
-
-         procedure Print_Header is
-         begin
-            Put (Ada.Strings.Fixed.Head (Var_Header, Widths (0)));
-            for C in Stat_First .. Column_Count loop
-               Put (Gap & Ada.Strings.Fixed.Tail (Column_Name (C), Widths (C - Name_Col)));
-            end loop;
-            New_Line;
-         end Print_Header;
-
-         Prev_Key    : Unbounded_String;
-         First_Group : Boolean := True;
+            return S;
+         end Group_Key_Text;
       begin
-         if Rows = 0 then
+         if Rows_Count = 0 then
             Put_Line ("(No rows to display)");
             return;
          end if;
 
-         --  Pass 1: compute column widths from headers and every cell.
-         Widths (0) := Var_Header'Length;
+         Headers (1) := To_Unbounded_String ("Variable");
          for C in Stat_First .. Column_Count loop
-            Widths (C - Name_Col) := Column_Name (C)'Length;
-         end loop;
-         for R in 1 .. Rows loop
-            Widths (0) := Natural'Max (Widths (0), Var_Cell (R)'Length);
-            for C in Stat_First .. Column_Count loop
-               Widths (C - Name_Col) :=
-                 Natural'Max (Widths (C - Name_Col), Stat_Cell (R, C)'Length);
-            end loop;
+            Headers (1 + C - Name_Col) := To_Unbounded_String (Column_Name (C));
          end loop;
 
-         Rule_Width := Widths (0);
-         for Idx in 1 .. Stat_Count loop
-            Rule_Width := Rule_Width + Gap'Length + Widths (Idx);
-         end loop;
-
-         --  Pass 2: print, grouping contiguous rows that share a BY-key.
-         for R in 1 .. Rows loop
+         for R in 1 .. Rows_Count loop
             declare
-               Key : constant String := Group_Key (R);
+               Row : Row_Cells (1 .. Col_Count);
             begin
-               if R = 1 or else Key /= To_String (Prev_Key) then
-                  if not First_Group then
-                     Print_Rule;
-                     New_Line;
-                  end if;
-                  First_Group := False;
-                  if Name_Col > 1 then
-                     Put_Line (Key);
-                  end if;
-                  Print_Header;
-                  Print_Rule;
-                  Prev_Key := To_Unbounded_String (Key);
-               end if;
+               Row (1) := To_Unbounded_String
+                 (To_String_Formatted
+                    (Get_Value_Upper (Logical_To_Physical (R), Column_Name (Name_Col))));
+               for C in Stat_First .. Column_Count loop
+                  Row (1 + C - Name_Col) := To_Unbounded_String
+                    (To_String_Formatted
+                       (Get_Value_Upper (Logical_To_Physical (R), Column_Name (C))));
+               end loop;
+               Rows.Append (Row);
+               Keys.Append (Group_Key_Text (R));
             end;
-
-            Put (Ada.Strings.Fixed.Head (Var_Cell (R), Widths (0)));
-            for C in Stat_First .. Column_Count loop
-               Put (Gap & Ada.Strings.Fixed.Tail (Stat_Cell (R, C), Widths (C - Name_Col)));
-            end loop;
-            New_Line;
          end loop;
 
-         Print_Rule;
+         Print_Ruled_Table
+           (Num_Label_Cols => 1,
+            Headers        => Headers,
+            Rows           => Rows,
+            Row_Group_Keys => Keys,
+            Show_Group_Key => Name_Col > 1);
       end;
    end Display_Stats_Table;
 

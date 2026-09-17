@@ -1,0 +1,24 @@
+Dataset opened: tests/data/tables_chisq_2way_degenerate.csv
+Table of A$ by B$
+
+Frequency  |
+Percent    |
+Row_Percent|
+Col_Percent|     B$=x|Total
+-----------+---------+-----
+p          |        2|    2
+           | 66.66667|     
+           |100.00000|     
+           | 66.66667|     
+-----------+---------+-----
+q          |        1|    1
+           | 33.33333|     
+           |100.00000|     
+           | 33.33333|     
+-----------+---------+-----
+Total      |        3|    3
+
+Statistic DF Value Prob
+(chi-square not computed: a row or column total is zero)
+
+TABLES complete.

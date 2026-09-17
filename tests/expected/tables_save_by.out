@@ -1,19 +1,23 @@
 Dataset opened: tests/data/freq.csv
------ BY REGION$=East -----
+REGION$ = East
 Frequency table for PRODUCT$
 
-PRODUCT$ Frequency Percent Cum_Freq Cum_Percent
-A 2 66.67 2 66.67
-B 1 33.33 3 100.00
-Total 3 100.00
+PRODUCT$  Frequency    Percent  Cum_Freq  Cum_Percent
+-----------------------------------------------------
+A                 2   66.66667         2     66.66667
+B                 1   33.33333         3    100.00000
+Total             3  100.00000                       
+-----------------------------------------------------
 
------ BY REGION$=West -----
+REGION$ = West
 Frequency table for PRODUCT$
 
-PRODUCT$ Frequency Percent Cum_Freq Cum_Percent
-A 1 33.33 1 33.33
-B 2 66.67 3 100.00
-Total 3 100.00
+PRODUCT$  Frequency    Percent  Cum_Freq  Cum_Percent
+-----------------------------------------------------
+A                 1   33.33333         1     33.33333
+B                 2   66.66667         3    100.00000
+Total             3  100.00000                       
+-----------------------------------------------------
 
 TABLES complete.
 REGION$,PRODUCT$,FREQUENCY,PERCENT,CUM_FREQ,CUM_PERCENT

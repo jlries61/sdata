@@ -1,12 +1,22 @@
 Dataset opened: tests/data/freq.csv
 Table of REGION$ by PRODUCT$
 
-Cell contents: Frequency Percent Row_Percent Col_Percent
-
-REGION$ PRODUCT$=A PRODUCT$=B Total
-East 2 33.33 66.67 66.67 1 16.67 33.33 33.33 3
-West 1 16.67 33.33 33.33 2 33.33 66.67 66.67 3
-Total 3 3 6
+Frequency  |
+Percent    |
+Row_Percent|
+Col_Percent|PRODUCT$=A|PRODUCT$=B|Total
+-----------+----------+----------+-----
+East       |         2|         1|    3
+           |  33.33333|  16.66667|     
+           |  66.66667|  33.33333|     
+           |  66.66667|  33.33333|     
+-----------+----------+----------+-----
+West       |         1|         2|    3
+           |  16.66667|  33.33333|     
+           |  33.33333|  66.66667|     
+           |  33.33333|  66.66667|     
+-----------+----------+----------+-----
+Total      |         3|         3|    6
 
 TABLES complete.
 REGION$,PRODUCT$,FREQUENCY,PERCENT,CUM_FREQ,CUM_PERCENT

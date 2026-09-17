@@ -2986,3 +2986,86 @@ Version bump: minor for both crates — a new function, documented-default-behav
 the `TABLES`/`STATS`/`AGGREGATE`/`TRANSPOSE`/`SAVE`-`IF=`/`USE`-`IF=` precedent; sdata-core's bump is
 additionally justified by the `Stats_Options.Stat_List` breaking type change.
 
+### ADR-076: TABLES output is reformatted to match STATS's column-aligned, ruled style
+
+**Date:** 2026-09-16 | **Status:** Accepted
+
+**Context.** User request (direct ask, no GitHub issue filed): `TABLES` and `STATS` are sdata's two
+summary-report commands, but `STATS` prints an aligned, `-`-ruled table (`Display_Stats_Table`,
+`src/sdata-interpreter.adb`: two-pass column-width computation, left-aligned label column,
+right-aligned data columns, a `-`-filled rule bracketing the header) while `TABLES` (all four of its
+print shapes — one-way frequency table, two-way crosstab grid, list-form, and the `/CHISQ`
+statistics block, `src/sdata-interpreter-execute_tables.adb`) builds every line by plain
+space-concatenation with no column alignment and no rule lines at all. `TABLES` also formats its
+numbers with its own hardcoded precision (`Fmt2`: 2 decimals for percentages; `Fmt4`: 4 decimals for
+chi-square statistics), ignoring the `DIGITS` option that `STATS` already honors via
+`To_String_Formatted` — despite `design.md`'s own `DIGITS` entry already naming `TABLES` among the
+commands it's supposed to govern.
+
+**Decision.** `Display_Stats_Table`'s two-pass width/alignment/rule logic is extracted into a new
+shared procedure, `Print_Ruled_Table`, generalized to accept `N` leading left-aligned label columns
+(`STATS` uses 1; `TABLES`'s list-form uses `K` = the number of crossing variables) instead of
+exactly 1, and declared in `sdata-interpreter.adb`'s body ahead of the `Execute_Tables ... is
+separate;` stub so `Execute_Tables`'s subunit can call it under ordinary Ada subunit visibility
+rules — no package spec change and no new child unit are needed, since both call sites already live
+in the same compilation unit's body. `Display_Stats_Table` itself becomes a thin wrapper over
+`Print_Ruled_Table (Num_Label_Cols => 1, ...)`; its own output must stay byte-identical (verified by
+the existing `STATS` test suite requiring zero expected-output changes). Three of `TABLES`'s four
+print paths (`Render_One_Way`, `Render_List`, the `/CHISQ` statistics block) become thin wrappers
+the same way. Every `Fmt2`/`Fmt4` call site, and one previously-hardcoded `" 100.00"` literal
+(`Render_One_Way`'s Total-row Percent), is replaced with `SData_Core.Values.To_String_Formatted`,
+making `TABLES` `DIGITS`-aware like `STATS` — a **confirmed, user-accepted behavior change** (via
+`AskUserQuestion`): `TABLES`'s default displayed precision changes from 2/4 decimals to `DIGITS`'s
+own default (5), not just its column spacing.
+
+**The two-way grid is the one shape with no `STATS` equivalent, and — per explicit user direction
+given after this architect pass's first draft — is modeled on SAS `PROC FREQ`'s classic ASCII
+crosstab layout** rather than forced into `Print_Ruled_Table`'s one-value-per-column model. (The
+first draft had proposed the latter, keeping the existing `"Cell contents: ..."` legend line and
+adding only block-scoped column alignment; the user found the fuller `PROC FREQ` redesign
+acceptable, so this decision supersedes that draft rather than the reverse.) The renderer prints
+one **row-BLOCK per crossing-variable-1 level, spanning 3–4 lines** (one per statistic: Frequency,
+`[Percent]`, Row_Percent, Col_Percent — `[Percent]` omitted under `/NOPERCENT` exactly as today), a
+stacked **corner-cell legend** naming those same statistics vertically in the table's top-left
+column (replacing, not supplementing, the old standalone `"Cell contents: ..."` line), `|`-delimited
+column boundaries, and `-`/`+` horizontal rules between row-blocks. Each data column (each
+crossing-variable-2 level, plus `Total`) has **one width shared by all its statistic lines**, but
+that width is **not** shared with any other column — confirmed as the one implementation detail
+most likely to be gotten backwards, since a wrong, globally-shared width model passes unnoticed
+against every existing `TABLES` test fixture's small, similarly-sized counts; a dedicated regression
+test with asymmetric cell-value widths across columns (e.g. a Frequency of `100` in one column and
+`1` in another) is required. `sdata`'s own legend vocabulary (`Frequency`/`Percent`/`Row_Percent`/
+`Col_Percent`) and existing `"V2=<level>"` column-header form are kept rather than switching to
+SAS's abbreviated terms and bare-level-plus-preamble-line convention — both scoping calls made to
+keep the diff smaller, flagged explicitly for the user to revise if full SAS fidelity is wanted
+there too. Margin cells (`Total` row/column) stay single-valued (Frequency only, no percentages,
+preserving the Non-Goal that computed values don't change) and the `Total` row gets no closing rule
+— both deliberate divergences from full `PROC FREQ` fidelity and from `Print_Ruled_Table`'s own
+STATS-style closing rule (this grid is modeled on `PROC FREQ`, not `STATS`, for exactly this
+component). `01-architect.md` includes a worked, hand-computed example rendering `tests/data/
+freq.csv`'s existing fixture data at `DIGITS`'s default of 5, generated programmatically (not typed
+freehand) to remove ambiguity for both the coder's implementation and the reviewer's hand-
+verification of the ~37 regenerated expected-output files.
+
+**The `BY`-group divider line changes** from `TABLES`'s own `"----- BY G$=p -----"` bracketed-dash
+format to `STATS`'s plain `"G$ = p"` line (`Display_Stats_Table`'s existing `Group_Key` function),
+for full visual consistency — decided during design rather than re-confirmed with the user, since
+the request was explicitly about matching `STATS`'s look and the blast radius is minimal (2 of 37
+`TABLES` tests: `tables_by.cmd`, `tables_save_by.cmd`).
+
+**Consequences:** sdata-only; zero sdata-core changes (`Display_Stats_Table` and every
+`Execute_Tables` print path already live in sdata — sdata-core's role is limited to the unchanged,
+already-public `To_String_Formatted` and the unchanged `SData_Core.Statistics` chi-square
+computation). No language-visible syntax change — `TABLES`'s options, columns, and computed
+`/SAVE` file output (ADR-071) are untouched; this is a print-formatting-only change, plus the
+confirmed `DIGITS`-default-precision behavior change described above. 37 of `tests/tables_*.cmd`'s
+`expected/*.out` files require regeneration, hand-verified against manually computed column widths
+and values for a representative sample (one one-way table, one two-way grid with asymmetric cell
+widths, one list-form with `K`=3, one `/CHISQ` block, both `BY`-grouped tests) rather than accepted
+in bulk. `doc/design.md`'s `TABLES` (and, if not already present, `STATS`) entries get one
+clarifying sentence noting the output is column-aligned and `DIGITS`-aware.
+
+Version bump: minor (print-format change across 4 `TABLES` shapes plus a real `DIGITS`-default
+precision behavior change — larger in surface area than a pure bug-fix patch, matching the
+`use-if-dataset-option`/`percentile-aggregate-function` precedent for a behavior-visible addition).
+

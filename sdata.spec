@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.31.0
+Version:        0.32.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Sep 16 2026 John L. Ries <john@theyarnbard.com> - 0.32.0-1
+- TABLES output reformatted to match STATS's column-aligned, ruled style (ADR-076)
+
 * Wed Sep 16 2026 John L. Ries <john@theyarnbard.com> - 0.31.0-1
 - STATS and AGGREGATE gain a general PCTL percentile function (ADR-075, closes #93).
 
