@@ -1,0 +1,36 @@
+Dataset opened: tests/data/freq.csv
+Table of REGION$ by PRODUCT$
+
+Frequency  |
+Percent    |
+Row_Percent|
+Col_Percent|PRODUCT$=A|PRODUCT$=B|Total
+-----------+----------+----------+-----
+East       |         2|         1|    3
+           |  33.33333|  16.66667|     
+           |  66.66667|  33.33333|     
+           |  66.66667|  33.33333|     
+-----------+----------+----------+-----
+West       |         1|         2|    3
+           |  16.66667|  33.33333|     
+           |  33.33333|  66.66667|     
+           |  33.33333|  66.66667|     
+-----------+----------+----------+-----
+Total      |         3|         3|    6
+
+Statistic                    DF    Value     Prob
+-------------------------------------------------
+Chi-Square                    1  0.66667  0.41422
+Likelihood-Ratio_Chi-Square   1  0.67960  0.40973
+Continuity-Adj._Chi-Square    1  0.00000  1.00000
+Mantel-Haenszel_Chi-Square    1  0.55556  0.45606
+Phi_Coefficient                  0.33333         
+Contingency_Coefficient          0.31623         
+Cramers_V                        0.33333         
+-------------------------------------------------
+
+Sample_Size = 6
+WARNING: over 20% of cells have expected count < 5; chi-square may be invalid.
+
+TABLES complete.
+DERIVED_UPPERCASE_EXISTS

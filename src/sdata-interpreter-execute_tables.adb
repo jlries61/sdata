@@ -605,17 +605,50 @@ procedure Execute_Tables (Stmt : Statement_Access) is
 
    --  Insert "_chisq" before the last '.' extension in Full (matching the
    --  directory-boundary-aware scan Full_Path's own Has_Extension uses),
-   --  or append it at the end if Full has no extension.
+   --  or append it at the end if Full has no extension.  The inserted
+   --  literal matches the base name's own case (checked from the last
+   --  path separator onward, so an unrelated lower-case directory
+   --  component -- e.g. "tests/data/" -- never affects the decision):
+   --  an unquoted /SAVE= name is uppercased by the parser (see
+   --  sdata-parser.adb's /SAVE and /CHISQFILE= handling) and gets a
+   --  matching "_CHISQ", so the whole derived name reads consistently
+   --  instead of a jarring "ADULT_RACE_VS_SEX_chisq.CSV".
    function Derive_Chisq_Name (Full : String) return String is
+      function Base_Has_Lower (Last : Natural) return Boolean is
+         First : Positive := Full'First;
+      begin
+         for I in reverse Full'First .. Last loop
+            if Full (I) = '/' or else Full (I) = '\' then
+               First := I + 1;
+               exit;
+            end if;
+         end loop;
+         for I in First .. Last loop
+            if Full (I) in 'a' .. 'z' then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end Base_Has_Lower;
    begin
       for I in reverse Full'Range loop
          if Full (I) = '.' then
-            return Full (Full'First .. I - 1) & "_chisq" & Full (I .. Full'Last);
+            declare
+               Suffix : constant String :=
+                 (if Base_Has_Lower (I - 1) then "_chisq" else "_CHISQ");
+            begin
+               return Full (Full'First .. I - 1) & Suffix & Full (I .. Full'Last);
+            end;
          elsif Full (I) = '/' or else Full (I) = '\' then
             exit;
          end if;
       end loop;
-      return Full & "_chisq";
+      declare
+         Suffix : constant String :=
+           (if Base_Has_Lower (Full'Last) then "_chisq" else "_CHISQ");
+      begin
+         return Full & Suffix;
+      end;
    end Derive_Chisq_Name;
 
    --  True if Reserved (a /SAVE-computed column name: FREQUENCY, PERCENT,

@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.32.0
+Version:        0.32.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Sep 16 2026 John L. Ries <john@theyarnbard.com> - 0.32.1-1
+- Fix TABLES /SAVE= and /CHISQFILE= to uppercase unquoted filenames (ADR-077)
+
 * Wed Sep 16 2026 John L. Ries <john@theyarnbard.com> - 0.32.0-1
 - TABLES output reformatted to match STATS's column-aligned, ruled style (ADR-076)
 

@@ -1,3 +1,9 @@
+sdata (0.32.1-1) unstable; urgency=medium
+
+  * Fix TABLES /SAVE= and /CHISQFILE= to uppercase unquoted filenames (ADR-077)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 16 Sep 2026 19:46:15 -0700
+
 sdata (0.32.0-1) unstable; urgency=medium
 
   * TABLES output reformatted to match STATS's column-aligned, ruled style (ADR-076)

@@ -3069,3 +3069,46 @@ Version bump: minor (print-format change across 4 `TABLES` shapes plus a real `D
 precision behavior change — larger in surface area than a pure bug-fix patch, matching the
 `use-if-dataset-option`/`percentile-aggregate-function` precedent for a behavior-visible addition).
 
+### ADR-077: TABLES's /SAVE= and /CHISQFILE= now uppercase unquoted filenames
+
+**Date:** 2026-09-17 | **Status:** Accepted
+
+**Context.** User report, reproduced directly against a real script
+(`~/testing/sdata/adultmrg.cmd`): `TABLES race$*sex$ /save=adult_race_vs_sex /chisq` produced
+`adult_race_vs_sex.CSV` and `adult_race_vs_sex_chisq.CSV` — a lower-case base name paired with an
+upper-case `.CSV` extension. `design.md` documents "if the file name is unquoted, it is converted
+to uppercase" for `USE`, and `SAVE`'s own entry states its filename "shall be interpreted in the
+same way as by the `USE` command" — `TABLES`'s `/SAVE=` entry likewise says its filename "is
+resolved the same way as the `SAVE` command's filename." Traced the actual parser code
+(`src/parser/sdata-parser.adb`): every other unquoted-filename call site (`USE`'s per-dataset spec,
+`SAVE`'s per-target spec, `FPATH`/`SUBMIT`/`SYSTEM`, `OUTPUT`) gates on `Token_Kind /=
+Token_String_Literal` before upper-casing the copied token text — `TABLES`'s own `/SAVE=` and
+`/CHISQFILE=` handling were the only two call sites that copied the raw token verbatim with no
+case conversion at all, a straightforward oversight from `ADR-071`'s original `/SAVE` implementation
+(never caught because every prior `TABLES` `/SAVE`-related test used an explicitly quoted filename).
+The upper-case `.CSV` came from `Full_Path`'s unconditional literal `& ".CSV"` append when no
+extension is given (`sdata_core-commands.adb`) — correct and unrelated to the bug; the mismatch was
+entirely the un-upper-cased base name sitting next to it.
+
+**Decision.** Added the identical `if Val_Tok.Kind /= Token_String_Literal then ... To_Upper ...`
+guard already used everywhere else, at both `/SAVE=` and `/CHISQFILE=`'s parse sites. Also made
+`Derive_Chisq_Name` (the default `<name>_chisq.<ext>` deriver used when `/CHISQFILE=` is absent)
+case-consistent with its input: it now inspects the base name portion only (scanning back from the
+extension to the last path separator, so an unrelated lower-case directory component such as
+`tests/data/` never influences the decision) and inserts `_CHISQ` when that portion has no lower-case
+letters, `_chisq` otherwise — closing a second-order inconsistency the primary fix would otherwise
+have left behind (`ADULT_RACE_VS_SEX_chisq.CSV`, an upper-case base with a stray lower-case derived
+segment) that the user's specific script would have hit immediately, since it relies on the
+default-derived name rather than an explicit `/CHISQFILE=`.
+
+**Consequences:** sdata-only, parser + interpreter (`src/parser/sdata-parser.adb`,
+`src/sdata-interpreter-execute_tables.adb`). No `design.md`/HELP/man-page change — this brings the
+implementation in line with already-documented behavior, not a new documented rule. Two new
+regression tests (`tables_save_unquoted_uppercase.cmd`, `tables_save_unquoted_chisq_derived.cmd`)
+covering unquoted `/SAVE=`, unquoted `/CHISQFILE=`, and the default-derived name's case-matching;
+existing quoted-filename `TABLES` `/SAVE` tests re-verified unaffected (the fix is gated on token
+kind, touching nothing about quoted paths). `make check`: 597 → 599.
+
+Version bump: patch (a pure bug fix restoring already-documented, already-implemented-elsewhere
+behavior — no new syntax, no behavior change beyond correcting the case of generated file names).
+

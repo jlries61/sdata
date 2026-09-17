@@ -2556,6 +2556,12 @@ package body SData.Parser is
                begin
                   Stmt.Table_Save_File (1 .. VLen) := Val_Tok.Text (1 .. VLen);
                   Stmt.Table_Save_Len := VLen;
+                  --  Unquoted filenames -> uppercase (matches USE/SAVE).
+                  if Val_Tok.Kind /= Token_String_Literal then
+                     for I in 1 .. Stmt.Table_Save_Len loop
+                        Stmt.Table_Save_File (I) := To_Upper (Stmt.Table_Save_File (I));
+                     end loop;
+                  end if;
                end;
 
             elsif Flag = "FMT" then
@@ -2675,6 +2681,12 @@ package body SData.Parser is
                begin
                   Stmt.Table_Chisq_File (1 .. VLen) := Val_Tok.Text (1 .. VLen);
                   Stmt.Table_Chisq_File_Len := VLen;
+                  --  Unquoted filenames -> uppercase (matches USE/SAVE).
+                  if Val_Tok.Kind /= Token_String_Literal then
+                     for I in 1 .. Stmt.Table_Chisq_File_Len loop
+                        Stmt.Table_Chisq_File (I) := To_Upper (Stmt.Table_Chisq_File (I));
+                     end loop;
+                  end if;
                end;
 
             else
