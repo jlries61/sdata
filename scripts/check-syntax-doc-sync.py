@@ -4,9 +4,7 @@ statement-kind-defining files (AST / parser / lexer) doesn't also update
 the user-facing doc set (HELP text, man page, design.md) in the same
 change.
 
-This is the semantic-content analogue of scripts/sync-test-counts.py,
-which already does this for *numeric* test-count prose. CLAUDE.md's
-"Keeping the user-facing surface in sync" section states the rule this
+CLAUDE.md's "Keeping the user-facing surface in sync" section states the rule this
 script enforces; doc/design.md (+ doc/adrs.md) is the source of truth
 those three doc files are checked *against* when they disagree with each
 other, per CLAUDE.md's "Conflict resolution" paragraph -- but this script
@@ -16,7 +14,7 @@ which no path-based heuristic can safely judge.
 This makes drift visible on the triggering push; it does not and cannot
 block a merge to main (no branch protection exists on this repo -- see
 .ssd/milestones/2026-09-03-post-pe-audit-remediation/systems-designer-r1.md).
-That's the same honest trade-off scripts/sync-test-counts.py already makes.
+That is an honest trade-off: a visible signal on the triggering push, not a wall.
 
 Usage:
     scripts/check-syntax-doc-sync.py
@@ -36,7 +34,7 @@ continuously-enforced claim -- code-reviewer does not run on every push
 in this repo's actual direct-push-to-main workflow.
 
 Python 3 stdlib only, matching this ecosystem's scripts/gen-reference.py
-and scripts/sync-test-counts.py convention.
+convention.
 """
 
 import os

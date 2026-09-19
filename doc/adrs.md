@@ -3222,3 +3222,43 @@ mutual-exclusion error) was removed and replaced with four tests reflecting the 
 (overlapping/full-coverage union with deduplication), and `display_by_first_last_union` (union
 computed over the `/BY=`-sorted order). `make check`: 612 → 615 (net +3 after the one removal).
 
+
+---
+
+### ADR-079: Test counts are not maintained in prose
+
+**Date:** 2026-09-19 | **Status:** Accepted
+
+**Context.** `CLAUDE.md`, `CONTRIBUTING.md`, and `doc/SOFTWARE_STANDARDS_REVIEW.md` each copied
+derived numbers (integration-test count, five per-binary unit counts, their total, data-vandal's count, the
+ADR count) by hand from `make check`'s output. `scripts/sync-test-counts.py` policed the copies, but only in
+CI, after the push. Its own header recorded that the drift "has recurred three times". The 2026-09-19
+milestone audit (`.ssd/milestones/2026-09-19-post-tables-stats-parity/skeptic-before.md`, SK-1) measured
+it directly: **11 of the last 30 pushes to `main` were red, and all 11 failed on that single step** —
+every one a test-adding commit whose local `make check` passed while the prose still held the old
+number. `CLAUDE.md` even carried a stale as-of label ("counts as of v0.16.3") on numbers that were
+being kept current by the script. A gate that fires on more than a third of pushes indicates a
+process problem, not a healthy check.
+
+**Decision.** Stop copying derived data into prose. `make check`'s own output is the only source of
+truth; prose says so and says how to obtain the number. Counts survive in exactly one place, as an
+explicitly dated snapshot in `doc/SOFTWARE_STANDARDS_REVIEW.md` §4.1 (an audit document is a dated
+record by nature and cannot go "stale" because it never claims to be current), plus the existing
+dated history log in that file. `scripts/sync-test-counts.py`, the `check-test-counts` Makefile target,
+and the CI step "Test-count doc sync check" are removed. The ADR count in `CLAUDE.md` ("N ADRs,
+contiguous") was removed under the same rule; contiguity itself is still stated and remains
+checkable with a one-line scan of `doc/adrs.md`.
+
+**Alternatives considered.** (a) Append the existing check to `make check` so it fails locally — this
+would have required a new `--sdata-only` flag (locally the script discovers the sibling repos and
+`gprbuild`s sdata-core's tests, which CI does not) and kept four hand-edited files; rejected because it
+gates the symptom. (b) Auto-rewrite the prose in a pre-commit hook — rejected: silent edits to tracked
+docs.
+
+**Consequences.** Adding a test no longer requires touching any document. Removed, knowingly: the
+script also ran the five unit binaries and would have caught a binary that stopped printing a pass
+count; `make check` already fails on any unit failure, so the residual loss is only that narrower
+case. Readers who want the current number run `make check`. Any *new* hand-maintained count in
+prose should be treated as a regression of this decision; re-grep at each milestone
+(`grep -nE '\b[0-9]{3}\b.*(test|check)' CLAUDE.md CONTRIBUTING.md README.md`). sdata-only; no
+`sdata-core` or `data-vandal` change (neither referenced the removed script — grepped).

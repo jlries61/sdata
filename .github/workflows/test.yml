@@ -59,10 +59,6 @@ jobs:
         working-directory: sdata
         run: alr exec -- make check
 
-      - name: Test-count doc sync check
-        working-directory: sdata
-        run: alr exec -- make check-test-counts
-
       # check-syntax-doc-sync.py diffs against the base commit, but
       # actions/checkout defaults to a 1-commit shallow clone -- unshallow
       # first or the diff has no history to work against.

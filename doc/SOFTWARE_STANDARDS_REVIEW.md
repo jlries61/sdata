@@ -234,6 +234,10 @@ is itself a finding (see Hard Truth).
 
 ### 4.1 Test Coverage
 
+**Snapshot as of 2026-09-19** (taken from `make check` output and
+`ls tests/*.cmd`; this table is a dated record, not a maintained figure --
+see ADR-079).
+
 | Suite | Count |
 |---|---|
 | Integration `.cmd` | **616** |
@@ -244,11 +248,13 @@ is itself a finding (see Hard Truth).
 | `interpreter_unit_test` | 101 |
 | **Unit total** | **885** |
 
-Counts synced 2026-07-30 from `make check` (the source of truth), alongside the
-EAV disk-spill schema (jlries61/sdata#64). CI runs all unit suites + 616
-integration tests + a fuzz-corpus regression on push and PR. data-vandal
-carries its own 149 integration tests (run manually / its own CI); sdata-core
-carries 392 in-crate assertions across 9 drivers.
+Counts were last hand-synced 2026-07-30, alongside the EAV disk-spill schema
+(jlries61/sdata#64), and re-verified for this snapshot on 2026-09-19 against
+`make check` (the source of truth). CI runs all unit suites + the integration
+tests + a fuzz-corpus regression on push and PR. data-vandal carries its own
+149 integration tests as of the snapshot (run manually / its own CI);
+sdata-core carries in-crate assertions across 9 drivers (see its own suite
+for the current figure).
 
 **Gap — RESOLVED 2026-06-09 (remediation #3, sdata-core PR #31).**
 `sdata_core-statistics.adb` (775 lines, ~54 distribution/IDF/RNG functions) had

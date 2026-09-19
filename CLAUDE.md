@@ -77,16 +77,17 @@ make build           # alternative if toolchain is on PATH
 make check           # build + run all tests (unit + integration)
 ```
 
-`make check` runs five unit-test binaries plus the integration suite (counts as
-of v0.16.3; `make check` output is the source of truth):
-1. `bin/csv_unit_test` — `SData_Core.CSV` functions (71)
-2. `bin/sdata_unit_test` — `SData_Core.Table` / `Variables` / transient-table / merge / PDV (384)
-3. `bin/evaluator_unit_test` — expression evaluator (225)
-4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write (104)
-5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT (101)
-6. 616 `.cmd` integration tests in `tests/` (885 unit checks total)
+`make check` runs five unit-test binaries plus the integration suite. Test
+counts are deliberately **not** recorded in prose (ADR-079); `make check`'s own
+output is the only source of truth:
+1. `bin/csv_unit_test` — `SData_Core.CSV` functions
+2. `bin/sdata_unit_test` — `SData_Core.Table` / `Variables` / transient-table / merge / PDV
+3. `bin/evaluator_unit_test` — expression evaluator
+4. `bin/file_io_unit_test` — CSV/ODF/OOXML read-write
+5. `bin/interpreter_unit_test` — control flow / SELECT / REPEAT
+6. the `.cmd` integration tests in `tests/`
 
-All 616 integration tests must pass before committing. Never use `--no-verify`.
+All integration tests must pass before committing. Never use `--no-verify`.
 
 **Documentation-only commits** — changes confined to `doc/`, `man/`, and `*.md`
 (README, CONTRIBUTING, CLAUDE.md) and similar non-build prose — do **not** require a
@@ -134,8 +135,8 @@ implement USE, SAVE, FPATH, OUTPUT, SELECT, KEEP, DROP, ARRAY, DIM, RUN, and
 their related helpers (`Execute_OUTPUT_Table`, `Execute_Rebuild_Filter`). sdata's
 interpreter delegates to these rather than duplicating the logic. data-vandal
 calls the same procedures. When changing one of these commands' semantics, edit
-sdata-core and confirm both `make check` (sdata, 616 integration tests) and
-`cd ~/Develop/data-vandal && make check` (data-vandal, 149 integration tests) still pass.
+sdata-core and confirm both `make check` (sdata) and
+`cd ~/Develop/data-vandal && make check` (data-vandal) still pass.
 
 ## Source Layout
 
@@ -159,10 +160,10 @@ src/
 tests/
   csv_unit_test.adb           -- SData_Core.CSV unit tests
   sdata_unit_test.adb         -- SData_Core.Variables / PDV unit tests
-  *.cmd                       -- integration test scripts (616)
+  *.cmd                       -- integration test scripts
 doc/
   SOFTWARE_STANDARDS_REVIEW.md  -- living standards audit (annotated)
-  adrs.md                     -- 78 ADRs (ADR-001 through ADR-078; contiguous)
+  adrs.md                     -- ADRs (ADR-001 onward; contiguous)
   architecture.md             -- package map, execution model, repo layout
   specs/                      -- design specs for completed features
   plans/                      -- implementation plans (step-by-step task lists)
@@ -222,7 +223,7 @@ before implementing or modifying any language-visible behaviour.
 
 **Architecture Decision Records** — `doc/adrs.md`
 
-Markdown; read directly. Documents 78 ADRs (ADR-001 through ADR-078,
+Markdown; read directly. Documents the ADRs (ADR-001 onward,
 contiguous) with rationale and status. ADRs 039–043 cover the sdata-core /
 data-vandal split. Check for a relevant ADR before proposing a design change.
 
@@ -294,7 +295,7 @@ one lingering. Do not reintroduce a hardcoded sdata-core version in these files.
 
 - Phases 1–4: **complete** (core, control flow, distributions/aggregates, spreadsheet I/O)
 - Phase 5 (Polish): **complete** — disk spillover, interactive improvements, pager, HELP, LIST, ERR/ERL, error messages, performance, documentation
-- Phase 6 (Testing): **ongoing** — 616 integration tests, 885 unit checks across 5 modules
+- Phase 6 (Testing): **ongoing** — integration tests plus unit checks across 5 modules
 - v0.8.0 milestone (2026-05-21): VANDALIZE extracted into `data-vandal`; sdata-core shared library created (ADRs 039–043)
 - STATS command (2026-07-01): SData's PROC MEANS analogue — per-variable summary statistics, one row per (BY group × variable), reusing the aggregate machinery (sdata v0.12.0, sdata-core v0.1.19; ADR-048)
 
