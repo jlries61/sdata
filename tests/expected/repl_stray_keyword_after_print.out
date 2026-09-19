@@ -1,0 +1,7 @@
+sdata> PRINT 1 RUN
+Error: syntax error: unexpected "RUN" after statement at line 1
+sdata> PRINT 2
+sdata> RUN
+2
+RUN complete. 1 records and 0 variables processed.
+sdata> QUIT

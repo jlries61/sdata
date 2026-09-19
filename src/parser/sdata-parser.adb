@@ -452,6 +452,18 @@ package body SData.Parser is
                return Node;
             end;
          when others =>
+            --  Not the start of an operand: leave the token where it is for
+            --  the caller.  Consuming it first (and then returning null) made
+            --  a stray token vanish without trace -- "PRINT 1 RUN" discarded
+            --  the RUN and looked like a complete statement (ADR-080).  These
+            --  are exactly the kinds the case below builds a node for.
+            if Tok.Kind not in Token_Numeric_Literal | Token_String_Literal
+                 | Token_Identifier | Token_Quoted_Identifier | Token_NEXT
+                 | Token_IF | Token_Left_Paren | Token_Dot | Token_Infinity
+                 | Token_NaN
+            then
+               return null;
+            end if;
             declare
                Actual_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
@@ -3991,6 +4003,35 @@ package body SData.Parser is
                "Unrecognized command """ & Tok.Text (1 .. Tok.Length) &
                """ at line " & Tok.Line'Image & " — type HELP for a list of commands";
       end case;
+
+      --  Statement terminator rule (ADR-080): a statement must be followed by
+      --  a newline, a colon, or the end of input -- or by a keyword that
+      --  closes or continues the block it sits in, or by a comma (a
+      --  continuation comma left after a complete statement is a legal
+      --  no-op, D4).  Anything else is a second statement run onto this line
+      --  without a colon.  A statement that already consumed its own newline
+      --  or colon (SELECT scans past separators looking for CASE, for one)
+      --  is finished, and what is peeked now starts the next line.
+      if Last_Token_Kind (Ctx.Lex_Ctx) not in Token_Newline | Token_Colon then
+         declare
+            Follower : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+         begin
+            if Follower.Kind not in Token_Newline | Token_Colon | Token_EOF
+                 | Token_Comma
+                 --  Block structure: the terminators Parse_If_Body,
+                 --  Parse_Select_Body and the FOR/WHILE/DO Parse_Block
+                 --  callers look for, plus the inline IF's ELSE/ELSEIF.
+                 | Token_ELSE | Token_ELSEIF | Token_END | Token_NEXT
+                 | Token_WEND | Token_UNTIL | Token_CASE | Token_WHEN
+                 | Token_OTHERWISE
+            then
+               raise Script_Error with
+                  "syntax error: unexpected """
+                  & Token_To_String (Follower)
+                  & """ after statement at line" & Follower.Line'Image;
+            end if;
+         end;
+      end if;
 
       if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon or else Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Newline then
          declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
