@@ -3001,6 +3001,18 @@ package body SData.Parser is
                                or else P.Kind = Token_ELSE or else P.Kind = Token_ELSEIF;
                      if P.Kind = Token_Comma or else P.Kind = Token_Semicolon then
                         declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+                        --  ADR-081: a semicolon means "print the next item
+                        --  right after this one", and one that ends the
+                        --  statement suppresses the newline.  A comma is a
+                        --  plain separator (a space), as before.
+                        if P.Kind = Token_Semicolon then
+                           Stmt.Print_Trailing_Semi := True;
+                           if Last_Arg /= null then
+                              Ada.Strings.Unbounded.Replace_Element
+                                (Stmt.Print_Seps,
+                                 Ada.Strings.Unbounded.Length (Stmt.Print_Seps), ';');
+                           end if;
+                        end if;
                      end if;
                   end;
 
@@ -3013,6 +3025,8 @@ package body SData.Parser is
                      if Stmt.Print_Args = null then Stmt.Print_Args := New_Arg;
                      else Last_Arg.Next := New_Arg; end if;
                      Last_Arg := New_Arg;
+                     Ada.Strings.Unbounded.Append (Stmt.Print_Seps, ' ');
+                     Stmt.Print_Trailing_Semi := False;
                   end;
                end loop;
             end;

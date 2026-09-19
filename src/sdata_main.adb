@@ -121,6 +121,10 @@ procedure SData_Main is
       Ada.Text_IO.Put_Line ("Interactive Console. Type QUIT to exit.");
       Buffer := Null_Unbounded_String;
       REPL : loop
+         --  ADR-081: end an unfinished PRINT/NOTE line (one ending in a
+         --  semicolon) so the prompt starts on a fresh line.
+         SData.Interpreter.Finish_Print_Line;
+         SData_Core.IO.Flush_Pager_Buffer;
          if Length (Buffer) = 0 then
             Ada.Text_IO.Put ("sdata> ");
          else

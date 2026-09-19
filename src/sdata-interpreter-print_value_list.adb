@@ -4,11 +4,16 @@
 
 separate (SData.Interpreter)
 procedure Print_Value_List (Args : Expression_List;
-                             Check_Permanent : access procedure (Arr_Name : String; Idx : Integer) := null) is
+                             Check_Permanent : access procedure (Arr_Name : String; Idx : Integer) := null;
+                             Seps : String := "";
+                             Trailing_Semi : Boolean := False) is
 begin
-   declare Current_Arg : Expression_List := Args;
+   declare
+      Current_Arg : Expression_List := Args;
+      Arg_No      : Natural := 0;
    begin
       while Current_Arg /= null loop
+         Arg_No := Arg_No + 1;
          if Current_Arg.Expr.Kind = Expr_Variable then
             declare
                VName : constant String := To_Upper (Current_Arg.Expr.Var_Name (1 .. Current_Arg.Expr.Var_Len));
@@ -79,9 +84,21 @@ begin
          else
             Put (To_String_Formatted (Evaluate (Current_Arg.Expr)));
          end if;
-         if Current_Arg.Next /= null then Put (" "); end if;
+         --  ADR-081: an item followed by a semicolon is adjacent to the next
+         --  one; anything else (a comma, whitespace) prints one space.
+         if Current_Arg.Next /= null
+           and then not (Arg_No <= Seps'Length
+                         and then Seps (Seps'First + Arg_No - 1) = ';')
+         then
+            Put (" ");
+         end if;
          Current_Arg := Current_Arg.Next;
       end loop;
-      New_Line;
+      if Trailing_Semi then
+         Print_Line_Open := True;   --  leave the line unfinished
+      else
+         New_Line;
+         Print_Line_Open := False;
+      end if;
    end;
 end Print_Value_List;

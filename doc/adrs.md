@@ -90,6 +90,7 @@ that might relitigate a settled question.
 | ADR-078 | DISPLAY gains /FIRST=, /LAST=, and /BY= options | 2026-09-17 | Accepted |
 | ADR-079 | Test counts are not maintained in prose | 2026-09-19 | Accepted |
 | ADR-080 | Comma rules: a continuation comma joins lines, a blank line ends a statement, a mid-line comma in a comma-free position is an error, and statements must end at a newline, colon or end of input | 2026-09-19 | Accepted |
+| ADR-081 | PRINT/NOTE: a semicolon prints items adjacent and a trailing semicolon suppresses the newline (Bywater BASIC 3.20) | 2026-09-19 | Accepted |
 
 ---
 
@@ -3367,3 +3368,60 @@ prototype without that exemption failed 44 existing tests, all false positives; 
   `HELP SYNTAX`; the man page's *Statement separation and line continuation*; `tests/expected/help_all.out`
   and `help_index.out` regenerated (pure additions). sdata-only: data-vandal has its own lexer and parser,
   and sdata-core has none.
+
+---
+
+### ADR-081: PRINT/NOTE: a semicolon prints items adjacent and a trailing semicolon suppresses the newline (Bywater BASIC 3.20)
+
+**Date:** 2026-09-19 | **Status:** Accepted
+
+**Context.** After ADR-080 shipped the user asked whether `;` should be kept at all ("I don't remember ever asking
+for it") and then ruled: **"we should support semicolons wherever the BW BASIC standard calls for them."** `;` had
+been in the lexer since the first commit and PRINT/NOTE accepted it, but treated it exactly like a comma or a space,
+so `PRINT "a"; "b"` printed `a b`. design.md sec1 says commands follow Bywater BASIC 3.20 unless stated otherwise.
+
+The Bywater BASIC 3.20 source archive (SourceForge) was read rather than assumed:
+- `bwbasic` man page: "expressions to be printed must be separated by the comma (tabbed output), the semicolon
+  (immediate sequential output) or the plus sign (immediate sequential output by string concatenation)".
+- `bwb_prn.c`, the PRINT element loop: a comma tabs to the next print zone, a semicolon outputs nothing ("concatenate
+  strings", i.e. the items are adjacent), and **both** set `OutputCR = FALSE`; at the end `if (OutputCR == TRUE)
+  newline` with the comment "did not end with ',' or ';'". A trailing separator therefore suppresses the newline.
+- Numbers print as `[space]number[space]` (positive) or `[minus]number[space]` (negative); strings print as-is.
+- BWBASIC's other semicolon uses are `PRINT USING fmt$; list`, `INPUT ["prompt";] list`, `INPUT ;` and
+  `LINE INPUT ["prompt";] var$`. sdata implements none of those statements, so they do not apply. The statement
+  separator in both languages is the colon.
+
+**Decision** (the user's rulings). (1) A semicolon between PRINT/NOTE items prints them **adjacent**. (2) A
+semicolon that **ends** the statement suppresses the newline. (3) A **comma stays a single space**; tab zones are not
+implemented and that is a deliberate, documented deviation. `PRINT ;` (no items) prints nothing and no newline. Two
+separators in a row (`;;`) remain a syntax error, as `,,` is. An unfinished line is ended before the `RUN complete`
+message so that message does not run on to it.
+
+**Mechanism.** `Expression_List_Node` belongs to sdata-core, so per-argument data is not added there (a public-API
+change across crates for a sdata-only feature). `Statement` gains, for PRINT/NOTE, `Print_Seps` (character I is `;`
+when a semicolon follows argument I, else a space) and `Print_Trailing_Semi`. The parser records them in the loop that
+already skipped the separator. `Print_Value_List` prints no space after an argument followed by `;` and skips the final
+`New_Line` for a trailing `;`, setting `Print_Line_Open`, which `Print_Run_Complete` and the REPL loop clear with a newline
+(`Finish_Print_Line`). sdata-only.
+
+**Alternatives considered.** Implementing tab zones for the comma: rejected by the user (a data-step language has no
+print zones). Padding numbers as BWBASIC does: rejected; it would change every PRINT of a number, and the user
+accepted `PRINT 1; 2` printing `12` (strings and explicit `" "` give spacing). A trailing comma also suppressing the
+newline (BWBASIC does): not adopted; a trailing comma is an ADR-080 continuation comma here, joining the next line.
+Adding the separators to `Expression_List_Node`: rejected (cross-crate).
+
+**Consequences.**
+- **Behavior change.** `PRINT "a"; "b"` was `a b`, now `ab`; `PRINT 1; 2` was `1 2`, now `12`. A trailing `;` used to
+  be ignored and now joins the following output onto the same line. Scripts that used `;` as a synonym for a space
+  change output; comma and whitespace scripts do not.
+- **Known limit.** `Print_Line_Open` is only cleared by a PRINT/NOTE newline and by `Print_Run_Complete`. If some other
+  command writes to the console while a PRINT line is open (for example DISPLAY between two PRINTs), the flag is stale
+  and one extra blank line may appear before the next `RUN complete`. This is cosmetic and was left simple on purpose.
+- In the REPL an unfinished line is ended before each prompt (`Finish_Print_Line`), so a trailing `;` only joins
+  output within one input line there; a script's output already ends with a newline at exit.
+- There is no statement that emits just a newline: a bare `PRINT` prints the record's variables and `PRINT ""` prints
+  `.` (an empty string is a missing value in sdata). An unfinished line is ended by the next PRINT/NOTE that prints
+  something, by `RUN complete`, or by the REPL prompt.
+- design.md, HELP PRINT, the man page and the HELP golden are updated; `NOTE` shares the rules. Files:
+  `src/ast/sdata-ast.ads`, `src/parser/sdata-parser.adb`, `src/sdata-interpreter.adb` and its `Print_Value_List`,
+  `Execute_Print` and `Execute_Note` subunits.

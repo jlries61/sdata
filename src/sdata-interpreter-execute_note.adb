@@ -120,5 +120,7 @@ begin
       end loop;
    end;
 
-   Print_Value_List (Stmt.Print_Args, Reject_Element'Access);
+   Print_Value_List (Stmt.Print_Args, Reject_Element'Access,
+                     Seps          => Ada.Strings.Unbounded.To_String (Stmt.Print_Seps),
+                     Trailing_Semi => Stmt.Print_Trailing_Semi);
 end Execute_Note;

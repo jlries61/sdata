@@ -184,9 +184,12 @@ package body SData.Help is
 
    procedure Help_PRINT is
    begin
-      Put_Line ("Command: PRINT [expr [[,] | [;] expr] ...]");
-      Put_Line ("Outputs values to the console, separated by spaces. A comma or a");
-      Put_Line ("semicolon between values is optional and has the same effect as a space.");
+      Put_Line ("Command: PRINT [expr [[,] | [;] expr] ...] [;]");
+      Put_Line ("Outputs values to the console. A space or comma between values prints one");
+      Put_Line ("space; a semicolon prints them adjacent, as in Bywater BASIC, so");
+      Put_Line ("PRINT ""a""; ""b"" prints ab. Numbers are not padded: PRINT 1; 2 prints 12.");
+      Put_Line ("A semicolon ending the statement suppresses the newline (the next output");
+      Put_Line ("continues on the same line); PRINT ; prints nothing.");
       Put_Line ("(A semicolon does not separate statements; use a colon.)");
       Put_Line ("No arguments: Prints all permanent variables for the current record.");
       Put_Line ("Execution: Deferred -- executed once per record inside the data step.");

@@ -188,7 +188,9 @@ package body SData.Interpreter is
    procedure Execute_Print        (Stmt : Statement_Access);
    procedure Execute_Note         (Stmt : Statement_Access);
    procedure Print_Value_List     (Args : Expression_List;
-                                    Check_Permanent : access procedure (Arr_Name : String; Idx : Integer) := null);
+                                    Check_Permanent : access procedure (Arr_Name : String; Idx : Integer) := null;
+                                    Seps : String := "";
+                                    Trailing_Semi : Boolean := False);
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context);
    procedure Execute_Metadata        (Stmt : Statement_Access);
    procedure Execute_Program_Remove  (Stmt : Statement_Access);
@@ -233,6 +235,12 @@ package body SData.Interpreter is
 
    --  Set of script files currently in the SUBMIT execution chain (for cycle detection).
    Submit_Chain : Name_Sets.Set;
+
+   --  ADR-081: a PRINT/NOTE ending in a semicolon leaves its output line
+   --  unfinished (as in Bywater BASIC).  Set by Print_Value_List and cleared
+   --  when a PRINT/NOTE ends its line; Print_Run_Complete closes an
+   --  unfinished line first so the RUN message does not run on to it.
+   Print_Line_Open : Boolean := False;
 
    --  ADR-058: submitted-file paths that have already produced at least one
    --  ADR-056 declarative-in-loop warning while loop-nested. SUBMIT
@@ -505,6 +513,14 @@ package body SData.Interpreter is
       --  A newly queued deferred statement is pending until the next RUN.
       Pending_Deferred := Pending_Deferred + 1;
    end Add_To_Active_Program;
+
+   procedure Finish_Print_Line is
+   begin
+      if Print_Line_Open then
+         New_Line;
+         Print_Line_Open := False;
+      end if;
+   end Finish_Print_Line;
 
    procedure Clear_Deferred_Program is
    begin
@@ -1002,7 +1018,9 @@ package body SData.Interpreter is
    --  idempotent (e.g. RANDOM()); evaluating it twice could check one
    --  element and print a different one. PRINT passes no check (null).
    procedure Print_Value_List (Args : Expression_List;
-                                Check_Permanent : access procedure (Arr_Name : String; Idx : Integer) := null) is separate;
+                                Check_Permanent : access procedure (Arr_Name : String; Idx : Integer) := null;
+                                Seps : String := "";
+                                Trailing_Semi : Boolean := False) is separate;
 
    --  IF / WHILE / FOR / LOOP_REPEAT / SELECT — all control flow constructs.
    procedure Execute_Control_Flow (Stmt : Statement_Access; Ctx : in out Step_Context) is separate;
@@ -2693,6 +2711,7 @@ package body SData.Interpreter is
          RC : constant String := Natural'Image (SData_Core.Table.Row_Count);
          VC : constant String := Natural'Image (SData_Core.Table.Column_Count);
       begin
+         Finish_Print_Line;
          Debug_Trace ("RUN complete: "
                       & RC (RC'First + 1 .. RC'Last)
                       & " records, "

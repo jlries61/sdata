@@ -37,6 +37,11 @@ package SData.Interpreter is
    --  Executes the global active program.
    procedure Run_Active_Program;
 
+   --  Ends an unfinished PRINT/NOTE output line (one that ended in a
+   --  semicolon), if there is one (ADR-081).  The REPL calls it before each
+   --  prompt so the prompt does not land on the end of the output.
+   procedure Finish_Print_Line;
+
    --  Returns True if a statement of the given kind executes immediately in
    --  the REPL rather than being queued for the next RUN (data step).
    --  Add new statement kinds here when they should not be deferred.

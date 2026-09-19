@@ -104,9 +104,12 @@ Default timeout: 300 s in batch mode, 0 (unlimited) in interactive mode.
 Override at startup with --shell-timeout=N; override at runtime with OPTIONS SHELLTIMEOUT N.
 Execution: Immediate -- the shell command is launched at once.
 
-Command: PRINT [expr [[,] | [;] expr] ...]
-Outputs values to the console, separated by spaces. A comma or a
-semicolon between values is optional and has the same effect as a space.
+Command: PRINT [expr [[,] | [;] expr] ...] [;]
+Outputs values to the console. A space or comma between values prints one
+space; a semicolon prints them adjacent, as in Bywater BASIC, so
+PRINT "a"; "b" prints ab. Numbers are not padded: PRINT 1; 2 prints 12.
+A semicolon ending the statement suppresses the newline (the next output
+continues on the same line); PRINT ; prints nothing.
 (A semicolon does not separate statements; use a colon.)
 No arguments: Prints all permanent variables for the current record.
 Execution: Deferred -- executed once per record inside the data step.

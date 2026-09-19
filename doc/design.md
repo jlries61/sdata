@@ -823,7 +823,7 @@ or *ECHO OFF* is in effect.
 
 - Syntax:
 
-  - *PRINT \[\<value\>...\]*: Print specified values separated by spaces. A comma or a semicolon between values is optional and has the same effect as a space (in Bywater BASIC they control spacing; here they do not). A semicolon has no other role in the language: it is not a statement separator (use *:*), and one after a complete statement is a syntax error.
+  - *PRINT \[\<value\>...\]*: Print specified values. A space or a comma between values prints one space (sdata does not tab to print zones, as Bywater BASIC does for a comma). A **semicolon** between values prints them adjacent, with nothing between them, as in Bywater BASIC; sdata does not pad numbers, so *PRINT 1; 2* prints *12* and any spacing is written explicitly (*PRINT A; " "; B*). A semicolon that ends the statement suppresses the newline, so the next output continues on the same line (Bywater BASIC also does this for a trailing comma; sdata does not); an unfinished line is ended before the *RUN complete* message. *PRINT ;* prints nothing and no newline. A semicolon has no other role in the language: it is not a statement separator (use *:*), and one after a complete statement is a syntax error.
   - *PRINT* (no arguments): Print values of all currently defined permanent variables with their names for current record.
 
 - **Number Formatting:** Floating point values printed with precision specified by most recently issued *DIGITS* statement.
@@ -834,7 +834,7 @@ or *ECHO OFF* is in effect.
 
 - Syntax:
 
-  - *NOTE \<value\> [\<value\>...]*: Print specified values separated by spaces. At least one argument is required — unlike *PRINT*, *NOTE* has no bare (no-argument) form, since it never has a "current record" to print permanent variables of.
+  - *NOTE \<value\> [\<value\>...]*: Print specified values, with the same separator rules as *PRINT* (space or comma: one space; semicolon: adjacent; a trailing semicolon suppresses the newline). At least one argument is required — unlike *PRINT*, *NOTE* has no bare (no-argument) form, since it never has a "current record" to print permanent variables of.
 
 - **Argument restriction:** every argument must be built entirely from temporary (*SET*) variables — a permanent (table-column) variable is rejected wherever it appears in an argument's expression, not only as a bare reference, because it has no well-defined single value outside a per-record data-step pass, which *NOTE* never has (see ADR-059 for the full rationale, including why a reducing expression like an aggregate function cannot be used as a workaround).
 

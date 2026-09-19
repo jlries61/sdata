@@ -1,0 +1,5 @@
+sdata> NOTE "x";
+x
+sdata> NOTE "y"
+y
+sdata> QUIT

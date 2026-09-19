@@ -5,7 +5,11 @@
 separate (SData.Interpreter)
 procedure Execute_Print (Stmt : Statement_Access) is
 begin
-   if Stmt.Print_Args = null then
+   if Stmt.Print_Args = null and then Stmt.Print_Trailing_Semi then
+      --  "PRINT ;": no items and a trailing semicolon -- nothing to print
+      --  and no newline, as in Bywater BASIC (ADR-081).
+      null;
+   elsif Stmt.Print_Args = null then
       --  P16 (design-vs-implementation audit): bare PRINT must show "all
       --  currently defined permanent variables ... for current record"
       --  (design.md §6.2 / Help_PRINT) -- i.e. the PDV as it stands for
@@ -36,6 +40,8 @@ begin
          GNAT.Strings.Free (PDV_List);
       end;
    else
-      Print_Value_List (Stmt.Print_Args);
+      Print_Value_List (Stmt.Print_Args,
+                        Seps          => Ada.Strings.Unbounded.To_String (Stmt.Print_Seps),
+                        Trailing_Semi => Stmt.Print_Trailing_Semi);
    end if;
 end Execute_Print;

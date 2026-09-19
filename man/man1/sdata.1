@@ -1284,9 +1284,22 @@ Array element forms are the same as for
 .BR LET .
 .TP
 .B PRINT [\fIexpr\fR ...]
-Print values to the console, separated by spaces.
-A comma or a semicolon between values is optional and has the same effect as a
-space.
+Print values to the console.
+A space or a comma between values prints one space.
+A semicolon between values prints them adjacent, as in Bywater BASIC, so
+.B PRINT \(dqa\(dq; \(dqb\(dq
+prints
+.BR ab .
+Numbers are not padded, so
+.B PRINT 1; 2
+prints
+.BR 12 .
+A semicolon that ends the statement suppresses the newline, so the next output
+continues on the same line; an unfinished line is ended before the
+.B RUN complete
+message.
+.B PRINT ;
+prints nothing.
 A semicolon has no other role: it does not separate statements (use
 .BR : ).
 With no arguments, prints all permanent variables for the current record.
