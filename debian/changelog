@@ -1,3 +1,9 @@
+sdata (0.34.0-1) unstable; urgency=medium
+
+  * Comma and statement rules (ADR-080): a blank line ends a continuation; a mid-line comma in an option loop or between statements is a syntax error; a statement must end at a newline, colon or end of input (PRINT 1 RUN and LET X = 1 PRINT X are now errors); a missing expression is a syntax error instead of a hang; new HELP SYNTAX topic
+
+ -- John L. Ries <john@theyarnbard.com>  Sat, 19 Sep 2026 14:54:09 -0700
+
 sdata (0.33.0-1) unstable; urgency=medium
 
   * DISPLAY gains /FIRST=, /LAST=, and /BY= options (ADR-078)
