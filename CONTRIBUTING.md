@@ -286,8 +286,8 @@ Do not use `--no-verify` to bypass hooks.
 
 ### Syntax changes and the doc-sync check
 
-A commit that changes `src/sdata-ast.ads`, `src/sdata-ast.adb`, `src/parser/sdata-parser.adb`, or
-`src/sdata-lexer.adb` (i.e. adds or modifies a statement kind, literal syntax, or keyword) is
+A commit that changes `src/ast/sdata-ast.ads`, `src/ast/sdata-ast.adb`, `src/parser/sdata-parser.adb`,
+`src/lexer/sdata-lexer.ads`, or `src/lexer/sdata-lexer.adb` (i.e. adds or modifies a statement kind, literal syntax, or keyword) is
 checked by CI (`make check-syntax-doc-sync`) to confirm it also touches at least one of
 `src/sdata-help.adb`, `man/man1/sdata.1`, or `doc/design.md` — see CLAUDE.md's "Keeping the
 user-facing surface in sync" section for why all three normally need updating together.

@@ -47,10 +47,11 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # Files where a new statement kind, literal syntax, or keyword is added.
 TRIGGER_SET = [
-    "src/sdata-ast.ads",
-    "src/sdata-ast.adb",
+    "src/ast/sdata-ast.ads",
+    "src/ast/sdata-ast.adb",
     "src/parser/sdata-parser.adb",
-    "src/sdata-lexer.adb",
+    "src/lexer/sdata-lexer.ads",   # token kinds / keywords are declared here
+    "src/lexer/sdata-lexer.adb",
 ]
 
 # The user-facing surface CLAUDE.md requires to stay in sync with the above.

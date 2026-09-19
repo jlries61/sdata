@@ -66,17 +66,17 @@ class EvaluateTests(unittest.TestCase):
         self.assertEqual(detail, ["src/parser/sdata-parser.adb"])
 
     def test_escape_trailer_skips_an_otherwise_stale_change(self):
-        files = ["src/sdata-lexer.adb"]
+        files = ["src/lexer/sdata-lexer.adb"]
         messages = (
             "refactor(lexer): extract token-scan helper, no new syntax\n\n"
             "Doc-Sync: not-applicable -- pure internal refactor, no syntax added\n"
         )
         status, detail = evaluate(files, messages)
         self.assertEqual(status, "escaped")
-        self.assertEqual(detail, ["src/sdata-lexer.adb"])
+        self.assertEqual(detail, ["src/lexer/sdata-lexer.adb"])
 
     def test_trailer_requires_a_reason_not_just_the_bare_key(self):
-        files = ["src/sdata-ast.ads"]
+        files = ["src/ast/sdata-ast.ads"]
         messages = "some commit\n\nDoc-Sync: not-applicable\n"
         status, _ = evaluate(files, messages)
         self.assertEqual(status, "stale")
@@ -87,7 +87,7 @@ class EvaluateTests(unittest.TestCase):
         # exact documented double-hyphen form with nothing after it, and
         # with only trailing whitespace, must still be treated as having
         # no valid trailer at all.
-        files = ["src/sdata-ast.ads"]
+        files = ["src/ast/sdata-ast.ads"]
         for messages in (
             "some commit\n\nDoc-Sync: not-applicable --\n",
             "some commit\n\nDoc-Sync: not-applicable --   \n",
@@ -96,10 +96,33 @@ class EvaluateTests(unittest.TestCase):
             self.assertEqual(status, "stale", msg=repr(messages))
 
     def test_multiple_trigger_files_any_one_required_file_satisfies(self):
-        files = ["src/sdata-ast.ads", "src/parser/sdata-parser.adb", "doc/design.md"]
+        files = ["src/ast/sdata-ast.ads", "src/parser/sdata-parser.adb", "doc/design.md"]
         status, detail = evaluate(files, "feat: new statement kind\n")
         self.assertEqual(status, "ok")
         self.assertEqual(detail, ["doc/design.md"])
+
+
+class ConfigTests(unittest.TestCase):
+
+    def test_every_configured_path_exists(self):
+        # The trigger set once listed three paths that did not exist
+        # (src/sdata-ast.*, src/sdata-lexer.adb -- the real files live under
+        # src/ast/ and src/lexer/), so a lexer-only or AST-only change never
+        # triggered the gate. A path that does not exist can never match a
+        # changed file, silently disabling that part of the check.
+        root = SCRIPT_PATH.parent.parent
+        for name in ("TRIGGER_SET", "REQUIRED_SET"):
+            for rel in getattr(module, name):
+                self.assertTrue((root / rel).is_file(), f"{name} lists a missing file: {rel}")
+
+    def test_lexer_only_change_is_gated(self):
+        status, detail = evaluate(["src/lexer/sdata-lexer.adb"], "tweak lexer\n")
+        self.assertEqual(status, "stale")
+        self.assertEqual(detail, ["src/lexer/sdata-lexer.adb"])
+
+    def test_ast_only_change_is_gated(self):
+        status, _ = evaluate(["src/ast/sdata-ast.ads"], "add a statement kind\n")
+        self.assertEqual(status, "stale")
 
 
 if __name__ == "__main__":
