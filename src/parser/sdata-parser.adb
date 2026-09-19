@@ -321,18 +321,14 @@ package body SData.Parser is
       else
          --  Inline form.
          S.Then_Branch := Parse_Statement (Ctx);
-         --  A trailing comma after the THEN-clause is a continuation marker
-         --  (design.md sec5.4; ADR-072), not a statement terminator -- it makes
-         --  the following line part of the *same* logical line, so ELSEIF/ELSE
-         --  must remain reachable exactly as if there had been no line break at
-         --  all. Skip it (and any further continuation commas) before checking
-         --  for ELSEIF/ELSE; a plain newline with no such comma still ends the
-         --  inline form here, leaving ELSEIF/ELSE on a following line to be
-         --  rejected as an unrelated statement, per the documented single-line-
-         --  form contract.
-         while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
-            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-         end loop;
+         --  A comma that ends the THEN-clause's line makes the next line part
+         --  of the same logical line, so ELSEIF/ELSE stay reachable exactly as
+         --  if there had been no line break.  The THEN-branch statement's own
+         --  end-of-statement check has already skipped that comma (ADR-080), and
+         --  a comma in the middle of the line is an error there; a plain newline
+         --  with no comma still ends the inline form here, leaving ELSEIF/ELSE on
+         --  a following line to be rejected as an unrelated statement, per the
+         --  documented single-line-form contract.
          if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_ELSEIF then
             declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
             S.Else_Branch := Parse_If_Statement (Ctx);
@@ -2810,20 +2806,17 @@ package body SData.Parser is
       Tok : Token := Get_Next_Token (Ctx.Lex_Ctx);
       Stmt : Statement_Access;
    begin
-      --  A trailing comma before a newline is always a continuation marker
-      --  (design.md sec5.4; ADR-072) -- it survives as a real Token_Comma
-      --  so a comma-delimited grammar (USE's dataset list, function
-      --  arguments, KEEP=/DROP= lists) can consume it as the separator it
-      --  already is there. When nothing consumes it -- the continuation
-      --  followed a statement whose own grammar has no comma role at all,
-      --  e.g. LET's assignment -- it reaches here, at the top of the next
-      --  statement, with no meaning. A bare comma is never the valid start
-      --  of any statement, so skipping it can never mask a real error;
-      --  treat it exactly like the leading Token_Colon/Token_Newline noise
-      --  already skipped below, rather than raising "Unrecognized command
-      --  ','" for what was only ever a continuation marker.
+      --  A comma that ends a line is a continuation marker (design.md sec5.4;
+      --  ADR-072, ADR-080) -- it survives as a real Token_Comma so a
+      --  comma-delimited grammar can consume it as the separator it is there.
+      --  One that nothing consumed reaches here with nothing to join: the
+      --  first body statement of a block whose header line ended in a comma
+      --  ("WHILE X < 2," / body), or a line holding only a comma.  Treat it
+      --  like the leading Token_Colon/Token_Newline noise skipped below.  A
+      --  comma in the middle of a line is not skipped: it is no statement
+      --  separator, and falls through to "Unrecognized command".
       while Tok.Kind = Token_Colon or else Tok.Kind = Token_Newline
-         or else Tok.Kind = Token_Comma
+         or else (Tok.Kind = Token_Comma and then Tok.Continuation)
       loop
          Tok := Get_Next_Token (Ctx.Lex_Ctx);
       end loop;
@@ -4008,18 +4001,28 @@ package body SData.Parser is
 
       --  Statement terminator rule (ADR-080): a statement must be followed by
       --  a newline, a colon, or the end of input -- or by a keyword that
-      --  closes or continues the block it sits in, or by a comma (a
-      --  continuation comma left after a complete statement is a legal
-      --  no-op, D4).  Anything else is a second statement run onto this line
-      --  without a colon.  A statement that already consumed its own newline
-      --  or colon (SELECT scans past separators looking for CASE, for one)
-      --  is finished, and what is peeked now starts the next line.
+      --  closes or continues the block it sits in.  Anything else is a second
+      --  statement run onto this line without a colon.  A comma that ends the
+      --  line only marks that the next line is joined on, so it is skipped
+      --  and what follows it is checked: "LET X = 1," / "PRINT X" is
+      --  "LET X = 1 PRINT X", an error, while a comma before a blank line or
+      --  the end of input joins nothing and is harmless.  A comma in the
+      --  middle of a line is never a separator between statements, so it is
+      --  not skipped and fails the check below.  A statement that already
+      --  consumed its own newline or colon (SELECT scans past separators
+      --  looking for CASE, for one) is finished, and what is peeked now
+      --  starts the next line.
       if Last_Token_Kind (Ctx.Lex_Ctx) not in Token_Newline | Token_Colon then
          declare
-            Follower : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+            Follower : Token := Peek_Next_Token (Ctx.Lex_Ctx);
          begin
+            if Follower.Kind = Token_Comma and then Follower.Continuation then
+               declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                       pragma Unreferenced (Discard);
+               begin null; end;
+               Follower := Peek_Next_Token (Ctx.Lex_Ctx);
+            end if;
             if Follower.Kind not in Token_Newline | Token_Colon | Token_EOF
-                 | Token_Comma
                  --  Block structure: the terminators Parse_If_Body,
                  --  Parse_Select_Body and the FOR/WHILE/DO Parse_Block
                  --  callers look for, plus the inline IF's ELSE/ELSEIF.

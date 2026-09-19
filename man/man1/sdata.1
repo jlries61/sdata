@@ -261,7 +261,16 @@ followed by
 is
 .BR "PRINT 1 RUN" ,
 a syntax error.
-A comma after a complete statement is a no\-op.
+A comma never separates statements: a comma in the middle of a line after a
+complete statement is a syntax error, and a comma that ends the line joins the
+next line even then, so
+.B LET X = 1,
+followed by
+.B PRINT X
+is
+.BR "LET X = 1 PRINT X" ,
+a syntax error.
+A comma before a blank line or the end of the input joins nothing and is harmless.
 .PP
 Where the grammar uses a comma as a separator (function arguments,
 .BR KEEP / DROP / RENAME / BY

@@ -157,7 +157,7 @@ Run with `bin/sdata <file>.cmd`.
 | D2 | **(b)** a continuation comma continues onto the next physical line only; **a blank line ends the statement.** |
 | D2 detail | **Comment-only lines are skipped**: they are invisible and do not end the statement. Only a truly blank (whitespace-only) line does. |
 | D3 | **(a)** a trailing `--` comment after the comma still counts as a continuation. |
-| D4 | **(a)** a trailing comma after a *complete* statement (`LET X=1,`) stays a legal no-op (`tests/orphan_continuation_comma.cmd` keeps passing). |
+| D4 | ~~**(a)** a trailing comma after a *complete* statement (`LET X=1,`) stays a legal no-op~~ **REVERSED at the round-1 gate (2026-09-19):** a comma never separates statements, and an end comma always joins the next line, even after a complete statement. `LET X=1,` / `PRINT X` is `LET X=1 PRINT X`, a syntax error; `tests/orphan_continuation_comma.cmd` now expects that error. |
 | D5 | **(a)** a dangling comma at the end of input stays silent. |
 | Repeated commas | **Keep swallowing**: extra comma-only lines directly after a continuation (`A,` / `,` / `B`) are still silently swallowed, as ADR-072 left them. A blank line between them still ends the statement. |
 | Rollout | **Error immediately**, no warning release. The rejected forms were never documented and the project is pre-release. |
@@ -181,7 +181,7 @@ uses a mid-line comma in a comma-free position.
 4. **Comma-free positions** (slash-option loops, TABLES request list, AGGREGATE outvar list): only a
    continuation comma is allowed, and it is ignored. A mid-line comma is a parse error naming the
    comma and saying it may only end a line here.
-5. **Complete statement.** A continuation comma after a complete statement is a legal no-op.
+5. **Complete statement.** *(Reversed at the gate.)* A comma in the middle of a line after a complete statement is a syntax error. A continuation comma appends the next line even after a complete statement, so `LET X = 1,` / `PRINT X` is a syntax error; a comma before a blank line or end of input joins nothing and is harmless.
 6. **End of input.** A dangling continuation comma at the end of input is silently accepted.
 
 ### What this changes, probe by probe (section 2)

@@ -661,7 +661,10 @@ Only spaces and at most one -- comment may follow it on that line:
 Comment-only lines after it are ignored. A BLANK line ends the
 statement, so a forgotten comma cannot swallow the next statement.
 The lines are simply joined: "PRINT 1," then "RUN" is "PRINT 1 RUN",
-which is a syntax error. A comma after a complete statement is a no-op.
+which is a syntax error -- and so is "LET X = 1," then "PRINT X", even
+though the LET was complete. A comma in the middle of a line never
+separates statements. A comma before a blank line or the end of the
+input joins nothing and is harmless.
 
 Where a comma is a separator -- function arguments, KEEP/DROP/RENAME/BY
 lists, USE dataset lists, PRINT/NOTE arguments, SELECT filter

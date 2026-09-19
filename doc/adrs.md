@@ -3308,8 +3308,13 @@ continuation comma simply joins the lines, and the joined text is parsed by ordi
    only end a line (continuation)` (**D1**). Comma-delimited grammars (function arguments,
    KEEP/DROP/RENAME/BY, USE dataset lists, PRINT/NOTE, SELECT conditions) are unchanged: a comma is a
    separator wherever it appears. PRINT/NOTE's optional comma is thereby documented as legal.
-3. A comma after a *complete* statement stays a legal no-op (**D4**; `tests/orphan_continuation_comma.cmd`
-   keeps passing). A dangling continuation comma at the end of input stays silent (**D5**).
+3. **A comma never separates statements, and an end comma always joins** (D4, *reversed at the round-1 gate,
+   2026-09-19*). A comma in the middle of a line after a complete statement is a syntax error
+   (`unexpected "," after statement`). A comma that ends a line appends the next line to the statement, even
+   after a complete statement and even where it would make more sense not to: `LET X = 1,` / `PRINT X` is
+   `LET X = 1 PRINT X`, an error. If nothing follows the comma (a blank line, or the end of input, **D5**)
+   nothing is joined and it is harmless. This replaces the original D4, which kept a comma after a complete
+   statement as a legal no-op (`tests/orphan_continuation_comma.cmd` now expects the error).
 4. **A statement must end at a newline, a colon or the end of input**, or be followed by a keyword that
    closes or continues the enclosing block (ELSE, ELSEIF, END, NEXT, WEND, UNTIL, CASE, WHEN, OTHERWISE) or
    by a comma. Otherwise: `syntax error: unexpected "<tok>" after statement at line N`. `Parse_Primary` no
@@ -3343,9 +3348,14 @@ prototype without that exemption failed 44 existing tests, all false positives; 
   two statements on one line without a colon. Newly accepted: a comment after a continuation comma; a
   blank line after a trailing comma (it ends the statement). No existing test depended on any of the
   rejected forms.
-- **Residual, deliberately left alone:** `Parse_If_Statement` has its own any-comma skip after an inline
-  THEN branch (before ELSE/ELSEIF). It is outside D1's named scope, so it still accepts a mid-line comma
-  there. Routing it through `Reject_Mid_Line_Comma` is a one-line change if wanted.
+- `Parse_If_Statement`'s own any-comma skip after an inline THEN branch was removed: the THEN-branch
+  statement's end-of-statement check now skips a comma that ends the line (so ELSE/ELSEIF stay reachable
+  across it) and rejects a mid-line one. `PRINT` keeps its own optional comma, so
+  `IF c THEN PRINT 1, ELSE PRINT 2` is unchanged.
+- **Amendments from the round-1 code review** (`.ssd/features/comma-continuation-rules/04-code-review.md`):
+  `Parse_Variable_List` rejects a mid-line comma only when a `/` follows it. The first version rejected any
+  comma not followed by a name, which broke `USE f(KEEP=A, HEADER=YES)` (there the comma separates options);
+  the review verified it against the old parser. D4 was reversed as described above.
 - **Residual:** `PRINT 1,` directly followed by a line beginning with a keyword is now an error, but a
   *non*-keyword next line (`PRINT 1,` / `X`) still simply joins and prints two values. That is the naive
   model working as intended.

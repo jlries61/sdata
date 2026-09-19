@@ -846,7 +846,10 @@ package body SData.Help is
       Put_Line ("Comment-only lines after it are ignored. A BLANK line ends the");
       Put_Line ("statement, so a forgotten comma cannot swallow the next statement.");
       Put_Line ("The lines are simply joined: ""PRINT 1,"" then ""RUN"" is ""PRINT 1 RUN"",");
-      Put_Line ("which is a syntax error. A comma after a complete statement is a no-op.");
+      Put_Line ("which is a syntax error -- and so is ""LET X = 1,"" then ""PRINT X"", even");
+      Put_Line ("though the LET was complete. A comma in the middle of a line never");
+      Put_Line ("separates statements. A comma before a blank line or the end of the");
+      Put_Line ("input joins nothing and is harmless.");
       New_Line;
       Put_Line ("Where a comma is a separator -- function arguments, KEEP/DROP/RENAME/BY");
       Put_Line ("lists, USE dataset lists, PRINT/NOTE arguments, SELECT filter");
