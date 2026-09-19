@@ -63,26 +63,32 @@ that might relitigate a settled question.
 | ADR-051 | Reject SORT/AGGREGATE/TRANSPOSE/STATS inside an active REPEAT block | 2026-07-30 | Superseded by ADR-055 |
 | ADR-052 | Validate SORT/BY variable names unconditionally, not gated on Column_Count > 0 | 2026-07-30 | Accepted |
 | ADR-053 | REPL test coverage via a Makefile `.repl` marker convention, not a Run_REPL refactor | 2026-08-03 | Accepted |
-| ADR-054 | Resolve REPEAT/DELETE keyword overloading: rename the low-usage side (REPEAT/UNTIL loop -> DO/UNTIL; DELETE n[-m] line editor -> REMOVE n[-m]) | 2026-08-03 | Accepted |
-| ADR-055 | Implicit RUN instead of rejecting SORT/AGGREGATE/TRANSPOSE/STATS with a pending program (supersedes ADR-051's reject mechanism) | 2026-08-03 | Accepted |
+| ADR-054 | Resolve REPEAT/DELETE keyword overloading by renaming the low-usage side | 2026-08-03 | Accepted |
+| ADR-055 | Implicit RUN instead of rejecting SORT/AGGREGATE/TRANSPOSE/STATS with a pending program | 2026-08-03 | Accepted |
 | ADR-056 | Declarative statement inside FOR/WHILE/DO-UNTIL: warn once per occurrence, don't reject | 2026-08-05 | Accepted |
 | ADR-057 | `.i`/`-.i`/`.n` typed literals construct Infinity/NaN directly; NaN's existing "never survives arithmetic" policy is preserved, not relaxed | 2026-08-08 | Accepted |
-| ADR-058 | SUBMIT inside a loop gets the same ADR-056 declarative-in-loop warning as inline use, deduplicated by submitted file path since SUBMIT re-parses fresh each call | 2026-08-24 | Accepted |
+| ADR-058 | SUBMIT inside a loop gets the same ADR-056 declarative-in-loop warning as inline use, deduplicated by submitted file path | 2026-08-24 | Accepted |
 | ADR-059 | NOTE — an Immediate-tier counterpart to PRINT that unconditionally rejects permanent variables | 2026-08-29 | Accepted |
 | ADR-060 | Parser errors raise Script_Error instead of printing and silently continuing | 2026-08-29 | Accepted |
 | ADR-061 | `Run_REPL` echoes each input line unconditionally, closing design.md's "Statement Echo" gap | 2026-08-31 | Accepted |
 | ADR-062 | Declarative/Immediate-tier expressions get the same unknown-function/arity checking as Deferred, by reusing `Check_Statement` — not by duplicating it | 2026-09-03 | Accepted |
 | ADR-063 | NOTE's permanent-variable rejection checks the resolved array *element*, not the array's declared class | 2026-09-05 | Accepted |
 | ADR-064 | Lexer `Token_Bad` sites raise Script_Error instead of printing and silently continuing | 2026-09-05 | Accepted |
-| ADR-065 | Status/bookkeeping messages reach the OUTPUT-file transcript unconditionally, matching design.md sec6.1 | 2026-09-05 | Accepted |
+| ADR-065 | Status/bookkeeping messages reach the OUTPUT-file transcript unconditionally, matching design.md §6.1 | 2026-09-05 | Accepted |
 | ADR-066 | Single-target SAVE (IF=...) routes through the multi-target registration path instead of the legacy fast-path, so its IF= filter is honored on auto-flush | 2026-09-05 | Accepted |
 | ADR-067 | String literals are single-line; an unterminated `"`/`'` string raises Script_Error instead of silently spanning lines or truncating at EOF | 2026-09-05 | Accepted |
-| ADR-068 | STATS' default text output is a SAS PROC MEANS-style "minimal box" table (Display_Stats_Table) instead of the generic DISPLAY row dump | 2026-09-08 | Accepted |
-| ADR-069 | DISPLAY's two default-print code paths are consolidated into one shared Display_Table renderer producing a SAS PROC PRINT-style boxed table (Obs column, left/right-justified per column type) | 2026-09-08 | Accepted |
-| ADR-070 | DISPLAY rebuilds the SELECT filter map itself (Execute_Rebuild_Filter) instead of relying on the next RUN, so a SELECT with no intervening RUN takes effect immediately | 2026-09-11 | Accepted |
-| ADR-071 | TABLES gains a /SAVE option, writing its crosstab to an external dataset via a new SData_Core.Table.Table_View (not the SAVE command's build-and-swap), preserving ADR-049's no-mutation guarantee | 2026-09-14 | Accepted |
-| ADR-072 | Trailing-comma line continuation now returns the comma as a real token instead of silently discarding it, fixing comma-delimited lists (USE, function arguments, KEEP=/DROP=/RENAME=) split across a continuation | 2026-09-15 | Accepted |
-| ADR-073 | USE's IN= provenance variable is now genuinely temporary (auto-dropped after the next RUN, never written by a deferred SAVE) instead of a permanent table column, matching design.md's own contract | 2026-09-14 | Accepted |
+| ADR-068 | STATS' default text output is a SAS PROC MEANS-style "minimal box" table instead of the generic DISPLAY row dump | 2026-09-08 | Accepted |
+| ADR-069 | DISPLAY's two default-print code paths are consolidated into one shared Display_Table renderer producing a SAS PROC PRINT-style boxed table | 2026-09-08 | Accepted |
+| ADR-070 | DISPLAY rebuilds the SELECT filter map itself instead of relying on the next RUN | 2026-09-11 | Accepted |
+| ADR-071 | TABLES gains a /SAVE option, writing its crosstab via a new Table_View rather than the SAVE command's build-and-swap | 2026-09-14 | Accepted |
+| ADR-072 | Trailing-comma line continuation returns the comma as a real token instead of discarding it | 2026-09-15 | Accepted |
+| ADR-073 | USE's IN= provenance variable is genuinely temporary, not a permanent table column | 2026-09-14 | Accepted |
+| ADR-074 | USE gains a per-dataset IF= option, modeled on SAS's WHERE= dataset option | 2026-09-16 | Accepted |
+| ADR-075 | STATS and AGGREGATE gain a general PCTL percentile aggregate | 2026-09-16 | Accepted |
+| ADR-076 | TABLES output is reformatted to match STATS's column-aligned, ruled style | 2026-09-16 | Accepted |
+| ADR-077 | TABLES's /SAVE= and /CHISQFILE= now uppercase unquoted filenames | 2026-09-17 | Accepted |
+| ADR-078 | DISPLAY gains /FIRST=, /LAST=, and /BY= options | 2026-09-17 | Accepted |
+| ADR-079 | Test counts are not maintained in prose | 2026-09-19 | Accepted |
 
 ---
 
@@ -1208,8 +1214,7 @@ loop containing `KEEP`, asserting exactly one warning line and correct final dat
 376 → 377, all green. Verified via revert: reverting the interpreter changes reproduces the exact
 pre-fix silent behavior against the new test, then re-applying restores it.
 
-### ADR-057: `.i`/`-.i`/`.n` typed literals construct Infinity/NaN directly; NaN's existing
-"never survives arithmetic" policy is preserved, not relaxed
+### ADR-057: `.i`/`-.i`/`.n` typed literals construct Infinity/NaN directly; NaN's existing "never survives arithmetic" policy is preserved, not relaxed
 
 **Date:** 2026-08-08 | **Status:** Accepted
 
