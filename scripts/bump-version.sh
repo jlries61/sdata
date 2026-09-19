@@ -231,5 +231,43 @@ case "$DO_COMMIT" in
         git commit -m "Bump version to $NEW_VER"
         git tag -a "v$NEW_VER" -m "Version $NEW_VER"
         echo "Tagged v$NEW_VER"
+
+        # Post-tag bookkeeping.  Prompts only -- nothing here happens unless
+        # you answer.  A shipped workstream left in .ssd/current.yml's
+        # `active:` list misleads the next session (milestone 2026-09-19,
+        # SK-2), so offer to archive it while the release is fresh.
+        # .ssd/ is local and gitignored: silently skipped where it is absent.
+        if [ -f "$ROOT/.ssd/current.yml" ] && command -v python3 >/dev/null 2>&1; then
+            ACTIVE=$(python3 "$ROOT/scripts/ssd-archive.py" --list 2>/dev/null) || ACTIVE=""
+            if [ -n "$ACTIVE" ]; then
+                echo ""
+                echo "Active SSD workstreams in .ssd/current.yml:"
+                echo "$ACTIVE" | sed 's/^/  /'
+                printf 'Archive one now (type its slug, Enter to skip)? '
+                read -r ARCH_SLUG || true
+                if [ -n "${ARCH_SLUG:-}" ]; then
+                    printf 'One-line landing note (Enter for none): '
+                    read -r ARCH_NOTE || true
+                    if [ -n "${ARCH_NOTE:-}" ]; then
+                        python3 "$ROOT/scripts/ssd-archive.py" "$ARCH_SLUG" --landed "$ARCH_NOTE" \
+                            || echo "Archive failed; edit .ssd/current.yml by hand."
+                    else
+                        python3 "$ROOT/scripts/ssd-archive.py" "$ARCH_SLUG" \
+                            || echo "Archive failed; edit .ssd/current.yml by hand."
+                    fi
+                fi
+            fi
+        fi
+
+        # sdata-core's consumer-tests.yml validates against a pinned sdata tag
+        # that only moves when someone remembers (milestone SK-3).  Say so when
+        # the pin trails this release; do not edit another repo from here.
+        PIN=$(sed -n 's/^[[:space:]]*ref:[[:space:]]*\(v[0-9][0-9.]*\).*/\1/p' \
+              "$ROOT/../sdata-core/.github/workflows/consumer-tests.yml" 2>/dev/null | head -1)
+        if [ -n "$PIN" ] && [ "$PIN" != "v$NEW_VER" ]; then
+            echo ""
+            echo "Reminder: sdata-core's consumer-tests.yml pins sdata $PIN; this release is v$NEW_VER."
+            echo "  Bump that pin the next time sdata-core is released."
+        fi
         ;;
 esac

@@ -317,3 +317,20 @@ This is opt-in and not installed automatically:
 Safe to re-run any time. If you already have a different `pre-push` hook installed, this refuses
 to overwrite it — pass `--force` if you're sure. See `scripts/check-finding-tracking.sh`'s header
 for what it checks and why it's advisory rather than blocking.
+
+### Optional: archiving a shipped SSD workstream
+
+Maintainers using the SSD workflow keep a local, gitignored `.ssd/current.yml`. After a release,
+the shipped workstream should leave its `active:` list, otherwise the next session reads it as
+still in progress. `scripts/bump-version.sh` now offers this right after it tags a release (a
+prompt — type a slug, or press Enter to skip). To do it by hand:
+
+```sh
+python3 scripts/ssd-archive.py --list                      # active workstreams
+python3 scripts/ssd-archive.py <slug> --landed "one-line summary"
+```
+
+A landing note over 300 characters is stored in full in `.ssd/features/<slug>/landed.md` and only a
+short summary stays in `current.yml`. The tool does nothing (exit 0) where `.ssd/` is absent, so
+contributors who don't use SSD are unaffected. Its tests: `python3 scripts/ssd_archive_test.py`.
+`bump-version.sh` also reminds you when sdata-core's `consumer-tests.yml` pin trails the release.
