@@ -59,6 +59,14 @@ package SData.Lexer is
       Length : Natural := 0;                -- Length of text in the buffer
       Line   : Positive;           -- Source line where token starts
       Column : Positive;           -- Source column where token starts
+      --  True only on a Token_Comma that ends a line (a continuation comma:
+      --  spaces and at most one "--" comment, then end of line).  Every other
+      --  comma -- and every other token kind -- leaves it False.  Grammars
+      --  with no comma role use it to tell "a comma that merely continues the
+      --  line" (skipped) from "a comma in the middle of a line" (an error);
+      --  comma-delimited grammars keep testing Kind = Token_Comma and ignore
+      --  it (ADR-072, ADR-080).
+      Continuation : Boolean := False;
    end record;
 
    --  Encapsulates the state of the lexer during processing.
@@ -79,6 +87,13 @@ package SData.Lexer is
    --  uses this to keep buffering and prompt for the continuation line
    --  instead of treating the statement as complete.
    function Ended_With_Continuation (Ctx : Lexer_Context) return Boolean;
+
+   --  Kind of the token most recently returned by Get_Next_Token (a
+   --  Peek_Next_Token does not change it).  The parser uses it to tell
+   --  whether a statement already consumed its own terminator (a Newline or
+   --  Colon) before checking what follows (ADR-080).  Token_Newline at the
+   --  start of a fresh lexer context.
+   function Last_Token_Kind (Ctx : Lexer_Context) return Token_Kind;
 
 private
    --  The internal state of the lexer.
@@ -102,6 +117,8 @@ private
       --  within the same call the way the old discard-based
       --  implementation had them.
       Just_Emitted_Continuation_Comma : Boolean := False;
+      --  Kind of the token most recently returned by Get_Next_Token.
+      Last_Kind : Token_Kind := Token_Newline;
    end record;
 
 end SData.Lexer;

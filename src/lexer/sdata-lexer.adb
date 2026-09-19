@@ -193,6 +193,7 @@ package body SData.Lexer is
                   T.Column := Saved_Col;
                   T.Text (1) := ',';
                   T.Length := 1;
+                  T.Continuation := True;
                   Ctx.Just_Emitted_Continuation_Comma := True;
                   return T;
                else
@@ -586,14 +587,25 @@ package body SData.Lexer is
    -- Get_Next_Token --
    --------------------
    function Get_Next_Token (Ctx : in out Lexer_Context) return Token is
+      T : Token;
    begin
       if Ctx.Has_Peeked then
          Ctx.Has_Peeked := False;
-         return Ctx.Peeked;
+         T := Ctx.Peeked;
       else
-         return Get_Next_Token_Internal (Ctx);
+         T := Get_Next_Token_Internal (Ctx);
       end if;
+      Ctx.Last_Kind := T.Kind;
+      return T;
    end Get_Next_Token;
+
+   ---------------------
+   -- Last_Token_Kind --
+   ---------------------
+   function Last_Token_Kind (Ctx : Lexer_Context) return Token_Kind is
+   begin
+      return Ctx.Last_Kind;
+   end Last_Token_Kind;
 
    ---------------------
    -- Peek_Next_Token --
