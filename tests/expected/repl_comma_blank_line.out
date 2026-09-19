@@ -1,0 +1,6 @@
+sdata> PRINT 1,
+..> 
+sdata> RUN
+1
+RUN complete. 1 records and 0 variables processed.
+sdata> QUIT

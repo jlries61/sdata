@@ -1,0 +1,7 @@
+sdata> PRINT 1,
+..> -- a comment-only line
+..> 
+sdata> RUN
+1
+RUN complete. 1 records and 0 variables processed.
+sdata> QUIT

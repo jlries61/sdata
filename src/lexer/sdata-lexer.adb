@@ -21,6 +21,7 @@ package body SData.Lexer is
       Ctx.Column := 1;
       Ctx.Has_Peeked := False;
       Ctx.Continued_At_EOF := False;
+      Ctx.Last_Kind := Token_Newline;
    end Initialize;
 
    -----------------------
@@ -60,6 +61,84 @@ package body SData.Lexer is
          Ctx.Pos := Ctx.Pos + 1;
       end if;
    end Advance;
+
+   ------------------------------------------------------------------
+   --  Continuation-line helpers (ADR-072, ADR-080).  A comma that ends
+   --  a line continues the statement onto the next physical line; these
+   --  decide how far that continuation reaches.
+   ------------------------------------------------------------------
+
+   --  Skips spaces, tabs and carriage returns -- never a line feed, so the
+   --  caller can tell a blank line (LF next) from a line with content.
+   procedure Skip_Blanks (Ctx : in out Lexer_Context) is
+   begin
+      while not Is_End_Of_Source (Ctx)
+        and then Current_Char (Ctx) in ' ' | ASCII.HT | ASCII.CR
+      loop
+         Advance (Ctx);
+      end loop;
+   end Skip_Blanks;
+
+   --  True when the read pointer is at the start of a "--" comment.
+   function At_Comment (Ctx : Lexer_Context) return Boolean is
+   begin
+      return not Is_End_Of_Source (Ctx)
+        and then Current_Char (Ctx) = '-'
+        and then Ctx.Pos < Ctx.Source_Len
+        and then Element (Ctx.Source, Ctx.Pos + 1) = '-';
+   end At_Comment;
+
+   --  Advances to the LF that ends the current line (or to end of source),
+   --  without consuming it.
+   procedure Skip_To_Line_End (Ctx : in out Lexer_Context) is
+   begin
+      while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= ASCII.LF loop
+         Advance (Ctx);
+      end loop;
+   end Skip_To_Line_End;
+
+   --  Called just after the LF that follows a continuation comma has been
+   --  consumed.  Skips the lines that are invisible to the statement -- a
+   --  comment-only line, or a line holding nothing but a comma (ADR-072
+   --  keeps swallowing that) -- and stops at the first of:
+   --    * a blank (whitespace-only) line: the statement ends there, so the
+   --      blank line's LF is left in place to be returned as an ordinary
+   --      Token_Newline (ADR-080, D2);
+   --    * end of source: a dangling continuation (the REPL keeps prompting);
+   --    * a line with real content, positioned at its first character.
+   procedure Skip_Continuation_Lines (Ctx : in out Lexer_Context) is
+   begin
+      loop
+         Skip_Blanks (Ctx);
+         if Is_End_Of_Source (Ctx) or else Current_Char (Ctx) = ASCII.LF then
+            return;
+         elsif At_Comment (Ctx) then
+            Skip_To_Line_End (Ctx);
+            Advance (Ctx);  -- the comment line's own LF
+         elsif Current_Char (Ctx) = ',' then
+            declare
+               Saved_Pos  : constant Positive := Ctx.Pos;
+               Saved_Col  : constant Positive := Ctx.Column;
+               Saved_Line : constant Positive := Ctx.Line;
+            begin
+               Advance (Ctx);
+               Skip_Blanks (Ctx);
+               if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ASCII.LF then
+                  Advance (Ctx);  -- a comma-only line: swallow it and go on
+               else
+                  --  The comma starts a line that has more on it, so it is
+                  --  content, not a bare continuation mark: put it back.
+                  Ctx.Pos := Saved_Pos;
+                  Ctx.Column := Saved_Col;
+                  Ctx.Line := Saved_Line;
+                  return;
+               end if;
+            end;
+         else
+            return;
+         end if;
+      end loop;
+   end Skip_Continuation_Lines;
 
    ----------------------------
    -- Get_Next_Token_Internal --
@@ -113,65 +192,33 @@ package body SData.Lexer is
             Advance (Ctx);
          end loop;
 
-         --  Handle line continuation: trailing comma before a newline.
+         --  Handle line continuation: a comma that ends a line (design.md
+         --  sec5.4, ADR-072, ADR-080).  "Ends a line" means only spaces/tabs/CR
+         --  and at most one "--" comment follow it before the LF or the end of
+         --  input.
          if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ',' then
             declare
-               Saved_Pos : constant Positive := Ctx.Pos;
-               Saved_Col : constant Positive := Ctx.Column;
+               Saved_Pos  : constant Positive := Ctx.Pos;
+               Saved_Col  : constant Positive := Ctx.Column;
                Saved_Line : constant Positive := Ctx.Line;
-               Found_Newline : Boolean := False;
+               Found_Newline : Boolean := False;  -- comma, then LF
+               At_End        : Boolean := False;  -- comma, then end of input
             begin
                Advance (Ctx); -- Consume ','
-               -- Skip spaces/tabs/carriage returns.
-               while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) in ' ' | ASCII.HT | ASCII.CR loop
-                  Advance (Ctx);
-               end loop;
-               
-               -- If next char is a newline, we have a continuation.
-               if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ASCII.LF then
-                  Advance (Ctx); -- Consume LF
+               Skip_Blanks (Ctx);
+               --  A trailing comment does not cancel the continuation (D3).
+               if At_Comment (Ctx) then
+                  Skip_To_Line_End (Ctx);
+               end if;
+
+               if Is_End_Of_Source (Ctx) then
+                  At_End := True;
+               elsif Current_Char (Ctx) = ASCII.LF then
+                  Advance (Ctx); -- Consume the LF
                   Found_Newline := True;
-                  -- Skip whitespace and comments on the following line(s).
-                  loop
-                     while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) in ' ' | ASCII.HT | ASCII.CR | ASCII.LF loop
-                        Advance (Ctx);
-                     end loop;
-                     
-                     -- Skip comments starting with '--' during continuation.
-                     if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '-' then
-                        declare
-                           Saved_Comment_Pos : constant Positive := Ctx.Pos;
-                        begin
-                           Advance (Ctx);
-                           if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = '-' then
-                              while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) /= ASCII.LF loop
-                                 Advance (Ctx);
-                              end loop;
-                           else
-                              Ctx.Pos := Saved_Comment_Pos;
-                              exit;
-                           end if;
-                        end;
-                     elsif not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ',' then
-                        -- Multiple commas allowed for multi-line continuation.
-                        declare
-                           Saved_C_Pos : constant Positive := Ctx.Pos;
-                        begin
-                           Advance (Ctx);
-                           while not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) in ' ' | ASCII.HT | ASCII.CR loop
-                              Advance (Ctx);
-                           end loop;
-                           if not Is_End_Of_Source (Ctx) and then Current_Char (Ctx) = ASCII.LF then
-                              Advance (Ctx);
-                           else
-                              Ctx.Pos := Saved_C_Pos;
-                              exit;
-                           end if;
-                        end;
-                     else
-                        exit;
-                     end if;
-                  end loop;
+                  --  Continue over comment-only and comma-only lines, but stop
+                  --  at a blank line (D2).
+                  Skip_Continuation_Lines (Ctx);
                end if;
 
                if Found_Newline then
@@ -180,7 +227,8 @@ package body SData.Lexer is
                   --  source position, with Ctx already advanced past the
                   --  swallowed newline(s)/comments/extra bare continuation
                   --  commas so the *next* call resumes tokenizing right at
-                  --  the real content that follows.  (Formerly this
+                  --  the real content that follows (or at the LF of the blank
+                  --  line that ends the statement).  (Formerly this
                   --  discarded the comma via `goto Continue_Loop`, which
                   --  is why comma-delimited lists split across a
                   --  continuation -- USE's dataset list, function-call
@@ -195,6 +243,20 @@ package body SData.Lexer is
                   T.Length := 1;
                   T.Continuation := True;
                   Ctx.Just_Emitted_Continuation_Comma := True;
+                  return T;
+               elsif At_End then
+                  --  A comma, then only blanks and/or a comment, then the end
+                  --  of input with no final LF (a script whose last line is
+                  --  "KEEP A, -- x").  It still ends the line as far as the
+                  --  parser is concerned (Continuation), but nothing follows
+                  --  to be swallowed and this is not a REPL "..>" wait, so
+                  --  Just_Emitted_Continuation_Comma stays clear.
+                  T.Kind := Token_Comma;
+                  T.Line := Saved_Line;
+                  T.Column := Saved_Col;
+                  T.Text (1) := ',';
+                  T.Length := 1;
+                  T.Continuation := True;
                   return T;
                else
                   --  Just a normal comma, backtrack to it and return it as a token later.
