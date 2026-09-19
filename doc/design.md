@@ -639,7 +639,13 @@ in &sect;7.1 indicates which tier each command belongs to.
     *DO*/*UNTIL*) are Deferred.
   - Examples: *LET*, *SET*, *PRINT*, *IF*, *DELETE* (record).
 
-- **Line Continuation:** Statement ending with comma shall be continued to next line.
+- **Statement Separation and Line Continuation:**
+  - A statement ends at the end of its line, at a colon (*:*), or at the end of input. Several statements may share a line only if a colon separates them. Anything else that follows a complete statement on the same line is a syntax error (for example *PRINT 1 RUN*, or *LET X = 1 PRINT X*), except a comma (below) and the keywords that close or continue the enclosing block (*ELSE*, *ELSEIF*, *END*, *NEXT*, *WEND*, *UNTIL*, *CASE*, *WHEN*, *OTHERWISE*). The error is *syntax error: unexpected "\<token\>" after statement at line N*.
+  - A **continuation comma** is a comma followed, on the same line, only by whitespace and at most one *--* comment before the end of the line. It continues the statement onto the next physical line. Comment-only lines after it are ignored, and a line holding nothing but a comma directly after it is ignored. **A blank (whitespace-only) line ends the statement.** Continuation simply joins the lines: *PRINT 1,* followed by *RUN* is *PRINT 1 RUN*, which is a syntax error.
+  - A comma after a complete statement (for example *LET X = 1,*) is a legal no-op. A continuation comma at the very end of the input is accepted silently.
+  - **Comma-delimited grammars** (function arguments, *KEEP*/*DROP*/*RENAME*/*BY* lists, *USE* dataset lists, *PRINT*/*NOTE* arguments, where the comma is optional, and *SELECT* filter conditions) treat a comma as a separator wherever it appears, whether or not it ends a line.
+  - **Comma-free positions** — the */option* loops of *USE*, *SAVE*, *TRANSPOSE*, *STATS*, *TABLES* and *DISPLAY*, the *TABLES* request list, and the *AGGREGATE* *outvar=fn(invar)* list — accept a comma only as a continuation comma. A comma in the middle of a line there is a syntax error: *unexpected "," at line N: a comma here may only end a line (continuation)*. A variable list followed by an option (*DISPLAY ID, /FIRST=2*) is such a position.
+  - In the interactive REPL a continuation comma at the end of the input prompts for the next line with *"..\> "*; a blank line at that prompt ends the statement.
 
 ### 5.5 USE and REPEAT Compatibility
 
@@ -840,7 +846,7 @@ or *ECHO OFF* is in effect.
 
 In interactive mode, declarative commands such as *USE*, *NAMES*, *OUTPUT*, *DIGITS*, and *ECHO* execute immediately upon entry to provide real-time feedback:
 
-- **Prompt:** *"sdata> "* shall be used as the prompt for a new statement, and *"..> "* for a continuation line (a statement ending in a comma continues on the next line; see §5.4's Line Continuation note).
+- **Prompt:** *"sdata> "* shall be used as the prompt for a new statement, and *"..> "* for a continuation line (a statement ending in a comma continues on the next line; see §5.4, Statement Separation and Line Continuation).
 - **Statement Echo:** Statements shall be echoed to screen, even if console output is disabled.
 - **Terminal Handling:** Any applicable terminal settings shall be handled appropriately.
 - **Paging:** If output text would otherwise scroll off the screen, display a page at a time using: - Pager specified at command line, OR - Sensible default for the operating system
@@ -1163,7 +1169,7 @@ Deferred Execution Commands are part of the program that is executed with the ne
 
 **Declarative Commands** are executed immediately. They typically configure the interpreter state or define data structures.
 
-**Line Continuation:** A statement ending with a comma shall be continued to the next line.
+**Line Continuation:** A statement ending with a comma shall be continued to the next line; the complete rules, including where a comma may and may not appear, are in §5.4 (*Statement Separation and Line Continuation*).
 
 ### 7.2 Functions
 

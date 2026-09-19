@@ -89,6 +89,7 @@ that might relitigate a settled question.
 | ADR-077 | TABLES's /SAVE= and /CHISQFILE= now uppercase unquoted filenames | 2026-09-17 | Accepted |
 | ADR-078 | DISPLAY gains /FIRST=, /LAST=, and /BY= options | 2026-09-17 | Accepted |
 | ADR-079 | Test counts are not maintained in prose | 2026-09-19 | Accepted |
+| ADR-080 | Comma rules: a continuation comma joins lines, a blank line ends a statement, a mid-line comma in a comma-free position is an error, and statements must end at a newline, colon or end of input | 2026-09-19 | Accepted |
 
 ---
 
@@ -3267,3 +3268,92 @@ case. Readers who want the current number run `make check`. Any *new* hand-maint
 prose should be treated as a regression of this decision; re-grep at each milestone
 (`grep -nE '\b[0-9]{3}\b.*(test|check)' CLAUDE.md CONTRIBUTING.md README.md`). sdata-only; no
 `sdata-core` or `data-vandal` change (neither referenced the removed script — grepped).
+
+---
+
+### ADR-080: Comma rules: a continuation comma joins lines, a blank line ends a statement, a mid-line comma in a comma-free position is an error, and statements must end at a newline, colon or end of input
+
+**Date:** 2026-09-19 | **Status:** Accepted
+
+**Context.** `design.md` §5.4 said one thing about commas: *"A statement ending with a comma shall be
+continued to the next line."* Everything else was behavior nobody had decided. The 2026-09-19 milestone
+(finding SK-4, refactor item R3) found the continuation-comma idiom implemented at 11 parser call sites
+and planned a refactor; probing 17 cases against the real binary (`doc/specs/2026-09-19-comma-separator-vs-continuation.md`)
+showed the rules themselves were the problem:
+
+- the lexer swallowed every blank line after a continuation comma, so a forgotten trailing comma silently
+  glued the *next statement* onto this one (`PRINT 1,` / blank / `PRINT 2` failed with a spurious
+  "Unrecognized command");
+- a `--` comment between the comma and the line end cancelled the continuation, though it is the natural
+  way to annotate a list;
+- a comma in the *middle* of a line was silently discarded in every grammar with no comma role
+  (`DISPLAY ID, /FIRST=2`, `STATS ID, /STATS=N`, `TABLES ID, ID*ID` all "worked"), because
+  `Skip_Continuation_Comma` skipped every `Token_Comma` and `Parse_Variable_List` consumed one after each name;
+- `PRINT 1 RUN` was not an error, even on one line with no comma at all: `Parse_Primary` consumed a token
+  before deciding it was not an operand and returned null, so the keyword vanished (`PRINT 1 LET`,
+  `PRINT 1 SELECT`, `PRINT 1 USE` likewise); and nothing required a terminator between statements, so
+  `LET X = 1 PRINT X` was two statements.
+
+**Decision** (the user's, made 2026-09-19 as D1-D5 plus follow-ups). The model is deliberately naive: **a
+continuation comma simply joins the lines, and the joined text is parsed by ordinary rules.** So
+`PRINT 1,` / `RUN` is `PRINT 1 RUN`, an ordinary syntax error.
+
+1. A *continuation comma* is a comma followed on its line only by whitespace and at most one `--` comment
+   (**D3**). It continues the statement onto the next physical line; comment-only lines after it are
+   invisible, a line holding only a comma directly after it is still swallowed (as ADR-072 left it), and
+   **a blank line ends the statement (D2)**.
+2. **Comma-free positions** — the `/option` loops of USE, SAVE, TRANSPOSE, STATS, TABLES and DISPLAY, the
+   TABLES request list, the AGGREGATE `outvar=fn(invar)` list — accept a comma only as a continuation
+   comma. A comma in the middle of a line is a syntax error: `unexpected "," at line N: a comma here may
+   only end a line (continuation)` (**D1**). Comma-delimited grammars (function arguments,
+   KEEP/DROP/RENAME/BY, USE dataset lists, PRINT/NOTE, SELECT conditions) are unchanged: a comma is a
+   separator wherever it appears. PRINT/NOTE's optional comma is thereby documented as legal.
+3. A comma after a *complete* statement stays a legal no-op (**D4**; `tests/orphan_continuation_comma.cmd`
+   keeps passing). A dangling continuation comma at the end of input stays silent (**D5**).
+4. **A statement must end at a newline, a colon or the end of input**, or be followed by a keyword that
+   closes or continues the enclosing block (ELSE, ELSEIF, END, NEXT, WEND, UNTIL, CASE, WHEN, OTHERWISE) or
+   by a comma. Otherwise: `syntax error: unexpected "<tok>" after statement at line N`. `Parse_Primary` no
+   longer consumes a token it cannot use. One-line statements without a `:` become errors.
+5. Rollout: **error immediately**, no warning release (pre-release; the rejected forms were never documented).
+
+**Mechanism.** `Token` gains `Continuation : Boolean := False`, set by the lexer only on a comma that ends a
+line. Comma-delimited grammars keep testing `Kind = Token_Comma` and never read it, so ADR-072 (the comma
+survives as a token) is **refined, not superseded**: the lexer still returns the comma. The lexer stops at a
+blank line and leaves its LF as an ordinary `Token_Newline`; the REPL outcome (a blank line at the `..> `
+prompt now ends the statement) follows from the existing `Just_Emitted_Continuation_Comma` /
+`Continued_At_EOF` handling with no new lexer state. `Lexer_Context` gains `Last_Kind`, set in
+`Get_Next_Token` only, exposed as `Last_Token_Kind`, so the terminator check can tell that a statement
+already consumed its own newline or colon (SELECT scans past separators looking for CASE). A first
+prototype without that exemption failed 44 existing tests, all false positives; with it, all passed.
+
+**Alternatives considered.**
+- *Swallow the comma in the lexer* (the milestone report's first recommendation): rejected, and retracted
+  from that report. It reintroduces sdata#90 for USE lists, function arguments and `KEEP=`/`DROP=`/`RENAME=`
+  lists, which need the comma as their separator.
+- *A distinct `Token_Continuation_Comma` kind*: rejected; every comma-delimited grammar tests
+  `Kind = Token_Comma`, so a new kind must be added to each and a missed one silently breaks ADR-072.
+- *Comparing the next token's line with the statement's first line* for the terminator check: rejected; it
+  misses a statement continued across lines by a comma, which is exactly `PRINT 1,` / `RUN`.
+- *Applying D1 to PRINT/NOTE too*: rejected by the user; `PRINT ID, VAL` is standard BASIC and ~15 test
+  files use it.
+- *Warn for a release before erroring*: declined by the user.
+
+**Consequences.**
+- Newly rejected: a mid-line comma in an option loop or the TABLES/AGGREGATE lists; `PRINT ... KEYWORD`;
+  two statements on one line without a colon. Newly accepted: a comment after a continuation comma; a
+  blank line after a trailing comma (it ends the statement). No existing test depended on any of the
+  rejected forms.
+- **Residual, deliberately left alone:** `Parse_If_Statement` has its own any-comma skip after an inline
+  THEN branch (before ELSE/ELSEIF). It is outside D1's named scope, so it still accepts a mid-line comma
+  there. Routing it through `Reject_Mid_Line_Comma` is a one-line change if wanted.
+- **Residual:** `PRINT 1,` directly followed by a line beginning with a keyword is now an error, but a
+  *non*-keyword next line (`PRINT 1,` / `X`) still simply joins and prints two values. That is the naive
+  model working as intended.
+- Two defects found while probing this area were fixed as separate commits: a missing expression flowing
+  into the AST as a null (a `DO`/`UNTIL` with no condition hung forever; `SUM(RUN)` leaked an Ada access
+  check) is now `Expected expression <where> at line N` via `Parse_Required_Expression` (516f412), and the
+  doc-sync CI gate had three nonexistent trigger paths so a lexer-only change never triggered it (7133aee).
+- Files: `src/lexer/sdata-lexer.ads/.adb`, `src/parser/sdata-parser.adb`; `doc/design.md` §5.4 and §7.1;
+  `HELP SYNTAX`; the man page's *Statement separation and line continuation*; `tests/expected/help_all.out`
+  and `help_index.out` regenerated (pure additions). sdata-only: data-vandal has its own lexer and parser,
+  and sdata-core has none.

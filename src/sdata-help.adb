@@ -54,6 +54,7 @@ package body SData.Help is
       New_Line;
       Put_Line ("Use HELP <name> for details.  Use HELP /ALL for the full reference.");
       Put_Line ("Use HELP EXECUTION for an explanation of the three execution tiers.");
+      Put_Line ("Use HELP SYNTAX for how statements end and how a trailing comma continues a line.");
       Put_Line ("Use HELP CONCEPTS for an introduction to the PDV, LET/SET, BY groups, and quoted identifiers.");
    end Help_Index;
 
@@ -827,6 +828,41 @@ package body SData.Help is
       Put_Line ("identifying which tier it belongs to.");
    end Help_EXECUTION;
 
+   procedure Help_SYNTAX is
+   begin
+      Put_Line ("Statement Separation and Line Continuation");
+      New_Line;
+      Put_Line ("A statement ends at the end of its line, at a colon (:), or at the");
+      Put_Line ("end of input. Several statements may share a line only if a colon");
+      Put_Line ("separates them:");
+      Put_Line ("  LET X = 1 : PRINT X");
+      Put_Line ("Anything else after a complete statement on the same line is a syntax");
+      Put_Line ("error, e.g. ""PRINT 1 RUN"" or ""LET X = 1 PRINT X"".");
+      New_Line;
+      Put_Line ("A comma that ENDS a line continues the statement onto the next line.");
+      Put_Line ("Only spaces and at most one -- comment may follow it on that line:");
+      Put_Line ("  KEEP ID,     -- the key");
+      Put_Line ("       SCORE");
+      Put_Line ("Comment-only lines after it are ignored. A BLANK line ends the");
+      Put_Line ("statement, so a forgotten comma cannot swallow the next statement.");
+      Put_Line ("The lines are simply joined: ""PRINT 1,"" then ""RUN"" is ""PRINT 1 RUN"",");
+      Put_Line ("which is a syntax error. A comma after a complete statement is a no-op.");
+      New_Line;
+      Put_Line ("Where a comma is a separator -- function arguments, KEEP/DROP/RENAME/BY");
+      Put_Line ("lists, USE dataset lists, PRINT/NOTE arguments, SELECT filter");
+      Put_Line ("conditions -- it may appear anywhere in the line.");
+      Put_Line ("Where the grammar has no comma -- the /option loops of USE, SAVE,");
+      Put_Line ("TRANSPOSE, STATS, TABLES and DISPLAY, the TABLES request list, and the");
+      Put_Line ("AGGREGATE outvar=fn(invar) list -- a comma may ONLY end a line; one in");
+      Put_Line ("the middle of a line is a syntax error:");
+      Put_Line ("  DISPLAY ID, /FIRST=2       -- error");
+      Put_Line ("  DISPLAY ID,                -- fine: the comma ends the line");
+      Put_Line ("          /FIRST=2");
+      New_Line;
+      Put_Line ("In the interactive REPL a line ending in a comma prompts ""..> "" for");
+      Put_Line ("the rest; a blank line at that prompt ends the statement.");
+   end Help_SYNTAX;
+
    procedure Help_CONCEPTS is
    begin
       Put_Line ("Concepts: PDV, LET vs SET, and BY Groups");
@@ -1460,6 +1496,7 @@ package body SData.Help is
    K_OPTIONS      : aliased constant String := "OPTIONS";
    K_EXECUTION    : aliased constant String := "EXECUTION";
    K_CONCEPTS     : aliased constant String := "CONCEPTS";
+   K_SYNTAX       : aliased constant String := "SYNTAX";
    K_BREAK        : aliased constant String := "BREAK";
    K_DEBUGGER     : aliased constant String := "DEBUGGER";
    K_DEBUG        : aliased constant String := "DEBUG";
@@ -1682,6 +1719,7 @@ package body SData.Help is
       (K_OPTIONS'Access,  Help_OPTIONS'Access,  C, N),
       (K_EXECUTION'Access, Help_EXECUTION'Access, C, N),
       (K_CONCEPTS'Access,  Help_CONCEPTS'Access,  C, N),
+      (K_SYNTAX'Access,    Help_SYNTAX'Access,    C, N),
       (K_DEBUGGER'Access, Help_DEBUGGER'Access,  C, N),
       (K_DEBUG'Access,    Help_DEBUGGER'Access,  N, N),   --  alias
       --  Math functions

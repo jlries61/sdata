@@ -238,6 +238,71 @@ emits an advisory warning and shows the backtick form to use.
 Set
 .B "OPTIONS WARNRESERVED NO"
 to suppress these warnings.
+.SS Statement separation and line continuation
+A statement ends at the end of its line, at a colon
+.RB ( : ),
+or at the end of input.
+Several statements may share a line only if a colon separates them.
+Anything else that follows a complete statement on the same line is a syntax
+error, for example
+.B PRINT 1 RUN
+or
+.BR "LET X = 1 PRINT X" .
+.PP
+A comma that ends a line continues the statement onto the next line.
+Only spaces and at most one
+.B \-\-
+comment may follow it on that line.
+Comment\-only lines after it are ignored; a blank line ends the statement.
+The lines are simply joined, so
+.B PRINT 1,
+followed by
+.B RUN
+is
+.BR "PRINT 1 RUN" ,
+a syntax error.
+A comma after a complete statement is a no\-op.
+.PP
+Where the grammar uses a comma as a separator (function arguments,
+.BR KEEP / DROP / RENAME / BY
+lists,
+.B USE
+dataset lists,
+.BR PRINT / NOTE
+arguments, and
+.B SELECT
+filter conditions) it may appear anywhere in the line.
+Where the grammar has no comma role \(em the
+.BI / option
+loops of
+.BR USE ,
+.BR SAVE ,
+.BR TRANSPOSE ,
+.BR STATS ,
+.B TABLES
+and
+.BR DISPLAY ,
+the
+.B TABLES
+request list, and the
+.B AGGREGATE
+.IB outvar = fn ( invar )
+list \(em a comma may only end a line, and a comma in the middle of a line is
+a syntax error:
+.PP
+.RS
+.B DISPLAY ID, /FIRST=2
+\(em error
+.br
+.B DISPLAY ID,
+followed by
+.B /FIRST=2
+on the next line \(em accepted
+.RE
+.PP
+In the interactive REPL a line ending in a comma prompts
+.B ..>
+for the rest; a blank line at that prompt ends the statement.
 .SS Declarative commands
 Execute immediately and configure state for the next data step.
 A Declarative command may appear inside a
