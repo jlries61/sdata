@@ -185,7 +185,9 @@ package body SData.Help is
    procedure Help_PRINT is
    begin
       Put_Line ("Command: PRINT [expr [[,] | [;] expr] ...]");
-      Put_Line ("Outputs values to the console, separated by spaces.");
+      Put_Line ("Outputs values to the console, separated by spaces. A comma or a");
+      Put_Line ("semicolon between values is optional and has the same effect as a space.");
+      Put_Line ("(A semicolon does not separate statements; use a colon.)");
       Put_Line ("No arguments: Prints all permanent variables for the current record.");
       Put_Line ("Execution: Deferred -- executed once per record inside the data step.");
    end Help_PRINT;

@@ -1284,7 +1284,11 @@ Array element forms are the same as for
 .BR LET .
 .TP
 .B PRINT [\fIexpr\fR ...]
-Print values to the console.
+Print values to the console, separated by spaces.
+A comma or a semicolon between values is optional and has the same effect as a
+space.
+A semicolon has no other role: it does not separate statements (use
+.BR : ).
 With no arguments, prints all permanent variables for the current record.
 .TP
 .B NOTE \fIexpr\fR [\fIexpr\fR ...]

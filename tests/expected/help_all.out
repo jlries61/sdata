@@ -105,7 +105,9 @@ Override at startup with --shell-timeout=N; override at runtime with OPTIONS SHE
 Execution: Immediate -- the shell command is launched at once.
 
 Command: PRINT [expr [[,] | [;] expr] ...]
-Outputs values to the console, separated by spaces.
+Outputs values to the console, separated by spaces. A comma or a
+semicolon between values is optional and has the same effect as a space.
+(A semicolon does not separate statements; use a colon.)
 No arguments: Prints all permanent variables for the current record.
 Execution: Deferred -- executed once per record inside the data step.
 

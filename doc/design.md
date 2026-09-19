@@ -823,7 +823,7 @@ or *ECHO OFF* is in effect.
 
 - Syntax:
 
-  - *PRINT \[\<value\>...\]*: Print specified values separated by spaces.
+  - *PRINT \[\<value\>...\]*: Print specified values separated by spaces. A comma or a semicolon between values is optional and has the same effect as a space (in Bywater BASIC they control spacing; here they do not). A semicolon has no other role in the language: it is not a statement separator (use *:*), and one after a complete statement is a syntax error.
   - *PRINT* (no arguments): Print values of all currently defined permanent variables with their names for current record.
 
 - **Number Formatting:** Floating point values printed with precision specified by most recently issued *DIGITS* statement.

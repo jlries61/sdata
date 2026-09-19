@@ -1457,7 +1457,6 @@ package body SData.Parser is
       --  -----------------------------------------------------------------------
       Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
       if Peeked.Kind = Token_Newline
-         or else Peeked.Kind = Token_Semicolon
          or else Peeked.Kind = Token_EOF
       then
          --  Bare USE — no datasets.  Leave Dataset_List empty and Mode MM_Single.
@@ -1783,7 +1782,6 @@ package body SData.Parser is
       --  -----------------------------------------------------------------------
       Peeked := Peek_Next_Token (Ctx.Lex_Ctx);
       if Peeked.Kind = Token_Newline
-         or else Peeked.Kind = Token_Semicolon
          or else Peeked.Kind = Token_EOF
       then
          --  Bare SAVE — clear pending saves.  Leave Save_List empty.
@@ -3955,7 +3953,7 @@ package body SData.Parser is
                            end if;
                         end;
                      elsif Next_T.Kind /= Token_Newline and then Next_T.Kind /= Token_Colon and then 
-                           Next_T.Kind /= Token_Semicolon and then Next_T.Kind /= Token_EOF then
+                           Next_T.Kind /= Token_EOF then
                         declare
                            Arg_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                         begin
