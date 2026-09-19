@@ -189,6 +189,15 @@ package body SData.Parser is
 
    --  Forward declarations for mutual recursion.
    function Parse_Expression (Ctx : in out Parser_Context) return Expression_Access;
+   --  Like Parse_Expression, but a missing expression is a syntax error
+   --  ("Expected expression <Where> at line N") instead of a null that flows
+   --  into the AST -- where it surfaced as a hang (DO..UNTIL with no
+   --  condition), an Ada access check leaking to the user, or a silently
+   --  ignored statement.  Use wherever the grammar demands an expression;
+   --  PRINT/NOTE, which treat a non-expression as the end of the argument
+   --  list, keep calling Parse_Expression directly.
+   function Parse_Required_Expression
+     (Ctx : in out Parser_Context; Where : String) return Expression_Access;
    function Parse_Expression_List (Ctx : in out Parser_Context; Closing : Token_Kind) return Expression_List;
    function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access;
    --  Parse an IF/ELSEIF statement starting from the condition (IF token already consumed).
@@ -259,7 +268,7 @@ package body SData.Parser is
    function Parse_If_Statement (Ctx : in out Parser_Context) return Statement_Access is
       S : constant Statement_Access := new Statement (Stmt_IF);
    begin
-      S.Condition := Parse_Expression (Ctx);
+      S.Condition := Parse_Required_Expression (Ctx, "after IF");
       if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_THEN then
          raise Script_Error with "Expected THEN after IF condition.";
       else
@@ -329,14 +338,14 @@ package body SData.Parser is
 
       loop
          declare
-            Expr     : constant Expression_Access := Parse_Expression (Ctx);
+            Expr     : constant Expression_Access := Parse_Required_Expression (Ctx, "in an argument list");
             Is_Range : Boolean := False;
             Expr_End : Expression_Access := null;
          begin
             if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon then
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                Is_Range := True;
-               Expr_End := Parse_Expression (Ctx);
+               Expr_End := Parse_Required_Expression (Ctx, "after ':' in a range");
             end if;
 
             New_Node := new Expression_List_Node'(Expr     => Expr,
@@ -492,7 +501,7 @@ package body SData.Parser is
                      end if;
 
                   when Token_Left_Paren =>
-                     Node := Parse_Expression (Ctx);
+                     Node := Parse_Required_Expression (Ctx, "after '('");
                      declare
                         Closer : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      begin
@@ -616,6 +625,25 @@ package body SData.Parser is
    begin
       return Parse_Expression_1 (Ctx, 1);
    end Parse_Expression;
+
+   -------------------------------
+   -- Parse_Required_Expression --
+   -------------------------------
+   function Parse_Required_Expression
+     (Ctx : in out Parser_Context; Where : String) return Expression_Access
+   is
+      --  Captured before parsing: a failed Parse_Expression may have moved
+      --  the lexer on, and the error belongs where the expression should
+      --  have started.
+      Start_Line : constant Positive := Peek_Next_Token (Ctx.Lex_Ctx).Line;
+      E : constant Expression_Access := Parse_Expression (Ctx);
+   begin
+      if E = null then
+         raise Script_Error with
+            "Expected expression " & Where & " at line" & Start_Line'Image;
+      end if;
+      return E;
+   end Parse_Required_Expression;
 
    -------------------------
    -- Parse_Variable_List --
@@ -874,7 +902,7 @@ package body SData.Parser is
                         "Expected '=' after IF in spec option at line" & Eq_Tok.Line'Image;
                   end if;
                end;
-               Opts.IF_Expr := Parse_Expression (Ctx);
+               Opts.IF_Expr := Parse_Required_Expression (Ctx, "after IF=");
 
             when Token_HEADER =>
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
@@ -2772,14 +2800,14 @@ package body SData.Parser is
                      LP      : constant Token      := Get_Next_Token (Ctx.Lex_Ctx);
                      Closing : constant Token_Kind :=
                         (if LP.Kind = Token_Left_Paren then Token_Right_Paren else Token_Right_Brace);
-                     First   : constant Expression_Access := Parse_Expression (Ctx);
+                     First   : constant Expression_Access := Parse_Required_Expression (Ctx, "in an array subscript");
                      Peek    : constant Token_Kind := Peek_Next_Token (Ctx.Lex_Ctx).Kind;
                   begin
                      if Peek = Token_Colon then
                         --  Range form: (lo : hi) — assign to every element lo..hi
                         declare
                            Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- consume ':'
-                           Second  : constant Expression_Access := Parse_Expression (Ctx);
+                           Second  : constant Expression_Access := Parse_Required_Expression (Ctx, "after ':' in an array range");
                            Lo_Node : constant Expression_List :=
                               new Expression_List_Node'(Expr => First,  Next => null, others => <>);
                            Hi_Node : constant Expression_List :=
@@ -2800,7 +2828,7 @@ package body SData.Parser is
                               declare
                                  Discard  : constant Token := Get_Next_Token (Ctx.Lex_Ctx); -- ','
                                  New_Node : constant Expression_List :=
-                                    new Expression_List_Node'(Expr => Parse_Expression (Ctx), Next => null, others => <>);
+                                    new Expression_List_Node'(Expr => Parse_Required_Expression (Ctx, "in an array subscript"), Next => null, others => <>);
                               begin
                                  Last.Next := New_Node;
                                  Last      := New_Node;
@@ -2843,7 +2871,7 @@ package body SData.Parser is
                Stmt.Arr_Idx      := A_Idx;
                Stmt.Arr_Idx_List := A_Idx_List;
                Stmt.Arr_Is_Slice := A_Is_Slice;
-               Stmt.Expr         := Parse_Expression (Ctx);
+               Stmt.Expr         := Parse_Required_Expression (Ctx, "after '=' in an assignment");
 
                --  Early type-conflict detection (issue #31).  A scalar
                --  assignment whose right-hand side is a literal of a kind that
@@ -2915,7 +2943,7 @@ package body SData.Parser is
             --  to resolve the keyword overload with Stmt_REPEAT above).
             Stmt := new Statement (Stmt_LOOP_DO);
             Stmt.Do_Body   := Parse_Block (Ctx, Token_UNTIL);
-            Stmt.Until_Cond := Parse_Expression (Ctx);
+            Stmt.Until_Cond := Parse_Required_Expression (Ctx, "after UNTIL");
 
          when Token_PRINT | Token_NOTE =>
             Stmt := new Statement
@@ -3355,7 +3383,7 @@ package body SData.Parser is
                            begin
                               loop
                                  declare
-                                    E : constant Expression_Access := Parse_Expression (Ctx);
+                                    E : constant Expression_Access := Parse_Required_Expression (Ctx, "after CASE/WHEN");
                                     L : constant Expression_List := new Expression_List_Node'(Expr => E, Next => null, others => <>);
                                  begin
                                     if Branch.Conditions = null then Branch.Conditions := L; else Last_Cond.Next := L; end if;
@@ -3539,7 +3567,7 @@ package body SData.Parser is
                      Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      pragma Unreferenced (Discard);
                   begin
-                     S.Expr := Parse_Expression (Ctx);
+                     S.Expr := Parse_Required_Expression (Ctx, "after BREAK WHEN");
                   end;
                end if;
                Stmt := S;
@@ -3561,7 +3589,7 @@ package body SData.Parser is
 
          when Token_RSEED =>
             Stmt := new Statement (Stmt_RSEED);
-            Stmt.Seed_Expr := Parse_Expression (Ctx);
+            Stmt.Seed_Expr := Parse_Required_Expression (Ctx, "after RSEED");
 
          when Token_OUTPUT =>
             declare
@@ -3733,7 +3761,7 @@ package body SData.Parser is
 
          when Token_WHILE =>
             Stmt := new Statement (Stmt_WHILE);
-            Stmt.While_Cond := Parse_Expression (Ctx);
+            Stmt.While_Cond := Parse_Required_Expression (Ctx, "after WHILE");
             Stmt.While_Body := Parse_Block (Ctx, Token_WEND);
 
          when Token_FOR =>
@@ -3744,14 +3772,14 @@ package body SData.Parser is
             begin
                Stmt.For_Var_Len := Var_Tok.Length;
                Stmt.For_Var (1 .. Var_Tok.Length) := Identifier_Text (Var_Tok);
-               Stmt.For_Start := Parse_Expression (Ctx);
+               Stmt.For_Start := Parse_Required_Expression (Ctx, "after FOR variable =");
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_TO then
                   declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
                end if;
-               Stmt.For_End := Parse_Expression (Ctx);
+               Stmt.For_End := Parse_Required_Expression (Ctx, "as the FOR end value");
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_STEP then
                   declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
-                  Stmt.For_Step := Parse_Expression (Ctx);
+                  Stmt.For_Step := Parse_Required_Expression (Ctx, "after STEP");
                end if;
                Stmt.For_Body := Parse_Block (Ctx, Token_NEXT);
                
