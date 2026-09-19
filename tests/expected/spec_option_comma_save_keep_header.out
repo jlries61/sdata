@@ -1,0 +1,10 @@
+Dataset opened: tests/data/display_rows.csv
+RUN complete. 5 records and 3 variables processed.
+Dataset saved: tests/data/spec_option_comma_save_out.csv
+RUN complete. 5 records and 3 variables processed.
+ID
+1
+2
+3
+4
+5

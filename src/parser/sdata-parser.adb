@@ -732,18 +732,20 @@ package body SData.Parser is
             Last := Node;
          end;
          
-         --  The comma between list items is optional.  A comma that ends a
-         --  line is a continuation and may be followed by anything; a
-         --  mid-line comma must be followed by another name.  Consuming one
-         --  that is not (e.g. "DISPLAY ID, /FIRST=2") is what used to let a
-         --  stray comma slip through before an option (ADR-080, D1).
+         --  The comma between list items is optional, and it can also be the
+         --  separator between two OPTIONS when the list is the value of one
+         --  ("USE f (KEEP=A, HEADER=YES)"), so what follows a mid-line comma
+         --  must not be restricted to names.  The one thing that is never
+         --  valid there is a "/": a statement-level list followed by a slash
+         --  option ("DISPLAY ID, /FIRST=2") has no comma role, and consuming
+         --  the comma here is what used to let it through (ADR-080, D1).  A
+         --  comma that ends a line is a continuation and may be followed by
+         --  anything.
          if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
             declare
                Comma : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
-               if not Comma.Continuation
-                 and then not Is_Identifier_Token (Peek_Next_Token (Ctx.Lex_Ctx))
-               then
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash then
                   Reject_Mid_Line_Comma (Comma);
                end if;
             end;

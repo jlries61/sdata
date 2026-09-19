@@ -1,0 +1,10 @@
+Dataset opened: tests/data/display_rows.csv
+RUN complete. 5 records and 2 variables processed.
+Obs       ID  GROUP$
+--------------------
+  1  1.00000  B     
+  2  2.00000  A     
+  3  3.00000  C     
+  4  4.00000  A     
+  5  5.00000  B     
+--------------------
