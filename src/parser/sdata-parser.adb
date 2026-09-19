@@ -151,6 +151,7 @@ package body SData.Parser is
          when Token_Left_Brace    => return "(";  -- treat {} as ()
          when Token_Right_Brace   => return ")";
          when Token_Comma         => return ",";
+         when Token_Semicolon     => return ";";
          when Token_Colon         => return ":";
          when Token_Dot           => return ".";
          when others => return Raw;
@@ -3995,7 +3996,12 @@ package body SData.Parser is
 
          when others =>
             raise Script_Error with
-               "Unrecognized command """ & Tok.Text (1 .. Tok.Length) &
+               "Unrecognized command """
+               --  Punctuation tokens (a "/", a stray ",") carry no text of
+               --  their own; name them rather than printing an empty pair of
+               --  quotes.
+               & (if Tok.Length = 0 then Token_To_String (Tok)
+                  else Tok.Text (1 .. Tok.Length)) &
                """ at line " & Tok.Line'Image & " — type HELP for a list of commands";
       end case;
 
