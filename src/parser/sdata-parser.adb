@@ -48,6 +48,20 @@ package body SData.Parser is
    function Identifier_Text (T : Token) return String is
      (T.Text (1 .. T.Length));
 
+   --  ADR-080, D1: in a position where the grammar has no comma role (a
+   --  slash-option loop, the TABLES request list, the AGGREGATE outvar
+   --  list), only a comma that ENDS a line -- a continuation -- is allowed.
+   --  A comma in the middle of a line is a syntax error, not something to
+   --  skip silently.  (Comma-delimited grammars never call this.)
+   procedure Reject_Mid_Line_Comma (Comma : Token) is
+   begin
+      if not Comma.Continuation then
+         raise Script_Error with
+            "unexpected "","" at line" & Comma.Line'Image
+            & ": a comma here may only end a line (continuation)";
+      end if;
+   end Reject_Mid_Line_Comma;
+
    --  A terminal comma is always a continuation marker (design.md sec5.4;
    --  ADR-072), even in a grammar that has no comma role of its own
    --  (space/star-separated TABLES requests, "/flag"-style option loops for
@@ -56,13 +70,20 @@ package body SData.Parser is
    --  grammar, so a statement split across lines with a trailing comma
    --  doesn't leave that comma sitting in front of the next real token,
    --  where it would otherwise be misread as ending the statement one
-   --  token too early.
+   --  token too early.  A comma in the middle of a line is not a continuation
+   --  and is rejected here (Reject_Mid_Line_Comma, ADR-080 D1).
    procedure Skip_Continuation_Comma (Ctx : in out Parser_Context) is
    begin
-      while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma loop
-         declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                 pragma Unreferenced (Discard);
-         begin null; end;
+      loop
+         declare
+            P : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+         begin
+            exit when P.Kind /= Token_Comma;
+            Reject_Mid_Line_Comma (P);
+            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                    pragma Unreferenced (Discard);
+            begin null; end;
+         end;
       end loop;
    end Skip_Continuation_Comma;
 
@@ -699,8 +720,21 @@ package body SData.Parser is
             Last := Node;
          end;
          
+         --  The comma between list items is optional.  A comma that ends a
+         --  line is a continuation and may be followed by anything; a
+         --  mid-line comma must be followed by another name.  Consuming one
+         --  that is not (e.g. "DISPLAY ID, /FIRST=2") is what used to let a
+         --  stray comma slip through before an option (ADR-080, D1).
          if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
-            declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx); begin null; end;
+            declare
+               Comma : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if not Comma.Continuation
+                 and then not Is_Identifier_Token (Peek_Next_Token (Ctx.Lex_Ctx))
+               then
+                  Reject_Mid_Line_Comma (Comma);
+               end if;
+            end;
          end if;
       end loop;
       return First;
