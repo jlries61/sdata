@@ -1,0 +1,13 @@
+Dataset opened: tests/data/display_rows.csv
+RUN complete. 5 records and 3 variables processed.
+Frequency table for GROUP$
+
+GROUP$  Frequency
+-----------------
+A               2
+B               2
+C               1
+Total           5
+-----------------
+
+TABLES complete.

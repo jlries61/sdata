@@ -1,0 +1,14 @@
+Dataset opened: tests/data/display_rows.csv
+RUN complete. 5 records and 3 variables processed.
+Table of GROUP$ by ID by SCORE
+
+GROUP$  ID       SCORE     Frequency   Percent  Cum_Freq  Cum_Percent
+---------------------------------------------------------------------
+A       2.00000  10.00000          1  20.00000         1     20.00000
+A       4.00000  40.00000          1  20.00000         2     40.00000
+B       1.00000  30.00000          1  20.00000         3     60.00000
+B       5.00000  15.00000          1  20.00000         4     80.00000
+C       3.00000  20.00000          1  20.00000         5    100.00000
+---------------------------------------------------------------------
+
+TABLES complete.
