@@ -91,6 +91,7 @@ that might relitigate a settled question.
 | ADR-079 | Test counts are not maintained in prose | 2026-09-19 | Accepted |
 | ADR-080 | Comma rules: a continuation comma joins lines, a blank line ends a statement, a mid-line comma in a comma-free position is an error, and statements must end at a newline, colon or end of input | 2026-09-19 | Accepted |
 | ADR-081 | PRINT/NOTE: a semicolon prints items adjacent and a trailing semicolon suppresses the newline (Bywater BASIC 3.20) | 2026-09-19 | Accepted |
+| ADR-082 | The lexer rejects a character it does not recognize instead of silently skipping it | 2026-09-21 | Accepted |
 
 ---
 
@@ -3425,3 +3426,32 @@ Adding the separators to `Expression_List_Node`: rejected (cross-crate).
 - design.md, HELP PRINT, the man page and the HELP golden are updated; `NOTE` shares the rules. Files:
   `src/ast/sdata-ast.ads`, `src/parser/sdata-parser.adb`, `src/sdata-interpreter.adb` and its `Print_Value_List`,
   `Execute_Print` and `Execute_Note` subunits.
+
+---
+
+### ADR-082: The lexer rejects a character it does not recognize instead of silently skipping it
+
+**Date:** 2026-09-21 | **Status:** Accepted
+
+**Context.** `Get_Next_Token_Internal` ended its character dispatch with `when others => -- Unknown character, skip it and
+move on`, present since the initial commit and never mentioned in design.md. Milestone verification
+(`skeptic-after.md`, N-1) executed the consequences: `LET X = 5 @ + 1` ran as `LET X = 5 + 1`; `LET X = 1 @` and `@ PRINT 1`
+ran; `PRINT @` did nothing; the same for `# % & ! ? ~ [ ] \`. It is the lexer-level twin of the parser-level defect fixed in
+ADR-080 (`Parse_Primary` consuming a token it could not use). ADR-080's terminator rule already caught a dropped
+character *between* two operands (`A # B` is `unexpected "B"`), which hid the problem; one at the start or end of a statement,
+or beside an operator, was still silent.
+
+**Decision.** The character is a syntax error: `unexpected character "@" at line N`; a non-printable one is reported by its
+code (`unexpected character (code 12) at line N`). Bytes above 127 are unaffected: they already lex as letters (a UTF-8 byte
+order mark or a non-breaking space is an identifier-like token and was already an error, so nothing regressed there).
+Strings, backtick names and comments are lexed separately and may contain anything.
+
+**A test that only passed by accident was corrected.** `tests/if_func_lazy.cmd` wrote `LET I# = RECNO`. design.md defines
+only `$` and `%` as name suffixes, so `I#` was invalid and worked solely because the `#` was dropped, making it the variable
+`I`. The test's purpose is lazy `IF()` evaluation, so `I#` became `I`; its expected output is unchanged. It was the only one of
+the 616 test scripts that used a character outside the recognized set.
+
+**Consequences.** Scripts that contained a stray character now fail with a clear message at the character instead of running
+with it removed. sdata-only; the parser fuzz corpus (which expects `Script_Error`) passes. design.md 5.4, `HELP SYNTAX` and the
+man page state the rule. Six tests (`tests/lexer_*`): trailing, beside an operator, leading, a control character, `#` as a
+suffix, a bare `%`, plus a positive test that junk inside strings and comments is still fine.

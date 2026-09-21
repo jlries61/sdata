@@ -867,6 +867,10 @@ package body SData.Help is
       Put_Line ("  DISPLAY ID,                -- fine: the comma ends the line");
       Put_Line ("          /FIRST=2");
       New_Line;
+      Put_Line ("A character that is not part of any token (for example @ # ! ? ~ [ ])");
+      Put_Line ("is a syntax error, never silently skipped: ""unexpected character");
+      Put_Line ("""@"" at line N"". Only $ and % are name suffixes, so I# is an error.");
+      New_Line;
       Put_Line ("In the interactive REPL a line ending in a comma prompts ""..> "" for");
       Put_Line ("the rest; a blank line at that prompt ends the statement.");
    end Help_SYNTAX;

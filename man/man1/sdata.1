@@ -309,6 +309,22 @@ followed by
 on the next line \(em accepted
 .RE
 .PP
+A character that is not part of any token (for example
+.BR @ ,
+.BR # ,
+.BR ! ,
+.BR ? ,
+.B ~
+or brackets) is a syntax error, never silently skipped:
+.BR "unexpected character ""@"" at line N" .
+Only
+.B $
+and
+.B %
+are name suffixes, so
+.B I#
+is an error.
+.PP
 In the interactive REPL a line ending in a comma prompts
 .B ..>
 for the rest; a blank line at that prompt ends the statement.

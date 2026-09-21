@@ -635,9 +635,20 @@ package body SData.Lexer is
                      T.Kind := Token_Dot;
                   end if;
                when others =>
-                  --  Unknown character, skip it and move on.
-                  Advance (Ctx);
-                  return Get_Next_Token_Internal (Ctx);
+                  --  A character the language has no meaning for.  It used
+                  --  to be skipped silently, so "LET X = 5 @ + 1" ran as
+                  --  "LET X = 5 + 1" and "I#" meant "I" (design.md sec2 gives
+                  --  names only the suffixes $ and %); reject it instead.
+                  --  Bytes above 127 never reach here: they lex as letters.
+                  declare
+                     Code : constant Natural := Character'Pos (C);
+                  begin
+                     raise Script_Error with
+                       "unexpected character "
+                       & (if Code in 33 .. 126 then """" & C & """"
+                          else "(code" & Natural'Image (Code) & ")")
+                       & " at line" & Ctx.Line'Image;
+                  end;
             end case;
          end if;
       end;
