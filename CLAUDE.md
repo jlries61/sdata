@@ -77,7 +77,8 @@ make build           # alternative if toolchain is on PATH
 make check           # build + run all tests (unit + integration)
 ```
 
-`make check` runs five unit-test binaries plus the integration suite. Test
+`make check` runs five unit-test binaries, the scripts' own tests and an ADR-table
+consistency check (`check-scripts`, pure Python), and the integration suite. Test
 counts are deliberately **not** recorded in prose (ADR-079); `make check`'s own
 output is the only source of truth:
 1. `bin/csv_unit_test` — `SData_Core.CSV` functions

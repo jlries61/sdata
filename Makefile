@@ -70,7 +70,7 @@ INSTALL_DIR  = $(DESTDIR)$(BINDIR)
 MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 DOC_DIR      = $(DESTDIR)$(DOCDIR)
 
-.PHONY: all build clean run check fuzz-corpus gnatcheck complexity-check \
+.PHONY: all build clean run check check-scripts fuzz-corpus gnatcheck complexity-check \
         check-syntax-doc-sync install srpm pkg msi sdata-core-tarball
 
 all: build
@@ -113,6 +113,7 @@ check: build
 	 if [ $$? -ne 0 ]; then \
 	   echo "Unit tests FAILED"; exit 1; \
 	 fi
+	@$(MAKE) --no-print-directory check-scripts
 	@echo ""
 	@echo "Running tests..."
 	@#  Generate the SUBMIT depth-limit chain (gitignored; see submit_depth_test.cmd).
@@ -189,6 +190,18 @@ gnatcheck: build
 
 complexity-check:
 	@GNATMETRIC=$$(scripts/provision-gnatmetric.sh) scripts/check-complexity.sh
+
+# The scripts' own tests plus the ADR summary-table consistency check. Pure
+# Python (no build), and part of `make check`, so a failure shows up locally
+# and in CI's `make check` rather than being run by hand or not at all (they
+# used to be exactly that: milestone verify N-2 / N-3).
+check-scripts:
+	@echo "Running script checks..."
+	@for t in scripts/ssd_archive_test.py scripts/check_syntax_doc_sync_test.py \
+	          scripts/check_adr_table_test.py; do \
+	   out=$$(python3 $$t 2>&1) || { echo "$$t FAILED"; echo "$$out"; exit 1; }; \
+	 done
+	@python3 scripts/check-adr-table.py
 
 # Verifies a commit that changes a statement-kind-defining file (AST/
 # parser/lexer) also updates the user-facing doc set (HELP text, man

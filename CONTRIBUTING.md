@@ -61,7 +61,9 @@ builds are fast.
 alr exec -- make check
 ```
 
-This runs five unit test binaries followed by the integration tests. Expected
+This runs five unit test binaries, the scripts' own tests plus a check that the ADR
+summary table in `doc/adrs.md` matches the ADR sections (`make check-scripts`), and
+then the integration tests. Expected
 output ends with:
 
 ```
