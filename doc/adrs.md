@@ -3415,9 +3415,12 @@ Adding the separators to `Expression_List_Node`: rejected (cross-crate).
 - **Behavior change.** `PRINT "a"; "b"` was `a b`, now `ab`; `PRINT 1; 2` was `1 2`, now `12`. A trailing `;` used to
   be ignored and now joins the following output onto the same line. Scripts that used `;` as a synonym for a space
   change output; comma and whitespace scripts do not.
-- **Known limit.** `Print_Line_Open` is only cleared by a PRINT/NOTE newline and by `Print_Run_Complete`. If some other
-  command writes to the console while a PRINT line is open (for example DISPLAY between two PRINTs), the flag is stale
-  and one extra blank line may appear before the next `RUN complete`. This is cosmetic and was left simple on purpose.
+- **Known limit.** `Print_Line_Open` is only cleared by a PRINT/NOTE newline, `Print_Run_Complete` and the REPL loop. A
+  `NOTE` ending in `;` (it runs at once) followed by another command that prints before the `RUN` (for example
+  `NOTE "x";` / `DISPLAY` / `RUN`) leaves the flag set: the output lands on the open line (`x(No columns to display)`)
+  and `RUN complete` is then preceded by one extra blank line. (An earlier draft gave a DISPLAY between two `PRINT`s as
+  the example; that case is not reachable, because `PRINT` is deferred and DISPLAY runs first. Checked by running both.)
+  This is cosmetic and was left simple on purpose.
 - In the REPL an unfinished line is ended before each prompt (`Finish_Print_Line`), so a trailing `;` only joins
   output within one input line there; a script's output already ends with a newline at exit.
 - There is no statement that emits just a newline: a bare `PRINT` prints the record's variables and `PRINT ""` prints
@@ -3442,14 +3445,22 @@ character *between* two operands (`A # B` is `unexpected "B"`), which hid the pr
 or beside an operator, was still silent.
 
 **Decision.** The character is a syntax error: `unexpected character "@" at line N`; a non-printable one is reported by its
-code (`unexpected character (code 12) at line N`). Bytes above 127 are unaffected: they already lex as letters (a UTF-8 byte
-order mark or a non-breaking space is an identifier-like token and was already an error, so nothing regressed there).
-Strings, backtick names and comments are lexed separately and may contain anything.
+code (`unexpected character (code 12) at line N`). **Non-ASCII text outside strings, comments and backticks is affected** (corrected 2026-09-21; the first version of this
+paragraph said bytes above 127 were unaffected, which was wrong). The lexer treats a Latin-1 *letter* byte as part of a name,
+so the first byte of a UTF-8 letter such as `é` (C3 A9) was accepted and the second was silently dropped: `é` became the
+one-byte name `Ã`, and `é` and `ã` collided. Now the second byte reaches the new error, so `LET é = 5` fails with
+`unexpected character (code 169)`. That is the intended outcome (design.md gives names only ASCII letters, digits and
+`_`; a name with accents needs backticks) but it is a behavior change, and the message names a byte, not the letter.
+A UTF-8 byte order mark was already an error and still is. Strings, backtick names and comments are lexed separately and
+may contain anything.
 
 **A test that only passed by accident was corrected.** `tests/if_func_lazy.cmd` wrote `LET I# = RECNO`. design.md defines
 only `$` and `%` as name suffixes, so `I#` was invalid and worked solely because the `#` was dropped, making it the variable
 `I`. The test's purpose is lazy `IF()` evaluation, so `I#` became `I`; its expected output is unchanged. It was the only one of
-the 616 test scripts that used a character outside the recognized set.
+the 689 test scripts (`tests/*.cmd`, counted just before the new lexer tests were added; an earlier draft said 616, the
+milestone's starting count) that used a character outside the recognized set. A wider scan of all 826 script files under
+`tests/` (including `tests/data/` and the fuzz corpus) found only the new lexer tests and two fuzz inputs that are garbage on
+purpose (`garbage.sdata`, `expr_complex.sdata`).
 
 **Consequences.** Scripts that contained a stray character now fail with a clear message at the character instead of running
 with it removed. sdata-only; the parser fuzz corpus (which expects `Script_Error`) passes. design.md 5.4, `HELP SYNTAX` and the
