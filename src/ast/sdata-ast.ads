@@ -83,6 +83,18 @@ package SData.AST is
       IN_Name          : String (1 .. Max_Name_Len) := (others => ' ');
       IN_Name_Len      : Natural := 0;          --  USE only; 0 = not set
       IF_Expr          : Expression_Access;     --  USE and SAVE; null = not set
+      --  ADR-083 (sdata) / ADR-0026 (sdata-core): one field, two
+      --  interpretations by consumer -- not two separate fields.  On a
+      --  Dataset_Spec (USE), this is never populated from a per-dataset
+      --  paren option (the parser rejects MISSING= there; USE's MISSING=
+      --  is statement-level only -- see Statement.Missing_Val below) and
+      --  holds the raw, comma-separated token LIST, split downstream in
+      --  sdata-core.  On a Save_Spec (SAVE), this IS legal as a per-target
+      --  paren option (same shape as Decimals_Val above) and holds a
+      --  single verbatim write token, never split.
+      Missing_Val      : String (1 .. Max_Missing_Spec_Len) :=
+                            (others => ' ');
+      Missing_Len      : Natural := 0;          --  0 = not specified
    end record;
 
    type Dataset_Spec is record
@@ -270,6 +282,15 @@ package SData.AST is
             NSCAN_Val        : Natural := 0;
             Skip_Val         : Natural := 0;
             Maxrows_Val      : Natural := 0;
+            --  ADR-083: legacy single-dataset/single-target copy of
+            --  Spec.Opts.Missing_Val, populated the same way Stmt.NSCAN_Val
+            --  is copied from Spec.Opts.NSCAN_Val.  USE: the raw,
+            --  comma-separated MISSING= token list (statement-level only).
+            --  SAVE: the single write token for the legacy (Save_List
+            --  length = 1) path.
+            Missing_Val      : String (1 .. Max_Missing_Spec_Len) :=
+                                  (others => ' ');
+            Missing_Len      : Natural := 0;
             Header_Specified : Boolean := False;
             Header_Val       : Boolean := True;
             DLM_Path         : String (1 .. Max_Delimiter_Len)  := (others => ' ');

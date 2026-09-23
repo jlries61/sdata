@@ -2575,6 +2575,8 @@ package body SData.Interpreter is
                   Eff_Decimals : constant Integer :=
                      (if T.Opts.Decimals_Specified then T.Opts.Decimals_Val
                       else -1);
+                  Eff_Missing : constant String :=
+                     T.Opts.Missing_Val (1 .. T.Opts.Missing_Len);
                   --  Use the per-target accumulator buffer as the output
                   --  source.  Fall back to Empty_Schema (header-only) when
                   --  the buffer was never initialized (no records routed).
@@ -2630,7 +2632,8 @@ package body SData.Interpreter is
                         Write_Header    => Eff_Header,
                         Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
                         Charset         => Eff_Charset,
-                        Decimals        => Eff_Decimals);
+                        Decimals        => Eff_Decimals,
+                        Missing_Token   => Eff_Missing);
                      Put_Line ("Dataset saved: " & Full);
                   exception
                      when SData_Core.File_IO.Save_Refused => null;

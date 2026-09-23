@@ -453,6 +453,98 @@ begin
           V.Num_Val = Real'(123456.789), True);
 
    ---------------------------------------------------------------------------
+   --  MISSING-* : user-declared MISSING= tokens (USE read side / SAVE write
+   --  side, sdata ADR-083 / sdata-core ADR-0026).
+   ---------------------------------------------------------------------------
+
+   --  Primary acceptance/regression test: type_mismatch.csv is the exact
+   --  ADR-0019 fixture used by PC-28..31 above, whose row 2 "N/A" forces
+   --  VALUE to character WITHOUT Missing_Tokens.  Declaring "N/A" flips it
+   --  back to numeric, with row 2 stored as missing instead of the literal
+   --  string -- the direct demonstration that this feature closes the
+   --  cliff for a declared sentinel.  PC-28..31 above are a separate
+   --  Parse_CSV call (no Missing_Tokens) and are unaffected by this one.
+   Parse_CSV ("tests/data/type_mismatch.csv", Missing_Tokens => "N/A");
+   Check ("MISSING-01 declared token: col count", Column_Count, 2);
+   Check ("MISSING-02 declared token: col 2 name is VALUE (numeric)",
+          Column_Name (2), "VALUE");
+   V := Get_Value (2, "VALUE");
+   Check ("MISSING-03 declared token: row2 is missing", V.Kind = Val_Missing, True);
+   V := Get_Value (3, "VALUE");
+   Check_Float ("MISSING-04 declared token: row3 stays numeric", V.Num_Val, 30.0);
+
+   --  Position-independence (the R-A regression guard, systems-designer
+   --  02-systems-designer.md §2): the same file and the same declared token
+   --  must produce the identical column type and missing-value outcome
+   --  regardless of whether the anomalous row falls inside or outside the
+   --  NSCAN scan window.  missing_declared.csv has "NA" at row 2 of 5;
+   --  Nscan_Rows=1 puts it outside the window (only row 1 scanned),
+   --  Nscan_Rows=5 puts it inside.
+   Parse_CSV ("tests/data/missing_declared.csv", Nscan_Rows => 1,
+              Missing_Tokens => "NA");
+   Check ("MISSING-05 outside-window: col name is VALUE (numeric)",
+          Column_Name (2), "VALUE");
+   V := Get_Value (2, "VALUE");
+   Check ("MISSING-06 outside-window: row2 is missing", V.Kind = Val_Missing, True);
+
+   Parse_CSV ("tests/data/missing_declared.csv", Nscan_Rows => 5,
+              Missing_Tokens => "NA");
+   Check ("MISSING-07 inside-window: col name is VALUE (numeric)",
+          Column_Name (2), "VALUE");
+   V := Get_Value (2, "VALUE");
+   Check ("MISSING-08 inside-window: row2 is missing", V.Kind = Val_Missing, True);
+
+   --  A token containing a literal comma, expressed by quoting it inside
+   --  the comma-separated MISSING= list (Split_Indices/CSV_Unquote reuse --
+   --  02-systems-designer.md §5).  missing_quoted_token.csv row 2's VALUE
+   --  field is the quoted CSV value "a,b"; the Ada string literal
+   --  "NA,""a,b""" below decodes to the runtime string NA,"a,b" -- one
+   --  comma-separated list with two tokens, NA and (quoted) a,b.
+   Parse_CSV ("tests/data/missing_quoted_token.csv",
+              Missing_Tokens => "NA,""a,b""");
+   Check ("MISSING-09 quoted-comma token: col name is VALUE (numeric)",
+          Column_Name (2), "VALUE");
+   V := Get_Value (2, "VALUE");
+   Check ("MISSING-10 quoted-comma token: row2 is missing", V.Kind = Val_Missing, True);
+
+   --  Write side: a missing cell is written verbatim as Missing_Token
+   --  instead of left blank; round-trips back through the same token on a
+   --  subsequent read.  missing_first.csv (PC-16/17's fixture) has row1 X
+   --  missing and is otherwise numeric.
+   Parse_CSV ("tests/data/missing_first.csv");
+   SData_Core.File_IO.Open_Output ("tests/data/missing_write_out.csv",
+      SData_Core.Config.CSV, Missing_Token => "NA");
+   Parse_CSV ("tests/data/missing_write_out.csv");
+   Check ("MISSING-11 write token: col count unchanged", Column_Count, 2);
+   --  Without declaring "NA" as missing on this re-read, the written
+   --  literal "NA" text makes X character-typed (X$) -- confirms the token
+   --  was actually written, not left blank (blank would still read back as
+   --  Val_Missing on X, indistinguishable from "nothing changed").
+   Check ("MISSING-12 write token: re-read column is X$ (character)",
+          Column_Name (1), "X$");
+   V := Get_Value (1, "X$");
+   Check ("MISSING-13 write token: re-read value is the token text",
+          To_String (V), "NA");
+
+   --  Round-trip: declaring the same token on the re-read recovers
+   --  Val_Missing instead of the literal string.
+   Parse_CSV ("tests/data/missing_write_out.csv", Missing_Tokens => "NA");
+   Check ("MISSING-14 round-trip: col name is X (numeric)",
+          Column_Name (1), "X");
+   V := Get_Value (1, "X");
+   Check ("MISSING-15 round-trip: value is missing", V.Kind = Val_Missing, True);
+
+   --  Missing_Token omitted (default "") leaves today's blank-field write
+   --  behavior exactly unchanged.
+   Parse_CSV ("tests/data/missing_first.csv");
+   SData_Core.File_IO.Open_Output ("tests/data/missing_write_default.csv",
+      SData_Core.Config.CSV);
+   Parse_CSV ("tests/data/missing_write_default.csv");
+   V := Get_Value (1, "X");
+   Check ("MISSING-16 default write: still missing (blank field)",
+          V.Kind = Val_Missing, True);
+
+   ---------------------------------------------------------------------------
    --  Summary
    ---------------------------------------------------------------------------
    New_Line;

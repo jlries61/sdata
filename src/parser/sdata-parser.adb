@@ -820,6 +820,9 @@ package body SData.Parser is
    --    NSCAN  = integer           (USE only; error if Allow_USE_Only is False)
    --    SKIP   = integer           (USE only; error if Allow_USE_Only is False)
    --    MAXROWS = integer          (USE only; error if Allow_USE_Only is False)
+   --    MISSING = string           (USE and SAVE, like DLM/CHARSET/SHEET; ADR-083.
+   --                                USE: comma-separated token list, split
+   --                                downstream. SAVE: verbatim write token.)
    --
    --  On entry: peeked token is Token_Left_Paren (not yet consumed).
    --  On exit:  Token_Right_Paren has been consumed.
@@ -1103,6 +1106,30 @@ package body SData.Parser is
                         end if;
                      end;
 
+                  elsif Key_Up = "MISSING" then
+                     --  ADR-083: legal as a per-dataset/per-target paren
+                     --  option for BOTH USE and SAVE, same as DLM/CHARSET/
+                     --  SHEET above and unlike NSCAN/SKIP/MAXROWS (which are
+                     --  gated to USE only).  For USE this means a
+                     --  multi-dataset merge can give each input its own
+                     --  MISSING= token list, exactly like each input can
+                     --  already have its own NSCAN=/SKIP=/MAXROWS= -- the
+                     --  statement-level slash form (Apply_Legacy_Slash_Option,
+                     --  below) remains available too, as the same
+                     --  single-dataset/single-target convenience it already
+                     --  is for every other option in this list.  For USE the
+                     --  value is a comma-separated token list, split
+                     --  downstream in sdata-core; for SAVE it is used
+                     --  verbatim (never split) as the write token.
+                     declare
+                        Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        VLen    : constant Natural :=
+                           Natural'Min (Val_Tok.Length, Max_Missing_Spec_Len);
+                     begin
+                        Opts.Missing_Val (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                        Opts.Missing_Len := VLen;
+                     end;
+
                   elsif Key_Up = "DECIMALS" then
                      declare
                         Peek : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
@@ -1162,7 +1189,7 @@ package body SData.Parser is
    --  the recognised option to Opts.
    --
    --  Recognised for both USE and SAVE:
-   --    FMT  HEADER  CHARSET  DLM  SHEET
+   --    FMT  HEADER  CHARSET  DLM  SHEET  MISSING
    --  Recognised for USE only (Allow_USE_Only = True):
    --    NSCAN  SKIP  MAXROWS
    --
@@ -1318,6 +1345,24 @@ package body SData.Parser is
                      "MAXROWS= not allowed in " & Context_Name &
                      " slash-options at line" & Flag_Tok.Line'Image;
                end if;
+
+            elsif Flag_Name = "MISSING" then
+               --  ADR-083: legal here for both USE and SAVE (unlike
+               --  NSCAN/SKIP/MAXROWS, which are USE-only) -- this is the
+               --  statement-level slash form, used by USE always (MISSING=
+               --  is statement-level only for USE -- see Parse_Spec_Options'
+               --  rejection of it as a per-dataset paren option) and by
+               --  SAVE for the legacy single-target path.  Case preserved
+               --  (Val_Tok.Text, not the upper-cased Val_Str) -- a MISSING
+               --  token is matched against real data values, which are
+               --  themselves case-sensitive.
+               declare
+                  VLen : constant Natural :=
+                     Natural'Min (Val_Tok.Length, Max_Missing_Spec_Len);
+               begin
+                  Opts.Missing_Val (1 .. VLen) := Val_Tok.Text (1 .. VLen);
+                  Opts.Missing_Len := VLen;
+               end;
 
             else
                raise Script_Error with
@@ -1649,6 +1694,9 @@ package body SData.Parser is
                Stmt.NSCAN_Val        := Spec.Opts.NSCAN_Val;
                Stmt.Skip_Val         := Spec.Opts.Skip_Val;
                Stmt.Maxrows_Val      := Spec.Opts.Maxrows_Val;
+               Stmt.Missing_Len      := Spec.Opts.Missing_Len;
+               Stmt.Missing_Val (1 .. Spec.Opts.Missing_Len) :=
+                  Spec.Opts.Missing_Val (1 .. Spec.Opts.Missing_Len);
 
                --  Sheet name.
                Stmt.Sheet_Name_Len := Spec.Opts.Sheet_Name_Len;
@@ -1913,6 +1961,10 @@ package body SData.Parser is
 
                Stmt.Decimals_Specified := Spec.Opts.Decimals_Specified;
                Stmt.Decimals_Val       := Spec.Opts.Decimals_Val;
+
+               Stmt.Missing_Len := Spec.Opts.Missing_Len;
+               Stmt.Missing_Val (1 .. Spec.Opts.Missing_Len) :=
+                  Spec.Opts.Missing_Val (1 .. Spec.Opts.Missing_Len);
 
                Stmt.Output_CHARSET_Len := Spec.Opts.Charset_Len;
                Stmt.Output_CHARSET_Val (1 .. Spec.Opts.Charset_Len) :=

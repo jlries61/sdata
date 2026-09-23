@@ -142,6 +142,7 @@ begin
                      Skip_Rows   => Stmt.Skip_Val,
                      Max_Rows    => Stmt.Maxrows_Val,
                      Nscan_Rows  => Stmt.NSCAN_Val,
+                     Missing_Tokens => Stmt.Missing_Val (1 .. Stmt.Missing_Len),
                      Is_Mock     => Stmt.Is_Mock);
                end;
 
@@ -372,6 +373,9 @@ begin
                               Skip_Rows   => Spec.Opts.Skip_Val,
                               Max_Rows    => Spec.Opts.Maxrows_Val,
                               Nscan_Rows  => Spec.Opts.NSCAN_Val,
+                              Missing_Tokens =>
+                                 Spec.Opts.Missing_Val
+                                    (1 .. Spec.Opts.Missing_Len),
                               Is_Mock     => Spec.Is_Mock);
 
                            --  Snapshot the global table into a transient
@@ -654,7 +658,8 @@ begin
                   Delimiter    => Eff_DLM,
                   Write_Header => Eff_Header,
                   Charset      => Eff_Charset,
-                  Decimals     => Eff_Decimals);
+                  Decimals     => Eff_Decimals,
+                  Missing_Token => Stmt.Missing_Val (1 .. Stmt.Missing_Len));
             end Legacy_Execute_SAVE;
          begin
             --  Empty SAVE: clear everything (both legacy and multi-target).
