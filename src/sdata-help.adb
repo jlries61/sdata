@@ -64,7 +64,7 @@ package body SData.Help is
 
    procedure Help_USE is
    begin
-      Put_Line ("Command: USE [MOCK | ""filename[sheet]""] [/FMT=format] [/NSCAN=n]");
+      Put_Line ("Command: USE [MOCK | ""filename[sheet]""] [/FMT=format] [/NSCAN=n] [/MISSING=list]");
       Put_Line ("Loads a dataset from CSV, ODF, or OOXML files into the Data Table.");
       Put_Line ("USE MOCK generates synthetic test data.");
       Put_Line ("Sheet selection (ODF/OOXML only):");
@@ -76,6 +76,14 @@ package body SData.Help is
       Put_Line ("  /FMT=format  Specifies the file format (CSV, ODF, OOXML).");
       Put_Line ("               Default is auto-detected from file extension.");
       Put_Line ("  /NSCAN=n     Number of rows to scan for type detection (default: 20).");
+      Put_Line ("  /MISSING=""tok[,tok...]""  Literal strings treated as missing, in");
+      Put_Line ("               addition to the built-in """" and ""."" (never replaced).");
+      Put_Line ("               Applies during the NSCAN-row scan too, so a declared");
+      Put_Line ("               token never forces a column to character and never");
+      Put_Line ("               triggers the ""non-numeric value"" warning -- it's");
+      Put_Line ("               expected, not an anomaly.  A quoted token may itself");
+      Put_Line ("               contain a comma, e.g. ""NA,""""a,b"""""".  CSV input only.");
+      Put_Line ("               Also legal per-dataset (in parentheses, like NSCAN=).");
       Put_Line ("Per-dataset options (in parentheses after a filename):");
       Put_Line ("  (IF=expr)                Include a row from this input only when expr");
       Put_Line ("                           is true, tested as the row comes off this");
@@ -120,6 +128,7 @@ package body SData.Help is
    procedure Help_SAVE is
    begin
       Put_Line ("Command: SAVE ""filename[sheet]"" [/FMT=format] [/HEADER=YES|NO] [/DECIMALS=N]");
+      Put_Line ("     [/MISSING=""token""]");
       Put_Line ("Queues the current Data Table to be saved after the next RUN command.");
       Put_Line ("Sheet selection (ODF/OOXML only):");
       Put_Line ("  Append the sheet name in brackets inside the filename string.");
@@ -133,6 +142,11 @@ package body SData.Help is
       Put_Line ("               (N >= 0).  CSV: rounds the stored value and trims");
       Put_Line ("               trailing zeros.  ODF/OOXML: keeps full precision and");
       Put_Line ("               applies a fixed N-decimal display format.");
+      Put_Line ("  /MISSING=""tok""  Write this literal string for a missing cell instead");
+      Put_Line ("               of leaving it blank.  A single string, not a list --");
+      Put_Line ("               unlike USE's /MISSING=, SAVE writes exactly one canonical");
+      Put_Line ("               representation.  Default (omitted): blank, unchanged.");
+      Put_Line ("               Overridable per-target, like /DECIMALS=.");
       Put_Line ("Multiple targets (comma-separated) with per-target options:");
       Put_Line ("  SAVE ""a"" (KEEP=ID), ""b"" (DROP=ID), ""c"" (RENAME=(X=Y))");
       Put_Line ("  (KEEP=name ...)          Keep only the named columns in this target.");

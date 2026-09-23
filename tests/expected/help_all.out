@@ -1,5 +1,5 @@
 === COMMAND REFERENCE ===
-Command: USE [MOCK | "filename[sheet]"] [/FMT=format] [/NSCAN=n]
+Command: USE [MOCK | "filename[sheet]"] [/FMT=format] [/NSCAN=n] [/MISSING=list]
 Loads a dataset from CSV, ODF, or OOXML files into the Data Table.
 USE MOCK generates synthetic test data.
 Sheet selection (ODF/OOXML only):
@@ -11,6 +11,14 @@ Options:
   /FMT=format  Specifies the file format (CSV, ODF, OOXML).
                Default is auto-detected from file extension.
   /NSCAN=n     Number of rows to scan for type detection (default: 20).
+  /MISSING="tok[,tok...]"  Literal strings treated as missing, in
+               addition to the built-in "" and "." (never replaced).
+               Applies during the NSCAN-row scan too, so a declared
+               token never forces a column to character and never
+               triggers the "non-numeric value" warning -- it's
+               expected, not an anomaly.  A quoted token may itself
+               contain a comma, e.g. "NA,""a,b""".  CSV input only.
+               Also legal per-dataset (in parentheses, like NSCAN=).
 Per-dataset options (in parentheses after a filename):
   (IF=expr)                Include a row from this input only when expr
                            is true, tested as the row comes off this
@@ -52,6 +60,7 @@ Formula cells (ODF/OOXML):
 Execution: Declarative -- loads the dataset at once.
 
 Command: SAVE "filename[sheet]" [/FMT=format] [/HEADER=YES|NO] [/DECIMALS=N]
+     [/MISSING="token"]
 Queues the current Data Table to be saved after the next RUN command.
 Sheet selection (ODF/OOXML only):
   Append the sheet name in brackets inside the filename string.
@@ -65,6 +74,11 @@ Options:
                (N >= 0).  CSV: rounds the stored value and trims
                trailing zeros.  ODF/OOXML: keeps full precision and
                applies a fixed N-decimal display format.
+  /MISSING="tok"  Write this literal string for a missing cell instead
+               of leaving it blank.  A single string, not a list --
+               unlike USE's /MISSING=, SAVE writes exactly one canonical
+               representation.  Default (omitted): blank, unchanged.
+               Overridable per-target, like /DECIMALS=.
 Multiple targets (comma-separated) with per-target options:
   SAVE "a" (KEEP=ID), "b" (DROP=ID), "c" (RENAME=(X=Y))
   (KEEP=name ...)          Keep only the named columns in this target.

@@ -92,6 +92,7 @@ that might relitigate a settled question.
 | ADR-080 | Comma rules: a continuation comma joins lines, a blank line ends a statement, a mid-line comma in a comma-free position is an error, and statements must end at a newline, colon or end of input | 2026-09-19 | Accepted |
 | ADR-081 | PRINT/NOTE: a semicolon prints items adjacent and a trailing semicolon suppresses the newline (Bywater BASIC 3.20) | 2026-09-19 | Accepted |
 | ADR-082 | The lexer rejects a character it does not recognize instead of silently skipping it | 2026-09-21 | Accepted |
+| ADR-083 | USE `/MISSING=` (a token list) and SAVE `/MISSING=` (a single write token) let a script declare its own missing-value sentinels | 2026-09-23 | Accepted |
 
 ---
 
@@ -3466,3 +3467,89 @@ purpose (`garbage.sdata`, `expr_complex.sdata`).
 with it removed. sdata-only; the parser fuzz corpus (which expects `Script_Error`) passes. design.md 5.4, `HELP SYNTAX` and the
 man page state the rule. Six tests (`tests/lexer_*`): trailing, beside an operator, leading, a control character, `#` as a
 suffix, a bare `%`, plus a positive test that junk inside strings and comments is still fine.
+
+### ADR-083: USE `/MISSING=` (a token list) and SAVE `/MISSING=` (a single write token) let a script declare its own missing-value sentinels
+
+**Date:** 2026-09-23 | **Status:** Accepted
+
+**Context.** `USE`'s column-type inference scans only the first `NSCAN` rows (default 20, max 1000)
+of a CSV input. A non-numeric sentinel value such as `N/A` landing inside the scan window forces the
+column to character type (every value becomes a string, the name gets a trailing `$`); the same
+sentinel landing after the window instead gets coerced to missing at load time with a capped
+"non-numeric value ... stored as missing" warning, leaving the column numeric. Executed evidence:
+two otherwise-identical CSVs, differing only in which row carries the value, produce a different
+column name, a different column type for every row, and a different fate for the anomaly itself.
+This position-dependent behavior is **not** a defect in the scan-window rule itself, which is the
+documented, previously-decided design (design.md USE §7.1; sdata-core ADR-0019,
+`.ssd/features/pd6-scan-window-type-inference/`, shipped v0.12.0, explicitly chosen over the
+alternative after an audit framed it as a genuine, defensible-either-way question) — ADR-0019 is
+unchanged and still governs how an *undeclared* anomaly is handled. The problem this ADR closes is
+narrower: sdata had no way to tell an *expected* sentinel from an actual anomaly, so a known "no
+data" marker like `N/A` was always treated as a surprise.
+
+On the write side, a missing value was written as a genuinely empty field (CSV) or empty cell
+(ODF/OOXML) in all three formats — confirmed by reading `Write_CSV`/`Write_ODF`/`Write_OOXML`, each of
+which either had no branch for `Val_Missing` or an explicit no-op one.
+
+**Decision.**
+
+1. `USE /MISSING="tok1,tok2,..."` — a single quoted, comma-separated list of literal strings, read-side.
+   Legal both as a whole-statement option (single-dataset convenience, like `/NSCAN=`) and as a
+   per-dataset paren option in a multi-file merge (like `NSCAN=`, `SKIP=`, `MAXROWS=`, `FMT=`, and every
+   other per-dataset option already is) — **not** restricted to statement-level-only as originally
+   scoped in this feature's brief; reading the parser showed `NSCAN=` and its siblings are already
+   legitimately per-dataset options, with the statement-level slash form being sugar for the
+   single-dataset case, and `MISSING=` follows the same established shape rather than inventing a
+   special, more restrictive case (recorded as spec drift from the original brief/architect doc, not
+   from any design decided by the user). Additive to the built-in `""`/`"."` markers, never a
+   replacement. A field matching a declared token is missing in *both* the NSCAN-window scan and the
+   per-row load, so a declared token can never produce a different outcome depending on which row it
+   lands on, and never triggers the coercion warning (it is expected, not anomalous). One summary line
+   is printed per `USE` if any value matched: `Note: "<file>": N value(s) matched a declared MISSING
+   token`. The list is split on a literal comma — independent of the input's own `/DLM=` — reusing the
+   same quote-aware CSV field splitter and unquoter the file's own fields already go through, so a
+   token containing a comma can be expressed by quoting it (`MISSING="NA,""a,b"""`); each token is then
+   trimmed of surrounding whitespace, the same treatment a header column name already gets. Matching
+   itself is exact and case-sensitive against the field's own (untrimmed) text — no new leniency is
+   added to how a data value is compared, only to how the token list is written. CSV input only; ODF/OOXML
+   have no NSCAN-window concept to interact with (their `Parse_ODF`/`Parse_OOXML` take no scan-row
+   parameter at all) and are unaffected — a deliberate scope limit, not an oversight, since bolting a
+   read-side option onto a reader whose own type-inference story (row-1-only, narrower, never fully
+   audited) hasn't been scoped risks exactly the kind of undertested corner ADR-0019's own follow-up
+   found in ODF/OOXML once before.
+2. `SAVE /MISSING="tok"` — a single string, write-side, never split (the read side needs to recognize
+   several possible spellings; the write side picks exactly one canonical spelling to emit, and
+   accepting a list here and silently writing its first element would be a footgun). Legal both
+   statement-level (single-target) and per-target in a multi-target `SAVE`, mirroring `DECIMALS=`'s
+   existing override shape exactly. When a cell is missing, this literal token is written instead of
+   the field/cell being left empty; omitted (`""`, the default) is byte-for-byte identical to today's
+   output. Applies to all three writers (CSV, ODF, OOXML) since all three already isolate their
+   `Val_Missing` write branch. The CSV writer routes the token through the existing `CSV_Quote`
+   function, so a token that itself needs escaping (containing the delimiter, a quote, or a newline)
+   round-trips correctly.
+3. One AST field, not two: `Spec_Options` (shared by a `Dataset_Spec` and a `Save_Spec`) gains a single
+   `Missing_Val`/`Missing_Len` pair, interpreted differently by its consumer — a list for `USE`, a
+   verbatim token for `SAVE` — rather than two separate fields. The two statements' parsers already
+   gate which options are legal where, so no new sharing mechanism was needed to keep the two uses from
+   colliding.
+4. Cross-crate, same shape as `NSCAN`/`DLM`: sdata's parser and AST carry the new option syntax;
+   sdata-core's `Parse_CSV`/`Write_CSV`/`Write_ODF`/`Write_OOXML` do the actual token-matching/writing
+   logic (see sdata-core ADR-0026 for the implementation-level detail: the shared read-side predicate,
+   the hardcoded `,` list separator independent of the file's delimiter, and the `Config.Runtime`
+   `Save_Missing_Token` state that threads the legacy single-target `SAVE`'s value through
+   `Flush_Pending_Save`).
+
+**Consequences.** `SAVE ... /MISSING="NA"` followed by `USE ... /MISSING="NA"` recovers the same missing
+values through the token instead of through blank/`.`. A user who declares a token that happens to
+collide with a real data value gets that value silently converted to missing — no per-value warning
+(it is definitionally not an anomaly once declared), but the one summary count per `USE` at least makes
+a mistyped or over-broad token visible rather than perfectly silent. No feature flag (pure additive
+syntax; omitted option is unchanged behavior on both the read and write side, verified by every new
+parameter defaulting to `""`); rollback is a plain `git revert`. design.md's `USE`/`SAVE` rows, `HELP
+USE`/`HELP SAVE`, and the man page all describe the option; `tests/expected/help_all.out`,
+`help_use.out`, and `help_lowercase.out` were regenerated (pure additions plus the two synopsis-line
+insertions). `tests/file_io_unit_test.adb` gained 16 `MISSING-*` unit tests exercising the primary
+acceptance case (the exact `type_mismatch.csv`/`"N/A"` fixture ADR-0019's own PC-28..31 tests use,
+left untouched, with `Missing_Tokens => "N/A"` added as a separate call), position-independence across
+two different `Nscan_Rows` values on one fixture, a quoted-comma token, and the write/round-trip path.
+ADR-0019 itself is unchanged; this ADR is additive to it, not a supersession.

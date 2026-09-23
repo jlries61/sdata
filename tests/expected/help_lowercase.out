@@ -1,4 +1,4 @@
-Command: USE [MOCK | "filename[sheet]"] [/FMT=format] [/NSCAN=n]
+Command: USE [MOCK | "filename[sheet]"] [/FMT=format] [/NSCAN=n] [/MISSING=list]
 Loads a dataset from CSV, ODF, or OOXML files into the Data Table.
 USE MOCK generates synthetic test data.
 Sheet selection (ODF/OOXML only):
@@ -10,6 +10,14 @@ Options:
   /FMT=format  Specifies the file format (CSV, ODF, OOXML).
                Default is auto-detected from file extension.
   /NSCAN=n     Number of rows to scan for type detection (default: 20).
+  /MISSING="tok[,tok...]"  Literal strings treated as missing, in
+               addition to the built-in "" and "." (never replaced).
+               Applies during the NSCAN-row scan too, so a declared
+               token never forces a column to character and never
+               triggers the "non-numeric value" warning -- it's
+               expected, not an anomaly.  A quoted token may itself
+               contain a comma, e.g. "NA,""a,b""".  CSV input only.
+               Also legal per-dataset (in parentheses, like NSCAN=).
 Per-dataset options (in parentheses after a filename):
   (IF=expr)                Include a row from this input only when expr
                            is true, tested as the row comes off this

@@ -489,6 +489,19 @@ data rows after the header before reading.
 .TP
 .BI MAXROWS= n
 Limit the number of data rows loaded from this dataset.
+.TP
+.BI MISSING= "\(dqtok[,tok...]\(dq"
+Literal strings treated as missing, in addition to the built-in \(dq\(dq
+and \(dq.\(dq (never replaced). Applies during the
+.B NSCAN
+scan too, so a declared token never forces a column to character and
+never triggers the non\-numeric\-value warning\ \-\- it is expected, not
+an anomaly. A token may itself contain a comma if quoted CSV\-style,
+e.g.\& \(dqNA,\(dq\(dqa,b\(dq\(dq\(dq. CSV input only; ODF/OOXML have no
+scan window to interact with. Also legal as a whole\-statement
+.B /MISSING=
+option (single\-dataset
+.BR USE ).
 .RE
 .PP
 \fBColumn\-name collisions\fR across inputs (excluding BY variables) are resolved
@@ -599,6 +612,21 @@ all three formats render finite floating\-point values at
 round\-trip precision (integer, string, and missing cells are never
 affected by
 .BR DECIMALS= ).
+.TP
+.BI MISSING= "\(dqtoken\(dq"
+Write this literal string for a missing cell instead of leaving it
+blank. A single string, not a list\ \-\- unlike
+.BR USE 's
+.BR /MISSING= ,
+.B SAVE
+writes exactly one canonical representation. Default (omitted): blank,
+unchanged. Overridable per\-target here, or set once as a
+whole\-statement
+.B /MISSING=
+option for a single\-target
+.BR SAVE ,
+like
+.BR /DECIMALS= .
 .RE
 .PP
 The
