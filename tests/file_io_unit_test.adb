@@ -544,6 +544,49 @@ begin
    Check ("MISSING-16 default write: still missing (blank field)",
           V.Kind = Val_Missing, True);
 
+   --  MISSING-17..19: NUMERIC COLUMNS ONLY (code review round 1 MAJOR-1,
+   --  user ruling 2026-09-25).  missing_string_col.csv's NAME$ column is
+   --  explicitly character by its "$" suffix, and row 2's value is the
+   --  literal string "NA" -- a legitimate value (Nebraska's state code is
+   --  the textbook case).  Declaring "NA" for the sake of some other,
+   --  numeric column in the same file must NOT discard it.
+   Parse_CSV ("tests/data/missing_string_col.csv", Missing_Tokens => "NA");
+   Check ("MISSING-17 string column: name keeps its $ suffix",
+          Column_Name (1), "NAME$");
+   V := Get_Value (2, "NAME$");
+   Check ("MISSING-18 string column: declared token is NOT missing",
+          V.Kind = Val_Missing, False);
+   Check ("MISSING-19 string column: declared token kept as text",
+          To_String (V), "NA");
+
+   --  MISSING-20..22: the token list splits on a literal "," regardless of
+   --  the file's own delimiter (code review round 1, MINOR-1).  A
+   --  pipe-delimited file with a two-token MISSING= list must still see
+   --  both tokens -- a naive implementation reusing Delimiter here would
+   --  split on "|" and match neither.
+   Parse_CSV ("tests/data/missing_pipe_delim.csv", Delimiter => "|",
+              Missing_Tokens => "NA,N/A");
+   Check ("MISSING-20 DLM+MISSING: col stays numeric (both tokens matched)",
+          Column_Name (1), "X");
+   V := Get_Value (2, "X");
+   Check ("MISSING-21 DLM+MISSING: first token matched", V.Kind = Val_Missing, True);
+   V := Get_Value (3, "X");
+   Check ("MISSING-22 DLM+MISSING: second token matched", V.Kind = Val_Missing, True);
+
+   --  MISSING-23/24: a write-side token containing the field delimiter is
+   --  CSV-quoted on output (code review round 1, MINOR-2), so it reads back
+   --  as one field, not two.  Without CSV_Quote the row would gain a field
+   --  and the value would truncate at the comma.
+   Parse_CSV ("tests/data/missing_first.csv");
+   SData_Core.File_IO.Open_Output ("tests/data/missing_write_quoted.csv",
+      SData_Core.Config.CSV, Missing_Token => "N,A");
+   Parse_CSV ("tests/data/missing_write_quoted.csv");
+   Check ("MISSING-23 quoted write token: still 2 columns, not 3",
+          Column_Count, 2);
+   V := Get_Value (1, "X$");
+   Check ("MISSING-24 quoted write token: value round-trips intact",
+          To_String (V), "N,A");
+
    ---------------------------------------------------------------------------
    --  Summary
    ---------------------------------------------------------------------------

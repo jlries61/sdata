@@ -78,6 +78,10 @@ package body SData.Help is
       Put_Line ("  /NSCAN=n     Number of rows to scan for type detection (default: 20).");
       Put_Line ("  /MISSING=""tok[,tok...]""  Literal strings treated as missing, in");
       Put_Line ("               addition to the built-in """" and ""."" (never replaced).");
+      Put_Line ("               NUMERIC COLUMNS ONLY: in a character column ($ suffix,");
+      Put_Line ("               or settled to character by the scan) a matching field");
+      Put_Line ("               stays ordinary text, so declaring a sentinel for one");
+      Put_Line ("               column cannot discard a real string value elsewhere.");
       Put_Line ("               Applies during the NSCAN-row scan too, so a declared");
       Put_Line ("               token never forces a column to character and never");
       Put_Line ("               triggers the ""non-numeric value"" warning -- it's");

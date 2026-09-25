@@ -3504,7 +3504,17 @@ which either had no branch for `Val_Missing` or an explicit no-op one.
    from any design decided by the user). Additive to the built-in `""`/`"."` markers, never a
    replacement. A field matching a declared token is missing in *both* the NSCAN-window scan and the
    per-row load, so a declared token can never produce a different outcome depending on which row it
-   lands on, and never triggers the coercion warning (it is expected, not anomalous). One summary line
+   lands on, and never triggers the coercion warning (it is expected, not anomalous).
+   **Numeric columns only** (user ruling 2026-09-25, closing code review round 1's MAJOR-1): in a
+   character column — one carrying the `$` suffix, or one the scan settled to character because of a
+   genuine non-numeric value — a matching field is stored as ordinary text and is *not* treated as
+   missing. Round 1 of the review found the first implementation applied the token to every column
+   regardless of type, a silent data-loss risk: a script declaring `MISSING="NA"` for one numeric
+   column's sake would also erase `NA` from an unrelated `CODE$` column where it is a legitimate value
+   (Nebraska's postal code being the textbook case). Scoping to numeric columns keeps the feature aimed
+   at the problem it was built for — the type-inference cliff, which only exists for a column whose
+   type is being *inferred* — and leaves character columns, whose type was never in question, storing
+   text as text. One summary line
    is printed per `USE` if any value matched: `Note: "<file>": N value(s) matched a declared MISSING
    token`. The list is split on a literal comma — independent of the input's own `/DLM=` — reusing the
    same quote-aware CSV field splitter and unquoter the file's own fields already go through, so a

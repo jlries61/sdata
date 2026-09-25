@@ -79,6 +79,7 @@ tests/data/dec_out.xlsx
 # file_io_unit_test MISSING= write-side scratch outputs (ADR-083)
 tests/data/missing_write_out.csv
 tests/data/missing_write_default.csv
+tests/data/missing_write_quoted.csv
 sdata_opt_*.csv
 
 # Packaging artifacts

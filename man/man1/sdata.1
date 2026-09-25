@@ -492,7 +492,13 @@ Limit the number of data rows loaded from this dataset.
 .TP
 .BI MISSING= "\(dqtok[,tok...]\(dq"
 Literal strings treated as missing, in addition to the built-in \(dq\(dq
-and \(dq.\(dq (never replaced). Applies during the
+and \(dq.\(dq (never replaced).
+.B Numeric columns only:
+in a character column (one with a \(dq$\(dq suffix, or whose type the scan
+settled to character) a matching field is stored as ordinary text and is
+not treated as missing, so declaring a sentinel for one column's sake
+cannot silently discard a legitimate string value elsewhere in the same
+file. Applies during the
 .B NSCAN
 scan too, so a declared token never forces a column to character and
 never triggers the non\-numeric\-value warning\ \-\- it is expected, not

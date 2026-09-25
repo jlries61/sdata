@@ -13,6 +13,10 @@ Options:
   /NSCAN=n     Number of rows to scan for type detection (default: 20).
   /MISSING="tok[,tok...]"  Literal strings treated as missing, in
                addition to the built-in "" and "." (never replaced).
+               NUMERIC COLUMNS ONLY: in a character column ($ suffix,
+               or settled to character by the scan) a matching field
+               stays ordinary text, so declaring a sentinel for one
+               column cannot discard a real string value elsewhere.
                Applies during the NSCAN-row scan too, so a declared
                token never forces a column to character and never
                triggers the "non-numeric value" warning -- it's
