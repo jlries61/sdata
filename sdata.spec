@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.34.0
+Version:        0.35.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Fri Sep 25 2026 John L. Ries <john@theyarnbard.com> - 0.35.0-1
+- Add USE /MISSING= and SAVE /MISSING= for user-declared missing-value tokens (ADR-083).
+
 * Sat Sep 19 2026 John L. Ries <john@theyarnbard.com> - 0.34.0-1
 - Comma and statement rules (ADR-080): a blank line ends a continuation; a mid-line comma in an option loop or between statements is a syntax error; a statement must end at a newline, colon or end of input (PRINT 1 RUN and LET X = 1 PRINT X are now errors); a missing expression is a syntax error instead of a hang; new HELP SYNTAX topic
 
