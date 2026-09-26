@@ -102,8 +102,7 @@ begin
             --  by the batch walker / at REPL entry, exactly like ARRAY already was.
             --  Re-executing it per record would re-DIM (and reset) the array on
             --  every record of a REPEAT n data step instead of once.
-            --  Stmt_HOLD/Stmt_UNHOLD (also never listed here as of the
-            --  2026-08-13 re-audit's PA-2/PB-4 resolution) are the same
+            --  Stmt_HOLD/Stmt_UNHOLD (also never listed here) are the same
             --  category too: they are Declarative -- a one-time decision
             --  about which variables retain their value across records, not
             --  a per-record toggle. An initial safety check against only
@@ -125,7 +124,7 @@ begin
             --  per-record replay at all and produces byte-identical output.
             --  tests/sort_by.cmd was rewritten to that idiom rather than
             --  keeping HOLD/UNHOLD in this whitelist.
-            --  Stmt_HELP (2026-08-13 re-audit PB-8): design.md §7.1,
+            --  Stmt_HELP (PB-8): design.md §7.1,
             --  sdata-help.adb, and CLAUDE.md all already say Immediate: only
             --  this whitelist disagreed, silently re-printing the same HELP
             --  text once per record when HELP was left inside an open

@@ -656,10 +656,10 @@ procedure Execute_Tables (Stmt : Statement_Access) is
    --  active BY variable's name, or (when Req /= null) one of Req's own
    --  crossing variable names -- case-insensitively, matching how
    --  SData_Core.Table.Add_Output_Column's own key canonicalization would
-   --  otherwise silently treat them as the same column (see BLOCKER-1,
-   --  04-code-review.md: Add_Output_Column no-ops on an existing name, so
-   --  an unguarded collision here does not raise -- it silently drops the
-   --  reserved column and lets the crossing/BY variable's own later write
+   --  otherwise silently treat them as the same column: Add_Output_Column
+   --  no-ops on an existing name, so an unguarded collision here does not
+   --  raise -- it silently drops the reserved column and lets the
+   --  crossing/BY variable's own later write
    --  clobber the computed value, or vice versa).  Req is null for
    --  Write_Chisq_Save_File's schema, which has no crossing variables of
    --  its own to check.
@@ -688,9 +688,9 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       return False;
    end Reserved_Name_Collision;
 
-   --  Raises a clear, actionable error for a reserved-name collision
-   --  (BLOCKER-1's fix: loud failure instead of Add_Output_Column's own
-   --  silent no-op, matching this project's established preference --
+   --  Raises a clear, actionable error for a reserved-name collision --
+   --  loud failure instead of Add_Output_Column's own silent no-op,
+   --  matching this project's established preference --
    --  e.g. the Output_Is_Spilled guard earlier in this same file, and
    --  ADR-0021's CHARSET hard-fail before it).
    procedure Check_Reserved_Name (Name : String; Req : Table_Request) is

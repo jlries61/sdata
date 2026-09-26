@@ -555,7 +555,7 @@ begin
 
    ---------------------------------------------------------------------------
    --  ── SData_Core.Variables: scalar/array storage-class hard error ─────────
-   --  (2026-08-13 re-audit PC-2 / ADR-0012 -- extends the #56 checks above
+   --  (sdata-core ADR-0012 -- extends the #56 checks above
    --  to the scalar/array boundary.)
    ---------------------------------------------------------------------------
 
@@ -659,7 +659,7 @@ begin
 
    ---------------------------------------------------------------------------
    --  ── SData_Core.Variables: Get_Array_Element / Set_Array_Element hard
-   --     errors (2026-08-13 re-audit PC-1 / ADR-0014) ─────────────────────────
+   --     errors (sdata-core ADR-0014) ─────────────────────────
    --  Direct-call coverage complementing sdata's REPL integration test
    --  (tests/array_element_read_undefined.{cmd,repl,flags}): that test proves
    --  a real script can reach the undefined-array raise (only via REPL mode --

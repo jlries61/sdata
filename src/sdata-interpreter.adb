@@ -35,14 +35,14 @@ with SData_Core.File_IO;
 --  SData.Interpreter — statement executor and data step engine.
 --
 --  Execution model (three tiers). This comment and CLAUDE.md's own tier
---  table (2026-08-13 re-audit PB-14: the two had drifted independently
---  from a shared original text without either being revisited) are both
---  descriptive copies -- the operational ground truth for the Declarative
---  tier specifically is the ADR-056 loop-placement-warning set below
---  (search this file for "Stmt.Kind in Stmt_ARRAY"), since that is the one
---  place the boundary has a real, checked consequence rather than just
---  being documentation. Keep both copies in sync with that set when either
---  changes.
+--  table had drifted independently from a shared original text for months
+--  without either being revisited before a 2026-08-13 re-audit caught it;
+--  both are descriptive copies -- the operational ground truth for the
+--  Declarative tier specifically is the ADR-056 loop-placement-warning set
+--  below (search this file for "Stmt.Kind in Stmt_ARRAY"), since that is
+--  the one place the boundary has a real, checked consequence rather than
+--  just being documentation. Keep both copies in sync with that set when
+--  either changes.
 --    Declarative       Commands such as USE, BY, SELECT, REPEAT, SAVE, FPATH,
 --                      RENAME, HOLD, UNHOLD, RSEED execute immediately and
 --                      configure interpreter state or shape the data step
@@ -144,7 +144,7 @@ package body SData.Interpreter is
    --  a bare TABLES statement as if deferred, and process_one_record.adb's
    --  per-record whitelist doesn't cover it either, so it silently never
    --  ran (issue #68).  Keep this list and Execute_Statement's case in sync.
-   --  Stmt_UNSET (2026-08-13 re-audit PB-11) was the same bug: absent here,
+   --  Stmt_UNSET was the same bug: absent here,
    --  UNSET was queued as deferred in the REPL and, being absent from
    --  process_one_record.adb's whitelist too, never fired at all
    --  interactively -- unlike batch, where Execute's own exclusion list
@@ -2220,19 +2220,17 @@ package body SData.Interpreter is
    begin
       if Stmt = null then return; end if;
 
-      --  P15 (design-vs-implementation audit, ADR-056) + the 2026-08-13
-      --  design-vs-implementation re-audit's PA-2/PB findings: a Declarative
-      --  statement -- one that configures interpreter state once rather
-      --  than per record -- inside a FOR/WHILE/DO-UNTIL loop is not a
-      --  syntax error, but is confusing: it takes effect once, not scoped
-      --  to that iteration. Warn (not reject), once per source occurrence
-      --  regardless of how many times the loop actually iterates. The set
-      --  below is design.md §7.1's Commands table Type column (already
-      --  correct for every row below before this change) plus USE/RENAME/
-      --  HOLD/UNHOLD, added per the resolution reached working through the
-      --  2026-08-13 re-audit's PA-2/PB findings: all four "execute
-      --  immediately... and shape the data step that follows" exactly like
-      --  their siblings, so they get the same loop-placement warning.
+      --  ADR-056: a Declarative statement -- one that configures interpreter
+      --  state once rather than per record -- inside a FOR/WHILE/DO-UNTIL
+      --  loop is not a syntax error, but is confusing: it takes effect
+      --  once, not scoped to that iteration. Warn (not reject), once per
+      --  source occurrence regardless of how many times the loop actually
+      --  iterates. The set below is design.md §7.1's Commands table Type
+      --  column (already correct for every row below before this change)
+      --  plus USE/RENAME/HOLD/UNHOLD, added in a later pass: all four
+      --  "execute immediately... and shape the data step that follows"
+      --  exactly like their siblings, so they get the same loop-placement
+      --  warning.
       --  sdata-help.adb's Execution lines were updated to match (were the
       --  stale side of the disagreement, not design.md). RSEED was added in
       --  the same follow-up: design.md §7.1 had said "Deferred Execution"

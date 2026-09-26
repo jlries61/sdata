@@ -841,8 +841,8 @@ begin
          if SData_Core.Table.Column_Count = 0 and then not SData_Core.Config.Runtime.Repeat_Active then
             raise Script_Error with "BY statement requires an active dataset (use USE or REPEAT first).";
          end if;
-         --  2026-08-20 re-audit PD-1 / sdata-core ADR-0013: BY no longer
-         --  sorts the input table -- it is purely declarative, establishing
+         --  sdata-core ADR-0013: BY no longer sorts the input table --
+         --  it is purely declarative, establishing
          --  the BY variables that grouping consumers key on, exactly as
          --  design.md sec5.2 documents ("Blocks need not be in sorted
          --  order"; "Blocks with same value combination but not consecutive

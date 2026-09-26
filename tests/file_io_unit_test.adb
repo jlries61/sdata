@@ -544,8 +544,8 @@ begin
    Check ("MISSING-16 default write: still missing (blank field)",
           V.Kind = Val_Missing, True);
 
-   --  MISSING-17..19: NUMERIC COLUMNS ONLY (code review round 1 MAJOR-1,
-   --  user ruling 2026-09-25).  missing_string_col.csv's NAME$ column is
+   --  MISSING-17..19: NUMERIC COLUMNS ONLY (sdata-core ADR-0026, "Numeric
+   --  columns only").  missing_string_col.csv's NAME$ column is
    --  explicitly character by its "$" suffix, and row 2's value is the
    --  literal string "NA" -- a legitimate value (Nebraska's state code is
    --  the textbook case).  Declaring "NA" for the sake of some other,
@@ -560,7 +560,8 @@ begin
           To_String (V), "NA");
 
    --  MISSING-20..22: the token list splits on a literal "," regardless of
-   --  the file's own delimiter (code review round 1, MINOR-1).  A
+   --  the file's own delimiter (sdata-core ADR-0026: the delimiter is
+   --  hardcoded to "," deliberately, independent of the file's own).  A
    --  pipe-delimited file with a two-token MISSING= list must still see
    --  both tokens -- a naive implementation reusing Delimiter here would
    --  split on "|" and match neither.
@@ -574,7 +575,7 @@ begin
    Check ("MISSING-22 DLM+MISSING: second token matched", V.Kind = Val_Missing, True);
 
    --  MISSING-23/24: a write-side token containing the field delimiter is
-   --  CSV-quoted on output (code review round 1, MINOR-2), so it reads back
+   --  CSV-quoted on output (sdata-core ADR-0026's write side), so it reads back
    --  as one field, not two.  Without CSV_Quote the row would gain a field
    --  and the value would truncate at the comma.
    Parse_CSV ("tests/data/missing_first.csv");
