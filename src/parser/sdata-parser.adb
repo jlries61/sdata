@@ -1548,10 +1548,10 @@ package body SData.Parser is
       procedure Parse_Filename_Into (Spec : Dataset_Spec_Access) is
          File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
       begin
-         --  sdata#90: this used to accept ANY token kind here, blindly
-         --  copying its Text/Length as
-         --  if it were filename text -- including a reserved-keyword token
-         --  like Token_QUIT.  Harmless before ADR-072 made the continuation
+         --  This used to accept ANY token kind here, blindly copying its
+         --  Text/Length as if it were filename text -- including a
+         --  reserved-keyword token like Token_QUIT.  Harmless before
+         --  ADR-072 made the continuation
          --  comma a real, persistent token (a bare trailing comma was
          --  simply discarded, so USE's dataset-list loop never called this
          --  a second time unless the user deliberately wrote a same-line
@@ -1906,11 +1906,10 @@ package body SData.Parser is
       procedure Parse_Filename_Into_Save (Spec : Save_Spec_Access) is
          File_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
       begin
-         --  sdata#90: same guard as Parse_Filename_Into (USE) -- see its
-         --  comment for the full explanation, including why Token_EOF is
-         --  deliberately exempted
-         --  (the REPL's own graceful continuation-prompt case). SAVE has
-         --  no MOCK case.
+         --  Same guard as Parse_Filename_Into (USE) -- see its comment for
+         --  the full explanation, including why Token_EOF is deliberately
+         --  exempted (the REPL's own graceful continuation-prompt case).
+         --  SAVE has no MOCK case.
          if File_Tok.Kind /= Token_String_Literal
            and then File_Tok.Kind /= Token_Identifier
            and then File_Tok.Kind /= Token_EOF
