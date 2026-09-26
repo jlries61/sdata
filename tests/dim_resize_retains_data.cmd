@@ -1,6 +1,5 @@
--- Regression test for P12 (design-vs-implementation audit,
--- .ssd/audits/2026-08-03-design-vs-implementation/report.md): re-DIMing an
--- array to a smaller range must retain the in-range elements' values, per
+-- Regression test: re-DIMing an array to a smaller range must retain the
+-- in-range elements' values, per
 -- design.md §3.5 ("Contraction: Elements outside new range are deleted" --
 -- implying elements inside the new range are NOT). Both temporary
 -- (Temp_Symbols-backed) and permanent (table-column-backed) real arrays

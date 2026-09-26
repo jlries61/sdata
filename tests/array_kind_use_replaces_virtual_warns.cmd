@@ -1,4 +1,4 @@
--- PC-3 (systems-designer recommendation): USE's Register_Subscripted_Columns
+-- USE's Register_Subscripted_Columns
 -- auto-detection (ADR-041) now inherits DIM's virtual-array-replacement
 -- fix -- a base(n)-shaped column pattern that collides with a pre-existing
 -- virtual array silently replaces it (per ADR-0015), which used to crash

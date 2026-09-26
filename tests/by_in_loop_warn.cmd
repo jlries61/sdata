@@ -1,4 +1,4 @@
--- PB-12: BY is in the ADR-056 declarative-warn set (interpreter.adb) but,
+-- BY is in the ADR-056 declarative-warn set (interpreter.adb) but,
 -- until now, no test exercised it specifically -- declarative_in_loop_warn.cmd
 -- covers KEEP, mentioning BY only in its comment. Confirms the one-time
 -- warning fires exactly once for BY inside a FOR loop, not three times.

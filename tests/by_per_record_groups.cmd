@@ -1,4 +1,4 @@
--- PB-12 (2026-08-13 re-audit): Stmt_BY removed from process_one_record.adb's
+-- Stmt_BY removed from process_one_record.adb's
 -- per-record replay whitelist. BY is Declarative -- dispatched once via the
 -- batch walker's immediate pre-scan, before any record runs -- and the
 -- redundant per-record redispatch this whitelist entry caused was already a

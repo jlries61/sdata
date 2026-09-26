@@ -1,4 +1,4 @@
--- 2026-08-20 re-audit PD-1 / sdata-core ADR-0013: LAG/NEXT across a BY-group
+-- sdata-core ADR-0013: LAG/NEXT across a BY-group
 -- boundary when the table is genuinely out-of-order (not the pre-existing
 -- filter_lag_next_by.cmd's case, where GRP already happens to be contiguous
 -- by X, so a sort there is a no-op). GRP alternates every record, so under

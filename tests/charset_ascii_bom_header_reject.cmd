@@ -1,4 +1,4 @@
--- PD-8 / ADR-0021 Consequences note (code-review round 2, MINOR-1): a UTF-8
+-- sdata-core ADR-0021's Consequences note: a UTF-8
 -- BOM in the header row is non-ASCII bytes, so it now correctly hard-fails
 -- under CHARSET=ASCII rather than being silently stripped -- pinned here so
 -- a future change doesn't "fix" this by moving the header charset check

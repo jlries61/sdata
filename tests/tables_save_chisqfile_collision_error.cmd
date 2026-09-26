@@ -1,7 +1,7 @@
 -- TABLES /SAVE /CHISQ: a BY variable named DF collides with the chi-square
--- file's computed DF column -- must raise a clear error (BLOCKER-1,
--- 04-code-review.md round 1). The main crosstab file has no such collision
--- (DF is not a request variable here) and is written normally before the
+-- file's computed DF column -- must raise a clear error. The main
+-- crosstab file has no such collision (DF is not a request variable here)
+-- and is written normally before the
 -- /CHISQ write fails -- same "main succeeds, chi-square fails" shape as
 -- tables_save_refused.cmd. Saved under tests/data/ (gitignored, not
 -- self-cleaned via SYSTEM rm) since the script aborts on the error below

@@ -1,4 +1,4 @@
--- PC-3 round-trip consistency check (systems-designer requirement): DIM
+-- Round-trip consistency check: DIM
 -- successfully replaces an existing virtual array with a real one; a
 -- subsequent ARRAY attempt on that now-real array must be rejected. Proves
 -- the replacement actually updated the array's registered kind to

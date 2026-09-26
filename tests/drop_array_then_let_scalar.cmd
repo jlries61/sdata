@@ -1,5 +1,5 @@
--- 2026-08-19 code review round 1 (MINOR-1): permanent regression coverage
--- for the remedy the PC-2 / ADR-0012 error messages advertise -- DROP an
+-- Permanent regression coverage for the remedy sdata-core ADR-0012's error
+-- messages advertise -- DROP an
 -- array, then redefine its freed name as a scalar. drop_array_real.cmd
 -- already proves DROP frees the name for re-DIM; this proves the LET
 -- (scalar) direction the SET/LET error messages specifically name.

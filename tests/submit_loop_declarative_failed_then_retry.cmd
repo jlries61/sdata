@@ -1,4 +1,4 @@
--- ADR-058 regression test (code-review round 1, MAJOR-1): a loop-nested
+-- ADR-058 regression test: a loop-nested
 -- SUBMIT of a given file path that FAILS (here: recursive SUBMIT detected,
 -- via a seeded self-referential scratch file) must not permanently mark
 -- that path as "already warned". A later, independent loop-nested SUBMIT

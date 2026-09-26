@@ -1,4 +1,5 @@
--- Core PB-11 regression: before the 2026-08-15 fix, UNSET was missing from
+-- Regression guard for the same REPL dispatch trap note_repl_dispatch.cmd
+-- exercises for NOTE (see ADR-059): before the fix, UNSET was missing from
 -- Is_Immediate, so the REPL queued it as deferred instead of dispatching it
 -- at once -- and since Stmt_UNSET was also never in Process_One_Record's
 -- whitelist, it silently never fired at all interactively, under any usage

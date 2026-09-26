@@ -1,4 +1,4 @@
--- 2026-08-20 re-audit PD-1 / sdata-core ADR-0013: Partition_By_Key's
+-- sdata-core ADR-0013: Partition_By_Key's
 -- composite BY-key must not let two genuinely different multi-variable
 -- key tuples collide into the same bucket. A naive fixed-separator string
 -- join (e.g. A & "|" & B) would flatten record 1 (A="X|Y", B="Z") and
