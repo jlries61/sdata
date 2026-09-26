@@ -1,0 +1,20 @@
+Dataset opened: tests/data/types_manytext.csv
+Dataset saved: tests/data/types_manytext_gen.xlsx
+RUN complete. 12 records and 2 variables processed.
+Note: "tests/data/types_manytext_gen.xlsx": column "LABEL" is declared character by the file header; /TYPES= overrides it to float
+Warning: "tests/data/types_manytext_gen.xlsx", data row 1, column "LABEL": non-numeric value "txt1" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx", data row 2, column "LABEL": non-numeric value "txt2" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx", data row 3, column "LABEL": non-numeric value "txt3" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx", data row 4, column "LABEL": non-numeric value "txt4" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx", data row 5, column "LABEL": non-numeric value "txt5" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx", data row 6, column "LABEL": non-numeric value "txt6" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx", data row 7, column "LABEL": non-numeric value "txt7" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx", data row 8, column "LABEL": non-numeric value "txt8" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx", data row 9, column "LABEL": non-numeric value "txt9" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx", data row 10, column "LABEL": non-numeric value "txt10" in numeric column -- stored as missing
+Warning: "tests/data/types_manytext_gen.xlsx": 2 additional non-numeric-value warning(s) suppressed (10 shown, 12 total)
+Dataset opened: tests/data/types_manytext_gen.xlsx
+Permanent Variables (Table Columns):
+LABEL N
+Session Variables (SET):
+(none)

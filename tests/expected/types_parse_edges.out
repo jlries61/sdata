@@ -1,0 +1,23 @@
+Note: "tests/data/types_demote.csv": column "CODE" is declared character by the file header; /TYPES= overrides it to float
+Dataset opened: tests/data/types_demote.csv
+Permanent Variables (Table Columns):
+CODE VAL%
+Session Variables (SET):
+(none)
+Note: "tests/data/types_demote.csv": column "CODE" is declared character by the file header; /TYPES= overrides it to float
+Dataset opened: tests/data/types_demote.csv
+Permanent Variables (Table Columns):
+CODE VAL
+Session Variables (SET):
+(none)
+Note: "tests/data/types_demote.csv": column "CODE" is declared character by the file header; /TYPES= overrides it to float
+Dataset opened: tests/data/types_demote.csv
+Permanent Variables (Table Columns):
+CODE VAL%
+Session Variables (SET):
+(none)
+Dataset opened: tests/data/types_demote.csv
+Permanent Variables (Table Columns):
+CODE$ VAL
+Session Variables (SET):
+(none)
