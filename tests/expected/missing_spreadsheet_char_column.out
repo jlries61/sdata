@@ -1,0 +1,14 @@
+Dataset opened: tests/data/missing_string_col.csv
+Dataset saved: tests/data/missing_string_col_gen.ods
+Dataset saved: tests/data/missing_string_col_gen.xlsx
+RUN complete. 3 records and 2 variables processed.
+Dataset opened: tests/data/missing_string_col_gen.ods
+Alice 1.00000
+NA 2.00000
+Bob 3.00000
+RUN complete. 3 records and 2 variables processed.
+Dataset opened: tests/data/missing_string_col_gen.xlsx
+Alice 1.00000
+NA 2.00000
+Bob 3.00000
+RUN complete. 3 records and 2 variables processed.

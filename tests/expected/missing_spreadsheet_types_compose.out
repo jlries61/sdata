@@ -1,0 +1,13 @@
+Dataset opened: tests/data/missing_types_compose.csv
+Dataset saved: tests/data/missing_types_compose_gen.xlsx
+RUN complete. 2 records and 2 variables processed.
+Note: "tests/data/missing_types_compose_gen.xlsx": column "A" is declared character by the file header; /TYPES= overrides it to float
+Note: "tests/data/missing_types_compose_gen.xlsx": 1 value(s) matched a declared MISSING token
+Dataset opened: tests/data/missing_types_compose_gen.xlsx
+Permanent Variables (Table Columns):
+A B$
+Session Variables (SET):
+(none)
+. NA
+5.00000 X
+RUN complete. 2 records and 2 variables processed.

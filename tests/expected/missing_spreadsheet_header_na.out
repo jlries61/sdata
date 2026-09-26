@@ -1,0 +1,22 @@
+Note: "tests/data/missing_header_na.csv": 1 value(s) matched a declared MISSING token
+Dataset opened: tests/data/missing_header_na.csv
+Dataset saved: tests/data/missing_header_na_gen.ods
+RUN complete. 3 records and 2 variables processed.
+Note: "tests/data/missing_header_na.csv": 1 value(s) matched a declared MISSING token
+Dataset opened: tests/data/missing_header_na.csv
+Dataset saved: tests/data/missing_header_na_gen.xlsx
+RUN complete. 3 records and 2 variables processed.
+Note: "tests/data/missing_header_na_gen.ods": 1 value(s) matched a declared MISSING token
+Dataset opened: tests/data/missing_header_na_gen.ods
+Permanent Variables (Table Columns):
+NA VALUE
+Session Variables (SET):
+(none)
+RUN complete. 3 records and 2 variables processed.
+Note: "tests/data/missing_header_na_gen.xlsx": 1 value(s) matched a declared MISSING token
+Dataset opened: tests/data/missing_header_na_gen.xlsx
+Permanent Variables (Table Columns):
+NA VALUE
+Session Variables (SET):
+(none)
+RUN complete. 3 records and 2 variables processed.

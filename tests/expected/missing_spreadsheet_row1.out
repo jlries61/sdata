@@ -1,0 +1,26 @@
+Dataset opened: tests/data/missing_row1.csv
+Dataset saved: tests/data/missing_row1_gen.ods
+RUN complete. 3 records and 2 variables processed.
+Dataset opened: tests/data/missing_row1.csv
+Dataset saved: tests/data/missing_row1_gen.xlsx
+RUN complete. 3 records and 2 variables processed.
+Note: "tests/data/missing_row1_gen.ods": 1 value(s) matched a declared MISSING token
+Dataset opened: tests/data/missing_row1_gen.ods
+Permanent Variables (Table Columns):
+ID VALUE
+Session Variables (SET):
+(none)
+1.00000 .
+2.00000 20.00000
+3.00000 30.00000
+RUN complete. 3 records and 2 variables processed.
+Note: "tests/data/missing_row1_gen.xlsx": 1 value(s) matched a declared MISSING token
+Dataset opened: tests/data/missing_row1_gen.xlsx
+Permanent Variables (Table Columns):
+ID VALUE
+Session Variables (SET):
+(none)
+1.00000 .
+2.00000 20.00000
+3.00000 30.00000
+RUN complete. 3 records and 2 variables processed.
