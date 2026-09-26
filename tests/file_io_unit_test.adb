@@ -673,6 +673,51 @@ begin
    V := Get_Value (2, "VALUE");
    Check ("TYPES-12 composed: declared token is missing", V.Kind = Val_Missing, True);
 
+   --  TYPES-13..20: the SPREADSHEET half.  These assert the stored VALUES,
+   --  not only the column type, deliberately: a test that checked the type
+   --  alone would pass with the B-1 defect fully present (the column would be
+   --  numeric while every cell raised Type_Mismatch_Error and got skipped),
+   --  which is exactly how this would have shipped broken.
+   --  See 02-systems-designer.md B-1 and 01-architect.md §8 R-A'.
+
+   --  ODF, parse-succeeds path: LABEL$ holds the STRING "77516" (that is what
+   --  NSC-ODF-* above assert).  Declaring it float must reinterpret the text
+   --  cell as a number -- the direction Get_Cell_Value ignored before B-1.
+   Parse_ODF ("tests/data/numeric_string_col.ods", Declared_Types => "LABEL");
+   Check ("TYPES-13 ODF declared float: name loses the $",
+          Column_Name (1), "LABEL");
+   V := Get_Value (1, "LABEL");
+   Check ("TYPES-14 ODF declared float: cell is numeric, not string",
+          V.Kind = Val_Numeric, True);
+   Check_Float ("TYPES-15 ODF declared float: text parsed to its number",
+                V.Num_Val, 77516.0);
+
+   --  ODF, parse-fails path: NAME$ holds "Alice"/"Bob" (PO-04/PO-07).
+   --  Declaring it float must COERCE TO MISSING with a warning -- before
+   --  B-1 this raised Type_Mismatch_Error per cell and the value was
+   --  dropped by a generic handler with unrelated wording.
+   Parse_ODF ("tests/data/sample.ods", Declared_Types => "NAME");
+   Check ("TYPES-16 ODF unparseable: name loses the $",
+          Column_Name (2), "NAME");
+   V := Get_Value (1, "NAME");
+   Check ("TYPES-17 ODF unparseable: coerced to missing, not skipped",
+          V.Kind = Val_Missing, True);
+
+   --  OOXML: identical pair, because the two readers are structurally the
+   --  same code and would fail in the same way.
+   Parse_OOXML ("tests/data/numeric_string_col.xlsx",
+                Declared_Types => "LABEL");
+   Check ("TYPES-18 OOXML declared float: name loses the $",
+          Column_Name (1), "LABEL");
+   V := Get_Value (1, "LABEL");
+   Check_Float ("TYPES-19 OOXML declared float: text parsed to its number",
+                V.Num_Val, 77516.0);
+
+   Parse_OOXML ("tests/data/sample.xlsx", Declared_Types => "NAME");
+   V := Get_Value (1, "NAME");
+   Check ("TYPES-20 OOXML unparseable: coerced to missing, not skipped",
+          V.Kind = Val_Missing, True);
+
    ---------------------------------------------------------------------------
    --  Summary
    ---------------------------------------------------------------------------
