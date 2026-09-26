@@ -8,6 +8,25 @@ with SData_Core.IO;            use SData_Core.IO;
 
 package body SData.Lexer is
 
+   --  Append one character to a token's text.  Every accumulation site goes
+   --  through here so that an over-long token reports itself instead of
+   --  failing an index check: a raw CONSTRAINT_ERROR naming a lexer source
+   --  line is exactly the kind of internal leak ADR-082 removed from this
+   --  same file, and it was reachable from ordinary input (any string
+   --  literal longer than Max_Token_Len, e.g. a wide /TYPES= list).
+   --  Patching the ten call sites individually would have left the next one
+   --  added to bring the crash back.
+   procedure Append_Char (T : in out Token; C : Character) is
+   begin
+      if T.Length >= Max_Token_Len then
+         raise Script_Error with
+            "token longer than" & Max_Token_Len'Image &
+            " characters at line" & T.Line'Image;
+      end if;
+      T.Length := T.Length + 1;
+      T.Text (T.Length) := C;
+   end Append_Char;
+
    ------------------
    -- Initialize --
    ------------------
@@ -321,8 +340,7 @@ package body SData.Lexer is
          if Is_Digit (C) then
             T.Kind := Token_Numeric_Literal;
             while not Is_End_Of_Source (Ctx) and then (Is_Digit (Current_Char (Ctx)) or Current_Char (Ctx) = '.') loop
-               T.Length := T.Length + 1;
-               T.Text (T.Length) := Current_Char (Ctx);
+               Append_Char (T, Current_Char (Ctx));
                Advance (Ctx);
             end loop;
             -- E-notation: consume E/e followed by optional sign and digits.
@@ -333,20 +351,17 @@ package body SData.Lexer is
                   Saved_Pos : constant Positive := Ctx.Pos;
                   Saved_Len : constant Natural   := T.Length;
                begin
-                  T.Length := T.Length + 1;
-                  T.Text (T.Length) := Current_Char (Ctx);
+                  Append_Char (T, Current_Char (Ctx));
                   Advance (Ctx);
                   if not Is_End_Of_Source (Ctx)
                      and then (Current_Char (Ctx) = '+' or else Current_Char (Ctx) = '-')
                   then
-                     T.Length := T.Length + 1;
-                     T.Text (T.Length) := Current_Char (Ctx);
+                     Append_Char (T, Current_Char (Ctx));
                      Advance (Ctx);
                   end if;
                   if not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) then
                      while not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) loop
-                        T.Length := T.Length + 1;
-                        T.Text (T.Length) := Current_Char (Ctx);
+                        Append_Char (T, Current_Char (Ctx));
                         Advance (Ctx);
                      end loop;
                   else
@@ -358,8 +373,7 @@ package body SData.Lexer is
 
          elsif Is_Letter (C) then
             while not Is_End_Of_Source (Ctx) and then (Is_Alphanumeric (Current_Char (Ctx)) or Current_Char (Ctx) = '_' or Current_Char (Ctx) = '$' or Current_Char (Ctx) = '%' or Current_Char (Ctx) = '.') loop
-               T.Length := T.Length + 1;
-               T.Text (T.Length) := Current_Char (Ctx);
+               Append_Char (T, Current_Char (Ctx));
                Advance (Ctx);
             end loop;
 
@@ -481,12 +495,10 @@ package body SData.Lexer is
                         exit;
                      end if;
                      --  Second consecutive quote: an escaped literal ".
-                     T.Length := T.Length + 1;
-                     T.Text (T.Length) := '"';
+                     Append_Char (T, '"');
                      Advance (Ctx); -- consume it, continue within the string
                   else
-                     T.Length := T.Length + 1;
-                     T.Text (T.Length) := Current_Char (Ctx);
+                     Append_Char (T, Current_Char (Ctx));
                      Advance (Ctx);
                   end if;
                end loop;
@@ -504,8 +516,7 @@ package body SData.Lexer is
               and then Current_Char (Ctx) /= '''
               and then Current_Char (Ctx) /= ASCII.LF
             loop
-               T.Length := T.Length + 1;
-               T.Text (T.Length) := Current_Char (Ctx);
+               Append_Char (T, Current_Char (Ctx));
                Advance (Ctx);
             end loop;
             if Is_End_Of_Source (Ctx) or else Current_Char (Ctx) = ASCII.LF then
@@ -524,8 +535,7 @@ package body SData.Lexer is
               and then Current_Char (Ctx) /= '`'
               and then Current_Char (Ctx) /= ASCII.LF
             loop
-               T.Length := T.Length + 1;
-               T.Text (T.Length) := Current_Char (Ctx);
+               Append_Char (T, Current_Char (Ctx));
                Advance (Ctx);
             end loop;
             if Is_End_Of_Source (Ctx) or else Current_Char (Ctx) = ASCII.LF then
@@ -605,8 +615,7 @@ package body SData.Lexer is
                      while not Is_End_Of_Source (Ctx)
                         and then Is_Digit (Current_Char (Ctx))
                      loop
-                        T.Length := T.Length + 1;
-                        T.Text (T.Length) := Current_Char (Ctx);
+                        Append_Char (T, Current_Char (Ctx));
                         Advance (Ctx);
                      end loop;
                   elsif not Is_End_Of_Source (Ctx)

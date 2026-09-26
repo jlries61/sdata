@@ -1,0 +1,20 @@
+Dataset opened: tests/data/inf_values.ods
+Inf
+Inf
+Inf
+RUN complete. 3 records and 3 variables processed.
+Dataset opened: tests/data/inf_values.xlsx
+Inf
+Inf
+Inf
+RUN complete. 3 records and 3 variables processed.
+Dataset opened: tests/data/inf_values.csv
+Inf
+infinity
++Inf
+RUN complete. 3 records and 3 variables processed.
+Dataset opened: tests/data/inf_values.ods
+Inf
+Inf
+Inf
+RUN complete. 3 records and 3 variables processed.
