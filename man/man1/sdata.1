@@ -490,6 +490,47 @@ data rows after the header before reading.
 .BI MAXROWS= n
 Limit the number of data rows loaded from this dataset.
 .TP
+.BI TYPES= "\(dqcol[,col...]\(dq"
+Declare the type of one or more columns explicitly, opting them out of
+type detection. This is the remedy when detection guesses wrong:
+.B NSCAN
+trades speed for accuracy, and a column whose awkward value falls outside
+the scanned window can be pinned directly instead of raising
+.B NSCAN
+for every column in the file. Two equivalent spellings are accepted \-\-
+.BI TYPES= \(dqAMOUNT,CODE$,QTY%\(dq
+using the same suffixes as a header line (\(dq$\(dq character, \(dq%\(dq
+integer, none floating point), and
+.BI TYPES= "(AMOUNT=NUM CODE=CHAR QTY=INT)"
+naming the types as keywords. One rule for every format: the column is the
+declared type, and a value that cannot be represented in it becomes
+missing, warned up to ten times per file \-\- the same treatment, and the
+same message, an undeclared non\-numeric value in a numeric column already
+receives. A declared name the file lacks, or a column named twice, is an
+error.
+.B Declaring a column character renames it,
+since a character column's name carries the \(dq$\(dq: after
+.BI TYPES= \(dqCODE$\(dq
+the column is
+.BR CODE$ ,
+and a
+.BR RENAME= ,
+.B KEEP=
+or
+.B DROP=
+in the same
+.B USE
+must use that name. Note that
+.B RENAME=
+ignores a name it cannot find rather than reporting it, so a stale
+reference there fails silently; run
+.B NAMES
+after
+.B USE
+to see the resulting names. Declaring a \(dq$\(dq\-suffixed column
+floating point strips the suffix. Where a declaration contradicts the
+file's own header suffix, the declaration wins and a note says so.
+.TP
 .BI MISSING= "\(dqtok[,tok...]\(dq"
 Literal strings treated as missing, in addition to the built-in \(dq\(dq
 and \(dq.\(dq (never replaced).

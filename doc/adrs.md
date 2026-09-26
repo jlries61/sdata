@@ -93,6 +93,7 @@ that might relitigate a settled question.
 | ADR-081 | PRINT/NOTE: a semicolon prints items adjacent and a trailing semicolon suppresses the newline (Bywater BASIC 3.20) | 2026-09-19 | Accepted |
 | ADR-082 | The lexer rejects a character it does not recognize instead of silently skipping it | 2026-09-21 | Accepted |
 | ADR-083 | USE `/MISSING=` (a token list) and SAVE `/MISSING=` (a single write token) let a script declare its own missing-value sentinels | 2026-09-23 | Accepted |
+| ADR-084 | USE `/TYPES=` declares a column's type explicitly, in either of two equivalent spellings, as the recovery path when NSCAN inference guesses wrong | 2026-09-25 | Accepted |
 
 ---
 
@@ -3563,3 +3564,69 @@ acceptance case (the exact `type_mismatch.csv`/`"N/A"` fixture ADR-0019's own PC
 left untouched, with `Missing_Tokens => "N/A"` added as a separate call), position-independence across
 two different `Nscan_Rows` values on one fixture, a quoted-comma token, and the write/round-trip path.
 ADR-0019 itself is unchanged; this ADR is additive to it, not a supersession.
+
+### ADR-084: USE `/TYPES=` declares a column's type explicitly, in either of two equivalent spellings, as the recovery path when NSCAN inference guesses wrong
+
+**Date:** 2026-09-25 | **Status:** Accepted
+
+**Context.** `NSCAN` is a speed-for-accuracy trade the user controls: a lower value scans fewer rows
+and infers column types faster but less reliably. The "cliff" — a value that changes a column's type
+when it falls inside the scan window and is merely coerced when it falls outside — is a *natural
+consequence* of sampling, not a defect: moving `NSCAN` only moves the boundary. ADR-0019's inference
+rule is settled and unchanged here.
+
+The real gap was **recovery**. When inference guessed wrong, the complete list of remedies was: re-run
+`USE` with a higher `/NSCAN=`, or edit the source file's header to add a `$`/`%` suffix. Verified
+against the parser's full option list, there was no per-column type override, and `RENAME=` cannot
+serve as one — design.md states a rename crossing the numeric/character boundary "is rejected and the
+*entire* `RENAME=` is aborted ... ADR-044 explicitly defers it," and `RENAME=` runs post-load anyway,
+so it cannot influence parsing. That left the knob with a perverse property: choosing a low `NSCAN` to
+avoid a deep scan could cost a **complete re-read of the file**, and the correction was global (deeper
+scanning of every column) for a local problem (one column). Editing the header is frequently
+unavailable — generated, read-only, or shared files that other tools also consume.
+
+**Decision.**
+
+1. **`USE /TYPES=` pins named columns' types, opting them out of inference.** `NSCAN` remains the
+   heuristic for everything the user did not anticipate; a low `NSCAN` becomes *safe* to choose
+   deliberately, because the handful of known-tricky columns can be declared.
+2. **Two spellings, one meaning.** `/TYPES="AMOUNT,CODE$,QTY%"` reuses the type suffixes a header line
+   already uses; `/TYPES=(AMOUNT=NUM CODE=CHAR QTY=INT)` names them as keywords. The parser normalizes
+   both to one canonical string, so the AST, the interpreter and sdata-core never learn there were two
+   — two syntaxes cost one branch in the parser and nothing downstream. The suffix form *is* the
+   canonical form and is therefore the one documentation and examples use. Reviewed objection, recorded
+   because it is real: the keyword form conceals a consequence the suffix form makes visible (below).
+   The user accepted both on the grounds that `NAMES` can always show the resulting names.
+3. **One rule for all three formats**, stated once rather than per format: *the column is the declared
+   type, and a value that cannot be represented in it becomes missing, warned up to ten times per
+   file.* That is the same treatment, and the same message, an undeclared non-numeric value in a
+   numeric column already received (ADR-0020's cap). Making this true rather than aspirational required
+   work in sdata-core — see ADR-0027.
+4. **Declaring a column character renames it**, because a character column's name carries the `$`.
+   After `/TYPES="CODE$"` the column is `CODE$`, and a `RENAME=`/`KEEP=`/`DROP=` in the same `USE` must
+   target that name. This is documented rather than merely implemented, because `RENAME=` **silently
+   ignores a source name it cannot find** — verified by execution, and unlike `KEEP`/`DROP`, which
+   hard-error. That asymmetry is pre-existing and left alone here (changing it could break scripts
+   relying on the no-op), but `/TYPES=` is the first mechanism in the language that changes a column's
+   name out from under a sibling option in the same statement, so it sharply raises the odds of
+   meeting it. Making unmatched `RENAME=` names an error is a candidate separate workstream.
+5. **Unmatched and duplicate declarations are hard errors.** A typo'd declaration that were silently
+   ignored would leave the column on inference — exactly the outcome `/TYPES=` exists to prevent — so
+   `KEEP`/`DROP`'s validate-before-acting precedent applies with more force. One rule for duplicates:
+   a base name may appear at most once, whether the repetition contradicts or merely repeats.
+6. **Over-length is an error, not truncation.** `DLM=`/`CHARSET=`/`SHEET=` truncate silently, but their
+   values are bounded by nature; this list scales with column count and approaches its 1024-character
+   limit at the design's own stated target, so a silently dropped declaration is reachable and would
+   produce the very mistyping the feature prevents.
+7. **Legal both as a whole-statement option and inside one dataset's parentheses**, like
+   `/NSCAN=`/`/SKIP=`/`/MAXROWS=`, so a multi-file merge can declare per input. USE-only; rejected on
+   `SAVE`, whose output types come from the table being written.
+
+**Consequences.** The combined idiom this line of work was building toward now exists:
+`USE "f.csv" / NSCAN=5 / TYPES="AMOUNT" / MISSING="N/A,NULL"` — a fast sample, one pinned column, and
+declared sentinels. `/TYPES=` composes with ADR-083's `/MISSING=` (which applies to numeric columns
+only, so a column declared character ignores declared tokens — consistent: text columns store text).
+ADR-0019 is untouched; this is additive to it. No feature flag: omitting `/TYPES=` is byte-for-byte
+current behavior, verified by 707 integration tests and 148 file-IO unit tests passing unchanged.
+20 `TYPES-*` unit tests and 6 `.cmd` tests cover both spellings, all three formats, demotion, the two
+error paths, and the `/MISSING=` composition.

@@ -1,5 +1,6 @@
 === COMMAND REFERENCE ===
 Command: USE [MOCK | "filename[sheet]"] [/FMT=format] [/NSCAN=n] [/MISSING=list]
+     [/TYPES=collist]
 Loads a dataset from CSV, ODF, or OOXML files into the Data Table.
 USE MOCK generates synthetic test data.
 Sheet selection (ODF/OOXML only):
@@ -22,6 +23,24 @@ Options:
                triggers the "non-numeric value" warning -- it's
                expected, not an anomaly.  A quoted token may itself
                contain a comma, e.g. "NA,""a,b""".  CSV input only.
+               Also legal per-dataset (in parentheses, like NSCAN=).
+  /TYPES="col[,col...]"  Declare column types explicitly, opting those
+               columns out of type detection.  Use when detection
+               guesses wrong: pin the one awkward column instead of
+               raising NSCAN for every column in the file.
+               Two equivalent spellings:
+                 /TYPES="AMOUNT,CODE$,QTY%"    (header suffixes)
+                 /TYPES=(AMOUNT=NUM CODE=CHAR QTY=INT)
+               $ = character, % = integer, no suffix = floating point.
+               A value that cannot be represented in the declared type
+               becomes missing, warned up to 10 times per file -- the
+               same rule and message for CSV, ODF and OOXML alike.
+               An unknown column name, or one declared twice, is an error.
+               NOTE: declaring a column character RENAMES it (CODE ->
+               CODE$), so a RENAME=/KEEP=/DROP= in the same USE must use
+               the new name.  RENAME= ignores a name it cannot find
+               rather than reporting it, so a stale reference there
+               fails silently.  Run NAMES after USE to see the result.
                Also legal per-dataset (in parentheses, like NSCAN=).
 Per-dataset options (in parentheses after a filename):
   (IF=expr)                Include a row from this input only when expr

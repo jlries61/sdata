@@ -65,6 +65,7 @@ package body SData.Help is
    procedure Help_USE is
    begin
       Put_Line ("Command: USE [MOCK | ""filename[sheet]""] [/FMT=format] [/NSCAN=n] [/MISSING=list]");
+      Put_Line ("     [/TYPES=collist]");
       Put_Line ("Loads a dataset from CSV, ODF, or OOXML files into the Data Table.");
       Put_Line ("USE MOCK generates synthetic test data.");
       Put_Line ("Sheet selection (ODF/OOXML only):");
@@ -87,6 +88,24 @@ package body SData.Help is
       Put_Line ("               triggers the ""non-numeric value"" warning -- it's");
       Put_Line ("               expected, not an anomaly.  A quoted token may itself");
       Put_Line ("               contain a comma, e.g. ""NA,""""a,b"""""".  CSV input only.");
+      Put_Line ("               Also legal per-dataset (in parentheses, like NSCAN=).");
+      Put_Line ("  /TYPES=""col[,col...]""  Declare column types explicitly, opting those");
+      Put_Line ("               columns out of type detection.  Use when detection");
+      Put_Line ("               guesses wrong: pin the one awkward column instead of");
+      Put_Line ("               raising NSCAN for every column in the file.");
+      Put_Line ("               Two equivalent spellings:");
+      Put_Line ("                 /TYPES=""AMOUNT,CODE$,QTY%""    (header suffixes)");
+      Put_Line ("                 /TYPES=(AMOUNT=NUM CODE=CHAR QTY=INT)");
+      Put_Line ("               $ = character, % = integer, no suffix = floating point.");
+      Put_Line ("               A value that cannot be represented in the declared type");
+      Put_Line ("               becomes missing, warned up to 10 times per file -- the");
+      Put_Line ("               same rule and message for CSV, ODF and OOXML alike.");
+      Put_Line ("               An unknown column name, or one declared twice, is an error.");
+      Put_Line ("               NOTE: declaring a column character RENAMES it (CODE ->");
+      Put_Line ("               CODE$), so a RENAME=/KEEP=/DROP= in the same USE must use");
+      Put_Line ("               the new name.  RENAME= ignores a name it cannot find");
+      Put_Line ("               rather than reporting it, so a stale reference there");
+      Put_Line ("               fails silently.  Run NAMES after USE to see the result.");
       Put_Line ("               Also legal per-dataset (in parentheses, like NSCAN=).");
       Put_Line ("Per-dataset options (in parentheses after a filename):");
       Put_Line ("  (IF=expr)                Include a row from this input only when expr");
