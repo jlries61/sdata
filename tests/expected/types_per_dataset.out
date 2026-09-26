@@ -1,0 +1,6 @@
+Warning: "tests/data/missing_declared.csv", data row 2, column "VALUE": non-numeric value "NA" in numeric column -- stored as missing
+Dataset opened: tests/data/missing_declared.csv
+Permanent Variables (Table Columns):
+ID VALUE
+Session Variables (SET):
+(none)

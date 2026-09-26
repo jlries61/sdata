@@ -754,6 +754,114 @@ package body SData.Parser is
    -----------------------
    -- Parse_Rename_List --
    -----------------------
+   ---------------------------------------------------------------------------
+   --  Parse_Types_Value  (ADR-084)
+   --
+   --  Parses either /TYPES= surface syntax into ONE canonical string of the
+   --  form "NAME,NAME$,NAME%".  The suffix form *is* the canonical form, so
+   --  only the keyword form needs rewriting -- which is why supporting two
+   --  syntaxes costs one branch here and nothing at all downstream: the AST,
+   --  the interpreter and sdata-core never learn there were two spellings.
+   --
+   --    suffix  :  /TYPES="AMOUNT,CODE$,QTY%"       (primary; already canonical)
+   --    keyword :  /TYPES=(AMOUNT=NUM CODE=CHAR)    (alias; rewritten here)
+   --
+   --  First_Tok is the value token the caller has ALREADY consumed -- both
+   --  option dispatchers read it before branching on the option name, so this
+   --  takes it rather than re-reading.  A '(' there selects the keyword form.
+   --
+   --  Over-length is an ERROR, never a silent Natural'Min truncation: unlike
+   --  DLM=/CHARSET=/SHEET=, whose values are bounded by nature, this list
+   --  scales with column count, and a silently dropped declaration would
+   --  leave that column on inference -- exactly what /TYPES= exists to
+   --  prevent.
+   ---------------------------------------------------------------------------
+   function Parse_Types_Value
+     (Ctx : in out Parser_Context; First_Tok : Token) return String
+   is
+      Buf : String (1 .. Max_Types_Spec_Len) := (others => ' ');
+      Len : Natural := 0;
+
+      procedure Append_Entry (S : String) is
+         Need : constant Natural := S'Length + (if Len > 0 then 1 else 0);
+      begin
+         if Len + Need > Max_Types_Spec_Len then
+            raise Script_Error with
+               "/TYPES= specification exceeds" & Max_Types_Spec_Len'Image &
+               " characters; split the USE or declare fewer columns";
+         end if;
+         if Len > 0 then
+            Len := Len + 1;
+            Buf (Len) := ',';
+         end if;
+         Buf (Len + 1 .. Len + S'Length) := S;
+         Len := Len + S'Length;
+      end Append_Entry;
+
+   begin
+      if First_Tok.Kind /= Token_Left_Paren then
+         --  Suffix form: the token text is already canonical.
+         if First_Tok.Length > Max_Types_Spec_Len then
+            raise Script_Error with
+               "/TYPES= specification exceeds" & Max_Types_Spec_Len'Image &
+               " characters; split the USE or declare fewer columns";
+         end if;
+         return First_Tok.Text (1 .. First_Tok.Length);
+      end if;
+
+      --  Keyword form.  '(' is already consumed; read name=KEYWORD entries
+      --  until ')'.  A comma between entries is tolerated but not required,
+      --  matching Parse_Rename_List's own behavior inside its parens.
+      loop
+         declare
+            Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+         begin
+            exit when Tok.Kind = Token_Right_Paren;
+            if not Is_Identifier_Token (Tok) then
+               raise Script_Error with
+                  "Expected a column name in /TYPES=( ... ) at line"
+                  & Tok.Line'Image;
+            end if;
+            declare
+               Nm : constant String := Identifier_Text (Tok);
+               Eq : constant Token  := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               if Eq.Kind /= Token_Equal then
+                  raise Script_Error with
+                     "Expected '=' after """ & Nm &
+                     """ in /TYPES=( ... ) at line" & Eq.Line'Image;
+               end if;
+               declare
+                  KW_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  KW     : constant String :=
+                     To_Upper (KW_Tok.Text (1 .. KW_Tok.Length));
+               begin
+                  if KW = "CHAR" or else KW = "CHARACTER" then
+                     Append_Entry (Nm & "$");
+                  elsif KW = "INT" or else KW = "INTEGER" then
+                     Append_Entry (Nm & "%");
+                  elsif KW = "NUM" or else KW = "NUMERIC"
+                     or else KW = "FLOAT"
+                  then
+                     Append_Entry (Nm);
+                  else
+                     raise Script_Error with
+                        "Unknown type """ & KW & """ in /TYPES=; expected " &
+                        "CHAR, INT or NUM, at line" & KW_Tok.Line'Image;
+                  end if;
+               end;
+            end;
+         end;
+         if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Comma then
+            declare
+               Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               pragma Unreferenced (Discard);
+            begin null; end;
+         end if;
+      end loop;
+      return Buf (1 .. Len);
+   end Parse_Types_Value;
+
    function Parse_Rename_List (Ctx : in out Parser_Context) return Rename_List is
       First : Rename_List := null;
       Last  : Rename_List := null;
@@ -1106,6 +1214,24 @@ package body SData.Parser is
                         end if;
                      end;
 
+                  elsif Key_Up = "TYPES" then
+                     --  ADR-084: USE only, same gate as NSCAN/SKIP/MAXROWS --
+                     --  declaring a column's type is meaningless for an
+                     --  output target, whose types come from the table.
+                     if not Allow_USE_Only then
+                        raise Script_Error with
+                           "TYPES= not allowed in SAVE spec options at line"
+                           & Key_Tok.Line'Image;
+                     end if;
+                     declare
+                        Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                        Canon   : constant String :=
+                           Parse_Types_Value (Ctx, Val_Tok);
+                     begin
+                        Opts.Types_Val (1 .. Canon'Length) := Canon;
+                        Opts.Types_Len := Canon'Length;
+                     end;
+
                   elsif Key_Up = "MISSING" then
                      --  ADR-083: legal as a per-dataset/per-target paren
                      --  option for BOTH USE and SAVE, same as DLM/CHARSET/
@@ -1345,6 +1471,20 @@ package body SData.Parser is
                      "MAXROWS= not allowed in " & Context_Name &
                      " slash-options at line" & Flag_Tok.Line'Image;
                end if;
+
+            elsif Flag_Name = "TYPES" then
+               --  ADR-084: USE only, matching NSCAN/SKIP/MAXROWS above.
+               if not Allow_USE_Only then
+                  raise Script_Error with
+                     "TYPES= not allowed in " & Context_Name &
+                     " slash-options at line" & Flag_Tok.Line'Image;
+               end if;
+               declare
+                  Canon : constant String := Parse_Types_Value (Ctx, Val_Tok);
+               begin
+                  Opts.Types_Val (1 .. Canon'Length) := Canon;
+                  Opts.Types_Len := Canon'Length;
+               end;
 
             elsif Flag_Name = "MISSING" then
                --  ADR-083: legal here for both USE and SAVE (unlike
@@ -1697,6 +1837,9 @@ package body SData.Parser is
                Stmt.Missing_Len      := Spec.Opts.Missing_Len;
                Stmt.Missing_Val (1 .. Spec.Opts.Missing_Len) :=
                   Spec.Opts.Missing_Val (1 .. Spec.Opts.Missing_Len);
+               Stmt.Types_Len        := Spec.Opts.Types_Len;
+               Stmt.Types_Val (1 .. Spec.Opts.Types_Len) :=
+                  Spec.Opts.Types_Val (1 .. Spec.Opts.Types_Len);
 
                --  Sheet name.
                Stmt.Sheet_Name_Len := Spec.Opts.Sheet_Name_Len;

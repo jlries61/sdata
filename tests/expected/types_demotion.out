@@ -1,0 +1,9 @@
+Note: "tests/data/types_demote.csv": column "CODE" is declared character by the file header; /TYPES= overrides it to float
+Dataset opened: tests/data/types_demote.csv
+Permanent Variables (Table Columns):
+CODE VAL
+Session Variables (SET):
+(none)
+10.00000 1.00000
+20.00000 2.00000
+RUN complete. 2 records and 2 variables processed.

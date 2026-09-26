@@ -22,5 +22,6 @@ package SData is
    Max_Charset_Len     : constant := SData_Core.Max_Charset_Len;
    Max_Options_Val_Len : constant := SData_Core.Max_Options_Val_Len;
    Max_Missing_Spec_Len : constant := SData_Core.Max_Missing_Spec_Len;
+   Max_Types_Spec_Len   : constant := SData_Core.Max_Types_Spec_Len;
 
 end SData;

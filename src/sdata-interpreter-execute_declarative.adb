@@ -143,6 +143,7 @@ begin
                      Max_Rows    => Stmt.Maxrows_Val,
                      Nscan_Rows  => Stmt.NSCAN_Val,
                      Missing_Tokens => Stmt.Missing_Val (1 .. Stmt.Missing_Len),
+                     Declared_Types => Stmt.Types_Val (1 .. Stmt.Types_Len),
                      Is_Mock     => Stmt.Is_Mock);
                end;
 
@@ -376,6 +377,9 @@ begin
                               Missing_Tokens =>
                                  Spec.Opts.Missing_Val
                                     (1 .. Spec.Opts.Missing_Len),
+                              Declared_Types =>
+                                 Spec.Opts.Types_Val
+                                    (1 .. Spec.Opts.Types_Len),
                               Is_Mock     => Spec.Is_Mock);
 
                            --  Snapshot the global table into a transient

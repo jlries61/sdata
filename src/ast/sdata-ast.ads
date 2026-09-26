@@ -95,6 +95,14 @@ package SData.AST is
       Missing_Val      : String (1 .. Max_Missing_Spec_Len) :=
                             (others => ' ');
       Missing_Len      : Natural := 0;          --  0 = not specified
+      --  ADR-084: USE /TYPES=, the per-column type override.  Holds the
+      --  CANONICAL form ("NAME,NAME$,NAME%") that the parser produces from
+      --  either surface syntax, so nothing downstream -- including
+      --  sdata-core -- ever learns there were two spellings.  USE only;
+      --  rejected in a SAVE spec-option block.  0 = not specified.
+      Types_Val        : String (1 .. Max_Types_Spec_Len) :=
+                            (others => ' ');
+      Types_Len        : Natural := 0;
    end record;
 
    type Dataset_Spec is record
@@ -291,6 +299,11 @@ package SData.AST is
             Missing_Val      : String (1 .. Max_Missing_Spec_Len) :=
                                   (others => ' ');
             Missing_Len      : Natural := 0;
+            --  ADR-084: legacy single-dataset copy of Spec.Opts.Types_Val,
+            --  populated exactly as Stmt.NSCAN_Val is.
+            Types_Val        : String (1 .. Max_Types_Spec_Len) :=
+                                  (others => ' ');
+            Types_Len        : Natural := 0;
             Header_Specified : Boolean := False;
             Header_Val       : Boolean := True;
             DLM_Path         : String (1 .. Max_Delimiter_Len)  := (others => ' ');
