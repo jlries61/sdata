@@ -1,4 +1,5 @@
--- MAJOR-2 (round 1): Detect_Inf used to return before the type dispatch, so
+-- Regression test for sdata-core ADR-0027 / PR #147: Detect_Inf used to
+-- return before the type dispatch, so
 -- an "Inf" cell in a column declared CHARACTER became numeric infinity in a
 -- Col_String column, raised inside Coerce_Value, and was dropped by the
 -- generic handler with an uncapped legacy warning -- on both spreadsheet
