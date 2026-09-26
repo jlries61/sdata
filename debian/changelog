@@ -1,3 +1,9 @@
+sdata (0.36.0-1) unstable; urgency=medium
+
+  * Add USE /TYPES=, a per-column type declaration overriding NSCAN inference (ADR-084).
+
+ -- John L. Ries <john@theyarnbard.com>  Sat, 26 Sep 2026 10:47:19 -0700
+
 sdata (0.35.0-1) unstable; urgency=medium
 
   * Add USE /MISSING= and SAVE /MISSING= for user-declared missing-value tokens (ADR-083).
