@@ -92,7 +92,7 @@ that might relitigate a settled question.
 | ADR-080 | Comma rules: a continuation comma joins lines, a blank line ends a statement, a mid-line comma in a comma-free position is an error, and statements must end at a newline, colon or end of input | 2026-09-19 | Accepted |
 | ADR-081 | PRINT/NOTE: a semicolon prints items adjacent and a trailing semicolon suppresses the newline (Bywater BASIC 3.20) | 2026-09-19 | Accepted |
 | ADR-082 | The lexer rejects a character it does not recognize instead of silently skipping it | 2026-09-21 | Accepted |
-| ADR-083 | USE `/MISSING=` (a token list) and SAVE `/MISSING=` (a single write token) let a script declare its own missing-value sentinels | 2026-09-23 | Accepted |
+| ADR-083 | USE `/MISSING=` (a token list) and SAVE `/MISSING=` (a single write token) let a script declare its own missing-value sentinels (amended: ODF/OOXML read-side support) | 2026-09-23 | Accepted (amended) |
 | ADR-084 | USE `/TYPES=` declares a column's type explicitly, in either of two equivalent spellings, as the recovery path when NSCAN inference guesses wrong | 2026-09-25 | Accepted |
 
 ---
@@ -3469,9 +3469,9 @@ with it removed. sdata-only; the parser fuzz corpus (which expects `Script_Error
 man page state the rule. Six tests (`tests/lexer_*`): trailing, beside an operator, leading, a control character, `#` as a
 suffix, a bare `%`, plus a positive test that junk inside strings and comments is still fine.
 
-### ADR-083: USE `/MISSING=` (a token list) and SAVE `/MISSING=` (a single write token) let a script declare its own missing-value sentinels
+### ADR-083: USE `/MISSING=` (a token list) and SAVE `/MISSING=` (a single write token) let a script declare its own missing-value sentinels (amended: ODF/OOXML read-side support)
 
-**Date:** 2026-09-23 | **Status:** Accepted
+**Date:** 2026-09-23 | **Status:** Accepted (amended)
 
 **Context.** `USE`'s column-type inference scans only the first `NSCAN` rows (default 20, max 1000)
 of a CSV input. A non-numeric sentinel value such as `N/A` landing inside the scan window forces the
@@ -3564,6 +3564,24 @@ acceptance case (the exact `type_mismatch.csv`/`"N/A"` fixture ADR-0019's own PC
 left untouched, with `Missing_Tokens => "N/A"` added as a separate call), position-independence across
 two different `Nscan_Rows` values on one fixture, a quoted-comma token, and the write/round-trip path.
 ADR-0019 itself is unchanged; this ADR is additive to it, not a supersession.
+
+**Amendment (2026-09-26): ODF/OOXML read-side support.** This ADR's own point 1 scoped `/MISSING=`
+read-side recognition to CSV only, calling the ODF/OOXML gap "a deliberate scope limit, not an
+oversight," pending their type-inference story being scoped and audited — exactly what sdata-core
+ADR-0027 (`/TYPES=`) subsequently did, giving both spreadsheet readers a lock (`Col_Locked`) and a
+`Target_Type`-aware `Get_Cell_Value`. `/MISSING=` now recognizes declared tokens on ODF and OOXML input
+identically to CSV: numeric columns only, no per-value warning, one end-of-load summary line, and a
+declared-missing value on row 1 does not force the column to character — the direct analogue of the
+scan-window behavior this ADR already documents for CSV, achieved without an NSCAN-equivalent concept
+because ODF/OOXML's row-1 type probe is the one place that needed the same treatment. No sdata-side
+change was needed: `Open_Input` already threaded `Missing_Tokens` to every reader's dispatch; it simply
+was never passed to `Parse_ODF`/`Parse_OOXML`, which didn't accept it. design.md's `USE` row, `HELP
+USE`, and the man page are corrected to describe the current, unified behavior instead of the CSV-only
+scope this ADR originally recorded; `tests/expected/help_all.out`, `help_use.out`, and
+`help_lowercase.out` were regenerated. See sdata-core's amended ADR-0026 for the implementation detail,
+including a design-review finding (B-1) fixed before it shipped: OOXML's header-name reader reuses the
+same `Get_Cell_Value` function, and an unconditional declared-missing check would have silently
+corrupted a column header whose text happened to match a declared token.
 
 ### ADR-084: USE `/TYPES=` declares a column's type explicitly, in either of two equivalent spellings, as the recovery path when NSCAN inference guesses wrong
 

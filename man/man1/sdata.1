@@ -544,8 +544,11 @@ file. Applies during the
 scan too, so a declared token never forces a column to character and
 never triggers the non\-numeric\-value warning\ \-\- it is expected, not
 an anomaly. A token may itself contain a comma if quoted CSV\-style,
-e.g.\& \(dqNA,\(dq\(dqa,b\(dq\(dq\(dq. CSV input only; ODF/OOXML have no
-scan window to interact with. Also legal as a whole\-statement
+e.g.\& \(dqNA,\(dq\(dqa,b\(dq\(dq\(dq. Applies to CSV, ODF and OOXML
+alike; ODF/OOXML have no
+.B NSCAN
+scan window, but their single row-1 type check gets the same
+non\-disqualifying treatment. Also legal as a whole\-statement
 .B /MISSING=
 option (single\-dataset
 .BR USE ).

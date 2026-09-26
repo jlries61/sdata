@@ -22,7 +22,9 @@ Options:
                token never forces a column to character and never
                triggers the "non-numeric value" warning -- it's
                expected, not an anomaly.  A quoted token may itself
-               contain a comma, e.g. "NA,""a,b""".  CSV input only.
+               contain a comma, e.g. "NA,""a,b""".  Applies to
+               CSV, ODF and OOXML alike; ODF/OOXML have no scan window,
+               but row 1 gets the same non-disqualifying treatment.
                Also legal per-dataset (in parentheses, like NSCAN=).
   /TYPES="col[,col...]"  Declare column types explicitly, opting those
                columns out of type detection.  Use when detection

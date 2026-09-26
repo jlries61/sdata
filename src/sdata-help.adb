@@ -87,7 +87,9 @@ package body SData.Help is
       Put_Line ("               token never forces a column to character and never");
       Put_Line ("               triggers the ""non-numeric value"" warning -- it's");
       Put_Line ("               expected, not an anomaly.  A quoted token may itself");
-      Put_Line ("               contain a comma, e.g. ""NA,""""a,b"""""".  CSV input only.");
+      Put_Line ("               contain a comma, e.g. ""NA,""""a,b"""""".  Applies to");
+      Put_Line ("               CSV, ODF and OOXML alike; ODF/OOXML have no scan window,");
+      Put_Line ("               but row 1 gets the same non-disqualifying treatment.");
       Put_Line ("               Also legal per-dataset (in parentheses, like NSCAN=).");
       Put_Line ("  /TYPES=""col[,col...]""  Declare column types explicitly, opting those");
       Put_Line ("               columns out of type detection.  Use when detection");
