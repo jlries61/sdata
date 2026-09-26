@@ -588,6 +588,92 @@ begin
           To_String (V), "N,A");
 
    ---------------------------------------------------------------------------
+   --  TYPES-* : per-column type override, /TYPES= (sdata ADR-084 /
+   --  sdata-core ADR-0027).  CSV half; ODF/OOXML are covered separately.
+   ---------------------------------------------------------------------------
+
+   --  TYPES-01..03: FORCE FLOAT -- the NSCAN-cliff case this feature exists
+   --  for.  missing_declared.csv has "NA" at row 2 of 5, well inside the
+   --  default 20-row scan window, so inference alone makes VALUE character
+   --  (that is what MISSING-05..08 above rely on).  Declaring it float must
+   --  override that, leaving the column numeric with the offending value
+   --  coerced to missing by the pre-existing path.
+   Parse_CSV ("tests/data/missing_declared.csv", Declared_Types => "VALUE");
+   Check ("TYPES-01 force float: column is VALUE, not VALUE$",
+          Column_Name (2), "VALUE");
+   V := Get_Value (2, "VALUE");
+   Check ("TYPES-02 force float: unparseable value became missing",
+          V.Kind = Val_Missing, True);
+   V := Get_Value (3, "VALUE");
+   Check_Float ("TYPES-03 force float: real values still numeric",
+                V.Num_Val, 30.0);
+
+   --  TYPES-04/05: FORCE CHARACTER on a column inference would call numeric.
+   --  The name gains the "$" -- declaring a column character renames it, the
+   --  documented consequence of ADR-084 decision 1.
+   Parse_CSV ("tests/data/missing_declared.csv", Declared_Types => "ID$");
+   Check ("TYPES-04 force character: column renamed to ID$",
+          Column_Name (1), "ID$");
+   V := Get_Value (1, "ID$");
+   Check ("TYPES-05 force character: value stored as text",
+          To_String (V), "1");
+
+   --  TYPES-06/07: DEMOTION -- the case that only /TYPES= can create and that
+   --  the shared naming rule exists to handle.  types_demote.csv's header
+   --  says CODE$ (character); declaring it float must both retype it AND
+   --  strip the suffix, rather than leaving a numeric column called CODE$.
+   Parse_CSV ("tests/data/types_demote.csv", Declared_Types => "CODE");
+   Check ("TYPES-06 demotion: $ stripped from the name",
+          Column_Name (1), "CODE");
+   V := Get_Value (1, "CODE");
+   Check_Float ("TYPES-07 demotion: value parsed as a number", V.Num_Val, 10.0);
+
+   --  TYPES-08: FORCE INTEGER.
+   Parse_CSV ("tests/data/types_demote.csv", Declared_Types => "VAL%");
+   Check ("TYPES-08 force integer: name carries %", Column_Name (2), "VAL%");
+
+   --  TYPES-09: a declared name the file does not have is a HARD ERROR, not
+   --  a silent no-op -- a typo'd declaration that were ignored would leave
+   --  the column on inference, exactly the outcome /TYPES= prevents
+   --  (ADR-084; KEEP/DROP set the precedent).
+   declare
+      Raised : Boolean := False;
+   begin
+      begin
+         Parse_CSV ("tests/data/types_demote.csv",
+                    Declared_Types => "NOSUCHCOLUMN");
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("TYPES-09 unmatched declared name raises Script_Error",
+             Raised, True);
+   end;
+
+   --  TYPES-10: a column declared twice is an error, whether the two
+   --  declarations contradict each other or merely repeat -- one rule.
+   declare
+      Raised : Boolean := False;
+   begin
+      begin
+         Parse_CSV ("tests/data/types_demote.csv",
+                    Declared_Types => "VAL%,VAL$");
+      exception
+         when SData_Core.Script_Error => Raised := True;
+      end;
+      Check ("TYPES-10 duplicate declared name raises Script_Error",
+             Raised, True);
+   end;
+
+   --  TYPES-11: composition with /MISSING= (ADR-083), the idiom this line of
+   --  work was building toward: pin the column numeric AND declare the
+   --  sentinel, giving a deterministic result with no coercion warning.
+   Parse_CSV ("tests/data/missing_declared.csv",
+              Declared_Types => "VALUE", Missing_Tokens => "NA");
+   Check ("TYPES-11 /TYPES= composes with /MISSING=", Column_Name (2), "VALUE");
+   V := Get_Value (2, "VALUE");
+   Check ("TYPES-12 composed: declared token is missing", V.Kind = Val_Missing, True);
+
+   ---------------------------------------------------------------------------
    --  Summary
    ---------------------------------------------------------------------------
    New_Line;
