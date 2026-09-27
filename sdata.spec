@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.36.0
+Version:        0.37.0
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Sat Sep 26 2026 John L. Ries <john@theyarnbard.com> - 0.37.0-1
+- USE /MISSING= now reads ODF and OOXML input, not just CSV (sdata-core ADR-0026 amendment).
+
 * Sat Sep 26 2026 John L. Ries <john@theyarnbard.com> - 0.36.0-1
 - Add USE /TYPES=, a per-column type declaration overriding NSCAN inference (ADR-084).
 
