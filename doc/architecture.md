@@ -156,6 +156,8 @@ interpreter encounters them and shape the data step that follows.
 | `ARRAY name v1 v2 …` | Bind an indexed alias over existing variables |
 | `RENAME old=new …` | Rename columns in the active dataset |
 | `DIM var[n]` | Pre-allocate a numeric array (creates new arrays only; columns matching `name(n)` in loaded data are auto-registered at `USE` time per [ADR-041](adrs.md)) |
+| `RSEED n` | Set the random-number seed to a literal integer; persists until changed (defaults from system time at session start) |
+| `DIGITS n` | Set the maximum decimal places for PRINT/LIST/DISPLAY/NAMES/STATS/TABLES display and the STR$/NUM$ conversion functions (default 5); does not affect SAVE/OUTPUT |
 
 ### Tier 2 — Immediate
 
@@ -169,6 +171,11 @@ Commands that trigger an action at once, outside any data step. They are not que
 | `AGGREGATE out=fn(in) …` | Collapse the table to one row per active BY group via `SData_Core.Commands.Execute_AGGREGATE` (build-and-swap; flushes pending SAVE; clears SELECT and BY) |
 | `TRANSPOSE [/KEEP=…] [/DROP=…] [/NAME=…] [/ID=…] [/ARRAY=…]` | Pivot columns→rows via `SData_Core.Commands.Execute_TRANSPOSE` (build-and-swap; flushes pending SAVE; clears SELECT and BY) |
 | `STATS [var …] [/STATS=stat …] [/NOPRINT]` | Compute per-variable summary statistics grouped by the active BY via `SData_Core.Commands.Execute_STATS` (build-and-swap; prints unless /NOPRINT; flushes pending SAVE; clears SELECT and BY) |
+| `TABLES request … [/CHISQ] [/SAVE=…] …` | Print frequency / crosstabulation reports (PROC FREQ analogue) via this crate's `Execute_Tables`; **print-only** — unlike AGGREGATE/TRANSPOSE/STATS it never replaces the table, alters the PDV, flushes a pending SAVE, or clears SELECT/BY |
+| `DISPLAY [var …] [/FIRST=n] [/LAST=n] [/BY=var …]` | Print the current Data Table as a boxed, one-row-per-record table (PROC PRINT-style) via `Execute_Metadata`; read-only, touches neither the table nor the active SELECT/BY |
+| `LIST` | Display the numbered contents of the program buffer (deferred statements queued for the next RUN); no arguments |
+| `NOTE value[, value…]` | Print one or more SET-scoped values immediately, at its position in program order — not replayed per record even when placed inside a loop body (unlike ECHO/DIGITS) |
+| `ECHO ON` / `ECHO OFF` | Enable or disable console-output writing to stdout (enabled by default) — **not** a literal-string print statement; see NOTE/PRINT for that |
 | `NAMES` | Print column names of the current dataset |
 | `SYSTEM cmd` | Pass a shell command to the OS |
 | `HELP [topic]` | Print help text |
@@ -192,7 +199,6 @@ from top to bottom.
 | `FOR var = lo TO hi [BY step]` | Counted loop |
 | `WHILE expr` | Condition-controlled loop |
 | `NEXT` | Advance a FOR counter |
-| `ECHO msg` | Print a literal string (not record-scoped output) |
 
 ---
 
@@ -339,7 +345,8 @@ decisions.
 
 Significant design choices — language selection, execution model, table storage strategy,
 CLI conventions, test approach, the sdata-core / data-vandal split, and per-session
-architectural calls — are recorded in `doc/adrs.md` (ADR-001 through ADR-061,
-contiguous). Each entry captures the context, the decision, the
+architectural calls — are recorded in `doc/adrs.md` (ADR-001 onward,
+contiguous — check that file for the current highest number rather than a count recorded
+here, which would only go stale again). Each entry captures the context, the decision, the
 alternatives considered, and the rationale. Consult it before proposing a structural
 change that might relitigate a settled question.

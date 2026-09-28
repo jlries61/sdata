@@ -54,7 +54,7 @@ section1() {
     local csv="$WORKDIR/rows100k.csv"
     gen_csv "$csv" 100000 10
     local scr="$WORKDIR/load_only.cmd"
-    printf "DATA \"%s\"\nQUIT\n" "$csv" > "$scr"
+    printf "USE \"%s\"\nQUIT\n" "$csv" > "$scr"
     time_run "load 100K rows (user)" "" "$scr"
 }
 
@@ -67,7 +67,7 @@ section2() {
     local csv="$WORKDIR/cols100.csv"
     gen_csv "$csv" 10000 100
     local scr="$WORKDIR/load_only2.cmd"
-    printf "DATA \"%s\"\nQUIT\n" "$csv" > "$scr"
+    printf "USE \"%s\"\nQUIT\n" "$csv" > "$scr"
     time_run "load 10K rows × 100 cols (user)" "" "$scr"
 }
 
@@ -84,10 +84,10 @@ section3() {
         gen_csv "$csv" "$rows" 10
 
         local scr_load="$WORKDIR/load_only_${rows}.cmd"
-        printf "DATA \"%s\"\nQUIT\n" "$csv" > "$scr_load"
+        printf "USE \"%s\"\nQUIT\n" "$csv" > "$scr_load"
 
         local scr_run="$WORKDIR/run_let_${rows}.cmd"
-        printf "DATA \"%s\"\nLET Y = V1 + V2\nRUN\nQUIT\n" "$csv" > "$scr_run"
+        printf "USE \"%s\"\nLET Y = V1 + V2\nRUN\nQUIT\n" "$csv" > "$scr_run"
 
         time_run "load only   ${rows} rows (user)" "" "$scr_load"
         time_run "load + RUN  ${rows} rows (user)" "" "$scr_run"
@@ -104,7 +104,7 @@ section5() {
     gen_csv "$csv" 100000 10
 
     local scr="$WORKDIR/spill_run.cmd"
-    printf "DATA \"%s\"\nLET Y = V1 + V2\nRUN\nQUIT\n" "$csv" > "$scr"
+    printf "USE \"%s\"\nLET Y = V1 + V2\nRUN\nQUIT\n" "$csv" > "$scr"
 
     time_run "in-memory (no -m)       (user)" "" "$scr"
     time_run "spillover  -m 10000     (user)" "-m 10000" "$scr"
@@ -136,7 +136,7 @@ P3discrete4.csv:tests/data/P3discrete4.csv
         fi
         found=$((found+1))
         local scr="$WORKDIR/real_load.cmd"
-        printf "DATA \"%s\"\nQUIT\n" "$path" > "$scr"
+        printf "USE \"%s\"\nQUIT\n" "$path" > "$scr"
         time_run "$label (user)" "" "$scr"
     done
     [ "$found" -eq 0 ] && echo "  No real-dataset files found under tests/data/."

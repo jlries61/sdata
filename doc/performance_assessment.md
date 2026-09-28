@@ -1,197 +1,200 @@
 # SData Performance Assessment
-**Version:** 0.6.1  
-**Date:** 2026-04-24  
-**Build:** `-O2` optimisation, debug info retained (`-g`)  
-**Platform:** x86-64 Linux
+**Version:** 0.37.0  
+**Date:** 2026-09-28  
+**Build:** `alr build` (default profile, `-O2` optimisation, debug info retained)  
+**Platform:** x86-64 Linux, single vCPU (Intel Skylake, IBRS) — see Methodology for why this matters
 
 ---
 
 ## Methodology
 
 Benchmarks were run against synthetic CSV files generated with uniform random
-numeric data (values formatted to 4 decimal places), plus a selection of real
-datasets from the project's test corpus.  Each measurement is the `user` time
-reported by the shell `time` builtin (CPU time consumed by the process),
-with wall-clock (`real`) time noted where it diverges meaningfully.
-All runs used `sdata -q` (quiet mode) to suppress console output.
-Background processes were cleared before each timing run.
+numeric data (values formatted to 4 decimal places) via `scripts/benchmark.sh`.
+Each measurement is the `user` time reported by the shell `time` builtin (CPU
+time consumed by the process). All runs used `sdata -q` (quiet mode) to
+suppress console output. Each section was run twice back-to-back; the figures
+below are consistent to within ~5% across both runs and either run's value
+would tell the same story — no averaging or cherry-picking was needed.
 
-Startup overhead is approximately 3 ms and is negligible at all dataset sizes
-tested.
+**`scripts/benchmark.sh` was broken going into this pass** and had to be fixed
+before it could produce a number at all: every generated `.cmd` script used
+`DATA "<file>"` to load a CSV, which is not a recognized sdata command (`USE`
+is — `DATA` predates a rename this script was never updated for). Running the
+unfixed script did not error visibly; each `sdata` invocation printed
+`Error: Unrecognized command "DATA"` to stderr, exited immediately, and the
+`time` wrapper faithfully reported that near-zero-cost failure as a
+result — e.g. "0.002s to load 100,000 rows," which is off by roughly three
+orders of magnitude and would have been reported as a genuine 500×
+improvement over the 0.6.1 baseline had it not been checked by hand against a
+manual `USE` invocation first. This is exactly the audit's own "museum vs.
+current" test applied to a tool rather than a document, and it's why this
+pass verifies every number against a real, non-erroring run rather than
+trusting the script's exit code alone. The script has been fixed (`DATA` →
+`USE`, six call sites) and committed alongside this doc.
+
+**Platform note:** this measurement environment is a single-vCPU virtualized
+host (see header), which is very likely *not* the same machine the 2026-04-24
+(v0.6.1) baseline was measured on — that document names no CPU, core count, or
+virtualization status, only "x86-64 Linux." Comparisons to the old baseline
+below are stated as observations, not as claims of regression or improvement;
+absolute wall-clock/CPU-time figures are not portable across unknown hardware,
+and this document did not previously record enough platform detail to rule
+that out as the dominant factor. This is being recorded explicitly for the
+next re-measurement.
+
+**Real-dataset corpus (former §4) is no longer available.** The five named
+files (`arrhythmia.csv`, `GoodBadx_10Kc.csv`, `d1_6-train-0.csv`,
+`P3discrete4.csv`, `3-13-08-ArrayDataTrans.csv`) do not exist under
+`tests/data/` in the current tree — `scripts/benchmark.sh` already handles
+this gracefully (per-file `[SKIP — file not found]`) rather than failing.
+Whether these were ever committed, or were always supplied locally by whoever
+ran the original 0.6.1 benchmark, is not recorded anywhere in the repository.
+This section is omitted below rather than reconstructed from four-month-old
+numbers against files this pass could not run.
+
+Startup overhead remains negligible at every size tested (no measurable
+`load only` time at trivially small row counts).
 
 ---
 
 ## Results
 
-### 1. CSV Load — Row Scaling (10 columns, pure numeric)
+### 1. CSV Load — Row Scaling (100,000 rows × 10 cols, pure numeric)
 
-**Before Priority 3 fix:** ~75,000 rows/sec (~1.29 s for 100K rows)  
-**After Priority 3 fix:** ~170,000 rows/sec (~0.59 s for 100K rows) — **2.2× faster**
+| Rows | User time | Throughput |
+|------|-----------|------------|
+| 100,000 | ~1.15 s | ~87,000 rows/sec |
 
-| Rows | Before (user) | After (user) |
-|------|---------------|--------------|
-| 100,000 | 1.293 s | 0.585 s |
+### 2. CSV Load — Column Scaling (10,000 rows × 100 cols, pure numeric)
 
-### 2. CSV Load — Column Scaling (10,000 rows, pure numeric)
-
-**Before Priority 3 fix:** ~700,000 cells/sec  
-**After Priority 3 fix:** ~1,700,000 cells/sec — **2.4× faster**
-
-| Columns | Before (user) | After (user) |
-|---------|---------------|--------------|
-| 100 | 1.356 s | 0.583 s |
+| Cells | User time | Throughput |
+|-------|-----------|------------|
+| 1,000,000 | ~1.15 s | ~867,000 cells/sec |
 
 ### 3. Expression Evaluation Overhead
 
-Each row processed by `RUN` incurs interpreter overhead beyond the base
-load cost.  The following measures a single `LET Y = V1 + V2` statement:
-
-**Before Priority 2 fix (0.6.0/0.6.1 baseline):**
+Each row processed by `RUN` incurs interpreter overhead beyond the base load
+cost. The following measures a single `LET Y = V1 + V2` statement:
 
 | Rows | Load only (user) | Load + RUN (user) | Per-row overhead |
-|------|-----------------|-------------------|-----------------|
-| 10,000 | 0.147 s | 0.457 s | ~31 μs |
-| 100,000 | 1.293 s | 4.267 s | ~30 μs |
+|------|-------------------|--------------------|-------------------|
+| 10,000 | ~0.117 s | ~0.219 s | ~10.2 μs |
+| 100,000 | ~1.219 s | ~2.181 s | ~9.6 μs |
 
-**After Priority 2 fix (indexed PDV + pre-resolved AST variables):**
+### 4. Spillover vs. In-Memory (100,000 rows × 10 cols, `LET Y = V1 + V2`)
 
-| Rows | Load only (user) | Load + RUN (user) | Per-row overhead |
-|------|-----------------|-------------------|-----------------|
-| 100,000 | 1.293 s | 1.942 s | ~6 μs |
-
-Per-row overhead dropped from **~30 μs to ~6 μs** — a **5× reduction**.
-The fix replaced `Permanent_Symbols` (a hash map) with a flat `PDV_Vec`
-vector, and pre-resolves all `Expr_Variable` AST node indices once per RUN
-so that the hot evaluation path performs zero hash lookups per variable access.
-
-### 4. Real Datasets
-
-| Dataset | Rows | Cols | File size | Before (user) | After (user) |
-|---------|------|------|-----------|---------------|--------------|
-| arrhythmia.csv | 452 | 280 | 396 KB | 0.017 s | 0.002 s |
-| GoodBadx\_10Kc.csv | 9,874 | 20 | 700 KB | 0.459 s | 0.141 s |
-| d1\_6-train-0.csv | 16,517 | 326 | 34 MB | 7.565 s | 2.332 s |
-| P3discrete4.csv | 60,000 | 69 | 19 MB | 11.473 s | 2.299 s |
-| 3-13-08-ArrayDataTrans.csv | 11 | 54,614 | 10 MB | 1.311 s | 0.655 s |
-
-The 54,614-column file loaded in 0.655 s of CPU time after optimisation (down
-from 1.311 s).  There is no observed hard limit on column count.  Real datasets
-with mixed numeric and string fields, missing values, and repeated-column
-markers show consistent 3–5× load improvements from the Priority 3 CSV
-tokenisation fixes.
-
-### 5. Spillover vs. In-Memory (100,000 rows × 10 cols, `LET Y = V1 + V2`)
-
-**Before fix (0.6.0):**
-
-| Mode | Real time | User time | Slowdown vs. in-memory |
-|------|-----------|-----------|------------------------|
-| In-memory (no `-m`) | 6.1 s | 4.3 s | — |
-| Spillover (`-m 10000`, 10 segments) | 614 s | 437 s | **~101×** |
-
-**After Priority 1 fix (segment-level prefetch + reference-type spill):**
-
-| Mode | Real time | User time | Slowdown vs. in-memory |
-|------|-----------|-----------|------------------------|
-| In-memory (no `-m`) | 4.2 s | 3.0 s | — |
-| Spillover (`-m 10000`, 10 segments) | 6.1 s | 4.5 s | **~1.5×** |
-
-The 101× penalty has been eliminated.  Two bugs were responsible:
-1. **Cell-by-cell SQL reads**: `Fetch_From_Disk` issued one `SELECT` per cell;
-   replaced with one `SELECT` per segment (10,000× reduction in query count).
-2. **Deep-copy in `Spill_Table_To_Disk`**: `T.Element(Key)` inside the inner
-   loop copied the entire column `Vector` (O(N) values) for every cell, producing
-   O(N²) allocations per spill call.  Fixed by using `Constant_Reference` via
-   pre-computed cursors.
+| Mode | User time | Slowdown vs. in-memory |
+|------|-----------|-------------------------|
+| In-memory (no `-m`) | ~2.20 s | — |
+| Spillover (`-m 10000`, 10 segments) | ~5.16 s | **~2.3×** |
 
 ---
 
-## Bottleneck Analysis
+## Observations vs. the 2026-04-24 (v0.6.1) baseline
 
-Three root causes account for essentially all observed slowness.
+Stated as observations, not conclusions — see the Platform note above for why
+a causal claim isn't supportable from this data alone:
 
-### A. CSV Parser (~700,000 cells/sec ceiling)
+- **Row/column load throughput** (~87K rows/sec, ~867K cells/sec here) is
+  roughly half the old post-fix figures (~170K rows/sec, ~1.7M cells/sec).
+- **Per-row expression-evaluation overhead** (~10 μs here) is roughly 60%
+  higher than the old post-fix figure (~6 μs).
+- **Spillover slowdown** (~2.3× here) is higher than the old post-fix figure
+  (~1.5×), though both are far below the pre-fix ~101× this project
+  eliminated — that fix (segment-level prefetch, `Constant_Reference` spill)
+  is architectural and nothing in this pass suggests it regressed.
 
-The current `Parse_CSV` implementation has three contributing inefficiencies:
+Two structural changes since 0.6.1 could plausibly move these numbers even on
+identical hardware, independent of the single-vCPU caveat above:
 
-1. **`Ada.Text_IO.Get_Line`** reads character by character through the Ada
-   runtime.  For large files this is substantially slower than bulk stream
-   reads.
+- **The v0.8.0 three-crate split** moved the table/PDV/evaluator layer into
+  `sdata-core`, consumed via a path-pinned Alire dependency. Every hot-path
+  call this benchmark exercises (`USE`'s CSV load, `LET`'s evaluator dispatch,
+  spillover's `Fetch_From_Disk`) now crosses a package boundary that didn't
+  exist in 0.6.1's single-crate layout. `alr build`'s optimizer inlines across
+  that boundary where it can, but this pass did not verify how completely.
+- **Command/option surface growth since 0.6.1** — STATS, TABLES, PCTL,
+  `/MISSING=`, `/TYPES=`, and everything else shipped across ~30 releases —
+  adds branches to code this benchmark's hot paths pass through (e.g. `USE`'s
+  per-field dispatch now has more declared-option cases to check), even
+  though none of those options are exercised by this benchmark's plain
+  numeric CSVs.
 
-2. **Double allocation in `Split`**: each field is converted to an
-   `Unbounded_String` inside `Split`, then immediately converted back to a
-   plain `String` in `Process_Row`.  This allocates and frees a heap object
-   per field per row.
+Neither explanation is verified here; distinguishing "different hardware" from
+"real per-call overhead added since 0.6.1" would require re-running this exact
+script on the original 0.6.1 measurement hardware, or profiling a 0.6.1
+tag against v0.37.0 on identical hardware — out of scope for this pass. This
+is recorded as a known gap for the next assessment rather than resolved by
+guessing.
 
-3. **`Float'Value` for numeric parsing**: Ada's `Float'Value` attribute
-   invokes the runtime's general-purpose string-to-float conversion.  A
-   hand-rolled fast path (e.g. inline digit accumulation) would be
-   meaningfully faster for the common case of short decimal strings.
+---
 
-### B. Per-Row Variable Lookup (~30 μs/row overhead)
+## Bottleneck Analysis (historical — 0.6.x, retained for context)
 
-During `RUN`, every variable reference in every statement resolves at
-runtime by name through `Ada.Containers.Indefinite_Hashed_Maps`.  A
-`LET Y = V1 + V2` statement performs approximately four such lookups per
-row: two reads (`V1`, `V2`), one write (`Y`), and one column-type check.
-At 10,000 rows this is 40,000 hash-map string lookups for a single
-statement.
+The three root causes identified in the 0.6.x assessment, and their fixes,
+remain accurate as a historical record of completed work. They are not
+re-derived here since this pass did not re-profile the codebase from
+scratch — only re-measure its current throughput.
 
-The fix is to pre-resolve variable names to column indices once (at
-program-buffer commit time or at the first `RUN`) and replace hash-map
-lookups during iteration with direct indexed vector access.  This is a
-structural change to the interpreter but not an architectural one.
+### A. CSV Parser (~700,000 cells/sec ceiling, pre-fix)
 
-### C. Spillover Read Access (~101× penalty)
+`Ada.Text_IO.Get_Line` character-by-character reads, double allocation in
+`Split` (each field round-tripped through `Unbounded_String`), and
+`Float'Value`'s general-purpose parser were the three contributors. Fixed via
+a heap-allocated line buffer, in-place field parsing (`Process_Line_Direct`),
+and `Try_Fast_Float` (inline decimal parser, `Float'Value` fallback only for
+scientific notation). **Done — Priority 3, 0.6.1.**
 
-The SQLite backing store is accessed cell-by-cell during `RUN`: each
-`Get_Value` call for a row that has been evicted to disk issues a separate
-SQL `SELECT` statement.  With `-m 10000` and 100,000 rows, processing
-the first statement in the program buffer triggers approximately 100,000
-individual SQL queries just to read `V1`.
+### B. Per-Row Variable Lookup (~30 μs/row overhead, pre-fix)
 
-The correct approach is to prefetch an entire in-memory segment's worth of
-rows from SQLite before beginning iteration over that segment, storing
-results in a flat per-column array.  Each segment then requires one SQL
-query per column rather than one per cell per column, reducing query count
-by a factor of `segment_size`.
+Every variable reference resolved at runtime through
+`Ada.Containers.Indefinite_Hashed_Maps` — four hash lookups per
+`LET Y = V1 + V2` row. Fixed by replacing `Permanent_Symbols` with a flat
+`PDV_Vec` vector and pre-resolving `Expr_Variable` AST node indices once per
+`RUN`. **Done — Priority 2, 0.6.1.**
+
+### C. Spillover Read Access (~101× penalty, pre-fix)
+
+Cell-by-cell SQL reads (`Fetch_From_Disk` issuing one `SELECT` per cell) and
+an `O(N²)` deep-copy in `Spill_Table_To_Disk` (`T.Element(Key)` copying the
+full column vector per cell). Fixed via segment-level prefetch and
+`Constant_Reference` with pre-computed cursors. **Done — Priority 1, 0.6.1.**
+The ~2.3× figure measured in this pass (§4 above) confirms the fix is still
+in effect — nowhere near the eliminated 101× — with the residual gap from the
+old ~1.5× figure covered by the Observations section above rather than
+re-analyzed as a new bottleneck.
 
 ---
 
 ## Recommendations
 
-The following improvements are listed in priority order based on impact.
+No new priority-ordered recommendation is added by this pass — nothing
+measured here identifies a new bottleneck the way the 0.6.x pass did. The one
+concrete action item is procedural, not algorithmic:
 
-### Priority 1 — Fix spillover read access (blocker) ✓ DONE
+### Re-measure on known, stable hardware before the next comparison
 
-The 101× slowdown has been eliminated (now ~1.5×) by two fixes:
-segment-level prefetch in `Fetch_From_Disk` and switching
-`Spill_Table_To_Disk` from `T.Element` (deep copy per cell) to
-`Constant_Reference` via pre-computed cursors.
-
-### Priority 2 — Pre-resolve variable names (high value) ✓ DONE
-
-Per-row overhead reduced from ~30 μs to ~6 μs (5×) by:
-replacing `Permanent_Symbols` hash map with a flat `PDV_Vec` vector,
-adding `Var_Index` to `Expr_Variable` AST nodes, and pre-resolving all
-variable indices once per RUN so the hot evaluation path does no hash lookups.
-
-### Priority 3 — Faster CSV tokenisation (moderate value) ✓ DONE
-
-Load throughput improved from ~700K to ~1.7M cells/sec (2.4×) by:
-using a heap-allocated line buffer with the procedure form of `Get_Line`
-(eliminates one string allocation per line), replacing `Split` with
-in-place field parsing via `Process_Line_Direct` (eliminates N
-`Unbounded_String` allocations per row), and adding `Try_Fast_Float`
-(inline decimal parser; `Float'Value` fallback only for scientific notation).
+This pass could not distinguish environment noise from real per-call overhead
+growth (see Observations above). The next performance assessment should
+either run on the same physical/virtual hardware as this one (recorded in the
+header above for that reason) or explicitly re-baseline against a tagged
+historical version on that same hardware, so any future comparison is
+apples-to-apples in a way this document and its 0.6.1 predecessor both failed
+to be.
 
 ---
 
 ## Summary
 
-In-memory performance is predictably linear in both row and column count,
-with no pathological cases at large sizes.  All three priority bottlenecks have been eliminated.  The spillover penalty
-is down from 101× to ~1.5×, per-row evaluation overhead is down from ~30 μs
-to ~6 μs, and CSV load throughput is up from ~700K to ~1.7M cells/sec.
-None of the fixes required architectural
-changes.
+In-memory performance remains linear in both row and column count at this
+scale, with no pathological cases observed. All three 0.6.x priority
+bottlenecks remain fixed — the eliminated 101× spillover penalty has not come
+back (currently ~2.3×), and no new bottleneck was identified. Current
+absolute throughput (~87K rows/sec, ~867K cells/sec, ~10 μs/row evaluation
+overhead) is lower than the 0.6.1 post-fix figures on a like-for-like reading
+of the numbers, but this document cannot currently attribute that gap to
+hardware, the v0.8.0 crate split, feature-surface growth, or some combination
+of the three — see Observations above. `scripts/benchmark.sh` itself was
+silently broken (stale `DATA` command name) going into this pass and has been
+fixed; it had not caught its own staleness in ~30 releases because nothing
+exercises it in CI.

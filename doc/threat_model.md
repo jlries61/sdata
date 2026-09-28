@@ -1,12 +1,18 @@
 # SData Threat Model
 
-**Version:** 0.9.7 | **Date:** 2026-06-09 | **Status:** Current
+**Version:** 0.37.0 | **Date:** 2026-09-28 | **Status:** Current
 
 *Refreshed for the three-crate split (v0.8.0, ADRs 039–043) and the input
 surface added since v0.6.13: multi-dataset `USE` / merge modes, transient
 tables, per-dataset/per-target `KEEP`/`DROP`/`RENAME` options, multi-target
 `SAVE`, and `RENAME` type conversion (ADR-044). Internal file references are
 updated to their post-split locations.*
+
+*2026-09-28: added T4 (`USE`/`SAVE /MISSING=`) and T5 (`USE /TYPES=`), two
+external-input surfaces added by ADR-083 and ADR-084 (2026-09-23/25) that
+this document did not previously cover — flagged by the 2026-09-26 standards
+audit. The previous header date (2026-06-09) had itself drifted from the
+file's actual last edit (2026-09-03, per `git log`); corrected here.*
 
 ---
 
@@ -165,6 +171,76 @@ filesystem limits are the effective guard.
 **Residual risk:** Accepted. Enforcing a loop depth or output-size limit
 would break legitimate use (e.g., iterative refinement scripts) and is
 outside the tool's trust model.
+
+---
+
+#### T4 — `USE`/`SAVE /MISSING=` token handling *(Mitigated)*
+
+**Threat:** `USE /MISSING="tok1,tok2,..."` (read) and `SAVE /MISSING="tok"`
+(write) let a script declare additional literal strings to treat as missing
+(ADR-083). A crafted or adversarial token list — very long tokens, an
+unusually large number of tokens, tokens containing control characters —
+could in principle be used to corrupt classification of legitimate data or
+to consume excessive resources during matching.
+
+**Mitigation:** Verified against the implementation
+(`SData_Core.File_IO.Helpers.Parse_Missing_Tokens` /
+`Is_Declared_Missing`, `sdata_core-file_io-helpers.adb`). The whole
+`/MISSING=` value is parsed once into a bounded token list (fixed-length
+buffer, `Max_Missing_Spec_Len = 256` characters total across all tokens
+combined — enforced by the parser, `sdata-parser.adb`); matching is exact
+case-sensitive string equality against each field's own text, with no
+regex, wildcard, or further interpretation of the token content. A token is
+never executed, evaluated as an expression, or used to construct a query —
+it is compared byte-for-byte, the same as the two built-in markers `""`
+and `"."`. Declared tokens apply to numeric/integer columns only; a
+character column's values are never reclassified, so a token cannot be used
+to silently discard a legitimate string value in a text column. `SAVE
+/MISSING=` accepts a single literal string, written verbatim in place of a
+missing cell — again no interpretation beyond byte-for-byte output.
+
+**Residual risk:** `Is_Declared_Missing` performs a linear scan of the token
+list for every field checked (bounded by the 256-character spec limit —
+at most on the order of 100 short tokens — times row count times numeric
+column count). This is bounded by the same small constant regardless of
+input file size and is not considered a meaningful resource-exhaustion
+vector on top of D1's existing crafted-file analysis. No other residual
+risk identified: the feature adds no new external command, file access, or
+evaluation path.
+
+---
+
+#### T5 — `USE /TYPES=` explicit type declaration *(Mitigated)*
+
+**Threat:** `USE /TYPES=` (ADR-084) lets a script declare a column's type
+explicitly (`/TYPES="AMOUNT,CODE$,QTY%"` or the equivalent keyword form),
+opting it out of `NSCAN` inference. A script could declare a type
+incompatible with the file's actual data (e.g. forcing an alphabetic column
+to numeric), raising the question of whether a resulting coercion failure
+could crash the interpreter or otherwise misbehave.
+
+**Mitigation:** Verified against the implementation
+(`SData_Core.File_IO.Helpers.Parse_Declared_Types` / `Apply_Declared_Types`,
+`sdata_core-file_io-helpers.adb`). A value that cannot be represented in
+the declared type is converted to missing and a warning is issued (capped
+at 10 per file) — the identical code path and message an *undeclared*
+non-numeric value in a numeric column already receives (ADR-0020's
+existing, previously-reviewed cap), not a new failure mode. Declaration
+input itself is validated before anything is applied: an unmatched column
+name, a duplicate declaration, or an over-length spec (`Max_Types_Spec_Len
+= 1024` characters, parser-enforced) is a hard `Script_Error` raised before
+any column type is changed, so a malformed declaration cannot leave the
+table in a partially-typed state. No SQL, shell, or file-path construction
+is reachable from a `/TYPES=` value — it is compared against already-loaded
+column names and mapped to one of three fixed internal type tags.
+
+**Residual risk:** Declaring a column character renames it (the `$` suffix
+becomes part of the column's name), which can interact with a same-statement
+`RENAME=`/`KEEP=`/`DROP=` targeting the old name — documented in ADR-084
+as a usability footgun (silently-ignored `RENAME=` on a name that no longer
+exists), not a security issue, since the failure mode is "option has no
+effect," not data corruption or code execution. No other residual risk
+identified.
 
 ---
 
@@ -357,6 +433,8 @@ should use `--nosubmit`.
 | T1 | SQL injection via CSV / RENAME column names | Low | Medium | **Mitigated** (456d1e0; `Sql_Id` applies to all name origins) |
 | T2 | Malformed Zip in ODF / OOXML | Low | Low–Medium | **Mitigated**; corpus regression via `ods_fuzz_driver` / `xlsx_fuzz_driver` |
 | T3 | Recursive SUBMIT + WRITE disk exhaustion | Very low | Low | **Accepted** (`--nosubmit` opt-in) |
+| T4 | `USE`/`SAVE /MISSING=` token handling | Very low | Low | **Mitigated** (bounded, exact-match only, no execution) |
+| T5 | `USE /TYPES=` type coercion | Very low | Low | **Mitigated** (same capped-warning path as existing undeclared-coercion handling) |
 | I1 | SQLite temp file on disk after crash | Low | Low | **Mitigated** (signal handlers + Finalize) |
 | D1 | Resource exhaustion via crafted file | Low | Medium | **Partially mitigated** (`-m` spill threshold) |
 | D2 | SYSTEM / SHELL blocking | Low | Low | **Mitigated** (ADR-037 timeout) |
