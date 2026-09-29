@@ -112,34 +112,37 @@ section5() {
 
 # ---------------------------------------------------------------------------
 # Section 4: Real Datasets
-# Paths are resolved relative to the repository root; skip missing files.
+# Looked up under $REAL_DATA_DIR (default: tests/data, relative to the repo
+# root); not committed to the repo, so set REAL_DATA_DIR to wherever your
+# copies live, e.g.: REAL_DATA_DIR=/path/to/corpus sh scripts/benchmark.sh
 # ---------------------------------------------------------------------------
 section4() {
     echo ""
     echo "=== 4. Real Datasets ==="
+    local data_dir="${REAL_DATA_DIR:-tests/data}"
+    echo "  (looking under: $data_dir)"
 
-    # List: "label:path"  (paths relative to repo root or absolute)
+    # List: "label:filename"
     REAL_DATASETS="
-arrhythmia.csv:tests/data/arrhythmia.csv
-GoodBadx_10Kc.csv:tests/data/GoodBadx_10Kc.csv
-d1_6-train-0.csv:tests/data/d1_6-train-0.csv
-P3discrete4.csv:tests/data/P3discrete4.csv
-3-13-08-ArrayDataTrans.csv:tests/data/3-13-08-ArrayDataTrans.csv
+arrhythmia.csv
+GoodBadx_10Kc.csv
+d1_6-train-0.csv
+P3discrete4.csv
+3-13-08-ArrayDataTrans.csv
 "
     local found=0
-    for entry in $REAL_DATASETS; do
-        local label="${entry%%:*}"
-        local path="${entry#*:}"
+    for name in $REAL_DATASETS; do
+        local path="$data_dir/$name"
         if [ ! -f "$path" ]; then
-            printf "  %-45s  [SKIP — file not found: %s]\n" "$label" "$path"
+            printf "  %-45s  [SKIP — file not found: %s]\n" "$name" "$path"
             continue
         fi
         found=$((found+1))
         local scr="$WORKDIR/real_load.cmd"
         printf "USE \"%s\"\nQUIT\n" "$path" > "$scr"
-        time_run "$label (user)" "" "$scr"
+        time_run "$name (user)" "" "$scr"
     done
-    [ "$found" -eq 0 ] && echo "  No real-dataset files found under tests/data/."
+    [ "$found" -eq 0 ] && echo "  No real-dataset files found under $data_dir/."
 }
 
 # ---------------------------------------------------------------------------

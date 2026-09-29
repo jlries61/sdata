@@ -42,15 +42,17 @@ and this document did not previously record enough platform detail to rule
 that out as the dominant factor. This is being recorded explicitly for the
 next re-measurement.
 
-**Real-dataset corpus (former §4) is no longer available.** The five named
-files (`arrhythmia.csv`, `GoodBadx_10Kc.csv`, `d1_6-train-0.csv`,
-`P3discrete4.csv`, `3-13-08-ArrayDataTrans.csv`) do not exist under
-`tests/data/` in the current tree — `scripts/benchmark.sh` already handles
-this gracefully (per-file `[SKIP — file not found]`) rather than failing.
-Whether these were ever committed, or were always supplied locally by whoever
-ran the original 0.6.1 benchmark, is not recorded anywhere in the repository.
-This section is omitted below rather than reconstructed from four-month-old
-numbers against files this pass could not run.
+**Real-dataset corpus**: not committed to the repo (correctly — these are
+large, externally-sourced files), but present on the machine this assessment
+was run on at `/home/datasets/datasets_csv`. Not found under `tests/data/`,
+which is why an earlier draft of this document incorrectly reported the
+corpus as unavailable and omitted §4 entirely. `scripts/benchmark.sh` now
+takes a `REAL_DATA_DIR` environment variable (default `tests/data`, so the
+committed script stays portable) — this pass ran
+`REAL_DATA_DIR=/home/datasets/datasets_csv sh scripts/benchmark.sh`. Whether
+these five files were ever committed, or were always supplied locally by
+whoever ran the original 0.6.1 benchmark, is still not recorded anywhere in
+the repository.
 
 Startup overhead remains negligible at every size tested (no measurable
 `load only` time at trivially small row counts).
@@ -81,7 +83,52 @@ cost. The following measures a single `LET Y = V1 + V2` statement:
 | 10,000 | ~0.117 s | ~0.219 s | ~10.2 μs |
 | 100,000 | ~1.219 s | ~2.181 s | ~9.6 μs |
 
-### 4. Spillover vs. In-Memory (100,000 rows × 10 cols, `LET Y = V1 + V2`)
+### 4. Real Datasets
+
+File dimensions below are measured directly against the corpus on this
+machine (header-excluded data-row count via `wc -l`, columns via the header's
+field count, byte size via `ls`) rather than carried forward from the 0.6.1
+doc, which is why row counts differ from that document by one in a couple of
+cases (almost certainly a trailing-newline counting difference, not a
+different file).
+
+| Dataset | Rows | Cols | File size | User time |
+|---|---|---|---|---|
+| arrhythmia.csv | 451 | 280 | 393 KB | 0.14 s |
+| GoodBadx_10Kc.csv | 9,873 | 20 | 698 KB | 0.24 s |
+| d1_6-train-0.csv | 16,516 | 326 | 33.6 MB | 7.73 s |
+| P3discrete4.csv | 59,999 | 69 | 18.8 MB | 4.16 s |
+| 3-13-08-ArrayDataTrans.csv | 10 | 54,614 | 9.9 MB | **did not complete** |
+
+The first four loaded without incident. The fifth — 54,614 columns in a
+single-digit row count — **did not complete**: still consuming CPU
+continuously after 6+ minutes when killed during this pass, against a
+0.655s figure recorded for the same file in the 0.6.1-era document. This is
+not attributable to the hardware/crate-split/feature-growth uncertainty
+discussed elsewhere in this document — it was isolated to a specific,
+reproducible algorithmic cause and confirmed with controlled synthetic
+tests (single-row CSVs at increasing column counts, `bin/sdata -q`):
+
+| Columns | User time | Ratio vs. half the column count |
+|---|---|---|
+| 5,000 | 3.4 s | — |
+| 10,000 | 12.5 s | 3.7× for 2× columns |
+| 20,000 | 49.1 s | 3.9× for 2× columns |
+
+Both ratios are close to the textbook 4×-per-doubling signature of an
+**O(columns²)** algorithm, and this curve extrapolates almost exactly onto
+the multi-minute hang observed on the real 54,614-column file — strong
+evidence this one mechanism is sufficient to explain the entire regression,
+not one contributor among several. Root cause and fix direction are tracked
+in [sdata-core#156](https://github.com/jlries61/sdata-core/issues/156)
+(`Warn_If_Duplicate_Name`, `sdata_core-file_io-helpers.adb:500`, a linear
+scan over every previously-seen column name for each new column — added by
+a duplicate-column-name warning feature after the 0.6.1 baseline, not a
+regression in code that predates it). Not fixed as part of this assessment;
+deferred per the project owner until the remaining 2026-09-26 standards-audit
+findings are addressed.
+
+### 5. Spillover vs. In-Memory (100,000 rows × 10 cols, `LET Y = V1 + V2`)
 
 | Mode | User time | Slowdown vs. in-memory |
 |------|-----------|-------------------------|
@@ -159,20 +206,38 @@ Cell-by-cell SQL reads (`Fetch_From_Disk` issuing one `SELECT` per cell) and
 an `O(N²)` deep-copy in `Spill_Table_To_Disk` (`T.Element(Key)` copying the
 full column vector per cell). Fixed via segment-level prefetch and
 `Constant_Reference` with pre-computed cursors. **Done — Priority 1, 0.6.1.**
-The ~2.3× figure measured in this pass (§4 above) confirms the fix is still
+The ~2.3× figure measured in this pass (§5 above) confirms the fix is still
 in effect — nowhere near the eliminated 101× — with the residual gap from the
 old ~1.5× figure covered by the Observations section above rather than
 re-analyzed as a new bottleneck.
+
+### D. Duplicate-column-name check (O(columns²), newly identified this pass, not fixed)
+
+`Warn_If_Duplicate_Name` (`sdata-core/src/sdata_core-file_io-helpers.adb:500`)
+scans every previously-seen column name for each new column while building
+the header, for CSV, ODF, and OOXML alike. Invisible below a few hundred
+columns; renders a 54,614-column real file unusable (§4 above). This was
+*not* one of the three bottlenecks the 0.6.x pass fixed — it was added later
+by a duplicate-column-name warning feature, so it is not a regression in code
+that predates 0.6.1, but it is a genuine, currently-unfixed bottleneck this
+document did not know about until this pass's real-dataset run surfaced it.
+Tracked in [sdata-core#156](https://github.com/jlries61/sdata-core/issues/156);
+not fixed here.
 
 ---
 
 ## Recommendations
 
-No new priority-ordered recommendation is added by this pass — nothing
-measured here identifies a new bottleneck the way the 0.6.x pass did. The one
-concrete action item is procedural, not algorithmic:
+### Priority 1 — Fix the O(columns²) duplicate-name check (blocker for wide files)
 
-### Re-measure on known, stable hardware before the next comparison
+Tracked in [sdata-core#156](https://github.com/jlries61/sdata-core/issues/156)
+(§4/Bottleneck D above). Not fixed as part of this assessment — deferred by
+the project owner until the remaining 2026-09-26 standards-audit findings are
+addressed — but this is the one genuinely new, currently-unfixed bottleneck
+this pass identified, and it is a hard blocker for any very-wide-column file
+rather than a gradual slowdown.
+
+### Priority 2 — Re-measure on known, stable hardware before the next comparison
 
 This pass could not distinguish environment noise from real per-call overhead
 growth (see Observations above). The next performance assessment should
@@ -186,15 +251,27 @@ to be.
 
 ## Summary
 
-In-memory performance remains linear in both row and column count at this
-scale, with no pathological cases observed. All three 0.6.x priority
-bottlenecks remain fixed — the eliminated 101× spillover penalty has not come
-back (currently ~2.3×), and no new bottleneck was identified. Current
-absolute throughput (~87K rows/sec, ~867K cells/sec, ~10 μs/row evaluation
-overhead) is lower than the 0.6.1 post-fix figures on a like-for-like reading
-of the numbers, but this document cannot currently attribute that gap to
-hardware, the v0.8.0 crate split, feature-surface growth, or some combination
-of the three — see Observations above. `scripts/benchmark.sh` itself was
-silently broken (stale `DATA` command name) going into this pass and has been
-fixed; it had not caught its own staleness in ~30 releases because nothing
-exercises it in CI.
+In-memory performance remains linear in both row and column count **at the
+scale the synthetic benchmarks in §1–3 test (up to 100 columns)**, with no
+pathological cases observed there. All three 0.6.x priority bottlenecks
+remain fixed — the eliminated 101× spillover penalty has not come back
+(currently ~2.3×). Current absolute throughput (~87K rows/sec, ~867K
+cells/sec, ~10 μs/row evaluation overhead) is lower than the 0.6.1 post-fix
+figures on a like-for-like reading of the numbers, but this document cannot
+currently attribute that gap to hardware, the v0.8.0 crate split,
+feature-surface growth, or some combination of the three — see Observations
+above.
+
+**A genuinely new, currently-unfixed bottleneck was found**, and it is
+serious: real-dataset testing (§4, restored this pass after an earlier draft
+of this document incorrectly reported the corpus as unavailable — it lives
+at `/home/datasets/datasets_csv` on this machine, not in the repo) surfaced
+an O(columns²) duplicate-column-name check that makes any CSV/ODF/OOXML file
+with tens of thousands of columns effectively unusable regardless of row
+count, confirmed by controlled synthetic tests showing textbook quadratic
+scaling. Tracked in
+[sdata-core#156](https://github.com/jlries61/sdata-core/issues/156); not
+fixed here by the project owner's direction. `scripts/benchmark.sh` itself
+was also silently broken (stale `DATA` command name) going into this pass
+and has been fixed; it had not caught its own staleness in ~30 releases
+because nothing exercises it in CI.
