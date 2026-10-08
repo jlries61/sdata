@@ -1,0 +1,4 @@
+Warning: "tests/data/dupcol_triple.csv", duplicate column name "A" -- last occurrence wins
+Warning: "tests/data/dupcol_triple.csv", duplicate column name "A" -- last occurrence wins
+Dataset opened: tests/data/dupcol_triple.csv
+RUN complete. 2 records and 2 variables processed.

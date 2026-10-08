@@ -1,0 +1,4 @@
+Warning: "tests/data/dupcol_wide_gen/dupcol_wide.csv", duplicate column name "DUP" -- last occurrence wins
+Warning: "tests/data/dupcol_wide_gen/dupcol_wide.csv", duplicate column name "DUP" -- last occurrence wins
+Dataset opened: tests/data/dupcol_wide_gen/dupcol_wide.csv
+RUN complete. 1 records and 19998 variables processed.

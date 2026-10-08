@@ -98,35 +98,53 @@ different file).
 | GoodBadx_10Kc.csv | 9,873 | 20 | 698 KB | 0.24 s |
 | d1_6-train-0.csv | 16,516 | 326 | 33.6 MB | 7.73 s |
 | P3discrete4.csv | 59,999 | 69 | 18.8 MB | 4.16 s |
-| 3-13-08-ArrayDataTrans.csv | 10 | 54,614 | 9.9 MB | **did not complete** |
+| 3-13-08-ArrayDataTrans.csv | 10 | 54,614 | 9.9 MB | 0.69 s (fixed; was **did not complete**) |
 
 The first four loaded without incident. The fifth — 54,614 columns in a
-single-digit row count — **did not complete**: still consuming CPU
-continuously after 6+ minutes when killed during this pass, against a
-0.655s figure recorded for the same file in the 0.6.1-era document. This is
+single-digit row count — originally **did not complete** when this section
+was first written: still consuming CPU continuously after 6+ minutes, against
+a 0.655s figure recorded for the same file in the 0.6.1-era document. That was
 not attributable to the hardware/crate-split/feature-growth uncertainty
-discussed elsewhere in this document — it was isolated to a specific,
-reproducible algorithmic cause and confirmed with controlled synthetic
-tests (single-row CSVs at increasing column counts, `bin/sdata -q`):
+discussed elsewhere in this document — it was isolated to two specific,
+reproducible algorithmic causes and confirmed with controlled synthetic tests
+(single-row CSVs at increasing column counts, `bin/sdata -q`):
 
-| Columns | User time | Ratio vs. half the column count |
+| Columns | User time (pre-fix) | Ratio vs. half the column count |
 |---|---|---|
 | 5,000 | 3.4 s | — |
 | 10,000 | 12.5 s | 3.7× for 2× columns |
 | 20,000 | 49.1 s | 3.9× for 2× columns |
 
 Both ratios are close to the textbook 4×-per-doubling signature of an
-**O(columns²)** algorithm, and this curve extrapolates almost exactly onto
-the multi-minute hang observed on the real 54,614-column file — strong
-evidence this one mechanism is sufficient to explain the entire regression,
-not one contributor among several. Root cause and fix direction are tracked
-in [sdata-core#156](https://github.com/jlries61/sdata-core/issues/156)
-(`Warn_If_Duplicate_Name`, `sdata_core-file_io-helpers.adb:500`, a linear
-scan over every previously-seen column name for each new column — added by
-a duplicate-column-name warning feature after the 0.6.1 baseline, not a
-regression in code that predates it). Not fixed as part of this assessment;
-deferred per the project owner until the remaining 2026-09-26 standards-audit
-findings are addressed.
+**O(columns²)** algorithm, and this curve extrapolated almost exactly onto
+the multi-minute hang observed on the real 54,614-column file.
+
+**Fixed** (sdata-core#156, ADR-0028/ADR-0029). The straightforward reading of
+the issue — one O(n²) scan — turned out to be only half the story, confirmed
+by direct instrumented timing rather than assumed from the curve above:
+
+1. `Warn_If_Duplicate_Name` (`sdata_core-file_io-helpers.adb`) did an O(n)
+   linear scan, re-`To_Upper`-ing every previously-seen column name on each
+   new column. Replaced with a `Name_Sets` hashed set (upper-cased once at
+   insertion) — ADR-0028.
+2. Verifying fix 1 against a synthetic wide file with **zero duplicate
+   names** still showed the same quadratic signature, which meant the first
+   fix alone was necessary but not sufficient. Traced to
+   `SData_Core.Table.Add_Column` (and, discovered mid-fix, its output-side
+   twin `Add_Output_Column`, hit once per column on every `RUN` record flush
+   via `Flush_PDV_To_Output`): both called an unconditional full
+   `Rebuild_Column_Cache`/`Rebuild_Output_Cache` on *every* column insertion,
+   itself O(n) per call and O(n²) total, independent of duplicate names.
+   Fixed by comparing the underlying hashed map's `Capacity` before/after
+   `Insert` and only paying the full rebuild when a real rehash occurred —
+   ADR-0029.
+
+Re-measured against the same real 54,614-column file after both fixes:
+**0.69 s**, matching the pre-regression 0.655s 0.6.1-era figure. A synthetic
+55,000-column file (zero duplicates) confirms the same figure independently.
+Loading is now linear in column count up to at least 55,000 columns, with no
+ceiling reintroduced by either fix (a hashed set and an amortized-growth
+cursor cache both scale past any column count tested here).
 
 ### 5. Spillover vs. In-Memory (100,000 rows × 10 cols, `LET Y = V1 + V2`)
 
@@ -211,31 +229,35 @@ in effect — nowhere near the eliminated 101× — with the residual gap from t
 old ~1.5× figure covered by the Observations section above rather than
 re-analyzed as a new bottleneck.
 
-### D. Duplicate-column-name check (O(columns²), newly identified this pass, not fixed)
+### D. Duplicate-column-name check + per-column cursor-cache rebuild (O(columns²), fixed)
 
 `Warn_If_Duplicate_Name` (`sdata-core/src/sdata_core-file_io-helpers.adb:500`)
-scans every previously-seen column name for each new column while building
-the header, for CSV, ODF, and OOXML alike. Invisible below a few hundred
-columns; renders a 54,614-column real file unusable (§4 above). This was
-*not* one of the three bottlenecks the 0.6.x pass fixed — it was added later
-by a duplicate-column-name warning feature, so it is not a regression in code
-that predates 0.6.1, but it is a genuine, currently-unfixed bottleneck this
-document did not know about until this pass's real-dataset run surfaced it.
-Tracked in [sdata-core#156](https://github.com/jlries61/sdata-core/issues/156);
-not fixed here.
+scanned every previously-seen column name for each new column while building
+the header, for CSV, ODF, and OOXML alike — invisible below a few hundred
+columns; rendered a 54,614-column real file unusable (§4 above). Neither this
+nor its sibling bottleneck below was one of the three the 0.6.x pass fixed —
+both were added later (a duplicate-column-name warning feature, and the
+column-cursor cache itself), so neither is a regression in code that
+predates 0.6.1; both are genuine bottlenecks this document did not know about
+until this pass's real-dataset run surfaced the first of them.
+
+A second, independent O(n²) mechanism (`SData_Core.Table.Add_Column` /
+`Add_Output_Column`, each rebuilding their entire cursor cache from scratch
+on every single column insert) was found while verifying the first fix —
+fixing `Warn_If_Duplicate_Name` alone left the same real file still taking
+tens of seconds. See §4 above for the fix (ADR-0028/ADR-0029,
+sdata-core#156, now closed) and the re-measured 0.69s figure.
 
 ---
 
 ## Recommendations
 
-### Priority 1 — Fix the O(columns²) duplicate-name check (blocker for wide files)
+### Priority 1 — Fix the O(columns²) duplicate-name check and cursor-cache rebuild — **done**
 
 Tracked in [sdata-core#156](https://github.com/jlries61/sdata-core/issues/156)
-(§4/Bottleneck D above). Not fixed as part of this assessment — deferred by
-the project owner until the remaining 2026-09-26 standards-audit findings are
-addressed — but this is the one genuinely new, currently-unfixed bottleneck
-this pass identified, and it is a hard blocker for any very-wide-column file
-rather than a gradual slowdown.
+(§4/Bottleneck D above), closed. Fixed and re-measured: the real
+54,614-column file that previously did not complete now loads in 0.69s,
+matching the pre-regression 0.655s baseline.
 
 ### Priority 2 — Re-measure on known, stable hardware before the next comparison
 
@@ -262,16 +284,17 @@ currently attribute that gap to hardware, the v0.8.0 crate split,
 feature-surface growth, or some combination of the three — see Observations
 above.
 
-**A genuinely new, currently-unfixed bottleneck was found**, and it is
-serious: real-dataset testing (§4, restored this pass after an earlier draft
-of this document incorrectly reported the corpus as unavailable — it lives
-at `/home/datasets/datasets_csv` on this machine, not in the repo) surfaced
-an O(columns²) duplicate-column-name check that makes any CSV/ODF/OOXML file
+**A genuinely new bottleneck was found and fixed**: real-dataset testing (§4,
+restored this pass after an earlier draft of this document incorrectly
+reported the corpus as unavailable — it lives at
+`/home/datasets/datasets_csv` on this machine, not in the repo) surfaced an
+O(columns²) duplicate-column-name check that made any CSV/ODF/OOXML file
 with tens of thousands of columns effectively unusable regardless of row
 count, confirmed by controlled synthetic tests showing textbook quadratic
-scaling. Tracked in
-[sdata-core#156](https://github.com/jlries61/sdata-core/issues/156); not
-fixed here by the project owner's direction. `scripts/benchmark.sh` itself
+scaling. A second, independent O(n²) mechanism in the column-load cursor
+cache was found while verifying the first fix. Both are fixed
+(sdata-core#156, ADR-0028/ADR-0029); the real 54,614-column file now loads in
+0.69s, matching the pre-regression baseline. `scripts/benchmark.sh` itself
 was also silently broken (stale `DATA` command name) going into this pass
 and has been fixed; it had not caught its own staleness in ~30 releases
 because nothing exercises it in CI.

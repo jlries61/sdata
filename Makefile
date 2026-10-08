@@ -124,6 +124,22 @@ check: build
 	   i=$$((i+1)); \
 	 done; \
 	 printf -- '-- depth-chain terminal (reached only without the guard)\n' > tests/data/submit_depth_gen/c065.cmd
+	@#  Wide synthetic CSV for the sdata-core#156/ADR-0028/ADR-0029 duplicate-
+	@#  column-name + cursor-cache perf regression test (dupcol_wide_perf_test.cmd)
+	@#  -- gitignored, generated at test time rather than committed (same
+	@#  precedent as the SUBMIT depth chain above). 3 columns literally named
+	@#  DUP (exercises Name_Sets.Insert called only on the non-duplicate branch
+	@#  -- a 3rd occurrence is the case that would raise Constraint_Error if
+	@#  Insert were ever called unconditionally) padded to 20,000 total columns
+	@#  -- wide enough that the pre-fix O(n^2) scan measured ~49s at this width
+	@#  (doc/performance_assessment.md Sec4), far past this suite's 10s
+	@#  per-test timeout, so a regression back to either the linear scan or
+	@#  the unconditional per-insert cache rebuild fails this test by timing
+	@#  out, not just running slow.
+	@mkdir -p tests/data/dupcol_wide_gen; \
+	 { printf 'DUP,DUP,DUP'; i=1; while [ $$i -le 19997 ]; do printf ',C%d' "$$i"; i=$$((i+1)); done; printf '\n'; \
+	   printf '1,2,3'; i=1; while [ $$i -le 19997 ]; do printf ',%d' "$$i"; i=$$((i+1)); done; printf '\n'; \
+	 } > tests/data/dupcol_wide_gen/dupcol_wide.csv
 	@#  A tests/<name>.repl marker (issue #69) runs the script via piped
 	@#  stdin instead of a filename argument, exercising Run_REPL (the
 	@#  interactive dispatch loop) instead of batch mode; the fixed 3-line

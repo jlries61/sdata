@@ -106,6 +106,7 @@ debian/debhelper-build-stamp
 
 # Generated SUBMIT depth-limit chain (submit_depth_test)
 tests/data/submit_depth_gen/
+tests/data/dupcol_wide_gen/
 
 # gnatmetric complexity gate
 /tools/
