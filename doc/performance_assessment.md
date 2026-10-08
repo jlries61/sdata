@@ -140,11 +140,26 @@ by direct instrumented timing rather than assumed from the curve above:
    ADR-0029.
 
 Re-measured against the same real 54,614-column file after both fixes:
-**0.69 s**, matching the pre-regression 0.655s 0.6.1-era figure. A synthetic
-55,000-column file (zero duplicates) confirms the same figure independently.
-Loading is now linear in column count up to at least 55,000 columns, with no
-ceiling reintroduced by either fix (a hashed set and an amortized-growth
-cursor cache both scale past any column count tested here).
+**0.69 s**, matching the pre-regression 0.655s 0.6.1-era figure. The same
+controlled synthetic-timing methodology used to prove the quadratic bug above
+was re-run post-fix to prove the fix is actually linear, not merely asserted
+to be (single-row CSVs, zero duplicate names, `bin/sdata -q`):
+
+| Columns | User time (post-fix) | Ratio vs. half the column count |
+|---|---|---|
+| 1,000 | 0.011 s | — |
+| 2,000 | 0.021 s | 1.9× for 2× columns |
+| 4,000 | 0.038 s | 1.8× for 2× columns |
+| 8,000 | 0.070 s | 1.8× for 2× columns |
+| 16,000 | 0.155 s | 2.2× for 2× columns |
+| 55,000 | 0.593 s | — (real-file scale) |
+
+Every ratio is close to the textbook 2×-per-doubling signature of a linear
+algorithm — a direct, measured contrast to the pre-fix table's 3.7–3.9×, not
+just an absence of the old symptom. Loading is now linear in column count up
+to at least 55,000 columns, with no ceiling reintroduced by either fix (a
+hashed set and an amortized-growth cursor cache both scale past any column
+count tested here).
 
 ### 5. Spillover vs. In-Memory (100,000 rows × 10 cols, `LET Y = V1 + V2`)
 
