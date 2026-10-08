@@ -312,4 +312,18 @@ cache was found while verifying the first fix. Both are fixed
 0.69s, matching the pre-regression baseline. `scripts/benchmark.sh` itself
 was also silently broken (stale `DATA` command name) going into this pass
 and has been fixed; it had not caught its own staleness in ~30 releases
-because nothing exercises it in CI.
+because nothing exercised it in CI, and the script also had a second,
+independent problem of the same shape — `time_run` piped a failing
+command's output through an `awk` filter that discarded everything except
+the `user` line, so a broken command reported a fast, plausible-looking time
+instead of surfacing its error. Both gaps are now closed: `time_run` fails
+loudly (and the script exits non-zero) on any sdata-reported error, and CI
+(`.github/workflows/test.yml`, "Performance benchmark smoke test") runs the
+script on every push/PR — as a correctness smoke test, not a performance
+gate, since CI runner speed varies too much for an absolute-time assertion
+to be anything but flaky. A general wide-column-count regression guard
+(`tests/wide_column_load_perf_test.cmd`, 20,000 unique columns, no
+duplicate-name involvement) was added alongside the bug-specific one
+(`tests/dupcol_wide_perf_test.cmd`) so a *future* O(n²) regression anywhere
+in the column-load/output-flush path is caught by `make check`'s existing
+10s per-test timeout, not just the one already fixed here.

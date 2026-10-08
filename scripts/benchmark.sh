@@ -36,13 +36,29 @@ gen_csv() {
     }' >> "$file"
 }
 
-# Run sdata quietly, report user time.
+# Tracks whether any time_run invocation hit an sdata-reported error, so the
+# script can exit non-zero at the end -- without this, a broken command (the
+# stale "DATA" vs "USE" bug that went unnoticed for ~30 releases, see
+# doc/performance_assessment.md) produces a near-zero "time" for a run that
+# actually failed, and nothing downstream (a human skimming the output, or a
+# future CI job) has any signal that anything went wrong.
+BENCH_FAILED=0
+
+# Run sdata quietly, report user time. FAILS LOUDLY (prints the error,
+# flags the run, keeps going) if sdata itself reported an error -- a broken
+# command must never silently report a fast time for a run that did nothing.
 # Usage: time_run <label> <extra_flags> <script_file>
 time_run() {
-    local label="$1" flags="$2" script="$3"
+    local label="$1" flags="$2" script="$3" out
     printf "  %-55s " "$label"
-    { time "$SDATA" -q $flags "$script" ; } 2>&1 \
-        | awk '/^user/{print $2}'
+    out=$( { time "$SDATA" -q $flags "$script" ; } 2>&1 )
+    if printf '%s\n' "$out" | grep -q '^Error:'; then
+        echo "FAILED"
+        printf '%s\n' "$out" | grep '^Error:' | sed 's/^/    /' >&2
+        BENCH_FAILED=1
+        return
+    fi
+    printf '%s\n' "$out" | awk '/^user/{print $2}'
 }
 
 # ---------------------------------------------------------------------------
@@ -159,4 +175,9 @@ section4
 section5
 
 echo ""
-echo "Done."
+if [ "$BENCH_FAILED" -ne 0 ]; then
+    echo "Done -- one or more runs FAILED (see above)."
+else
+    echo "Done."
+fi
+exit "$BENCH_FAILED"

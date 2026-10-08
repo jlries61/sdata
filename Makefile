@@ -140,6 +140,19 @@ check: build
 	 { printf 'DUP,DUP,DUP'; i=1; while [ $$i -le 19997 ]; do printf ',C%d' "$$i"; i=$$((i+1)); done; printf '\n'; \
 	   printf '1,2,3'; i=1; while [ $$i -le 19997 ]; do printf ',%d' "$$i"; i=$$((i+1)); done; printf '\n'; \
 	 } > tests/data/dupcol_wide_gen/dupcol_wide.csv
+	@#  General wide-column-count perf regression guard (wide_column_load_perf_test.cmd)
+	@#  -- gitignored, generated at test time. Deliberately NOT tied to any one
+	@#  bug: 20,000 all-UNIQUE column names, so this is independent of
+	@#  Warn_If_Duplicate_Name/ADR-0028 (the dupcol_wide_gen fixture above
+	@#  already covers that) and guards the general per-column load +
+	@#  per-record output-flush path (Add_Column/Add_Output_Column, ADR-0029)
+	@#  against any future O(n^2) regression introduced anywhere in that path
+	@#  -- not just the one already fixed. Same 10s-timeout-as-pass/fail-
+	@#  boundary pattern as dupcol_wide_gen above.
+	@mkdir -p tests/data/wide_column_load_gen; \
+	 { printf 'C1'; i=2; while [ $$i -le 20000 ]; do printf ',C%d' "$$i"; i=$$((i+1)); done; printf '\n'; \
+	   printf '1'; i=2; while [ $$i -le 20000 ]; do printf ',%d' "$$i"; i=$$((i+1)); done; printf '\n'; \
+	 } > tests/data/wide_column_load_gen/wide_column_load.csv
 	@#  A tests/<name>.repl marker (issue #69) runs the script via piped
 	@#  stdin instead of a filename argument, exercising Run_REPL (the
 	@#  interactive dispatch loop) instead of batch mode; the fixed 3-line

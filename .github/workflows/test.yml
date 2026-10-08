@@ -59,6 +59,20 @@ jobs:
         working-directory: sdata
         run: alr exec -- make check
 
+      # scripts/benchmark.sh was broken for ~30 releases (stale "DATA"
+      # command) without anyone noticing, because nothing exercised it.
+      # This is a correctness smoke test, not a performance gate: CI
+      # runners vary too much in speed for an absolute-time assertion to
+      # be anything but flaky, so this only fails if sdata itself reports
+      # an error during a benchmark run (the exact failure mode that went
+      # undetected before) -- the printed times are informational, for a
+      # human skimming CI logs, not asserted against a threshold. §4 (Real
+      # Datasets) has no corpus in CI and prints SKIP lines, which is
+      # expected, not a failure.
+      - name: Performance benchmark smoke test
+        working-directory: sdata
+        run: sh scripts/benchmark.sh
+
       # check-syntax-doc-sync.py diffs against the base commit, but
       # actions/checkout defaults to a 1-commit shallow clone -- unshallow
       # first or the diff has no history to work against.
