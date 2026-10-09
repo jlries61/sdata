@@ -58,7 +58,26 @@ time_run() {
         BENCH_FAILED=1
         return
     fi
-    printf '%s\n' "$out" | awk '/^user/{print $2}'
+    # The shell `time` keyword's output format is NOT portable across
+    # shells, and /bin/sh resolves to a genuinely different shell depending
+    # on platform (dash on Debian/Ubuntu, incl. GitHub Actions runners --
+    # bash in some other environments), so this cannot assume one format:
+    #   bash/ksh: a "real/user/sys" block, e.g. a line "user  0m1.234s"
+    #   dash:     one line "1.23user 0.01system 0:01.30elapsed ...", no
+    #             separate "real" label and a bare "Xuser" token instead
+    # of a labelled "0mX.XXXs" one. Handle both explicitly rather than
+    # silently printing nothing when the pattern doesn't match (which is
+    # exactly how this script's own CI blind spot went unnoticed before --
+    # see the comment on BENCH_FAILED above).
+    printf '%s\n' "$out" | awk '
+        /^user[ \t]/ { print $2; found=1; exit }
+        /[0-9.]+user([ \t]|$)/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i ~ /user$/) { print $i; found=1; exit }
+            }
+        }
+        END { if (!found) print "(unparsed time output)" }
+    '
 }
 
 # ---------------------------------------------------------------------------
