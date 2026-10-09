@@ -146,7 +146,9 @@ This crate (sdata-only code):
 ```
 src/
   sdata-interpreter.adb       -- command dispatch, data step loop
-  sdata-interpreter-execute_declarative.adb  -- declarative-command subunits
+  sdata-interpreter-execute_declarative.adb  -- SAVE/SORT/BY/REPEAT/SELECT/
+                                              --   DIGITS/RSEED/NEW/OPTIONS
+  sdata-interpreter-execute_use.adb          -- USE (single- and multi-dataset)
   sdata-interpreter-execute_assignment.adb   -- LET/SET handlers
   sdata-interpreter-execute_io.adb           -- PRINT/WRITE/SUBMIT handlers
   sdata-interpreter-execute_metadata.adb     -- NAMES/DROP/KEEP/ARRAY/DIM

@@ -196,6 +196,7 @@ package body SData.Interpreter is
    procedure Execute_Program_Remove  (Stmt : Statement_Access);
    procedure Execute_Program_Insert  (Stmt : Statement_Access);
    procedure Execute_Declarative     (Stmt : Statement_Access);
+   procedure Execute_USE (Stmt : Statement_Access);
    procedure Execute_IO           (Stmt : Statement_Access; Loop_Depth : Natural := 0);
    procedure Execute_Tables          (Stmt : Statement_Access);
    --  C5: entry-time single-statement checker (body is a separate subunit).
@@ -1638,8 +1639,32 @@ package body SData.Interpreter is
       end if;
    end Execute_Program_Insert;
 
-   --  USE / SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW / OPTIONS.
+   --  Convert a DLM string (e.g. "," "\t" "TAB" "|") to a single Character.
+   --  Shared across subunits (Execute_Declarative's SAVE/OPTIONS arms and
+   --  Execute_USE) -- declared here, before their "is separate"
+   --  stubs, so each sees it without duplication (same pattern as
+   --  Check_Statement/Check_Expr above, and the Introduced comment's
+   --  rationale for shared subunit state).
+   function Dlm_To_Str (S : String) return String is
+      U : constant String := To_Upper (S);
+   begin
+      if U'Length = 0                then return ","; end if;
+      if U = "\T" or else U = "TAB" then return "" & ASCII.HT; end if;
+      if U = "NEWLINE"              then return "" & ASCII.LF; end if;
+      if U = "PIPE"                 then return "|"; end if;
+      if U = "SPACE"                then return " "; end if;
+      if U = "COMMA"                then return ","; end if;
+      return S;
+   end Dlm_To_Str;
+
+   --  SAVE / SORT / BY / REPEAT / SELECT (filter) / DIGITS / RSEED / NEW / OPTIONS.
    procedure Execute_Declarative (Stmt : Statement_Access) is separate;
+
+   --  USE -- split out of Execute_Declarative (refactor; was a 610-line case
+   --  arm, SOFTWARE_STANDARDS_REVIEW.md section 2 finding) into its own
+   --  subunit, matching the pattern every other declarative command
+   --  category and Execute_Tables already use.
+   procedure Execute_USE (Stmt : Statement_Access) is separate;
 
    --  SUBMIT / SYSTEM / OUTPUT / FPATH — external interaction and I/O routing.
    --  Loop_Depth (ADR-058) is the caller's Ctx.Loop_Depth at the SUBMIT
