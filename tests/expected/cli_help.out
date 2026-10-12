@@ -1,0 +1,23 @@
+Usage: sdata [options] [filename]
+Options:
+  -h, --help    Show this help message
+  -v, --version Show version information
+  --copyright   Show copyright and license information
+  -m <cells>    Set max in-memory table cells (rows*cols; 0 = unlimited)
+  -t <count>    Set max temporary variables
+  --clen <len>  Set max character variable length (default 256)
+  --shell-timeout=N        SYSTEM/SHELL timeout in seconds (0=unlimited; default 300 in batch)
+  --noshell                Disable SHELL command and function
+  --nosubmit               Disable SUBMIT command
+  -k, --continue-on-error  Continue executing after a statement error
+  --ignore-math-errors     Math domain errors return MISSING instead of halting
+  --progress               Report record-count progress on stderr for long USE/RUN/SORT runs
+  -u, --infmt              Input dataset and format
+  -s, --outfmt             Output dataset and format
+  -o <file>                Console output file
+  -q                       Suppress console output (Quiet Mode)
+  -p <pager>               External pager command for interactive output
+                           (e.g. "less -F", "more"); ignored in batch mode;
+                           incompatible with --noshell
+  --debug[=N]              Trace execution to stderr
+                           1=I/O only  2=+record/flow  3=+assignments (default 3)
