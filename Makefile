@@ -71,7 +71,7 @@ MAN1_DIR     = $(DESTDIR)$(MANDIR)/man1
 DOC_DIR      = $(DESTDIR)$(DOCDIR)
 
 .PHONY: all build clean run check check-scripts fuzz-corpus gnatcheck complexity-check \
-        check-syntax-doc-sync install srpm pkg msi sdata-core-tarball
+        check-syntax-doc-sync install srpm pkg msi sdata-core-tarball coverage
 
 all: build
 
@@ -219,6 +219,47 @@ gnatcheck: build
 
 complexity-check:
 	@GNATMETRIC=$$(scripts/provision-gnatmetric.sh) scripts/check-complexity.sh
+
+# Line-coverage report for sdata + sdata-core (gcov; see scripts/coverage-report.py
+# for the aggregation and why its own output, not a number quoted here, is the
+# source of truth -- same ADR-079 lesson that already applies to test counts).
+#
+# Deliberately a separate, on-demand target rather than part of `make check`:
+# the coverage-instrumented build takes roughly 5-10x longer than a normal one
+# (full rebuild of the whole dependency closure, debug-profile-adjacent
+# overhead), so it doesn't belong in every push's CI run.
+#
+# Wipes both crates' obj/lib first -- cheap insurance against a stale
+# mixed-profile cache leaving some objects instrumented and others not (seen
+# in practice: an incremental rebuild on top of an already-built, non-
+# instrumented sdata-core left barely half its units with a matching .gcno).
+# A later plain `alr build`/`make build` will NOT itself revert this
+# instrumented state (gprbuild sees no source changes and leaves the
+# instrumented objects alone) -- run `rm -rf obj lib bin ../sdata-core/obj
+# ../sdata-core/lib && alr build` to return to a normal, non-instrumented
+# build when you're done measuring coverage.
+#
+# The nested `make check` below is explicitly run through `alr exec --`
+# rather than bare `$(MAKE)`. Root cause, traced via `make -n coverage`
+# (whose dry run still really executes recursive $(MAKE) lines -- GNU
+# Make's own documented exception, so it can show what the sub-make would
+# do): if `GPR_PROJECT_PATH` is ALREADY an environment-origin variable in
+# the invoking shell (e.g. left over from an earlier interactive `alr exec`
+# in the same session) but a bare `$(MAKE) check` doesn't itself re-run
+# `alr exec` to keep that value populated correctly for this invocation,
+# this file's own `ifeq ($(origin GPR_PROJECT_PATH),environment)` branch
+# fires and picks bare gprbuild -- the branch meant for packaging builds
+# with an externally-supplied project path -- which can't resolve
+# sdata-core's dependencies here. Wrapping with `alr exec --` guarantees
+# `GPR_PROJECT_PATH` is both environment-origin *and* correctly populated
+# for this specific call, regardless of whatever the ambient shell state
+# happens to be.
+coverage:
+	@rm -rf obj lib bin
+	@rm -rf ../sdata-core/obj ../sdata-core/lib
+	alr build -- -cargs:Ada -fprofile-arcs -ftest-coverage -largs -lgcov
+	@alr exec -- $(MAKE) --no-print-directory check
+	@python3 scripts/coverage-report.py
 
 # The scripts' own tests plus the ADR summary-table consistency check. Pure
 # Python (no build), and part of `make check`, so a failure shows up locally
