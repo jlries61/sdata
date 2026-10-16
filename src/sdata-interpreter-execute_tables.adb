@@ -309,6 +309,125 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          end loop;
          IO.Put_Line (To_String (Line));
       end Print_Rule;
+      procedure Compute_Column_Widths is
+      begin
+         --  Pass 1: column widths -- header text vs. every value the column
+         --  carries.  Total_Col only ever carries Frequency-shaped values.
+         for C in 1 .. Num_Data_Cols loop
+            Col_W (C) := Col_Header (C)'Length;
+         end loop;
+         for I in L1.First_Index .. L1.Last_Index loop
+            for C in 1 .. Total_Col - 1 loop
+               Col_W (C) := Natural'Max
+                 (Col_W (C), Trim (Freq_At (I, C)'Image, Both)'Length);
+               if Show_Pct then
+                  Col_W (C) := Natural'Max (Col_W (C), Fmt (Pct_At (I, C))'Length);
+               end if;
+               Col_W (C) := Natural'Max (Col_W (C), Fmt (Row_Pct_At (I, C))'Length);
+               Col_W (C) := Natural'Max (Col_W (C), Fmt (Col_Pct_At (I, C))'Length);
+            end loop;
+            Col_W (Total_Col) := Natural'Max
+              (Col_W (Total_Col), Trim (L1 (I).Count'Image, Both)'Length);
+         end loop;
+         for C in 1 .. Total_Col - 1 loop
+            Col_W (C) := Natural'Max
+              (Col_W (C), Trim (Col_Total (C)'Image, Both)'Length);
+         end loop;
+         Col_W (Total_Col) := Natural'Max
+           (Col_W (Total_Col), Trim (Grand'Image, Both)'Length);
+
+         for S of Stat_Names loop
+            Corner_W := Natural'Max (Corner_W, Length (S));
+         end loop;
+         for L of L1 loop
+            Corner_W := Natural'Max (Corner_W, Length (L.Disp));
+         end loop;
+         Corner_W := Natural'Max (Corner_W, 5);  --  "Total"
+      end Compute_Column_Widths;
+
+      procedure Print_Header_Block is
+      begin
+         --  Corner-legend header block; column headers appear only on the
+         --  LAST legend line (Col_Percent -- always present and always last).
+         for S in 1 .. Num_Stats loop
+            declare
+               Line : Unbounded_String := To_Unbounded_String
+                 (Ada.Strings.Fixed.Head (To_String (Stat_Names (S)), Corner_W) & "|");
+            begin
+               if S = Num_Stats then
+                  for C in 1 .. Num_Data_Cols loop
+                     if C > 1 then
+                        Append (Line, "|");
+                     end if;
+                     Append (Line, Ada.Strings.Fixed.Tail (Col_Header (C), Col_W (C)));
+                  end loop;
+               end if;
+               IO.Put_Line (To_String (Line));
+            end;
+         end loop;
+         Print_Rule;
+      end Print_Header_Block;
+
+      procedure Print_Data_Rows is
+      begin
+         --  One row-BLOCK per V1 level (Num_Stats lines), each followed by a
+         --  rule (including the last block, immediately before the Total row).
+         for I in L1.First_Index .. L1.Last_Index loop
+            for S in 1 .. Num_Stats loop
+               declare
+                  Label : constant String :=
+                    (if S = S_Freq then To_String (L1 (I).Disp) else "");
+                  Line  : Unbounded_String := To_Unbounded_String
+                    (Ada.Strings.Fixed.Head (Label, Corner_W) & "|");
+               begin
+                  for C in 1 .. Num_Data_Cols loop
+                     if C > 1 then
+                        Append (Line, "|");
+                     end if;
+                     declare
+                        Cell : Unbounded_String;
+                     begin
+                        if S = S_Freq then
+                           Cell := To_Unbounded_String
+                             (Trim (Freq_At (I, C)'Image, Both));
+                        elsif C = Total_Col then
+                           Cell := Null_Unbounded_String;
+                        elsif S = S_Pct then
+                           Cell := To_Unbounded_String (Fmt (Pct_At (I, C)));
+                        elsif S = S_RowPct then
+                           Cell := To_Unbounded_String (Fmt (Row_Pct_At (I, C)));
+                        else
+                           Cell := To_Unbounded_String (Fmt (Col_Pct_At (I, C)));
+                        end if;
+                        Append (Line, Ada.Strings.Fixed.Tail (To_String (Cell), Col_W (C)));
+                     end;
+                  end loop;
+                  IO.Put_Line (To_String (Line));
+               end;
+            end loop;
+            Print_Rule;
+         end loop;
+      end Print_Data_Rows;
+
+      procedure Print_Total_Row is
+      begin
+         --  Total row: single line, Frequency-only (margin cells stay
+         --  single-valued); no closing rule (PROC FREQ's own convention).
+         declare
+            Line : Unbounded_String := To_Unbounded_String
+              (Ada.Strings.Fixed.Head ("Total", Corner_W) & "|");
+         begin
+            for C in 1 .. Num_Data_Cols loop
+               if C > 1 then
+                  Append (Line, "|");
+               end if;
+               Append (Line,
+                       Ada.Strings.Fixed.Tail (Trim (Col_Total (C)'Image, Both), Col_W (C)));
+            end loop;
+            IO.Put_Line (To_String (Line));
+         end;
+      end Print_Total_Row;
+
    begin
       Stat_Names (S_Freq) := To_Unbounded_String ("Frequency");
       if Show_Pct then
@@ -320,112 +439,13 @@ procedure Execute_Tables (Stmt : Statement_Access) is
       IO.Put_Line ("Table of " & V1 & " by " & V2);
       IO.New_Line;
 
-      --  Pass 1: column widths -- header text vs. every value the column
-      --  carries.  Total_Col only ever carries Frequency-shaped values.
-      for C in 1 .. Num_Data_Cols loop
-         Col_W (C) := Col_Header (C)'Length;
-      end loop;
-      for I in L1.First_Index .. L1.Last_Index loop
-         for C in 1 .. Total_Col - 1 loop
-            Col_W (C) := Natural'Max
-              (Col_W (C), Trim (Freq_At (I, C)'Image, Both)'Length);
-            if Show_Pct then
-               Col_W (C) := Natural'Max (Col_W (C), Fmt (Pct_At (I, C))'Length);
-            end if;
-            Col_W (C) := Natural'Max (Col_W (C), Fmt (Row_Pct_At (I, C))'Length);
-            Col_W (C) := Natural'Max (Col_W (C), Fmt (Col_Pct_At (I, C))'Length);
-         end loop;
-         Col_W (Total_Col) := Natural'Max
-           (Col_W (Total_Col), Trim (L1 (I).Count'Image, Both)'Length);
-      end loop;
-      for C in 1 .. Total_Col - 1 loop
-         Col_W (C) := Natural'Max
-           (Col_W (C), Trim (Col_Total (C)'Image, Both)'Length);
-      end loop;
-      Col_W (Total_Col) := Natural'Max
-        (Col_W (Total_Col), Trim (Grand'Image, Both)'Length);
+      Compute_Column_Widths;
 
-      for S of Stat_Names loop
-         Corner_W := Natural'Max (Corner_W, Length (S));
-      end loop;
-      for L of L1 loop
-         Corner_W := Natural'Max (Corner_W, Length (L.Disp));
-      end loop;
-      Corner_W := Natural'Max (Corner_W, 5);  --  "Total"
+      Print_Header_Block;
 
-      --  Corner-legend header block; column headers appear only on the
-      --  LAST legend line (Col_Percent -- always present and always last).
-      for S in 1 .. Num_Stats loop
-         declare
-            Line : Unbounded_String := To_Unbounded_String
-              (Ada.Strings.Fixed.Head (To_String (Stat_Names (S)), Corner_W) & "|");
-         begin
-            if S = Num_Stats then
-               for C in 1 .. Num_Data_Cols loop
-                  if C > 1 then
-                     Append (Line, "|");
-                  end if;
-                  Append (Line, Ada.Strings.Fixed.Tail (Col_Header (C), Col_W (C)));
-               end loop;
-            end if;
-            IO.Put_Line (To_String (Line));
-         end;
-      end loop;
-      Print_Rule;
+      Print_Data_Rows;
 
-      --  One row-BLOCK per V1 level (Num_Stats lines), each followed by a
-      --  rule (including the last block, immediately before the Total row).
-      for I in L1.First_Index .. L1.Last_Index loop
-         for S in 1 .. Num_Stats loop
-            declare
-               Label : constant String :=
-                 (if S = S_Freq then To_String (L1 (I).Disp) else "");
-               Line  : Unbounded_String := To_Unbounded_String
-                 (Ada.Strings.Fixed.Head (Label, Corner_W) & "|");
-            begin
-               for C in 1 .. Num_Data_Cols loop
-                  if C > 1 then
-                     Append (Line, "|");
-                  end if;
-                  declare
-                     Cell : Unbounded_String;
-                  begin
-                     if S = S_Freq then
-                        Cell := To_Unbounded_String
-                          (Trim (Freq_At (I, C)'Image, Both));
-                     elsif C = Total_Col then
-                        Cell := Null_Unbounded_String;
-                     elsif S = S_Pct then
-                        Cell := To_Unbounded_String (Fmt (Pct_At (I, C)));
-                     elsif S = S_RowPct then
-                        Cell := To_Unbounded_String (Fmt (Row_Pct_At (I, C)));
-                     else
-                        Cell := To_Unbounded_String (Fmt (Col_Pct_At (I, C)));
-                     end if;
-                     Append (Line, Ada.Strings.Fixed.Tail (To_String (Cell), Col_W (C)));
-                  end;
-               end loop;
-               IO.Put_Line (To_String (Line));
-            end;
-         end loop;
-         Print_Rule;
-      end loop;
-
-      --  Total row: single line, Frequency-only (margin cells stay
-      --  single-valued); no closing rule (PROC FREQ's own convention).
-      declare
-         Line : Unbounded_String := To_Unbounded_String
-           (Ada.Strings.Fixed.Head ("Total", Corner_W) & "|");
-      begin
-         for C in 1 .. Num_Data_Cols loop
-            if C > 1 then
-               Append (Line, "|");
-            end if;
-            Append (Line,
-                    Ada.Strings.Fixed.Tail (Trim (Col_Total (C)'Image, Both), Col_W (C)));
-         end loop;
-         IO.Put_Line (To_String (Line));
-      end;
+      Print_Total_Row;
 
       if not Include_Missing and then Missing > 0 then
          IO.New_Line;
@@ -792,107 +812,122 @@ procedure Execute_Tables (Stmt : Statement_Access) is
             return False;
          end Tuple_Less;
          package Tuple_Sorting is new Tuple_Vectors.Generic_Sorting ("<" => Tuple_Less);
-      begin
-         C := Req.Vars;
-         for I in 1 .. K loop
-            Names (I) := To_Unbounded_String
-              (C.Var.Start_Name (1 .. C.Var.Start_Len));
-            Levels (I) := Build_Levels (Rows, To_String (Names (I)));
-            Pos (I)    := Index_Map (Levels (I));
-            C := C.Next;
-         end loop;
-
-         for P of Rows loop
-            declare
-               Key : Unbounded_String;
-               Tup : Idx_Array;
-               OK  : Boolean := True;
-            begin
-               for I in 1 .. K loop
-                  declare
-                     V : constant Values.Value :=
-                       SData_Core.Table.Get_Value (P, To_String (Names (I)));
-                  begin
-                     if not Is_Present (V, Include_Missing) then
-                        OK := False; exit;
-                     end if;
-                     Tup (I) := Pos (I)(To_String (Disp_Of (V)));
-                     if I > 1 then Append (Key, "|"); end if;
-                     Append (Key, Trim (Tup (I)'Image, Both));
-                  end;
-               end loop;
-               if OK then
-                  declare
-                     Ks : constant String := To_String (Key);
-                  begin
-                     if Seen.Contains (Ks) then
-                        declare
-                           R : Tuple_Rec := Present (Seen (Ks));
-                        begin
-                           R.Count := R.Count + 1;
-                           Present.Replace_Element (Seen (Ks), R);
-                        end;
-                     else
-                        Present.Append ((Idx => Tup, Count => 1));
-                        Seen.Insert (Ks, Present.Last_Index);
-                     end if;
-                  end;
-                  Grand := Grand + 1;
-               end if;
-            end;
-         end loop;
-
-         Tuple_Sorting.Sort (Present);
-         declare
-            Cum : Natural := 0;
+         procedure Resolve_Crossing_Vars is
          begin
-            for R of Present loop
+            C := Req.Vars;
+            for I in 1 .. K loop
+               Names (I) := To_Unbounded_String
+                 (C.Var.Start_Name (1 .. C.Var.Start_Len));
+               Levels (I) := Build_Levels (Rows, To_String (Names (I)));
+               Pos (I)    := Index_Map (Levels (I));
+               C := C.Next;
+            end loop;
+         end Resolve_Crossing_Vars;
+
+         procedure Accumulate_Tuples is
+         begin
+            for P of Rows loop
                declare
-                  F       : constant Natural := R.Count;
-                  Pct     : constant Real :=
-                    (if Grand = 0 then 0.0 else 100.0 * Real (F) / Real (Grand));
-                  Out_Row : Positive;
+                  Key : Unbounded_String;
+                  Tup : Idx_Array;
+                  OK  : Boolean := True;
                begin
-                  Cum := Cum + F;
-                  SData_Core.Table.Add_Output_Row;
-                  Out_Row := SData_Core.Table.Output_Row_Count;
-                  for BI in 1 .. SData_Core.Table.By_Var_Count loop
+                  for I in 1 .. K loop
                      declare
-                        BNm : constant String := SData_Core.Table.By_Var_Name (BI);
+                        V : constant Values.Value :=
+                          SData_Core.Table.Get_Value (P, To_String (Names (I)));
                      begin
-                        SData_Core.Table.Set_Output_Value
-                          (Out_Row, BNm,
-                           SData_Core.Table.Get_Value (First_Phys, BNm));
+                        if not Is_Present (V, Include_Missing) then
+                           OK := False; exit;
+                        end if;
+                        Tup (I) := Pos (I)(To_String (Disp_Of (V)));
+                        if I > 1 then Append (Key, "|"); end if;
+                        Append (Key, Trim (Tup (I)'Image, Both));
                      end;
                   end loop;
-                  for I in 1 .. K loop
-                     SData_Core.Table.Set_Output_Value
-                       (Out_Row, To_String (Names (I)), Levels (I)(R.Idx (I)).Val);
-                  end loop;
-                  SData_Core.Table.Set_Output_Value
-                    (Out_Row, "FREQUENCY",
-                     (Kind => Values.Val_Integer, Int_Val => Values.Int (F)));
-                  if not Stmt.Table_NOPERCENT then
-                     SData_Core.Table.Set_Output_Value
-                       (Out_Row, "PERCENT",
-                        (Kind => Values.Val_Numeric, Num_Val => Pct));
-                  end if;
-                  if not Stmt.Table_NOCUM then
-                     SData_Core.Table.Set_Output_Value
-                       (Out_Row, "CUM_FREQ",
-                        (Kind => Values.Val_Integer, Int_Val => Values.Int (Cum)));
-                     if not Stmt.Table_NOPERCENT then
-                        SData_Core.Table.Set_Output_Value
-                          (Out_Row, "CUM_PERCENT",
-                           (Kind => Values.Val_Numeric,
-                            Num_Val =>
-                              (if Grand = 0 then 0.0
-                               else 100.0 * Real (Cum) / Real (Grand))));
-                     end if;
+                  if OK then
+                     declare
+                        Ks : constant String := To_String (Key);
+                     begin
+                        if Seen.Contains (Ks) then
+                           declare
+                              R : Tuple_Rec := Present (Seen (Ks));
+                           begin
+                              R.Count := R.Count + 1;
+                              Present.Replace_Element (Seen (Ks), R);
+                           end;
+                        else
+                           Present.Append ((Idx => Tup, Count => 1));
+                           Seen.Insert (Ks, Present.Last_Index);
+                        end if;
+                     end;
+                     Grand := Grand + 1;
                   end if;
                end;
             end loop;
-         end;
+         end Accumulate_Tuples;
+
+         procedure Emit_Sorted_Rows is
+         begin
+            Tuple_Sorting.Sort (Present);
+            declare
+               Cum : Natural := 0;
+            begin
+               for R of Present loop
+                  declare
+                     F       : constant Natural := R.Count;
+                     Pct     : constant Real :=
+                       (if Grand = 0 then 0.0 else 100.0 * Real (F) / Real (Grand));
+                     Out_Row : Positive;
+                  begin
+                     Cum := Cum + F;
+                     SData_Core.Table.Add_Output_Row;
+                     Out_Row := SData_Core.Table.Output_Row_Count;
+                     for BI in 1 .. SData_Core.Table.By_Var_Count loop
+                        declare
+                           BNm : constant String := SData_Core.Table.By_Var_Name (BI);
+                        begin
+                           SData_Core.Table.Set_Output_Value
+                             (Out_Row, BNm,
+                              SData_Core.Table.Get_Value (First_Phys, BNm));
+                        end;
+                     end loop;
+                     for I in 1 .. K loop
+                        SData_Core.Table.Set_Output_Value
+                          (Out_Row, To_String (Names (I)), Levels (I)(R.Idx (I)).Val);
+                     end loop;
+                     SData_Core.Table.Set_Output_Value
+                       (Out_Row, "FREQUENCY",
+                        (Kind => Values.Val_Integer, Int_Val => Values.Int (F)));
+                     if not Stmt.Table_NOPERCENT then
+                        SData_Core.Table.Set_Output_Value
+                          (Out_Row, "PERCENT",
+                           (Kind => Values.Val_Numeric, Num_Val => Pct));
+                     end if;
+                     if not Stmt.Table_NOCUM then
+                        SData_Core.Table.Set_Output_Value
+                          (Out_Row, "CUM_FREQ",
+                           (Kind => Values.Val_Integer, Int_Val => Values.Int (Cum)));
+                        if not Stmt.Table_NOPERCENT then
+                           SData_Core.Table.Set_Output_Value
+                             (Out_Row, "CUM_PERCENT",
+                              (Kind => Values.Val_Numeric,
+                               Num_Val =>
+                                 (if Grand = 0 then 0.0
+                                  else 100.0 * Real (Cum) / Real (Grand))));
+                        end if;
+                     end if;
+                  end;
+               end loop;
+            end;
+         end Emit_Sorted_Rows;
+
+      begin
+         Resolve_Crossing_Vars;
+
+         Accumulate_Tuples;
+
+         Emit_Sorted_Rows;
       end;
    end Save_Request_Rows;
 
@@ -1219,58 +1254,152 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          end Tuple_Less;
          package Tuple_Sorting is new
            Tuple_Vectors.Generic_Sorting ("<" => Tuple_Less);
-      begin
-         C := Req.Vars;
-         for I in 1 .. K loop
-            Names (I) := To_Unbounded_String
-              (C.Var.Start_Name (1 .. C.Var.Start_Len));
-            Levels (I) := Build_Levels (Rows, To_String (Names (I)));
-            Pos (I)    := Index_Map (Levels (I));
-            C := C.Next;
-         end loop;
-         --  Accumulate one entry per DISTINCT observed tuple, keyed on the
-         --  "i1|i2|..." level-index string (Seen -> position in Present).
-         for P of Rows loop
+         procedure Resolve_Crossing_Vars is
+         begin
+            C := Req.Vars;
+            for I in 1 .. K loop
+               Names (I) := To_Unbounded_String
+                 (C.Var.Start_Name (1 .. C.Var.Start_Len));
+               Levels (I) := Build_Levels (Rows, To_String (Names (I)));
+               Pos (I)    := Index_Map (Levels (I));
+               C := C.Next;
+            end loop;
+         end Resolve_Crossing_Vars;
+
+         procedure Accumulate_Tuples is
+         begin
+            --  Accumulate one entry per DISTINCT observed tuple, keyed on the
+            --  "i1|i2|..." level-index string (Seen -> position in Present).
+            for P of Rows loop
+               declare
+                  Key : Unbounded_String;
+                  Tup : Idx_Array;
+                  OK  : Boolean := True;
+               begin
+                  for I in 1 .. K loop
+                     declare
+                        V : constant Values.Value :=
+                          SData_Core.Table.Get_Value (P, To_String (Names (I)));
+                     begin
+                        if not Is_Present (V, Include_Missing) then
+                           OK := False; exit;
+                        end if;
+                        Tup (I) := Pos (I)(To_String (Disp_Of (V)));
+                        if I > 1 then Append (Key, "|"); end if;
+                        Append (Key, Trim (Tup (I)'Image, Both));
+                     end;
+                  end loop;
+                  if OK then
+                     declare
+                        Ks : constant String := To_String (Key);
+                     begin
+                        if Seen.Contains (Ks) then
+                           declare
+                              R : Tuple_Rec := Present (Seen (Ks));
+                           begin
+                              R.Count := R.Count + 1;
+                              Present.Replace_Element (Seen (Ks), R);
+                           end;
+                        else
+                           Present.Append ((Idx => Tup, Count => 1));
+                           Seen.Insert (Ks, Present.Last_Index);
+                        end if;
+                     end;
+                     Grand := Grand + 1;
+                  else
+                     Missing := Missing + 1;
+                  end if;
+               end;
+            end loop;
+         end Accumulate_Tuples;
+
+         procedure Build_And_Print_List_Table is
+         begin
+            --  ADR-076: thin wrapper over the shared Print_Ruled_Table, with
+            --  Num_Label_Cols => K crossing-variable columns.  No Total row
+            --  (list-form never had one).  Force_Header_When_Empty => True
+            --  preserves the pre-ADR-076 behavior of always showing the
+            --  header even with zero observed tuples (list-form never had a
+            --  "no rows" message, unlike STATS).
             declare
-               Key : Unbounded_String;
-               Tup : Idx_Array;
-               OK  : Boolean := True;
+               Col_Count : constant Positive := K + 1
+                 + (if Show_Pct then 1 else 0)
+                 + (if Show_Cum then 1 else 0)
+                 + (if Show_Cum and then Show_Pct then 1 else 0);
+               Headers  : Row_Cells (1 .. Col_Count);
+               Out_Rows : Row_Cell_Vectors.Vector;
+               Keys     : Opt_String_Vectors.Vector;
+               Idx      : Positive;
             begin
+               Idx := 1;
                for I in 1 .. K loop
-                  declare
-                     V : constant Values.Value :=
-                       SData_Core.Table.Get_Value (P, To_String (Names (I)));
-                  begin
-                     if not Is_Present (V, Include_Missing) then
-                        OK := False; exit;
-                     end if;
-                     Tup (I) := Pos (I)(To_String (Disp_Of (V)));
-                     if I > 1 then Append (Key, "|"); end if;
-                     Append (Key, Trim (Tup (I)'Image, Both));
-                  end;
+                  Headers (Idx) := Names (I); Idx := Idx + 1;
                end loop;
-               if OK then
-                  declare
-                     Ks : constant String := To_String (Key);
-                  begin
-                     if Seen.Contains (Ks) then
-                        declare
-                           R : Tuple_Rec := Present (Seen (Ks));
-                        begin
-                           R.Count := R.Count + 1;
-                           Present.Replace_Element (Seen (Ks), R);
-                        end;
-                     else
-                        Present.Append ((Idx => Tup, Count => 1));
-                        Seen.Insert (Ks, Present.Last_Index);
-                     end if;
-                  end;
-                  Grand := Grand + 1;
-               else
-                  Missing := Missing + 1;
+               Headers (Idx) := To_Unbounded_String ("Frequency"); Idx := Idx + 1;
+               if Show_Pct then
+                  Headers (Idx) := To_Unbounded_String ("Percent"); Idx := Idx + 1;
                end if;
+               if Show_Cum then
+                  Headers (Idx) := To_Unbounded_String ("Cum_Freq"); Idx := Idx + 1;
+               end if;
+               if Show_Cum and then Show_Pct then
+                  Headers (Idx) := To_Unbounded_String ("Cum_Percent"); Idx := Idx + 1;
+               end if;
+
+               --  Emit observed tuples in value order (Tuple_Less == the old
+               --  odometer order).  Cost is O(Present * log Present), never
+               --  the Cartesian product of level cardinalities.
+               Tuple_Sorting.Sort (Present);
+               declare
+                  Cum : Natural := 0;
+               begin
+                  for R of Present loop
+                     declare
+                        F    : constant Natural := R.Count;
+                        Pct  : constant Real :=
+                          (if Grand = 0 then 0.0
+                           else 100.0 * Real (F) / Real (Grand));
+                        Row  : Row_Cells (1 .. Col_Count);
+                        J    : Positive;
+                     begin
+                        Cum := Cum + F;
+                        J := 1;
+                        for I in 1 .. K loop
+                           Row (J) := Levels (I)(R.Idx (I)).Disp; J := J + 1;
+                        end loop;
+                        Row (J) := To_Unbounded_String (Trim (F'Image, Both)); J := J + 1;
+                        if Show_Pct then
+                           Row (J) := To_Unbounded_String (Fmt (Pct)); J := J + 1;
+                        end if;
+                        if Show_Cum then
+                           Row (J) := To_Unbounded_String (Trim (Cum'Image, Both)); J := J + 1;
+                        end if;
+                        if Show_Cum and then Show_Pct then
+                           Row (J) := To_Unbounded_String
+                             (Fmt (if Grand = 0 then 0.0
+                                   else 100.0 * Real (Cum) / Real (Grand)));
+                           J := J + 1;
+                        end if;
+                        Out_Rows.Append (Row);
+                        Keys.Append (Null_Unbounded_String);
+                     end;
+                  end loop;
+               end;
+
+               Print_Ruled_Table
+                 (Num_Label_Cols          => K,
+                  Headers                 => Headers,
+                  Rows                    => Out_Rows,
+                  Row_Group_Keys          => Keys,
+                  Show_Group_Key          => False,
+                  Force_Header_When_Empty => True);
             end;
-         end loop;
+         end Build_And_Print_List_Table;
+
+      begin
+         Resolve_Crossing_Vars;
+
+         Accumulate_Tuples;
 
          --  Title.
          declare
@@ -1284,85 +1413,7 @@ procedure Execute_Tables (Stmt : Statement_Access) is
          end;
          IO.New_Line;
 
-         --  ADR-076: thin wrapper over the shared Print_Ruled_Table, with
-         --  Num_Label_Cols => K crossing-variable columns.  No Total row
-         --  (list-form never had one).  Force_Header_When_Empty => True
-         --  preserves the pre-ADR-076 behavior of always showing the
-         --  header even with zero observed tuples (list-form never had a
-         --  "no rows" message, unlike STATS).
-         declare
-            Col_Count : constant Positive := K + 1
-              + (if Show_Pct then 1 else 0)
-              + (if Show_Cum then 1 else 0)
-              + (if Show_Cum and then Show_Pct then 1 else 0);
-            Headers  : Row_Cells (1 .. Col_Count);
-            Out_Rows : Row_Cell_Vectors.Vector;
-            Keys     : Opt_String_Vectors.Vector;
-            Idx      : Positive;
-         begin
-            Idx := 1;
-            for I in 1 .. K loop
-               Headers (Idx) := Names (I); Idx := Idx + 1;
-            end loop;
-            Headers (Idx) := To_Unbounded_String ("Frequency"); Idx := Idx + 1;
-            if Show_Pct then
-               Headers (Idx) := To_Unbounded_String ("Percent"); Idx := Idx + 1;
-            end if;
-            if Show_Cum then
-               Headers (Idx) := To_Unbounded_String ("Cum_Freq"); Idx := Idx + 1;
-            end if;
-            if Show_Cum and then Show_Pct then
-               Headers (Idx) := To_Unbounded_String ("Cum_Percent"); Idx := Idx + 1;
-            end if;
-
-            --  Emit observed tuples in value order (Tuple_Less == the old
-            --  odometer order).  Cost is O(Present * log Present), never
-            --  the Cartesian product of level cardinalities.
-            Tuple_Sorting.Sort (Present);
-            declare
-               Cum : Natural := 0;
-            begin
-               for R of Present loop
-                  declare
-                     F    : constant Natural := R.Count;
-                     Pct  : constant Real :=
-                       (if Grand = 0 then 0.0
-                        else 100.0 * Real (F) / Real (Grand));
-                     Row  : Row_Cells (1 .. Col_Count);
-                     J    : Positive;
-                  begin
-                     Cum := Cum + F;
-                     J := 1;
-                     for I in 1 .. K loop
-                        Row (J) := Levels (I)(R.Idx (I)).Disp; J := J + 1;
-                     end loop;
-                     Row (J) := To_Unbounded_String (Trim (F'Image, Both)); J := J + 1;
-                     if Show_Pct then
-                        Row (J) := To_Unbounded_String (Fmt (Pct)); J := J + 1;
-                     end if;
-                     if Show_Cum then
-                        Row (J) := To_Unbounded_String (Trim (Cum'Image, Both)); J := J + 1;
-                     end if;
-                     if Show_Cum and then Show_Pct then
-                        Row (J) := To_Unbounded_String
-                          (Fmt (if Grand = 0 then 0.0
-                                else 100.0 * Real (Cum) / Real (Grand)));
-                        J := J + 1;
-                     end if;
-                     Out_Rows.Append (Row);
-                     Keys.Append (Null_Unbounded_String);
-                  end;
-               end loop;
-            end;
-
-            Print_Ruled_Table
-              (Num_Label_Cols          => K,
-               Headers                 => Headers,
-               Rows                    => Out_Rows,
-               Row_Group_Keys          => Keys,
-               Show_Group_Key          => False,
-               Force_Header_When_Empty => True);
-         end;
+         Build_And_Print_List_Table;
 
          if not Include_Missing and then Missing > 0 then
             IO.New_Line;
