@@ -302,8 +302,11 @@ Doc-Sync: not-applicable -- <reason>
 ```
 
 This is logged, not silently trusted — the trailer is a greppable audit trail for the next
-`/ssd milestone` review, not a merge gate (this repo has no branch protection, so a red CI check
-here is a visibility signal, not a block). Use it honestly.
+`/ssd milestone` review. As of 2026-10-12 this repo *does* enforce branch protection: `main` requires
+a passing `test` check before a PR can merge, so a red CI check here is now an actual block, not just
+a visibility signal. The trailer remains the legitimate way to satisfy the doc-sync check when no doc
+sync is needed — it causes `make check-syntax-doc-sync` to self-skip (print `SKIPPED` and exit 0)
+rather than fail, so an honest use of it does not trip the new gate. Use it honestly.
 
 ### Optional: local finding-tracking hook
 
