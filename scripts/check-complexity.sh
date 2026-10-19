@@ -2,9 +2,22 @@
 # Cyclomatic-complexity gate for sdata src/ (excluding the recursive-descent
 # parser and the tokenizer — see the exemption note at the file list below).
 # Fails (exit 1) if any covered unit's McCabe cyclomatic complexity exceeds
-# MAX_CYCLOMATIC. Threshold derived from the measured maximum: the worst
-# covered unit is SData_Main at 81; ceiling set to 85 (next multiple of 5
-# above the measured max, and >= max+3 headroom). Raise it only deliberately,
+# MAX_CYCLOMATIC.
+#
+# Ceiling history: originally set to 85 when SData_Main measured 81 (next
+# multiple of 5 above the then-measured max). That gave only 4 points of
+# headroom after several releases' worth of growth (STATS, TABLES, PCTL, new
+# option surfaces) — flagged by the 2026-09-26/27 standards audit as thin
+# margin for a gate whose whole point is catching growth before it compounds.
+# Re-measured 2026-10-19 after this cycle's extract-subunit refactors
+# (SData_Main's CLI arg-parsing loop, Execute_Tables' three largest nested
+# procedures, Parse_Expression, Execute_AGGREGATE/Execute_TRANSPOSE in
+# sdata-core): current worst covered unit is Parse_Command_Line at 66,
+# restoring 19 points of headroom (vs. 85) as a side effect of that
+# decomposition work, not a ceiling change. Left at 85 rather than re-tightened
+# to a new next-multiple-of-5 — ratcheting the ceiling down to track every dip
+# in the measured max would recreate the same thin-margin problem the audit
+# flagged, just at a smaller number. Raise (or deliberately re-baseline) only
 # with justification — growth past the ceiling signals a subprogram that
 # should be decomposed. See doc/specs/2026-06-15-gnatmetric-ci-gate-design.md.
 set -eu
