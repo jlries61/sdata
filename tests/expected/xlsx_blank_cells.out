@@ -1,0 +1,19 @@
+Dataset opened: tests/data/xlsx_blank_roundtrip.csv
+Dataset saved: tests/data/xlsx_blank_gen.xlsx
+RUN complete. 4 records and 2 variables processed.
+Dataset opened: tests/data/xlsx_blank_gen.xlsx
+Obs        A        B
+---------------------
+  1  1.00000  2.00000
+  2        .  3.00000
+  3  4.00000        .
+  4  5.00000  6.00000
+---------------------
+Dataset opened: tests/data/xlsx_blank_cells.xlsx
+Obs  NAME$        X        Y
+----------------------------
+  1  a      1.00000  2.00000
+  2  b            .  3.00000
+  3  .      4.00000  5.00000
+  4  d      6.00000        .
+----------------------------

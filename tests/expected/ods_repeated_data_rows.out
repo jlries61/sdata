@@ -1,0 +1,7 @@
+Dataset opened: tests/data/ods_repeated_rows.ods
+RUN complete. 2002 records and 1 variables processed.
+Variable     N      MIN     MEAN      MAX      STD
+--------------------------------------------------
+A         2002  0.00000  0.00799  9.00000  0.25476
+--------------------------------------------------
+STATS complete. 1 records and 6 variables processed.
