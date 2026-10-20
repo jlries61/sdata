@@ -1,0 +1,12 @@
+Dataset opened: tests/data/csv_embedded_newline.csv
+Dataset saved: tests/data/csv_embedded_newline_gen.csv
+RUN complete. 3 records and 2 variables processed.
+Dataset opened: tests/data/csv_embedded_newline_gen.csv
+Obs  A$                    B
+----------------------------
+  1  line1
+line2     1.00000
+  2  x,y             2.00000
+  3  say "hi"
+there  3.00000
+----------------------------

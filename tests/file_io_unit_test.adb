@@ -148,14 +148,17 @@ begin
    V := Get_Value (2, "VAL1");
    Check_Float ("PC-24 max_rows=2 row2 VAL1", V.Num_Val, 4.0);
 
-   --  PC-25..PC-27: unclosed quote — parser recovers; corrupt field stored
-   --  with the leading quote character still present in the value.
+   --  PC-25..PC-27: unclosed quote -- a quote that opens a field and never
+   --  closes runs to end of file as one field (RFC 4180; F02 made quoted
+   --  fields span line breaks), with the leading quote character still
+   --  present in the value, and the "unclosed quote" warning is emitted.
    --  File: NAME$,SCORE / "Alice,90 / Bob,85
    Parse_CSV ("tests/data/unclosed_quote.csv");
    Check ("PC-25 unclosed-quote col count",  Column_Count, 2);
-   Check ("PC-26 unclosed-quote row count",  Row_Count,    2);
-   V := Get_Value (2, "NAME$");
-   Check ("PC-27 unclosed-quote row2 NAME$", To_String (V.Str_Val), "Bob");
+   Check ("PC-26 unclosed-quote row count",  Row_Count,    1);
+   V := Get_Value (1, "NAME$");
+   Check ("PC-27 unclosed-quote row1 NAME$",
+          To_String (V.Str_Val) (1 .. 8), """Alice,9");
 
    --  PC-28..PC-31: a non-numeric value within the scan window retypes the
    --  whole column character (ADR-0019 -- design.md's "any non-numeric
