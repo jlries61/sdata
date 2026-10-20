@@ -1,0 +1,16 @@
+Dataset opened: tests/data/csv_crlf.csv
+Permanent Variables (Table Columns):
+A B$ RINGS
+Session Variables (SET):
+(none)
+Obs        A  B$     RINGS
+--------------------------
+  1  1.00000  x   15.00000
+  2  2.00000  y    7.00000
+--------------------------
+Dataset opened: tests/data/csv_bare_cr.csv
+Obs        A        B
+---------------------
+  1  1.00000  2.00000
+  2  3.00000  4.00000
+---------------------
