@@ -3552,6 +3552,7 @@ package body SData.Parser is
                Tok_Local : Token;
                Saved_Expr : Expression_Access := null;
                Is_Block : Boolean := False;
+               Select_Case_Kw : Boolean := False;
             begin
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Slash then
                   --  SELECT /ALL cancels any active record filter.
@@ -3568,6 +3569,18 @@ package body SData.Parser is
                   Stmt := new Statement (Stmt_SELECT_FILTER);
                   --  Stmt.Expr remains null, signalling filter cancellation.
                else
+               --  design.md spells the multi-way branch "SELECT CASE expr";
+               --  the CASE keyword directly after SELECT is accepted and
+               --  skipped (F11), so both spellings give the same statement.
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_CASE then
+                  declare
+                     Discard_Case : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  begin
+                     null;
+                  end;
+                  Select_Case_Kw := True;
+               end if;
+
                --  Collect the optional expression text (everything up to CASE /
                --  WHEN / OTHERWISE / EOL / EOF), converting top-level commas to
                --  AND conjunctions in the process.
@@ -3597,6 +3610,12 @@ package body SData.Parser is
                Is_Block := Tok_Local.Kind = Token_CASE or else
                            Tok_Local.Kind = Token_WHEN or else
                            Tok_Local.Kind = Token_OTHERWISE;
+
+               if Select_Case_Kw and then not Is_Block then
+                  raise Script_Error with
+                     "SELECT CASE must be followed by CASE, WHEN or OTHERWISE at line"
+                     & Tok_Local.Line'Image;
+               end if;
 
                if not Is_Block then
                   -- Record filter form: SELECT <expr>

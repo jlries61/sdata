@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.4
+Version:        0.37.5
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Oct 22 2026 John L. Ries <john@theyarnbard.com> - 0.37.5-1
+- SELECT CASE accepted; BREAK resumes the record in batch mode; SAVE /FMT= overrides the extension.
+
 * Thu Oct 22 2026 John L. Ries <john@theyarnbard.com> - 0.37.4-1
 - Empty table and REPEAT 0 run the data step zero times.
 

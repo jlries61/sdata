@@ -42,7 +42,8 @@ begin
                   Write_Header => Eff_Header,
                   Charset      => Eff_Charset,
                   Decimals     => Eff_Decimals,
-                  Missing_Token => Stmt.Missing_Val (1 .. Stmt.Missing_Len));
+                  Missing_Token => Stmt.Missing_Val (1 .. Stmt.Missing_Len),
+                  Fmt_Specified => Stmt.Format_Specified);
             end Legacy_Execute_SAVE;
          begin
             --  Empty SAVE: clear everything (both legacy and multi-target).

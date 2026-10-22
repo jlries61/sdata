@@ -407,21 +407,22 @@ begin
    Put_Line ("");
    Put_Line ("--- F: BREAK ---");
 
-   --  IC-22: BREAK skips remaining statements for the current record.
+   --  IC-22: BREAK pauses, then resumes with the following statement of the
+   --  same record (F12, design.md section 7.1); non-interactive here.
    Run ("REPEAT 1" & L &
         "LET X = 1" & L &
         "BREAK" & L &
         "LET X = 999" & L &
         "RUN");
-   Check ("IC-22: BREAK skips subsequent LET", TGI (1, "X"), 1);
+   Check ("IC-22: BREAK resumes with subsequent LET", TGI (1, "X"), 999);
 
-   --  IC-23: BREAK WHEN true skips remaining statements.
+   --  IC-23: BREAK WHEN true likewise resumes after the pause.
    Run ("REPEAT 1" & L &
         "LET X = 1" & L &
         "BREAK WHEN 1 = 1" & L &
         "LET X = 999" & L &
         "RUN");
-   Check ("IC-23: BREAK WHEN true skips subsequent LET", TGI (1, "X"), 1);
+   Check ("IC-23: BREAK WHEN true resumes with subsequent LET", TGI (1, "X"), 999);
 
    --  IC-24: BREAK WHEN false does not trigger; subsequent statement executes.
    Run ("REPEAT 1" & L &

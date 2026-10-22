@@ -1,3 +1,9 @@
+sdata (0.37.5-1) unstable; urgency=medium
+
+  * SELECT CASE accepted; BREAK resumes the record in batch mode; SAVE /FMT= overrides the extension.
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 22 Oct 2026 16:01:56 -0700
+
 sdata (0.37.4-1) unstable; urgency=medium
 
   * Empty table and REPEAT 0 run the data step zero times.
