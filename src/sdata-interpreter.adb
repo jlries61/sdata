@@ -2524,7 +2524,7 @@ package body SData.Interpreter is
       SData_Core.Table.Clear_Index_Map;
       --  REPEAT generates records for exactly one RUN.  Subsequent RUNs
       --  must iterate the committed table, not re-use Repeat_Count.
-      SData_Core.Commands.Execute_REPEAT (0);
+      SData_Core.Config.Runtime.End_Repeat;
       Set_Current_Record_Index (0);
       Apply_Pending_Mods;
       --  Delegate the end-of-step shared work (filter rebuild against the
@@ -2685,7 +2685,8 @@ package body SData.Interpreter is
       Global_Has_Write : constant Boolean := Has_Output_Statement (Start, Boundary);
       Num_Records      : constant Natural :=
          (if SData_Core.Config.Runtime.Repeat_Active then SData_Core.Config.Runtime.Repeat_Count
-          else (if Row_Count > 0 then Row_Count else 1));
+          else (if Row_Count = 0 and then Input_File_Columns.Is_Empty
+                then 1 else Row_Count));
       Step_Mode : Boolean :=
          SData_Core.Config.Debug_Level > 0 and then SData_Core.IO.Is_Interactive;
       Act       : Step_Action := Action_Continue;

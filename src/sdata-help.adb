@@ -725,7 +725,7 @@ package body SData.Help is
 
    procedure Help_REPEAT is
    begin
-      Put_Line ("Command (data step): REPEAT n  (creates n records)");
+      Put_Line ("Command (data step): REPEAT n  (creates n records; REPEAT 0 creates none)");
       Put_Line ("REPEAT n also cancels any queued deferred statements (LET, SET, etc.).");
       Put_Line ("Enter setup statements AFTER the REPEAT command, not before it.");
       Put_Line ("SORT, AGGREGATE, TRANSPOSE, and STATS are rejected between REPEAT n and");

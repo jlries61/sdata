@@ -1,8 +1,9 @@
 -- issue #66 boundary case (renamed from repeat_zero_sort_ok.cmd, see issue
--- #67): REPEAT 0 is the documented "cancel any active REPEAT" form
--- (SData_Core.Commands.Execute_REPEAT clears Repeat_Active when Count = 0)
--- -- it does not open a data-generation window, so an Immediate command
--- right after it must not be rejected by #66's REPEAT-active guard. This
+-- #67): REPEAT 0 requests zero records (F28, 2026-10-19 stress test; it was
+-- formerly the "cancel any active REPEAT" form) -- it opens an empty data
+-- generation window, and an Immediate command right after it must not be
+-- rejected by #66's REPEAT-active guard; the implicit RUN processes 0
+-- records. This
 -- used to use SORT X, but issue #67 made SORT's undefined-variable guard
 -- unconditional -- since REPEAT (any count, including 0) unconditionally
 -- clears the table, there is no name SORT could reference here that

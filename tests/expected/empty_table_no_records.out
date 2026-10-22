@@ -1,0 +1,20 @@
+Warning: File contains a header but no data records.
+Dataset opened: tests/data/empty_table_hdr.csv
+Dataset saved: tests/data/empty_table_out.csv
+RUN complete. 0 records and 3 variables processed.
+Warning: File contains a header but no data records.
+Dataset opened: tests/data/empty_table_out.csv
+Permanent Variables (Table Columns):
+A B C
+Session Variables (SET):
+(none)
+RUN complete. 0 records and 3 variables processed.
+Dataset opened: tests/data/join_l.csv
+Dataset opened: tests/data/join_r.csv
+RUN complete. 0 records and 3 variables processed.
+RUN complete. 0 records and 0 variables processed.
+RUN complete. 1 records and 1 variables processed.
+Obs        Y
+------------
+  1  1.00000
+------------

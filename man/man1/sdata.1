@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-10-22" "sdata 0.37.3" "User Commands"
+.TH SDATA 1 "2026-10-22" "sdata 0.37.4" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -744,7 +744,7 @@ is associated with this command's own result, not written by the implicit
 .B REPEAT \fIn\fR
 Create
 .I n
-output records in the next data step (REPEAT mode).
+output records in the next data step (REPEAT mode); \fBREPEAT 0\fR creates none.
 Also cancels any queued deferred statements
 .RB ( LET ,
 .B SET ,

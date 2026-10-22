@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.3
+Version:        0.37.4
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Oct 22 2026 John L. Ries <john@theyarnbard.com> - 0.37.4-1
+- Empty table and REPEAT 0 run the data step zero times.
+
 * Thu Oct 22 2026 John L. Ries <john@theyarnbard.com> - 0.37.3-1
 - Fix NRN, WIF; character-based UTF-8 string functions; --clen truncation on character boundaries.
 
