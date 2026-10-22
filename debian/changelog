@@ -1,3 +1,9 @@
+sdata (0.37.2-1) unstable; urgency=medium
+
+  * Stable VAR/STD (Welford) and heap-held group values so STATS/AGGREGATE handle groups over 350k rows (sdata-core 0.16.3).
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 21 Oct 2026 21:24:16 -0700
+
 sdata (0.37.1-1) unstable; urgency=medium
 
   * CSV and spreadsheet reader fixes: XLSX blank cells, ODS repeated rows, CRLF/bare-CR, quoted newlines, long lines, exact int64 (sdata-core 0.16.2).
