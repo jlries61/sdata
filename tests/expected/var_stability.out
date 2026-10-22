@@ -1,0 +1,9 @@
+Dataset opened: tests/data/var_stability.csv
+Variable   N              MEAN      STD      VAR
+------------------------------------------------
+X         20          32.86281  0.00000  0.00000
+Y         20  1000000002.00000  1.45095  2.10526
+------------------------------------------------
+STATS complete. 2 records and 5 variables processed.
+0.01000
+RUN complete. 1 records and 1 variables processed.
