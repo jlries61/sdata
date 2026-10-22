@@ -1,0 +1,78 @@
+REPEAT 1
+LET V = ROUND(1,400)
+LET W = ROUND(1.5,20)
+LET U = ROUND(1e300,5)
+PRINT V W U
+RUN
+####
+REPEAT 1
+LET X = 10**400
+PRINT X INF(X)
+RUN
+####
+REPEAT 1
+LET Y = 10**(-400)
+LET W = 0**0
+PRINT Y W
+RUN
+####
+REPEAT 1
+LET V = 0**(-1)
+PRINT V
+RUN
+####
+REPEAT 1
+LET X$ = HEX$(-1)
+LET Y$ = HEX$(255, 300)
+LET Z$ = BIN$(-5, 3)
+LET W$ = OCT$(1e30)
+PRINT X$ Y$ Z$ W$
+RUN
+####
+REPEAT 1
+LET Y$ = CHR$(256)
+PRINT LEN(Y$)
+RUN
+####
+REPEAT 1
+LET Z$ = CHR$(0)
+PRINT LEN(Z$) Z$
+RUN
+####
+REPEAT 1
+LET X$ = LEFT$("abc", -1)
+PRINT X$
+LET Z$ = MID$("abc", 0, 2)
+LET W$ = MID$("abc", -5, 100)
+LET V$ = RIGHT$("abc", 0)
+LET U$ = SEG$("abc", 2, 0)
+PRINT "[" Z$ "][" W$ "][" V$ "][" U$ "]"
+RUN
+####
+REPEAT 1
+LET X = 1e308 * 10
+LET Y = -X
+PRINT X Y
+LET Z = X + Y
+PRINT Z
+RUN
+####
+REPEAT 1
+LET X = 5 % 3
+RUN
+####
+REPEAT 1
+LET X = 1e400
+LET Y = 1e-400
+LET Z = 123456789012345678901234567890
+PRINT X Y Z
+RUN
+####
+REPEAT 1
+LET X% = 3.9
+LET Y% = -3.9
+LET Z% = 1e18 + 0.5
+PRINT X% Y% Z%
+LET W% = 7 / 2
+PRINT W%
+RUN

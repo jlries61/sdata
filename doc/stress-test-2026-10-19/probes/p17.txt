@@ -1,0 +1,88 @@
+REPEAT 1
+LET `AS` = 5
+LET `my col` = 6
+LET LET1 = `AS` + `my col`
+PRINT LET1
+LET lower = 1
+PRINT LOWER Lower
+RUN
+####
+REPEAT 1
+LET IF = 1
+RUN
+####
+REPEAT 1
+LET X = X
+LET Y = Y + 1
+PRINT X Y
+RUN
+####
+REPEAT 1
+LET A = 1
+DIM A(3)
+RUN
+####
+REPEAT 1
+DIM A(3)
+LET A = 1
+RUN
+####
+REPEAT 1
+LET A1 = 1
+LET A2 = 2
+LET A3 = 3
+ARRAY AR A1 A2 A3
+LET S = SUM(AR)
+LET M = MEAN(AR(1:2))
+LET N = N(AR)
+PRINT S M N AR(2)
+LET AR(2) = 20
+PRINT A2
+RUN
+####
+REPEAT 1
+LET A1 = 1
+LET B1$ = "x"
+ARRAY AR A1 B1$
+RUN
+####
+REPEAT 1
+LET X1 = 1
+LET X3 = 3
+DROP X1:X3
+RUN
+NAMES
+####
+REPEAT 2
+LET X1 = 1
+LET X3 = 3
+LET Z = SUM(X1:X3)
+PRINT Z
+RUN
+NAMES
+####
+REPEAT 1
+LET A% = 5
+LET B = A% / 2
+LET C% = A% / 2
+LET D% = 7 / 2 * 2
+PRINT B C% D%
+LET E% = A% + 0.5
+PRINT E%
+LET F% = "x"
+RUN
+####
+REPEAT 1
+LET S$ = "abc"
+LET T$ = S$ + 1
+RUN
+####
+REPEAT 1
+SET T = 1
+SET T$ = "a"
+PRINT T T$
+UNSET T
+UNSET T$
+UNSET /ALL
+PRINT T
+RUN

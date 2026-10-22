@@ -1037,7 +1037,7 @@ package body SData.Help is
    --  String functions
    -- ==========================================================================
 
-   procedure Help_LEN    is begin Put_Line ("Function: LEN(s$)  ->  length of string s$"); end Help_LEN;
+   procedure Help_LEN    is begin Put_Line ("Function: LEN(s$)  ->  length of string s$ in characters (UTF-8)"); end Help_LEN;
    procedure Help_LEFTS  is begin Put_Line ("Function: LEFT$(s$, n)  ->  leftmost n characters"); end Help_LEFTS;
    procedure Help_RIGHTS is begin Put_Line ("Function: RIGHT$(s$, n)  ->  rightmost n characters"); end Help_RIGHTS;
    procedure Help_MIDS   is begin Put_Line ("Function: MID$(s$, start [, len])  ->  substring"); end Help_MIDS;

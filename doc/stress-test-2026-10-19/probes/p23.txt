@@ -1,0 +1,75 @@
+REPEAT 1
+PRINT 1. .5 1e3 1E+3 1e-3 .5e3 5.e2 007 0.0 1e0
+RUN
+####
+REPEAT 1
+PRINT 1.2.3
+RUN
+####
+REPEAT 1
+PRINT 1e
+RUN
+####
+REPEAT 1
+PRINT 0x1F
+RUN
+####
+REPEAT 1
+PRINT 1_000
+RUN
+####
+REPEAT 1
+PRINT 12abc
+RUN
+####
+REPEAT 1
+LET é = 1
+RUN
+####
+REPEAT 1
+LET X = 1 +
+ 2
+PRINT X
+RUN
+####
+REPEAT 1
+LET X = (1 +
+2)
+PRINT X
+RUN
+####
+REPEAT 1
+PRINT "unterminated
+RUN
+####
+REPEAT 1
+PRINT 'single' "double" 'it''s' "say ""hi"""
+RUN
+####
+REPEAT 1
+PRINT "a\nb"
+RUN
+####
+REPEAT 1
+PRINT .i, -.i, .n, .I, .N, .info
+RUN
+####
+REPEAT 1
+PRINT 1 <> 2, 1 != 2, 1 == 1, 1 >= 1, 1 =< 2, 1 => 1, 1 >< 2
+RUN
+####
+REPEAT 1
+PRINT 5 \ 2
+RUN
+####
+REPEAT 1
+PRINT 5 MOD 2, 5 DIV 2
+RUN
+####
+REPEAT 1
+PRINT 2 ^ 3, 2 ** 3, 2 ^ -1
+RUN
+####
+REPEAT 1
+PRINT TRUE() FALSE() TRUE FALSE
+RUN

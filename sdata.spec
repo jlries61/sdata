@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.2
+Version:        0.37.3
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Oct 22 2026 John L. Ries <john@theyarnbard.com> - 0.37.3-1
+- Fix NRN, WIF; character-based UTF-8 string functions; --clen truncation on character boundaries.
+
 * Wed Oct 21 2026 John L. Ries <john@theyarnbard.com> - 0.37.2-1
 - Stable VAR/STD (Welford) and heap-held group values so STATS/AGGREGATE handle groups over 350k rows (sdata-core 0.16.3).
 

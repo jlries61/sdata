@@ -1,0 +1,9 @@
+SUBMIT "sub1.cmd"
+####
+FPATH "/tmp"
+SUBMIT "nosuch"
+####
+REPEAT 1
+SUBMIT "sub1.cmd"
+LET Y = 1
+RUN

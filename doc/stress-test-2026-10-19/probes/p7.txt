@@ -1,0 +1,26 @@
+REPEAT 2
+PRINT "before"
+BREAK
+PRINT "after"
+RUN
+####
+REPEAT 2
+PRINT "before"
+BREAK WHEN RECNO() = 1
+PRINT "after"
+RUN
+####
+REPEAT 3
+LET X = RECNO()
+SELECT CASE X
+RUN
+PRINT "tail"
+####
+REPEAT 3
+LET X = RECNO()
+SELECT CASE X
+CASE 2
+PRINT "two"
+END SELECT
+RUN
+PRINT "tail"

@@ -1,0 +1,7 @@
+REPEAT 1
+FOR I = 1 TO 3
+LET S = 1
+NEXT
+PRINT I
+RUN
+REM design.md: 4

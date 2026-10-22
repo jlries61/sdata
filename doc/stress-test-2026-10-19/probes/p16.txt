@@ -1,0 +1,40 @@
+USE "g1.csv"
+KEEP NOSUCH
+RUN
+NAMES
+####
+USE "g1.csv"
+DROP NOSUCH
+RUN
+####
+USE "g1.csv"
+LET 5 = 5
+RUN
+NAMES
+####
+USE "g1.csv"
+HOLD NOSUCH
+RUN
+####
+USE "g1.csv" /FMT=BOGUS
+DISPLAY /FIRST=1
+####
+USE "g1.csv" /CHARSET=BOGUS
+DISPLAY /FIRST=1
+####
+USE "g1.csv" /NOSUCH=5
+DISPLAY /FIRST=1
+####
+OPTIONS HEADER MAYBE
+USE "g1.csv"
+DISPLAY /FIRST=1
+####
+USE "g1.csv"
+SAVE "o1.csv" /CHARSET=BOGUS
+RUN
+####
+USE "g1.csv"
+SAVE "o1.csv" /FMT=OOXML
+RUN
+SAVE "o2.xlsx" /FMT=CSV
+RUN

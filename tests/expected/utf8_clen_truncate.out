@@ -1,0 +1,16 @@
+Warning: String truncated to  5 characters.
+Warning: String truncated to  5 characters.
+Warning: String truncated to  5 characters.
+Warning: String truncated to  5 characters.
+Dataset opened: tests/data/utf8_strings.csv
+Warning: String truncated to  5 characters.
+ÀÉ ÀÉ 2.00000
+Warning: String truncated to  5 characters.
+Ångs Ångs 4.00000
+Warning: String truncated to  5 characters.
+stra stras 5.00000
+Warning: String truncated to  5 characters.
+日 日 1.00000
+Warning: String truncated to  5 characters.
+aé aéa 3.00000
+RUN complete. 5 records and 3 variables processed.

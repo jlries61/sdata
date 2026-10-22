@@ -1,0 +1,7 @@
+DIGITS 12
+REPEAT 1
+LET A = WIF(0.5,2,3)
+LET B = WCF(A,2,3)
+PRINT A B
+RUN
+REM B should be 0.5

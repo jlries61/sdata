@@ -1,0 +1,96 @@
+REPEAT 1
+LET X = 1/0
+PRINT X
+RUN
+####
+REPEAT 1
+LET X = 0/0
+RUN
+####
+OPTIONS IEEE_DIVIDE YES
+REPEAT 1
+LET X = 0/0
+LET Y = 1/0
+LET Z = -1/0
+PRINT X Y Z
+RUN
+####
+REPEAT 1
+LET X = SQR(-1)
+PRINT X
+RUN
+####
+REPEAT 1
+LET X = LOG(0)
+LET Y = LN(-5)
+LET Z = ARCSIN(2)
+RUN
+####
+REPEAT 1
+LET X = MAXNUM()*2
+LET Y = X - X
+LET Z = INF(X)
+PRINT X Y Z
+RUN
+####
+REPEAT 1
+LET X = 10**400
+LET Y = 10**(-400)
+LET Z = (-8)**(1/3)
+LET W = 0**0
+LET V = 0**(-1)
+PRINT X Y Z W V
+RUN
+####
+REPEAT 1
+LET X = MOD(5,0)
+RUN
+####
+REPEAT 1
+LET X = MOD(5.5,2)
+LET Y = MOD(-7,3)
+LET Z = MOD(7,-3)
+PRINT X Y Z
+RUN
+####
+REPEAT 1
+LET X = ROUND(2.5,0)
+LET Y = ROUND(-2.5,0)
+LET Z = ROUND(1234.5678,-2)
+LET W = ROUND(1e300,-300)
+LET V = ROUND(1,1000000)
+PRINT X Y Z W V
+RUN
+####
+REPEAT 1
+LET X = HEX$(-1)
+LET Y = HEX$(255, 300)
+LET Z = BIN$(-5, 3)
+LET W = OCT$(1e30)
+PRINT X Y Z W
+RUN
+####
+REPEAT 1
+LET X = HEX("ZZ")
+LET Y = HEX("FFFFFFFFFFFFFFFFFF")
+LET Z = HEX("")
+PRINT X Y Z
+RUN
+####
+REPEAT 1
+LET X$ = CHR$(-1)
+LET Y$ = CHR$(256)
+LET Z$ = CHR$(0)
+LET W$ = CHR$(1e10)
+PRINT LEN(X$) LEN(Y$) LEN(Z$)
+RUN
+####
+REPEAT 1
+LET X$ = LEFT$("abc", -1)
+LET Y$ = LEFT$("abc", 1e10)
+LET Z$ = MID$("abc", 0, 2)
+LET W$ = MID$("abc", -5, 100)
+LET V$ = RIGHT$("abc", 0)
+LET U$ = SEG$("abc", 2, 0)
+PRINT X$ Y$ Z$ W$ V$ U$
+RUN

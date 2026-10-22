@@ -1,0 +1,58 @@
+REPEAT 1
+LET X = 0
+LET A = IF(X = 0, 1, 1/X)
+PRINT A
+RUN
+####
+REPEAT 1
+LET X = 0
+IF X <> 0 AND 1/X > 1 THEN PRINT "yes"
+PRINT "done"
+RUN
+####
+REPEAT 1
+LET X = 0
+IF X = 0 OR 1/X > 1 THEN PRINT "yes"
+PRINT "done"
+RUN
+####
+REPEAT 1
+LET X = .
+PRINT X > 1, X = ., X <> ., MISSING(X), X + 1, X * 0, -X, ABS(X), X AND 1, X OR 1, NOT X
+IF X THEN PRINT "t" ELSE PRINT "f"
+IF X > 1 THEN PRINT "gt" ELSE PRINT "notgt"
+RUN
+####
+REPEAT 1
+LET S$ = ""
+PRINT S$ = "", LEN(S$), S$ + "a", MISSING(S$), "a" < ""
+IF S$ THEN PRINT "t" ELSE PRINT "f"
+RUN
+####
+REPEAT 1
+LET A$ = "abc  "
+PRINT A$ = "abc", LEN(A$), "ABC" = "abc", "a" < "B", "Z" < "a"
+RUN
+####
+REPEAT 1
+LET X = 5
+LET Y = IF(X > 3, "big", "small")
+RUN
+####
+REPEAT 1
+LET X = 5
+LET Y$ = IF(X > 3, "big", "small")
+LET Z = IF(X > 3, 1, "small")
+PRINT Y$ Z
+RUN
+####
+REPEAT 3
+LET X = RECNO()
+IF X = 1 THEN
+  PRINT "one"
+ELSEIF X = 2 THEN
+  PRINT "two"
+ELSE
+  PRINT "other"
+END IF
+RUN

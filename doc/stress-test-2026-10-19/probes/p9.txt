@@ -1,0 +1,28 @@
+USE "g1.csv"
+RENAME X = Y
+NAMES
+RUN
+DISPLAY
+####
+USE "g1.csv"
+RENAME X = X$
+RUN
+DISPLAY
+LET W = X$ + 1
+RUN
+####
+USE "g1.csv"
+RENAME NOPE = Q
+####
+USE "g1.csv"
+RENAME G$ = G
+RUN
+DISPLAY
+SAVE "rn.csv"
+RUN
+####
+USE "g1.csv"
+DROP Y
+RENAME X = Y
+RUN
+DISPLAY

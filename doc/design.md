@@ -1613,7 +1613,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><em>LEN</em></td>
 <td><em>LEN(A$)</em></td>
 <td></td>
-<td>Return the length of <em>A$</em>.</td>
+<td>Return the length of <em>A$</em> in characters. Strings are treated as UTF-8: a multi-byte character counts as one, and a byte that is not part of a well-formed UTF-8 sequence counts as one character. <em>LEFT$</em>, <em>RIGHT$</em>, <em>MID$</em>, <em>SEG$</em>, <em>INDEX</em>, <em>INSTR</em>, <em>MATCH</em> and <em>POS</em> likewise count and return positions in characters and never split a multi-byte character; <em>UCASE$</em> and <em>LCASE$</em> map non-ASCII letters by Unicode simple case mapping and leave bytes that are not valid UTF-8 unchanged. The <em>--clen</em> limit is a byte limit, but truncation never leaves half a character.</td>
 </tr>
 <tr>
 <td><em>LGT</em></td>
@@ -2195,7 +2195,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <td><p>0 ≤ ᶲ ≤ 1</p>
 <p><em>p</em> &gt; 0</p>
 <p><em>q</em> &gt; 0</p></td>
-<td>Return the value of the probability density function of the Weibull distribution where ᶲ is the probability, <em>p</em> is the scale parameter, and <em>q</em> is the shape parameter.</td>
+<td>Return the value of the quantile function (inverse cumulative distribution function) of the Weibull distribution where ᶲ is the probability, <em>p</em> is the scale parameter, and <em>q</em> is the shape parameter.</td>
 </tr>
 <tr>
 <td><em>WRN</em></td>

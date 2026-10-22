@@ -1,0 +1,9 @@
+RSEED 1
+REPEAT 100000
+LET N = NRN(20, 0.3)
+LET M = MRN(20, 0.3)
+SAVE "F22.csv"
+RUN
+USE "F22.csv"
+STATS /STATS=N MEAN STD MAX
+REM NRN: mean 20 sd 0.3 (normal!)   MRN: mean 6 sd 2.05

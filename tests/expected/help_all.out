@@ -841,7 +841,7 @@ Function: ATND(x)    ->  arctangent of x (degrees)
 
 Function: ATAN2D(y,x) ->  arctangent of y/x (degrees)
 
-Function: LEN(s$)  ->  length of string s$
+Function: LEN(s$)  ->  length of string s$ in characters (UTF-8)
 
 Function: LEFT$(s$, n)  ->  leftmost n characters
 

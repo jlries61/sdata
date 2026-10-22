@@ -1,0 +1,9 @@
+Dataset opened: tests/data/utf8_strings.csv
+Dataset saved: tests/data/utf8_strings_gen.csv
+RUN complete. 5 records and 10 variables processed.
+NAME$,L$,U$,N,LF$,RT$,MD$,P,IX,MT
+ÀÉ,àé,ÀÉ,2,ÀÉ,ÀÉ,É,0,0,0
+Ångström,ångström,ÅNGSTRÖM,8,Ån,öm,ng,0,0,0
+straße,straße,STRAßE,6,st,ße,tr,0,0,0
+日本語,日本語,日本語,3,日本,本語,本語,0,0,0
+aé日b,aé日b,AÉ日B,4,aé,日b,é日,4,4,4

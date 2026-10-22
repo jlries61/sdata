@@ -1,0 +1,6 @@
+Dataset saved: tests/data/binomial_nrn_gen.csv
+RUN complete. 20000 records and 2 variables processed.
+Dataset opened: tests/data/binomial_nrn_gen.csv
+AGGREGATE complete. 1 records and 4 variables processed.
+1.00000 1.00000 1.00000 1.00000
+RUN complete. 1 records and 8 variables processed.

@@ -1,3 +1,9 @@
+sdata (0.37.3-1) unstable; urgency=medium
+
+  * Fix NRN, WIF; character-based UTF-8 string functions; --clen truncation on character boundaries.
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 22 Oct 2026 08:57:28 -0700
+
 sdata (0.37.2-1) unstable; urgency=medium
 
   * Stable VAR/STD (Welford) and heap-held group values so STATS/AGGREGATE handle groups over 350k rows (sdata-core 0.16.3).
