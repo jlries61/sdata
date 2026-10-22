@@ -1,3 +1,9 @@
+sdata (0.37.4-1) unstable; urgency=medium
+
+  * Empty table and REPEAT 0 run the data step zero times.
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 22 Oct 2026 12:18:51 -0700
+
 sdata (0.37.3-1) unstable; urgency=medium
 
   * Fix NRN, WIF; character-based UTF-8 string functions; --clen truncation on character boundaries.
