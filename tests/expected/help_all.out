@@ -508,7 +508,7 @@ Example:
   WEND
 Execution: Deferred -- executed once per record inside the data step.
 
-Command (data step): REPEAT n  (creates n records)
+Command (data step): REPEAT n  (creates n records; REPEAT 0 creates none)
 REPEAT n also cancels any queued deferred statements (LET, SET, etc.).
 Enter setup statements AFTER the REPEAT command, not before it.
 SORT, AGGREGATE, TRANSPOSE, and STATS are rejected between REPEAT n and

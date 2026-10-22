@@ -1059,7 +1059,7 @@ END IF</pre></td>
 <td><em>REPEAT</em></td>
 <td><em>REPEAT</em> &lt;<em>n</em>&gt;</td>
 <td>Declarative</td>
-<td>Specify the number of records to be written to the internal table or output dataset. This command will cancel any <em>USE</em> statement currently in effect, and also cancels any queued deferred statements (<em>LET</em>, <em>SET</em>, etc.). Consequently, setup statements that should govern the <em>REPEAT</em> data step must be entered <em>after</em> the <em>REPEAT</em> command (the setup-after-REPEAT idiom).</td>
+<td>Specify the number of records to be written to the internal table or output dataset; <em>REPEAT 0</em> writes none. A data step over a table that has columns but no rows (a header-only file, an empty join) likewise processes zero records. This command will cancel any <em>USE</em> statement currently in effect, and also cancels any queued deferred statements (<em>LET</em>, <em>SET</em>, etc.). Consequently, setup statements that should govern the <em>REPEAT</em> data step must be entered <em>after</em> the <em>REPEAT</em> command (the setup-after-REPEAT idiom).</td>
 </tr>
 <tr>
 <td><em>RSEED</em></td>

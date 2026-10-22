@@ -332,6 +332,7 @@ begin
             Clear_Program_Only;
          else
             SData_Core.Table.Clear;
+            Input_File_Columns.Clear;
             SData_Core.Variables.Clear_Temporary;
             SData_Core.Variables.Initialize_PDV;
             Clear_Active_Program;

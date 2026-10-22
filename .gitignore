@@ -141,3 +141,4 @@ tests/data/tables_save_dfcollide_out.csv
 # Python bytecode cache (scripts/*.py)
 __pycache__/
 *.pyc
+tests/data/empty_table_out.csv
