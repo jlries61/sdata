@@ -1,0 +1,32 @@
+REPEAT 1
+LET X = 3
+SELECT CASE X
+CASE 3
+PRINT "three"
+END SELECT
+LIST
+PRINT "after"
+RUN
+####
+REPEAT 1
+LET X = 3
+SELECT X
+CASE 3
+PRINT "three"
+CASE 4
+PRINT "four"
+END SELECT
+LIST
+PRINT "after"
+RUN
+####
+REPEAT 1
+LET X = 3
+SELECT X
+CASE 3:
+PRINT "three"
+CASE 4:
+PRINT "four"
+END SELECT
+PRINT "after"
+RUN

@@ -1,0 +1,56 @@
+USE "r.csv"
+DISPLAY X1:X3
+DISPLAY X1-X3
+DISPLAY X2-Y
+####
+USE "r.csv"
+STATS X1:X3
+STATS X1-X3
+STATS X2-Y
+####
+USE "r.csv"
+SORT X1-X2
+DISPLAY
+####
+USE "r.csv"
+BY X1:X2
+DISPLAY
+####
+USE "r.csv"
+KEEP X1-X3
+RUN
+NAMES
+####
+USE "r.csv"
+DROP X2-X3
+RUN
+NAMES
+####
+USE "r.csv"
+AGGREGATE S = SUM(X1:X3)
+DISPLAY
+####
+USE "r.csv"
+LET S = SUM(X1:X3)
+LET T = MEAN(X1-X3)
+RUN
+DISPLAY
+####
+USE "r.csv"
+ARRAY AR X1-X3
+LET S = SUM(AR)
+RUN
+DISPLAY
+####
+USE "r.csv"
+ARRAY AR X1:X3
+LET S = SUM(AR)
+RUN
+DISPLAY
+####
+USE "r.csv"
+TABLES X1:X2
+####
+USE "r.csv"
+TRANSPOSE /KEEP=X1:X3
+DISPLAY

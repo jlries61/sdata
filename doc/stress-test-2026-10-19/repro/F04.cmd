@@ -1,0 +1,4 @@
+REPEAT 1
+LET X$ = CHR$(256)
+LET Y$ = LEFT$("abc", 1e10)
+RUN

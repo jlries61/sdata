@@ -1,0 +1,3 @@
+USE "F14_const.csv"
+STATS X /STATS=N MEAN STD VAR
+REM Error: a-ngelfu.adb:891 ...

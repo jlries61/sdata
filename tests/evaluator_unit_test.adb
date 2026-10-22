@@ -392,12 +392,22 @@ begin
    Check ("DF-12: LIF(1.0) raises domain error",
           Raises ("LIF", (1 => (Kind => Val_Numeric, Num_Val => 1.0))), True);
 
-   --  DF-13: NRN(10.0, 2.0) returns Val_Numeric (regression: was calling BRN)
+   --  DF-13: NRN(n, p) is a binomial variate (F22: it used to return a normal
+   --  N(n, p)).  Integer valued in 0 .. n, and identical to its synonym MRN
+   --  under the same seed.
    SData_Core.Statistics.Set_Seed (42);
-   V := F2 ("NRN", 10.0, 2.0);
-   Check ("DF-13: NRN(10,2) returns Val_Numeric", V.Kind = Val_Numeric, True);
-   --  Exact value with seed 42:
-   Check_Num ("DF-13b: NRN(10,2) seed-42 value", V, 11.39017, 0.0001);
+   V := F2 ("NRN", 10.0, 0.5);
+   Check ("DF-13: NRN(10,0.5) returns Val_Numeric", V.Kind = Val_Numeric, True);
+   Check ("DF-13b: NRN(10,0.5) integer in 0..10",
+          V.Num_Val = Real'Truncation (V.Num_Val)
+             and V.Num_Val >= 0.0 and V.Num_Val <= 10.0, True);
+   declare
+      N_Draw : constant Real := V.Num_Val;
+   begin
+      SData_Core.Statistics.Set_Seed (42);
+      V := F2 ("MRN", 10.0, 0.5);
+      Check_Num ("DF-13c: NRN(10,0.5) = MRN(10,0.5) at seed 42", V, N_Draw, 0.0);
+   end;
 
    --  DF-14: URN(0, 1) returns a value in [0.0, 1.0)
    SData_Core.Statistics.Set_Seed (42);

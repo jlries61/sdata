@@ -1,0 +1,49 @@
+REPEAT 1
+LET A$ = "hello world"
+PRINT LEN(A$) UCASE$(A$) LCASE$("ÀÉ") LEFT$(A$, 5) RIGHT$(A$, 5) MID$(A$, 7, 3) MID$(A$, 7, 100)
+PRINT INDEX(A$, "o") INSTR(1, A$, "o") POS("o", A$) POS("o", A$, 6) MATCH(A$, "o", 6) INDEX(A$, "") INDEX("", "a")
+PRINT TRIM$("  x  ") "[" LTRIM$("  x  ") "][" RTRIM$("  x  ") "]"
+PRINT VAL("12abc") VAL("  12  ") VAL("1e3") VAL("0x10") VAL("-") VAL("")
+PRINT NUM("3.5") NUM$(3.14159265358979) STR$(1e20) STR$(1e-20) STR$(-0)
+PRINT ASC("A") ASC("") CHR$(65) ASC("é") ORD("é")
+PRINT "a" + "b" "a" + 1
+RUN
+####
+REPEAT 1
+PRINT 1 + "a"
+RUN
+####
+REPEAT 1
+PRINT "abc" * 2
+RUN
+####
+REPEAT 1
+PRINT "a" < "b" "a" = "A" "b" > "a" "" = ""
+RUN
+####
+REPEAT 1
+LET A$ = "x"
+LET B$ = A$ + A$ + A$
+PRINT B$ LEN(B$)
+PRINT SEG$("abcdef", 3, 2) SEG$("abcdef", 0, 2) SEG$("abcdef", 10, 2)
+RUN
+####
+REPEAT 1
+LET A$ = "é日本"
+PRINT LEN(A$) LEFT$(A$, 1) RIGHT$(A$, 1) MID$(A$, 2, 1) UCASE$(A$) INDEX(A$, "本")
+RUN
+####
+REPEAT 1
+PRINT HEX("FF") HEX$(255) BIN$(5, 8) OCT$(8) HEX$(255, 6)
+PRINT CEIL(1.2) FLOOR(-1.2) INT(-1.2) FIX(-1.2) SGN(-3) ABS(-2.5) FP(-1.5) IP(-1.5)
+PRINT MIN(3, 1, 2) MAX(3, 1, 2) MIN("b", "a") SUM(1, 2, .) MEAN(1, 2, .) N(1, ., 3) NMISS(1, ., 3)
+PRINT MEDIAN(1, 2, 3, 4) STD(1, 2) VAR(1) STD(1) GMEAN(1, 4) GMEAN(-1, 4) HMEAN(0, 2)
+RUN
+####
+REPEAT 1
+PRINT TIME$() DATE$() 
+RUN
+####
+REPEAT 1
+PRINT PI() E() MAXINT() MININT() MAXNUM() MINNUM() MAXLEN("a")
+RUN

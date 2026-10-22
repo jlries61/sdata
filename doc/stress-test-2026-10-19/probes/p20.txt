@@ -1,0 +1,43 @@
+USE "g1.csv"
+SAVE "w1.csv" AS EVENS (IF=MOD(RECNO(),2)=0), "w2.csv" AS ODDS (KEEP=G$ X RENAME=(X=XX))
+LET Z = X * 2
+RUN
+####
+USE "g1.csv"
+SAVE "w1.csv" AS A, "w2.csv" AS B
+IF X > 2 THEN WRITE A
+ELSE WRITE B
+RUN
+####
+USE "g1.csv"
+SAVE "w1.csv" AS A, "w1.csv" AS B
+RUN
+####
+USE "g1.csv"
+SAVE "w1.csv" AS A, "w2.csv" AS A
+RUN
+####
+USE "g1.csv"
+SAVE "w1.csv" AS A
+WRITE NOSUCH
+RUN
+####
+USE "g1.csv"
+WRITE
+WRITE
+RUN
+DISPLAY
+####
+USE "g1.csv"
+HOLD
+LET CNT = CNT + 1
+RUN
+DISPLAY
+####
+USE "g1.csv"
+HOLD CNT
+IF MISSING(CNT) THEN LET CNT = 0
+LET CNT = CNT + 1
+LET LASTG$ = G$
+RUN
+DISPLAY

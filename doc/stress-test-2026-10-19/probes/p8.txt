@@ -1,0 +1,68 @@
+USE "g1.csv", "g2.csv" /BY=G$
+DISPLAY
+####
+USE "g1.csv" AS A, "g2.csv" AS B /BY=G$ /JOIN
+DISPLAY
+####
+USE "g1.csv", "g2.csv" /BY=G$ /INTERLEAVE
+DISPLAY
+####
+USE "g1.csv", "g2.csv" /APPEND
+DISPLAY
+####
+USE "g1.csv", "g2.csv"
+DISPLAY
+####
+USE "g1.csv"(IF=X>2 RENAME=(X=XX) KEEP=G$ XX IN=INA), "g2.csv"(IN=INB) /BY=G$
+DISPLAY
+####
+USE "g1.csv" /BY=NOPE, "g2.csv"
+####
+USE "g1.csv", "g1.csv" /BY=G$ /JOIN
+DISPLAY
+####
+USE "g1.csv" /JOIN
+####
+USE "g1.csv", "nonexist.csv" /APPEND
+####
+USE "g1.csv" /NSCAN=0
+DISPLAY
+####
+USE "g1.csv" /NSCAN=-5
+DISPLAY
+####
+USE "g1.csv" /NSCAN=99999999999999999999
+DISPLAY
+####
+USE "g1.csv" /MISSING="a,b" /TYPES="X%,Y$"
+DISPLAY
+####
+USE "g1.csv" /TYPES=(X=CHAR Y=INT)
+DISPLAY
+####
+USE "g1.csv" /TYPES=(NOPE=CHAR)
+####
+USE "g1.csv"
+KEEP X
+DROP X
+RUN
+NAMES
+####
+USE "g1.csv"
+RENAME X = Y
+NAMES
+####
+USE "g1.csv"
+RENAME X = X2, Y = X
+NAMES
+####
+USE "g1.csv"
+RENAME X = X$
+NAMES
+####
+USE "g1.csv"
+HOLD Y
+LET Y = Y
+LET C = IF(MISSING(Y), 0, 1)
+RUN
+DISPLAY

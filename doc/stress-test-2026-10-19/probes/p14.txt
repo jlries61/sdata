@@ -1,0 +1,29 @@
+REPEAT 1
+LET R = SHELL("echo hi; exit 3")
+PRINT R
+RUN
+####
+REPEAT 1
+LET R = SHELL("sleep 2")
+PRINT R
+RUN
+####
+SYSTEM "echo from system"
+SYSTEM "exit 7"
+SYSTEM "kill -9 $$"
+PRINT "x"
+####
+OPTIONS SHELLTIMEOUT 1
+SYSTEM "sleep 5; echo done"
+SYSTEM "echo after"
+####
+USE "g1.csv; touch pwned"
+####
+SUBMIT "g1.csv"
+####
+SYSTEM "echo $HOME"
+SYSTEM ""
+SYSTEM 5
+####
+SET C$ = "echo expr-cmd"
+SYSTEM C$
