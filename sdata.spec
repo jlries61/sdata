@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.0
+Version:        0.37.1
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Oct 21 2026 John L. Ries <john@theyarnbard.com> - 0.37.1-1
+- CSV and spreadsheet reader fixes: XLSX blank cells, ODS repeated rows, CRLF/bare-CR, quoted newlines, long lines, exact int64 (sdata-core 0.16.2).
+
 * Sat Sep 26 2026 John L. Ries <john@theyarnbard.com> - 0.37.0-1
 - USE /MISSING= now reads ODF and OOXML input, not just CSV (sdata-core ADR-0026 amendment).
 
