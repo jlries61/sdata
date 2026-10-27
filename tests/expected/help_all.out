@@ -477,7 +477,7 @@ Example:
 Execution: Declarative -- filter is active for all subsequent RUNs.
 
 -- Multi-way branch form --------------------------------------
-Command: SELECT [expression]
+Command: SELECT [CASE] [expression]   (the CASE keyword is optional)
   CASE value : statement
   WHEN condition : statement
   OTHERWISE : statement

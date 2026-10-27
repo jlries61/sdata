@@ -224,7 +224,9 @@ begin
                end;
             when others => null;
          end case;
-         exit when Ctx.Deleted or else Break_Fired;
+         --  BREAK pauses and then resumes from the paused point (design.md
+         --  §7.1); only DELETE ends the record early.
+         exit when Ctx.Deleted;
          Iter := Iter.Next;
       end loop;
 

@@ -2656,7 +2656,8 @@ package body SData.Interpreter is
                         Allow_Overwrite => SData_Core.Config.Runtime.Options_SAVEOVERWRT,
                         Charset         => Eff_Charset,
                         Decimals        => Eff_Decimals,
-                        Missing_Token   => Eff_Missing);
+                        Missing_Token   => Eff_Missing,
+                        Honor_Extension => not T.Opts.Format_Specified);
                      Put_Line ("Dataset saved: " & Full);
                   exception
                      when SData_Core.File_IO.Save_Refused => null;

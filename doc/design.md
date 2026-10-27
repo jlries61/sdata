@@ -1089,7 +1089,7 @@ END IF</pre></td>
 <td><em>SELECT CASE</em>/<em>CASE</em>/<em>END SELECT</em></td>
 <td></td>
 <td>Deferred Execution</td>
-<td>Multi-way branch: evaluate <em>expression</em> once, then execute the statement(s) under the first matching <em>CASE</em> value (or the <em>OTHERWISE</em> clause, if present and no <em>CASE</em> matches), terminated by <em>END SELECT</em>. Note the closing keyword is <em>END SELECT</em>, not <em>CASE END</em>.</td>
+<td>Multi-way branch: evaluate <em>expression</em> once (the <em>CASE</em> keyword after <em>SELECT</em> is optional: <em>SELECT CASE expr</em> and <em>SELECT expr</em> followed by <em>CASE</em> clauses are the same statement), then execute the statement(s) under the first matching <em>CASE</em> value (or the <em>OTHERWISE</em> clause, if present and no <em>CASE</em> matches), terminated by <em>END SELECT</em>. Note the closing keyword is <em>END SELECT</em>, not <em>CASE END</em>.</td>
 </tr>
 <tr>
 <td><em>SET</em></td>

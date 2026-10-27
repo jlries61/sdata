@@ -142,3 +142,5 @@ tests/data/tables_save_dfcollide_out.csv
 __pycache__/
 *.pyc
 tests/data/empty_table_out.csv
+tests/data/save_fmt_o1.csv
+tests/data/save_fmt_o2.ODS

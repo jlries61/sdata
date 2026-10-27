@@ -685,7 +685,7 @@ package body SData.Help is
       Put_Line ("Execution: Declarative -- filter is active for all subsequent RUNs.");
       New_Line;
       Put_Line ("-- Multi-way branch form --------------------------------------");
-      Put_Line ("Command: SELECT [expression]");
+      Put_Line ("Command: SELECT [CASE] [expression]   (the CASE keyword is optional)");
       Put_Line ("  CASE value : statement");
       Put_Line ("  WHEN condition : statement");
       Put_Line ("  OTHERWISE : statement");

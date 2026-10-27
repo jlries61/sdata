@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-10-22" "sdata 0.37.4" "User Commands"
+.TH SDATA 1 "2026-10-22" "sdata 0.37.5" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -1453,7 +1453,7 @@ or
 .B ELSE
 is needed and REPL-friendliness matters.
 .TP
-.B SELECT [\fIexpr\fR] CASE \fIval\fR : \fIstmt\fR ... END SELECT
+.B SELECT [CASE] [\fIexpr\fR] CASE \fIval\fR : \fIstmt\fR ... END SELECT
 Multi\-way branch.
 .TP
 .B FOR \fIvar\fR = \fIstart\fR TO \fIend\fR [STEP \fIs\fR] ... NEXT
@@ -1487,10 +1487,8 @@ Pauses execution and enters the interactive debug inspection prompt (see
 .BR \-\-debug ).
 In non\-interactive contexts (batch mode, piped input) emits a message to
 standard error and continues automatically.
-When BREAK fires, the remaining statements in the current record are not
-executed for that record.
-Execution resumes from the first statement of the next record after
-.BR CONTINUE .
+After the pause (or, when non\-interactive, immediately) execution resumes
+with the statement that follows BREAK in the same record.
 Valid only inside a data step.
 .TP
 .B BREAK WHEN \fIexpr\fR
