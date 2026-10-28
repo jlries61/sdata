@@ -756,8 +756,10 @@ package body SData.Help is
       Put_Line ("Redirects all console output to a file (written to file AND stdout).");
       Put_Line ("No arguments: Closes the current output file.");
       Put_Line ("Options:");
-      Put_Line ("  /CHARSET=cs  Specifies the character set (e.g., UTF-8, ASCII).");
-      Put_Line ("  /FMT=format  Specifies the file format (e.g., CSV, ODF).");
+      Put_Line ("  /CHARSET=cs  Character set of the file: UTF-8, UTF-16 (LE, with BOM),");
+      Put_Line ("               UTF-16BE, or ASCII (a non-ASCII character is an error).");
+      Put_Line ("  /FMT=eol     Line ending of the file: LF, CRLF, CR or AUTO.");
+      Put_Line ("Both also set the matching OPTIONS (CHARSET, TXTFMT) defaults.");
       Put_Line ("Execution: Immediate -- takes effect at once.");
    end Help_OUTPUT;
 
