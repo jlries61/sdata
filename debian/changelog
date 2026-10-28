@@ -1,3 +1,9 @@
+sdata (0.37.10-1) unstable; urgency=medium
+
+  * Distribution parameter domain checks (no hangs); NaN results are errors.
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 27 Oct 2026 19:34:02 -0700
+
 sdata (0.37.9-1) unstable; urgency=medium
 
   * Domain errors replace Ada runtime text in user-facing messages.
