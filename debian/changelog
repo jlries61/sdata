@@ -1,3 +1,9 @@
+sdata (0.37.9-1) unstable; urgency=medium
+
+  * Domain errors replace Ada runtime text in user-facing messages.
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 27 Oct 2026 18:57:06 -0700
+
 sdata (0.37.8-1) unstable; urgency=medium
 
   * OUTPUT /FMT= and /CHARSET= apply to the redirected file.

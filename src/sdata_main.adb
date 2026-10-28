@@ -189,6 +189,11 @@ exception
           | SData_Core.Values.Conversion_Error =>
       Put_Line_Error ("Error: " & Exception_Message (E));
       Set_Exit_Status (Failure);
+   when E : Constraint_Error =>
+      --  A runtime check failure from a number that does not fit; the Ada
+      --  file:line text means nothing to the user (F18, F33).
+      Put_Line_Error ("Error: " & SData.Interpreter.Friendly_Message (E));
+      Set_Exit_Status (Failure);
    when E : others =>
       Put_Line_Error ("An error occurred: " & Exception_Name (E) & ": " & Exception_Message (E));
       Set_Exit_Status (Failure);

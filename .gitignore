@@ -147,3 +147,4 @@ tests/data/save_fmt_o2.ODS
 tests/data/output_fc_crlf.txt
 tests/data/output_fc_u16.txt
 tests/data/output_ascii_rej.txt
+tests/data/aggregate_large_group_gen.csv

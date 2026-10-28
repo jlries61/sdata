@@ -107,6 +107,10 @@ begin
             Put_Line_Error ("Error: " & Exception_Message (E));
             Buffer := Null_Unbounded_String;
             SData_Core.IO.Flush_Pager_Buffer;
+         when E : Constraint_Error =>
+            Put_Line_Error ("Error: " & SData.Interpreter.Friendly_Message (E));
+            Buffer := Null_Unbounded_String;
+            SData_Core.IO.Flush_Pager_Buffer;
          when E : others =>
             Put_Line_Error ("Internal error: " & Exception_Name (E) & ": " & Exception_Message (E));
             Buffer := Null_Unbounded_String;
