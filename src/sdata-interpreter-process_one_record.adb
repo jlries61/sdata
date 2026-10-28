@@ -216,11 +216,17 @@ begin
                            (1, SData_Core.Table.Get_Current_Record_Index);
                      else raise; end if;
                   when E : others =>
-                     if SData_Core.Config.Continue_On_Error then
-                        Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
-                        SData_Core.Commands.Execute_Record_Error
-                           (1, SData_Core.Table.Get_Current_Record_Index);
-                     else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
+                     --  An Ada runtime check failing here (overflow, range)
+                     --  is a user-data problem; do not leak its file:line text.
+                     declare
+                        Msg : constant String := Friendly_Message (E);
+                     begin
+                        if SData_Core.Config.Continue_On_Error then
+                           Put_Line_Error ("Error: " & Msg);
+                           SData_Core.Commands.Execute_Record_Error
+                              (1, SData_Core.Table.Get_Current_Record_Index);
+                        else raise Script_Error with Msg; end if;
+                     end;
                end;
             when others => null;
          end case;

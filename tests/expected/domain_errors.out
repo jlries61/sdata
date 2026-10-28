@@ -1,0 +1,11 @@
+Error: ABS: argument out of range
+RUN complete. 1 records and 0 variables processed.
+Error: CHR$: argument out of range
+RUN complete. 1 records and 0 variables processed.
+Error: LEFT$: argument out of range
+RUN complete. 1 records and 0 variables processed.
+Error: ATAN2: argument out of range
+RUN complete. 1 records and 0 variables processed.
+Error: Assignment failed for variable I%: numeric overflow or value out of range
+RUN complete. 1 records and 0 variables processed.
+Error: numeric overflow or value out of range

@@ -234,5 +234,5 @@ exception
    when SData_Core.Script_Error => raise;
    when E : others =>
       raise Script_Error with "Assignment failed for variable " & Var_Name_Str
-        & ": " & Ada.Exceptions.Exception_Message (E);
+        & ": " & Friendly_Message (E);
 end Execute_Assignment;

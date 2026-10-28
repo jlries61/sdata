@@ -601,6 +601,22 @@ package body SData.Interpreter is
       Action        :    out Step_Action)
    is separate;
 
+   function Friendly_Message
+     (E : Ada.Exceptions.Exception_Occurrence) return String is
+      Msg : constant String := Ada.Exceptions.Exception_Message (E);
+   begin
+      --  Keep a message the program wrote itself; replace the compiler's
+      --  "unit.adb:NNN ... check failed" / "bad input for 'Value" text.
+      if Ada.Strings.Fixed.Index (Msg, ".adb:") > 0
+         or else Ada.Strings.Fixed.Index (Msg, "bad input for") > 0
+         or else Ada.Strings.Fixed.Index (Msg, "explicit raise") > 0
+         or else Msg'Length = 0
+      then
+         return "numeric overflow or value out of range";
+      end if;
+      return Msg;
+   end Friendly_Message;
+
    function Program_Buffer_Length return Natural is
      (Natural (Active_Program_Vec.Length));
 
@@ -2916,10 +2932,10 @@ package body SData.Interpreter is
                   else raise; end if;
                when E : others =>
                   if SData_Core.Config.Continue_On_Error then
-                     Put_Line_Error ("Error: " & Ada.Exceptions.Exception_Message (E));
+                     Put_Line_Error ("Error: " & Friendly_Message (E));
                      SData_Core.Commands.Execute_Record_Error
                         (1, SData_Core.Table.Get_Current_Record_Index);
-                  else raise Script_Error with Ada.Exceptions.Exception_Message (E); end if;
+                  else raise Script_Error with Friendly_Message (E); end if;
             end;
          else
             --  A deferred statement (LET/SET/PRINT/IF/...) skipped by this

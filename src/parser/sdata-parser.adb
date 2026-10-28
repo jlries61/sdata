@@ -4274,6 +4274,13 @@ package body SData.Parser is
       end if;
 
       return Stmt;
+   exception
+      --  A numeric operand that does not parse or does not fit (an Ada
+      --  'Value or range check failing) is a user error, not a crash (F18, F33).
+      when Constraint_Error =>
+         raise Script_Error with
+            "invalid number or value out of range in statement at line"
+            & Tok.Line'Image;
    end Parse_Statement;
 
    -------------------

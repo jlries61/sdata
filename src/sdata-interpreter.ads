@@ -7,6 +7,7 @@
 --  in order, managing data loading, the implicit record loop (Data Step), 
 --  and data export.
 
+with Ada.Exceptions;
 with SData.AST; use SData.AST;
 
 package SData.Interpreter is
@@ -22,6 +23,13 @@ package SData.Interpreter is
    procedure Add_To_Active_Program (Stmt : Statement_Access; Source : String := "");
 
    --  Returns the number of entries in the program buffer.
+   --  Friendly_Message -- the text to show a user for an unexpected exception:
+   --  an Ada runtime check failure (Constraint_Error: overflow, range, a
+   --  malformed number) becomes a plain statement instead of the compiler's
+   --  "unit.adb:NNN overflow check failed" (F04, F18, F33).
+   function Friendly_Message
+     (E : Ada.Exceptions.Exception_Occurrence) return String;
+
    function Program_Buffer_Length return Natural;
 
    --  Clears the global active program.
