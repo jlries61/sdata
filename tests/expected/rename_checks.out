@@ -1,0 +1,13 @@
+Dataset opened: tests/data/colon_ranges.csv
+RUN complete. 4 records and 6 variables processed.
+Permanent Variables (Table Columns):
+Y X2 X3 X4 G1 G2
+Session Variables (SET):
+(none)
+Obs         Y
+-------------
+  1   1.00000
+  2   5.00000
+  3   9.00000
+  4  13.00000
+-------------

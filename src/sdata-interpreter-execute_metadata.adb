@@ -73,10 +73,65 @@ begin
             end if;
          end;
       when Stmt_RENAME =>
-         declare Curr : Rename_List := Stmt.Rename_Pairs;
+         declare
+            Curr : Rename_List := Stmt.Rename_Pairs;
+
+            --  CancelPending_Drop -- if NAME is queued for DROP (which takes
+            --  effect at the next RUN), drop the column now and forget the
+            --  queued DROP, so the name is free for the rename and the later
+            --  DROP does not hit the renamed column.  True if it was queued.
+            function Cancel_Pending_Drop (Name : String) return Boolean is
+               Prev : Column_Mod_List := null;
+               Cur  : Column_Mod_List := Pending_Mods;
+            begin
+               while Cur /= null loop
+                  if Cur.Kind = Mod_Drop and then not Cur.Is_Range
+                     and then To_Upper (Cur.Name (1 .. Cur.Len)) = To_Upper (Name)
+                  then
+                     if Prev = null then Pending_Mods := Cur.Next;
+                     else Prev.Next := Cur.Next; end if;
+                     if Pending_Mods_Tail = Cur then Pending_Mods_Tail := Prev; end if;
+                     Free_Mod (Cur);
+                     return True;
+                  end if;
+                  Prev := Cur;
+                  Cur  := Cur.Next;
+               end loop;
+               return False;
+            end Cancel_Pending_Drop;
+
+            function Is_Char (Name : String) return Boolean is
+              (Name'Length > 0 and then Name (Name'Last) = '$');
          begin
             while Curr /= null loop
-               Rename_Column (Curr.Old_Name (1 .. Curr.Old_Len), Curr.New_Name (1 .. Curr.New_Len));
+               declare
+                  Old_N : constant String := Curr.Old_Name (1 .. Curr.Old_Len);
+                  New_N : constant String := Curr.New_Name (1 .. Curr.New_Len);
+               begin
+                  --  design.md section 7.1 (F17): the old name must exist, the
+                  --  new name must be free (or DROPped), and a numeric
+                  --  variable may not take a character name or vice versa.
+                  if not Has_Column (Old_N) then
+                     raise Script_Error with
+                        "RENAME: no such variable """ & Old_N & """";
+                  end if;
+                  if Is_Char (Old_N) /= Is_Char (New_N) then
+                     raise Script_Error with
+                        "RENAME: cannot rename " & Old_N & " to " & New_N
+                        & " (a numeric variable may not take a character name or vice versa)";
+                  end if;
+                  if To_Upper (Old_N) /= To_Upper (New_N)
+                     and then Has_Column (New_N)
+                  then
+                     if Cancel_Pending_Drop (New_N) then
+                        Drop_Column (New_N);
+                     else
+                        raise Script_Error with
+                           "RENAME: """ & New_N & """ already exists (DROP it first)";
+                     end if;
+                  end if;
+                  Rename_Column (Old_N, New_N);
+               end;
                Curr := Curr.Next;
             end loop;
          end;
