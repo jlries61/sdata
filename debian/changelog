@@ -1,3 +1,9 @@
+sdata (0.37.7-1) unstable; urgency=medium
+
+  * HEX$/OCT$/BIN$ width argument; gamma and exponential arities documented.
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 27 Oct 2026 17:39:52 -0700
+
 sdata (0.37.6-1) unstable; urgency=medium
 
   * Colon and dash ranges expand in function arguments, STATS, TRANSPOSE, SORT, BY and USE KEEP/DROP.
