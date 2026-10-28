@@ -1,3 +1,9 @@
+sdata (0.37.12-1) unstable; urgency=medium
+
+  * RENAME rejects unknown/duplicate names and numeric-character crossings; long column names warn.
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 27 Oct 2026 21:51:08 -0700
+
 sdata (0.37.11-1) unstable; urgency=medium
 
   * TABLES colon ranges; AND/OR short-circuit; blank CSV lines skipped.
