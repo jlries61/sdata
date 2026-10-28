@@ -1,0 +1,1 @@
+Error: AGGREGATE: a variable range is not supported as the argument to 'SUM'; name one variable or an array

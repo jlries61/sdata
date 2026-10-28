@@ -2311,6 +2311,7 @@ Notes:
 - `^` is left-associative, not right-associative: `2^3^2` evaluates to `(2^3)^2 = 64`, not `2^(3^2) = 512`.
 - Comparison operators are left-associative and chain like any other left-associative operator rather than short-circuiting a multi-term comparison: `1<2<3` parses as `(1<2)<3`.
 - *AND* binds tighter than *OR*/*XOR*, which share a precedence level.
+- *AND* and *OR* evaluate their right operand only when it can matter: a false left operand decides *AND* (result 0) and a true left operand decides *OR* (result 1) without evaluating the right, so `IF X <> 0 AND 1/X > 1` does not divide by zero. A missing left operand still gives missing. *XOR* always evaluates both.
 - `^` and `**` are interchangeable spellings of exponentiation, accepted in every expression-parsing context (the main statement parser and `SELECT` filter expressions alike). Prior to the fix for issue #65, the two contexts diverged (the main parser accepted only `^`; `SELECT` accepted only `**`); this is now resolved and both spellings work everywhere.
 - *MOD* is not an infix operator — it is the two-argument function *MOD(x,y)* (see §7.2). There is no *DIV* operator or function.
 - Parentheses group in the ordinary way, resetting precedence inside.
