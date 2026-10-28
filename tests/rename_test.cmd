@@ -6,10 +6,11 @@ RENAME ID=IDENT
 NAMES
 RUN
 
--- Multiple renames in one statement
+-- Multiple renames in one statement (a character name must stay character,
+-- design.md section 7.1 -- the former NAME$=LABEL was the F17 defect)
 NEW
 USE "tests/data/data.csv"
-RENAME ID=NUM, NAME$=LABEL
+RENAME ID=NUM, NAME$=LABEL$
 NAMES
 RUN
 
