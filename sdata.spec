@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.7
+Version:        0.37.8
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Oct 27 2026 John L. Ries <john@theyarnbard.com> - 0.37.8-1
+- OUTPUT /FMT= and /CHARSET= apply to the redirected file.
+
 * Tue Oct 27 2026 John L. Ries <john@theyarnbard.com> - 0.37.7-1
 - HEX$/OCT$/BIN$ width argument; gamma and exponential arities documented.
 

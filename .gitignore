@@ -144,3 +144,6 @@ __pycache__/
 tests/data/empty_table_out.csv
 tests/data/save_fmt_o1.csv
 tests/data/save_fmt_o2.ODS
+tests/data/output_fc_crlf.txt
+tests/data/output_fc_u16.txt
+tests/data/output_ascii_rej.txt
