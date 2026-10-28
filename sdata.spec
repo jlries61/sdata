@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.10
+Version:        0.37.11
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Oct 27 2026 John L. Ries <john@theyarnbard.com> - 0.37.11-1
+- TABLES colon ranges; AND/OR short-circuit; blank CSV lines skipped.
+
 * Tue Oct 27 2026 John L. Ries <john@theyarnbard.com> - 0.37.10-1
 - Distribution parameter domain checks (no hangs); NaN results are errors.
 

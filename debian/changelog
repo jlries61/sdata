@@ -1,3 +1,9 @@
+sdata (0.37.11-1) unstable; urgency=medium
+
+  * TABLES colon ranges; AND/OR short-circuit; blank CSV lines skipped.
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 27 Oct 2026 20:55:19 -0700
+
 sdata (0.37.10-1) unstable; urgency=medium
 
   * Distribution parameter domain checks (no hangs); NaN results are errors.
