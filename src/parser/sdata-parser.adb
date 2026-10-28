@@ -2218,6 +2218,17 @@ package body SData.Parser is
                      Spec.Invar_Name_Len := In_Tok.Length;
                      Spec.Invar_Name (1 .. In_Tok.Length) := Invar;
 
+                     --  F36: AGGREGATE takes a single variable (or array
+                     --  element); a range there used to fail with a puzzling
+                     --  "expected ')'".  Say what is wrong.
+                     if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon
+                        or else Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Minus
+                     then
+                        raise Script_Error with
+                          "AGGREGATE: a variable range is not supported as the "
+                          & "argument to '" & Fn & "'; name one variable or an array";
+                     end if;
+
                      if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren
                      then
                         --  Array element: <name>(<positive int literal>)
@@ -2707,19 +2718,93 @@ package body SData.Parser is
             Req  : constant Table_Request := new Table_Request_Node;
             V1   : Variable_List := null;
             VL   : Variable_List := null;
-            function New_Var (T : Token) return Variable_List is
+            function New_Var_S (S : String) return Variable_List is
                N : constant Variable_List := new Variable_List_Node;
             begin
-               N.Var.Start_Name (1 .. T.Length) := Identifier_Text (T);
-               N.Var.Start_Len := T.Length;
+               N.Var.Start_Name (1 .. S'Length) := S;
+               N.Var.Start_Len := S'Length;
                return N;
-            end New_Var;
+            end New_Var_S;
+            function New_Var (T : Token) return Variable_List is
+              (New_Var_S (Identifier_Text (T)));
+            Is_Range    : Boolean := False;
+            Extra_First : Table_Request := null;   --  tables 2..n of a range
+            Extra_Last  : Table_Request := null;
          begin
             declare T : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin V1 := New_Var (T); VL := V1; end;
+            --  A colon range (X1:X3) asks for one one-way table per variable
+            --  in the range (design.md section 3.6, F36).
+            if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Colon then
+               declare
+                  Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  pragma Unreferenced (Discard);
+                  End_T   : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+                  Lo_S    : constant String := V1.Var.Start_Name (1 .. V1.Var.Start_Len);
+                  Hi_S    : constant String :=
+                     (if Is_Identifier_Token (End_T) then Identifier_Text (End_T) else "");
+                  function Split (S : String; Prefix_Last : out Natural;
+                                  Num : out Natural) return Boolean is
+                     I : Natural := S'Last;
+                  begin
+                     while I >= S'First and then S (I) in '0' .. '9' loop
+                        I := I - 1;
+                     end loop;
+                     Prefix_Last := I;
+                     if I = S'Last then Num := 0; return False; end if;
+                     Num := Natural'Value (S (I + 1 .. S'Last));
+                     return True;
+                  exception
+                     when Constraint_Error => Num := 0; return False;
+                  end Split;
+                  Lo_P, Hi_P, Lo_N, Hi_N : Natural;
+               begin
+                  if Hi_S'Length = 0
+                     or else not Split (Lo_S, Lo_P, Lo_N)
+                     or else not Split (Hi_S, Hi_P, Hi_N)
+                     or else To_Upper (Lo_S (Lo_S'First .. Lo_P))
+                             /= To_Upper (Hi_S (Hi_S'First .. Hi_P))
+                  then
+                     raise Script_Error with
+                        "TABLES: invalid range " & Lo_S & ":" & Hi_S
+                        & " (names must share a prefix and end in a number)";
+                  end if;
+                  Is_Range := True;
+                  declare
+                     A   : constant Natural := Natural'Min (Lo_N, Hi_N);
+                     B   : constant Natural := Natural'Max (Lo_N, Hi_N);
+                     Pfx : constant String := Lo_S (Lo_S'First .. Lo_P);
+                  begin
+                     for N in A .. B loop
+                        declare
+                           Img  : constant String := Natural'Image (N);
+                           Name : constant String :=
+                              Pfx & Img (Img'First + 1 .. Img'Last);
+                        begin
+                           if N = A then
+                              V1 := New_Var_S (Name);
+                           else
+                              declare
+                                 R : constant Table_Request := new Table_Request_Node;
+                              begin
+                                 R.Vars := New_Var_S (Name);
+                                 if Extra_First = null then Extra_First := R;
+                                 else Extra_Last.Next := R; end if;
+                                 Extra_Last := R;
+                              end;
+                           end if;
+                        end;
+                     end loop;
+                  end;
+               end;
+               if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Star then
+                  raise Script_Error with
+                     "TABLES: a variable range cannot be crossed with '*'";
+               end if;
+            end if;
             --  crossing: * ident ...
             Skip_Continuation_Comma (Ctx);
-            while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Star loop
+            while not Is_Range and then Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Star loop
                declare Discard : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                        pragma Unreferenced (Discard);
                begin
@@ -2742,6 +2827,10 @@ package body SData.Parser is
             Req.Vars := V1;
             if First_Req = null then First_Req := Req; else Last_Req.Next := Req; end if;
             Last_Req := Req;
+            if Extra_First /= null then
+               Last_Req.Next := Extra_First;
+               Last_Req := Extra_Last;
+            end if;
          end;
       end loop;
 
