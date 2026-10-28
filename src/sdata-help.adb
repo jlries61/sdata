@@ -1061,10 +1061,10 @@ package body SData.Help is
    --  Base conversion
    -- ==========================================================================
 
-   procedure Help_HEXS is begin Put_Line ("Function: HEX$(n)  ->  hexadecimal string for integer n"); end Help_HEXS;
+   procedure Help_HEXS is begin Put_Line ("Function: HEX$(n [, width])  ->  hexadecimal string for integer n, zero-padded to width digits"); end Help_HEXS;
    procedure Help_HEX  is begin Put_Line ("Function: HEX(s$)  ->  integer value of hexadecimal string s$"); end Help_HEX;
-   procedure Help_OCTS is begin Put_Line ("Function: OCT$(n)  ->  octal string for integer n"); end Help_OCTS;
-   procedure Help_BINS is begin Put_Line ("Function: BIN$(n)  ->  binary string for integer n"); end Help_BINS;
+   procedure Help_OCTS is begin Put_Line ("Function: OCT$(n [, width])  ->  octal string for integer n, zero-padded to width digits"); end Help_OCTS;
+   procedure Help_BINS is begin Put_Line ("Function: BIN$(n [, width])  ->  binary string for integer n, zero-padded to width digits"); end Help_BINS;
 
    -- ==========================================================================
    --  Record navigation

@@ -877,13 +877,13 @@ Function: NUM$(x)  ->  numeric x formatted as string (alias for STR$)
 
 Function: NUM(x)  ->  convert string or integer x to float
 
-Function: HEX$(n)  ->  hexadecimal string for integer n
+Function: HEX$(n [, width])  ->  hexadecimal string for integer n, zero-padded to width digits
 
 Function: HEX(s$)  ->  integer value of hexadecimal string s$
 
-Function: OCT$(n)  ->  octal string for integer n
+Function: OCT$(n [, width])  ->  octal string for integer n, zero-padded to width digits
 
-Function: BIN$(n)  ->  binary string for integer n
+Function: BIN$(n [, width])  ->  binary string for integer n, zero-padded to width digits
 
 Function: RECNO()  ->  current logical record number (1-based)
   When a SELECT filter is active, RECNO counts only visible records.

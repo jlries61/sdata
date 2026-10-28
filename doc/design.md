@@ -1357,21 +1357,24 @@ Functions perform computations and return values. Unless otherwise stated:
 </tr>
 <tr>
 <td><em>ECF</em></td>
-<td><em>ECF(x)</em></td>
-<td><em>x</em> ≥ 0</td>
-<td>Return the value of the cumulative distribution function of the exponential distribution where <em>x</em> is the evaluation point.</td>
+<td><em>ECF(x, rate)</em></td>
+<td><p><em>x</em> ≥ 0</p>
+<p><em>rate</em> &gt; 0</p></td>
+<td>Return the value of the cumulative distribution function of the exponential distribution where <em>x</em> is the evaluation point and <em>rate</em> is the rate parameter.</td>
 </tr>
 <tr>
 <td><em>EDF</em></td>
-<td><em>EDF(x)</em></td>
-<td><em>x</em> ≥ 0</td>
-<td>Return the value of the probability density function of the exponential distribution where <em>x</em> is the evaluation point.</td>
+<td><em>EDF(x, rate)</em></td>
+<td><p><em>x</em> ≥ 0</p>
+<p><em>rate</em> &gt; 0</p></td>
+<td>Return the value of the probability density function of the exponential distribution where <em>x</em> is the evaluation point and <em>rate</em> is the rate parameter.</td>
 </tr>
 <tr>
 <td><em>EIF</em></td>
-<td><em>EIF(ᶲ)</em></td>
-<td>0 ≤ <em>ᶲ </em>≤ 1</td>
-<td>Return the value of the inverse probability density function of the exponential distribution where <em>ᶲ</em> is the probability.</td>
+<td><em>EIF(ᶲ, rate)</em></td>
+<td><p>0 ≤ <em>ᶲ </em>≤ 1</p>
+<p><em>rate</em> &gt; 0</p></td>
+<td>Return the value of the inverse probability density function of the exponential distribution where <em>ᶲ</em> is the probability and <em>rate</em> is the rate parameter.</td>
 </tr>
 <tr>
 <td><em>EOF</em></td>
@@ -1393,9 +1396,9 @@ Functions perform computations and return values. Unless otherwise stated:
 </tr>
 <tr>
 <td><em>ERN</em></td>
-<td><em>ERN</em></td>
-<td></td>
-<td>Return a random number in the exponential distribution.</td>
+<td><em>ERN(rate)</em></td>
+<td><em>rate</em> &gt; 0</td>
+<td>Return a random number in the exponential distribution where <em>rate</em> is the rate parameter.</td>
 </tr>
 <tr>
 <td><em>ERR</em></td>
@@ -1466,24 +1469,27 @@ Functions perform computations and return values. Unless otherwise stated:
 </tr>
 <tr>
 <td><em>GCF</em></td>
-<td><em>GCF(γ, p)</em></td>
-<td><p><em>γ</em> ≥ 0</p>
-<p><em>p</em> &gt; 0</p></td>
-<td>Return the value of the cumulative distribution function of the gamma distribution where  <em>γ </em>is the evaluation point and <em>p </em>is the shape parameter.</td>
+<td><em>GCF(x, shape, rate)</em></td>
+<td><p><em>x</em> ≥ 0</p>
+<p><em>shape</em> &gt; 0</p>
+<p><em>rate</em> &gt; 0</p></td>
+<td>Return the value of the cumulative distribution function of the gamma distribution where <em>x</em> is the evaluation point, <em>shape</em> is the shape parameter and <em>rate</em> is the rate parameter.</td>
 </tr>
 <tr>
 <td><em>GDF</em></td>
-<td><em>GDF(γ, p)</em></td>
-<td><p><em>γ</em> ≥ 0</p>
-<p><em>p</em> &gt; 0</p></td>
-<td>Return the value of the gamma density function where <em>γ </em>is the evaluation point and <em>p </em>is the shape parameter.</td>
+<td><em>GDF(x, shape, rate)</em></td>
+<td><p><em>x</em> ≥ 0</p>
+<p><em>shape</em> &gt; 0</p>
+<p><em>rate</em> &gt; 0</p></td>
+<td>Return the value of the gamma density function where <em>x</em> is the evaluation point, <em>shape</em> is the shape parameter and <em>rate</em> is the rate parameter.</td>
 </tr>
 <tr>
 <td><em>GIF</em></td>
-<td><em>GIF(ᶲ, p)</em></td>
+<td><em>GIF(ᶲ, shape, rate)</em></td>
 <td><p>0 ≤ <em>ᶲ</em> ≤ 1</p>
-<p><em>p</em> &gt; 0</p></td>
-<td>Return the value of the inverse probability density function of the gamma distribution where <em>ᶲ </em>  is the probability and <em>p </em>is the shape parameter.</td>
+<p><em>shape</em> &gt; 0</p>
+<p><em>rate</em> &gt; 0</p></td>
+<td>Return the value of the inverse probability density function of the gamma distribution where <em>ᶲ </em>  is the probability, <em>shape</em> is the shape parameter and <em>rate</em> is the rate parameter.</td>
 </tr>
 <tr>
 <td><em>GMEAN</em></td>
@@ -1493,9 +1499,10 @@ Functions perform computations and return values. Unless otherwise stated:
 </tr>
 <tr>
 <td><em>GRN</em></td>
-<td><em>GRN(p)</em></td>
-<td><em>p</em> &gt; 0</td>
-<td>Return a random number in the gamma distribution where <em>p</em> is the shape parameter.</td>
+<td><em>GRN(shape, rate)</em></td>
+<td><p><em>shape</em> &gt; 0</p>
+<p><em>rate</em> &gt; 0</p></td>
+<td>Return a random number in the gamma distribution where <em>shape</em> is the shape parameter and <em>rate</em> is the rate parameter.</td>
 </tr>
 <tr>
 <td><em>HBOUND</em></td>
@@ -1518,7 +1525,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>HEX$</em></td>
 <td><em>HEX$(X, Y)</em></td>
-<td>0 &lt; <em>Y <em>≤</em></em> 255</td>
+<td>0 ≤ <em>Y</em> ≤ 255</td>
 <td>Return the hexadecimal (base 16) representation of <em>X</em> as a string. If <em>Y</em> is given, the result is left-padded with zeros to at least <em>Y</em> digits.</td>
 </tr>
 <tr>
@@ -1873,7 +1880,7 @@ Functions perform computations and return values. Unless otherwise stated:
 <tr>
 <td><em>OCT$</em></td>
 <td><em>OCT$(X, Y% )</em></td>
-<td>0 &lt; <em>Y%</em> ≤ 255</td>
+<td>0 ≤ <em>Y%</em> ≤ 255</td>
 <td>Return the octal (base 8) representation of <em>X</em> as a string. If <em>Y%</em> is given, the result is left-padded with zeros to at least <em>Y%</em> digits.</td>
 </tr>
 <tr>
