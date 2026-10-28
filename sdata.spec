@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.12
+Version:        0.37.13
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Oct 27 2026 John L. Ries <john@theyarnbard.com> - 0.37.13-1
+- FOR loop variable retains the first out-of-range value after normal termination, as design.md 7.1 specifies (F13)
+
 * Tue Oct 27 2026 John L. Ries <john@theyarnbard.com> - 0.37.12-1
 - RENAME rejects unknown/duplicate names and numeric-character crossings; long column names warn.
 
