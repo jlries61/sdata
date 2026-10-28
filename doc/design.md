@@ -304,6 +304,8 @@ Two kinds of range notation are supported:
   - Non-existent variables are created if applicable (not needed for *DROP* statement).
   - Example: *MONTHPAY1:MONTHPAY60* (*MONTHPAY1* through *MONTHPAY60* in numeric order).
 
+Ranges are accepted wherever a variable list is: *KEEP*, *DROP*, *ARRAY*, *DISPLAY*, *SORT*, *BY*, *STATS*, and *TRANSPOSE*'s */KEEP* and */DROP*; a colon range is also accepted as a function argument, e.g. *SUM(X1:X3)* (the dash form is subtraction there). A range whose ends cannot be resolved (different prefixes, no trailing number, or an undefined dash-range end) is an error.
+
 Array Element Ranges:
 
 - Format: *ARRAY(start:end).*

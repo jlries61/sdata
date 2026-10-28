@@ -1,0 +1,41 @@
+Dataset opened: tests/data/colon_ranges.csv
+RUN complete. 4 records and 3 variables processed.
+Obs         S         M        C
+--------------------------------
+  1   6.00000   2.00000  3.00000
+  2  18.00000   6.00000  3.00000
+  3  30.00000  10.00000  3.00000
+  4  42.00000  14.00000  3.00000
+--------------------------------
+Dataset opened: tests/data/colon_ranges.csv
+STATS complete. 2 records and 6 variables processed.
+Obs  _NAME_$  N      MIN     MEAN       MAX      STD
+----------------------------------------------------
+  1  X1       4  1.00000  7.00000  13.00000  5.16398
+  2  X2       4  2.00000  8.00000  14.00000  5.16398
+----------------------------------------------------
+Dataset opened: tests/data/colon_ranges.csv
+AGGREGATE complete. 3 records and 3 variables processed.
+Obs       G1       G2  CNT
+--------------------------
+  1  1.00000  1.00000    1
+  2  1.00000  2.00000    2
+  3  2.00000  1.00000    1
+--------------------------
+Dataset opened: tests/data/colon_ranges.csv
+AGGREGATE complete. 3 records and 3 variables processed.
+Obs       G1       G2  CNT
+--------------------------
+  1  1.00000  1.00000    1
+  2  1.00000  2.00000    2
+  3  2.00000  1.00000    1
+--------------------------
+Dataset opened: tests/data/colon_ranges.csv
+TRANSPOSE complete. 2 records and 5 variables processed.
+Obs  _NAME_$   _X_(1)   _X_(2)    _X_(3)    _X_(4)
+--------------------------------------------------
+  1  X1       1.00000  5.00000   9.00000  13.00000
+  2  X2       2.00000  6.00000  10.00000  14.00000
+--------------------------------------------------
+Dataset opened: tests/data/colon_ranges.csv
+Error: invalid range X1:G2 (names must share a prefix and end in a number)

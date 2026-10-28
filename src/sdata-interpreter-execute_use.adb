@@ -14,9 +14,29 @@ procedure Execute_USE (Stmt : Statement_Access) is
       Cur : Variable_List := V;
    begin
       while Cur /= null loop
-         Outv.Append
-           (To_Unbounded_String
-              (Cur.Var.Start_Name (1 .. Cur.Var.Start_Len)));
+         if Cur.Var.Is_Range and then Cur.Var.Is_Colon_Range then
+            --  F36: X1:X3 names every numbered variable in the range.
+            declare
+               Names : constant Name_Vectors.Vector :=
+                  Expand_Colon_Names
+                    (To_Upper (Cur.Var.Start_Name (1 .. Cur.Var.Start_Len)),
+                     To_Upper (Cur.Var.End_Name (1 .. Cur.Var.End_Len)));
+            begin
+               if Names.Is_Empty then
+                  raise Script_Error with "invalid range "
+                     & Cur.Var.Start_Name (1 .. Cur.Var.Start_Len) & ":"
+                     & Cur.Var.End_Name (1 .. Cur.Var.End_Len);
+               end if;
+               for N of Names loop Outv.Append (N); end loop;
+            end;
+         elsif Cur.Var.Is_Range then
+            raise Script_Error with
+               "a dash range is not supported here; use the colon form (X1:X3)";
+         else
+            Outv.Append
+              (To_Unbounded_String
+                 (Cur.Var.Start_Name (1 .. Cur.Var.Start_Len)));
+         end if;
          Cur := Cur.Next;
       end loop;
    end Convert_Variable_List;

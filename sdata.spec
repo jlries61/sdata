@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.5
+Version:        0.37.6
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Oct 27 2026 John L. Ries <john@theyarnbard.com> - 0.37.6-1
+- Colon and dash ranges expand in function arguments, STATS, TRANSPOSE, SORT, BY and USE KEEP/DROP.
+
 * Thu Oct 22 2026 John L. Ries <john@theyarnbard.com> - 0.37.5-1
 - SELECT CASE accepted; BREAK resumes the record in batch mode; SAVE /FMT= overrides the extension.
 
