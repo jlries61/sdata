@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.8
+Version:        0.37.9
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Oct 27 2026 John L. Ries <john@theyarnbard.com> - 0.37.9-1
+- Domain errors replace Ada runtime text in user-facing messages.
+
 * Tue Oct 27 2026 John L. Ries <john@theyarnbard.com> - 0.37.8-1
 - OUTPUT /FMT= and /CHARSET= apply to the redirected file.
 
