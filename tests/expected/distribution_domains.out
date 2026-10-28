@@ -1,0 +1,18 @@
+Error: TCF: Student t distribution: degrees of freedom must be positive
+RUN complete. 1 records and 0 variables processed.
+Error: TIF: Student t distribution: degrees of freedom must be positive
+RUN complete. 1 records and 0 variables processed.
+Error: BCF: Beta distribution: shape parameters must be positive
+RUN complete. 1 records and 0 variables processed.
+Error: BIF: Beta distribution: shape parameters must be positive
+RUN complete. 1 records and 0 variables processed.
+Error: FCF: F distribution: degrees of freedom must be positive
+RUN complete. 1 records and 0 variables processed.
+Error: FIF: F distribution: degrees of freedom must be positive
+RUN complete. 1 records and 0 variables processed.
+Error: ROUND: result is not a number (argument out of range)
+RUN complete. 1 records and 0 variables processed.
+Error: GDF: result is not a number (argument out of range)
+RUN complete. 1 records and 0 variables processed.
+0.81839
+RUN complete. 1 records and 1 variables processed.
