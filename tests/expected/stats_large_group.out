@@ -4,9 +4,3 @@ Variable       N     MEAN
 X         360000  4.50000
 -------------------------
 STATS complete. 1 records and 3 variables processed.
-Dataset opened: tests/data/stats_large_group_gen.csv
-AGGREGATE complete. 1 records and 3 variables processed.
-Obs       N        M        P
------------------------------
-  1  360000  4.50000  8.10000
------------------------------
