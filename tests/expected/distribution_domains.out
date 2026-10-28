@@ -10,6 +10,10 @@ Error: FCF: F distribution: degrees of freedom must be positive
 RUN complete. 1 records and 0 variables processed.
 Error: FIF: F distribution: degrees of freedom must be positive
 RUN complete. 1 records and 0 variables processed.
+Error: BIF: Probability must be in [0,1]
+RUN complete. 1 records and 0 variables processed.
+Error: BIF: Beta distribution: shape parameters below 1e-10 are not supported
+RUN complete. 1 records and 0 variables processed.
 Error: ROUND: result is not a number (argument out of range)
 RUN complete. 1 records and 0 variables processed.
 Error: GDF: result is not a number (argument out of range)
