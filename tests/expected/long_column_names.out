@@ -1,0 +1,8 @@
+Warning: column name "AAAAAAAAAAAAAAAAAAAA..." is 71 characters long; truncated to 64
+Warning: column name "AAAAAAAAAAAAAAAAAAAA..." is 71 characters long; truncated to 64
+Warning: "tests/data/long_names.csv", duplicate column name "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" -- last occurrence wins
+Dataset opened: tests/data/long_names.csv
+Permanent Variables (Table Columns):
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA SHORT
+Session Variables (SET):
+(none)
