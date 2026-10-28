@@ -156,11 +156,10 @@ begin
          end;
       when Stmt_SORT =>
          declare
-            Curr_Var : Variable_List := Stmt.Sort_Vars;
-            Count    : Natural := 0;
-            Tmp      : Variable_List := Curr_Var;
+            Names : constant Name_Vectors.Vector :=
+               Expand_Var_List (Stmt.Sort_Vars);
+            Count : constant Natural := Natural (Names.Length);
          begin
-            while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
             --  A SORT variable must name an existing table column; otherwise the
             --  sort silently treats every key as missing and leaves the data
             --  unordered while still reporting success (issue #50).  The common
@@ -174,31 +173,23 @@ begin
             --  the table already has real columns or there is no pending body to
             --  forward-reference into, and Column_Count = 0 means the name was
             --  simply never a column.
-            declare
-               V : Variable_List := Curr_Var;
-            begin
-               while V /= null loop
-                  if not SData_Core.Table.Has_Column
-                           (V.Var.Start_Name (1 .. V.Var.Start_Len))
-                  then
-                     raise Script_Error with
-                       "undefined variable """
-                       & V.Var.Start_Name (1 .. V.Var.Start_Len) & """";
-                  end if;
-                  V := V.Next;
-               end loop;
-            end;
+            for N of Names loop
+               if not SData_Core.Table.Has_Column (To_String (N)) then
+                  raise Script_Error with
+                    "undefined variable """ & To_String (N) & """";
+               end if;
+            end loop;
             if Count > 0 then
                declare
                   Crit : Sort_Criteria_Array (1 .. Count);
                   Idx  : Positive := 1;
                begin
-                  while Curr_Var /= null loop
+                  for N of Names loop
                      Crit (Idx).Name := (others => ' ');
-                     Crit (Idx).Name (1 .. Curr_Var.Var.Start_Len) := To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len));
-                     Crit (Idx).Len := Curr_Var.Var.Start_Len;
+                     Crit (Idx).Name (1 .. Length (N)) := To_Upper (To_String (N));
+                     Crit (Idx).Len := Length (N);
                      Crit (Idx).Dir := Ascending;
-                     Idx := Idx + 1; Curr_Var := Curr_Var.Next;
+                     Idx := Idx + 1;
                   end loop;
                   Sort (Crit);
                end;
@@ -241,28 +232,25 @@ begin
          --  redundantly clearing and re-registering the same BY variables
          --  every record.
          declare
-            Curr_Var : Variable_List := Stmt.Sort_Vars;
-            Count    : Natural := 0;
-            Tmp      : Variable_List := Curr_Var;
+            --  F36: colon and dash ranges (BY G1:G3, BY G1-G3) name every
+            --  variable in the range, not just the first.
+            Names : constant Name_Vectors.Vector :=
+               Expand_Var_List (Stmt.Sort_Vars);
+            Count : constant Natural := Natural (Names.Length);
 
             function Already_Established return Boolean is
-               C : Variable_List := Stmt.Sort_Vars;
             begin
                if Count = 0 or else Count /= SData_Core.Table.By_Var_Count then
                   return False;
                end if;
                for I in 1 .. Count loop
-                  if To_Upper (C.Var.Start_Name (1 .. C.Var.Start_Len))
-                       /= SData_Core.Table.By_Var_Name (I)
-                  then
+                  if To_Upper (To_String (Names (I))) /= SData_Core.Table.By_Var_Name (I) then
                      return False;
                   end if;
-                  C := C.Next;
                end loop;
                return True;
             end Already_Established;
          begin
-            while Tmp /= null loop Count := Count + 1; Tmp := Tmp.Next; end loop;
             if Count = 0 then
                --  Bare BY cancels grouping.
                SData_Core.Table.Clear_By_Vars;
@@ -279,25 +267,15 @@ begin
                --  from-scratch REPEAT body to one implicit group regardless of
                --  which BY names were given (see ADR-051's Root Cause), so the
                --  exemption protected no observable behavior, only a footgun.
-               declare
-                  V : Variable_List := Curr_Var;
-               begin
-                  while V /= null loop
-                     if not SData_Core.Table.Has_Column
-                              (V.Var.Start_Name (1 .. V.Var.Start_Len))
-                     then
-                        raise Script_Error with
-                          "undefined variable """
-                          & V.Var.Start_Name (1 .. V.Var.Start_Len) & """";
-                     end if;
-                     V := V.Next;
-                  end loop;
-               end;
+               for N of Names loop
+                  if not SData_Core.Table.Has_Column (To_String (N)) then
+                     raise Script_Error with
+                       "undefined variable """ & To_String (N) & """";
+                  end if;
+               end loop;
                SData_Core.Table.Clear_By_Vars;
-               while Curr_Var /= null loop
-                  SData_Core.Table.Add_By_Var
-                    (To_Upper (Curr_Var.Var.Start_Name (1 .. Curr_Var.Var.Start_Len)));
-                  Curr_Var := Curr_Var.Next;
+               for N of Names loop
+                  SData_Core.Table.Add_By_Var (To_Upper (To_String (N)));
                end loop;
             end if;
          end;

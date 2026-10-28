@@ -860,6 +860,73 @@ package body SData.Interpreter is
       return Result;
    end Expand_Colon_Names;
 
+   --  Expand_Var_List -- expands an AST variable list against the table as it
+   --  stands now: a plain name stays itself, a colon range (X1:X3) becomes
+   --  the numbered names X1..X3, and a dash range (A-C) becomes every column
+   --  from A to C in table order.  For the Immediate/Declarative commands
+   --  (STATS, TRANSPOSE, BY, SORT) whose operands are resolved at dispatch;
+   --  KEEP/DROP/ARRAY defer dash ranges (see Expand_Range).  An unresolvable
+   --  range is an error rather than a silent single-variable fallback (F36).
+   function Expand_Var_List (V : Variable_List) return Name_Vectors.Vector is
+      Result : Name_Vectors.Vector;
+      Cur    : Variable_List := V;
+   begin
+      while Cur /= null loop
+         declare
+            Start_Name : constant String :=
+               To_Upper (Cur.Var.Start_Name (1 .. Cur.Var.Start_Len));
+         begin
+            if not Cur.Var.Is_Range then
+               --  A plain name is passed through as written (consumers
+               --  upper-case it themselves and quote it in messages).
+               Result.Append (To_Unbounded_String
+                                (Cur.Var.Start_Name (1 .. Cur.Var.Start_Len)));
+            else
+               declare
+                  End_Name : constant String :=
+                     To_Upper (Cur.Var.End_Name (1 .. Cur.Var.End_Len));
+               begin
+                  if Cur.Var.Is_Colon_Range then
+                     declare
+                        Names : constant Name_Vectors.Vector :=
+                           Expand_Colon_Names (Start_Name, End_Name);
+                     begin
+                        if Names.Is_Empty then
+                           raise Script_Error with
+                              "invalid range " & Start_Name & ":" & End_Name
+                              & " (names must share a prefix and end in a number)";
+                        end if;
+                        for N of Names loop Result.Append (N); end loop;
+                     end;
+                  else
+                     declare
+                        Lo, Hi : Natural := 0;
+                     begin
+                        for I in 1 .. Column_Count loop
+                           if Column_Name (I) = Start_Name then Lo := I; end if;
+                           if Column_Name (I) = End_Name   then Hi := I; end if;
+                        end loop;
+                        if Lo = 0 or else Hi = 0 then
+                           raise Script_Error with
+                              "undefined variable in range " & Start_Name
+                              & "-" & End_Name;
+                        end if;
+                        if Lo > Hi then
+                           declare T : constant Natural := Lo; begin Lo := Hi; Hi := T; end;
+                        end if;
+                        for I in Lo .. Hi loop
+                           Result.Append (To_Unbounded_String (Column_Name (I)));
+                        end loop;
+                     end;
+                  end if;
+               end;
+            end if;
+         end;
+         Cur := Cur.Next;
+      end loop;
+      return Result;
+   end Expand_Var_List;
+
    procedure Expand_Range (Kind : Column_Mod_Kind; Range_Spec : Variable_Range) is
       Start_Name : constant String := (if Range_Spec.Start_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.Start_Name (1 .. Range_Spec.Start_Len)) else "");
       End_Name   : constant String := (if Range_Spec.End_Len in 1 .. Max_Name_Len then To_Upper (Range_Spec.End_Name (1 .. Range_Spec.End_Len)) else "");
@@ -2147,26 +2214,10 @@ package body SData.Interpreter is
       Opts : SData_Core.Commands.Transpose_Options;
    begin
       --  Convert Keep_Vars Variable_List → Keep_List Name_Vectors.Vector.
-      declare
-         Curr : Variable_List := Stmt.Keep_Vars;
-      begin
-         while Curr /= null loop
-            Opts.Keep_List.Append
-              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
-            Curr := Curr.Next;
-         end loop;
-      end;
+      Opts.Keep_List := Expand_Var_List (Stmt.Keep_Vars);
 
       --  Convert Drop_Vars Variable_List → Drop_List Name_Vectors.Vector.
-      declare
-         Curr : Variable_List := Stmt.Drop_Vars;
-      begin
-         while Curr /= null loop
-            Opts.Drop_List.Append
-              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
-            Curr := Curr.Next;
-         end loop;
-      end;
+      Opts.Drop_List := Expand_Var_List (Stmt.Drop_Vars);
 
       --  Fixed-string fields → Unbounded_String.  Pass empty strings as-is;
       --  Execute_TRANSPOSE applies the defaults (_NAME_$ and _X_).
@@ -2200,15 +2251,7 @@ package body SData.Interpreter is
       Opts : SData_Core.Commands.Stats_Options;
    begin
 
-      declare
-         Curr : Variable_List := Stmt.Stats_Vars;
-      begin
-         while Curr /= null loop
-            Opts.Var_List.Append
-              (To_Unbounded_String (Curr.Var.Start_Name (1 .. Curr.Var.Start_Len)));
-            Curr := Curr.Next;
-         end loop;
-      end;
+      Opts.Var_List := Expand_Var_List (Stmt.Stats_Vars);
 
       declare
          Curr : Stat_Request_List := Stmt.Stats_Stats;
@@ -2487,9 +2530,29 @@ package body SData.Interpreter is
       Cur : SData.AST.Variable_List := V;
    begin
       while Cur /= null loop
-         Outv.Append
-           (To_Unbounded_String
-              (Cur.Var.Start_Name (1 .. Cur.Var.Start_Len)));
+         if Cur.Var.Is_Range and then Cur.Var.Is_Colon_Range then
+            --  F36: X1:X3 names every numbered variable in the range.
+            declare
+               Names : constant Name_Vectors.Vector :=
+                  Expand_Colon_Names
+                    (To_Upper (Cur.Var.Start_Name (1 .. Cur.Var.Start_Len)),
+                     To_Upper (Cur.Var.End_Name (1 .. Cur.Var.End_Len)));
+            begin
+               if Names.Is_Empty then
+                  raise Script_Error with "invalid range "
+                     & Cur.Var.Start_Name (1 .. Cur.Var.Start_Len) & ":"
+                     & Cur.Var.End_Name (1 .. Cur.Var.End_Len);
+               end if;
+               for N of Names loop Outv.Append (N); end loop;
+            end;
+         elsif Cur.Var.Is_Range then
+            raise Script_Error with
+               "a dash range is not supported here; use the colon form (X1:X3)";
+         else
+            Outv.Append
+              (To_Unbounded_String
+                 (Cur.Var.Start_Name (1 .. Cur.Var.Start_Len)));
+         end if;
          Cur := Cur.Next;
       end loop;
    end Convert_Variable_List;
