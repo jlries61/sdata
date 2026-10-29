@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-10-27" "sdata 0.37.13" "User Commands"
+.TH SDATA 1 "2026-10-29" "sdata 0.37.14" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -473,7 +473,8 @@ Override the input format for this dataset
 Whether the first row is a header (default YES).
 .TP
 .BI CHARSET= enc
-Character encoding (e.g.\& UTF\-8, UTF\-16, ASCII).
+Character encoding: AUTO, UTF\-8, UTF\-16, UTF\-16LE, UTF\-16BE or ASCII.
+Any other name is an error.
 .TP
 .BI DLM= delim
 Field delimiter for CSV files (default comma; multi-character delimiters
@@ -629,7 +630,7 @@ Output format for this target
 Whether to write a header row (default YES).
 .TP
 .BI CHARSET= enc
-Character encoding for this target (e.g.\& UTF\-8).
+Character encoding for this target (same names as for USE).
 .TP
 .BI DECIMALS= N
 Control floating-point output precision for this target.

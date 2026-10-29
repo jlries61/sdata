@@ -341,6 +341,16 @@ begin
                return """" & S & """";
             end Dlm_Display;
 
+            --  YES or NO; anything else is an error, never a silent NO (F32).
+            function Yes_No return Boolean is
+            begin
+               if Val_Upper /= "YES" and then Val_Upper /= "NO" then
+                  raise SData_Core.Script_Error with
+                     "OPTIONS " & Key & " must be YES or NO";
+               end if;
+               return Val_Upper = "YES";
+            end Yes_No;
+
             function Bool_Display (B : Boolean) return String is
             begin
                return (if B then "YES" else "NO");
@@ -368,38 +378,50 @@ begin
             elsif Key = "MAXTEMPMEM" then
                SData_Core.Config.Max_Temp_Vars := Natural'Value (Val);
             elsif Key = "CSVDLM" then
+               if Val = "" then
+                  raise SData_Core.Script_Error with
+                     "OPTIONS CSVDLM value cannot be empty";
+               end if;
                SData_Core.Commands.Execute_OPTIONS_CSVDLM (Dlm_To_Str (Val));
             elsif Key = "HEADER" then
-               SData_Core.Commands.Execute_OPTIONS_Header (Val_Upper = "YES");
+               SData_Core.Commands.Execute_OPTIONS_Header (Yes_No);
             elsif Key = "SAVEOVERWRT" then
                SData_Core.Commands.Execute_OPTIONS_SAVEOVERWRT
-                  (Val_Upper = "YES");
+                  (Yes_No);
             elsif Key = "TXTFMT" then
                SData_Core.Commands.Execute_OPTIONS_TXTFMT (Val_Upper);
             elsif Key = "CHARSET" then
                SData_Core.Commands.Execute_OPTIONS_CHARSET (Val);
             elsif Key = "IEEE_DIVIDE" then
                SData_Core.Commands.Execute_OPTIONS_IEEE_Divide
-                  (Val_Upper = "YES");
+                  (Yes_No);
             elsif Key = "SHELLTIMEOUT" then
                SData_Core.Commands.Execute_OPTIONS_Shell_Timeout
                   (Natural'Value (Val));
             elsif Key = "DEBUG" then
-               SData_Core.Config.Debug_Level := Natural'Value (Val);
+               declare
+                  Level : constant Natural := Natural'Value (Val);
+               begin
+                  if Level > 3 then
+                     raise SData_Core.Script_Error with
+                        "OPTIONS DEBUG must be between 0 and 3";
+                  end if;
+                  SData_Core.Config.Debug_Level := Level;
+               end;
             elsif Key = "JOIN_WARN_THRESHOLD" then
                SData_Core.Commands.Execute_OPTIONS_Join_Warn_Threshold
                   (Natural'Value (Val));
             elsif Key = "PROGRESS" then
-               SData_Core.Config.Progress := (Val_Upper = "YES");
+               SData_Core.Config.Progress := Yes_No;
             elsif Key = "WARNRESERVED" then
-               SData_Core.Commands.Execute_OPTIONS_WarnReserved (Val_Upper = "YES");
+               SData_Core.Commands.Execute_OPTIONS_WarnReserved (Yes_No);
             else
                Put_Line_Error ("Warning: Unknown OPTIONS key: " & Key);
             end if;
          exception
             when Constraint_Error =>
-               Put_Line_Error
-                  ("Error: Invalid value for OPTIONS " & Key & ": " & Val);
+               raise SData_Core.Script_Error with
+                  "Invalid value for OPTIONS " & Key & ": " & Val;
          end;
       when others => null;
    end case;
