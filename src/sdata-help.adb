@@ -817,12 +817,13 @@ package body SData.Help is
       Put_Line ("  OPTIONS HEADER YES|NO      : CSV files have a header row (default: YES)");
       Put_Line ("  OPTIONS SAVEOVERWRT YES|NO : Overwrite existing files on SAVE (default: YES)");
       Put_Line ("  OPTIONS TXTFMT AUTO|LF|CRLF|CR  : Line ending for CSV output (default: AUTO)");
-      Put_Line ("  OPTIONS CHARSET name       : Character set label (stored, advisory only)");
+      Put_Line ("  OPTIONS CHARSET name       : Character set: AUTO|UTF-8|UTF-16|UTF-16LE|UTF-16BE|ASCII");
       Put_Line ("  OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)");
       Put_Line ("                               0.0/0.0 always raises an error. Cleared by NEW.");
       Put_Line ("  OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.");
       Put_Line ("  OPTIONS PROGRESS YES|NO    : Emit record-count progress on stderr for long USE/RUN/SORT runs (default: NO)");
       Put_Line ("  OPTIONS WARNRESERVED YES|NO: Warn when a loaded column matches a reserved keyword (default: YES)");
+      Put_Line ("A value outside the ones listed (e.g. HEADER MAYBE) is an error.");
       Put_Line ("");
       Put_Line ("CLI flags (set at startup, not runtime):");
       Put_Line ("  --shell-timeout=N    : SYSTEM/SHELL timeout in seconds (0 = unlimited; default 300 in batch)");

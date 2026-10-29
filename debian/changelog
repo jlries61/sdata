@@ -1,3 +1,9 @@
+sdata (0.37.14-1) unstable; urgency=medium
+
+  * Invalid option values and flag values are errors, not silent defaults: OPTIONS (YES/NO keys, TXTFMT, CHARSET, DEBUG, CSVDLM), USE/SAVE /FMT /HEADER /DLM /CHARSET, OUTPUT flags (F32)
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 29 Oct 2026 15:59:46 -0700
+
 sdata (0.37.13-1) unstable; urgency=medium
 
   * FOR loop variable retains the first out-of-range value after normal termination, as design.md 7.1 specifies (F13)

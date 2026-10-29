@@ -39,6 +39,57 @@ package body SData.Parser is
      (T.Kind = Token_Identifier
         or else T.Kind = Token_Quoted_Identifier);
 
+   --  Flag-value checks shared by USE, SAVE, TABLES and OUTPUT: an invalid
+   --  value is an error, never a silent default (F32).
+   function Require_Yes_No (Val_Tok : Token; Flag : String) return Boolean is
+      V : constant String := To_Upper (Val_Tok.Text (1 .. Val_Tok.Length));
+   begin
+      if V /= "YES" and then V /= "NO" then
+         raise Script_Error with
+            "/" & Flag & "= must be YES or NO at line" & Val_Tok.Line'Image;
+      end if;
+      return V = "YES";
+   end Require_Yes_No;
+
+   procedure Require_Dlm (Val_Tok : Token) is
+   begin
+      if Val_Tok.Length = 0 then
+         raise Script_Error with
+            "/DLM= must not be empty at line" & Val_Tok.Line'Image;
+      end if;
+   end Require_Dlm;
+
+   --  Join the tokens of a hyphenated character-set name ("UTF", "-", "16",
+   --  "LE") into one string; First has already been consumed.
+   function Join_Charset_Tokens
+     (Ctx : in out Parser_Context; First : Token) return String
+   is
+      Result : constant String := First.Text (1 .. First.Length);
+   begin
+      if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Minus then
+         return Result;
+      end if;
+      declare
+         Dash : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+         Mid  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+         pragma Unreferenced (Dash);
+         Head : constant String := Result & "-" & Mid.Text (1 .. Mid.Length);
+         Nxt  : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+      begin
+         if Is_Identifier_Token (Nxt)
+           and then (To_Upper (Nxt.Text (1 .. Nxt.Length)) = "LE"
+                     or else To_Upper (Nxt.Text (1 .. Nxt.Length)) = "BE")
+         then
+            declare
+               Suf : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            begin
+               return Head & Suf.Text (1 .. Suf.Length);
+            end;
+         end if;
+         return Head;
+      end;
+   end Join_Charset_Tokens;
+
    --  Use Identifier_Text wherever an identifier token's name is read, so the
    --  intent ("this is an identifier, bare or quoted") is explicit. Quoted-id
    --  tokens already store backtick-stripped text, so this is equivalent to a
@@ -1177,6 +1228,7 @@ package body SData.Parser is
                         VLen    : constant Natural :=
                            Natural'Min (Val_Tok.Length, Max_Delimiter_Len);
                      begin
+                        Require_Dlm (Val_Tok);
                         Opts.DLM_Val (1 .. VLen) := Val_Tok.Text (1 .. VLen);
                         Opts.DLM_Len := VLen;
                      end;
@@ -1350,13 +1402,16 @@ package body SData.Parser is
                   Opts.Fmt_Override := SData_Core.Config.ODF;
                elsif Val_Str = "OOXML" or else Val_Str = "XLSX" then
                   Opts.Fmt_Override := SData_Core.Config.OOXML;
+               else
+                  raise Script_Error with
+                     "/FMT= must be CSV, ODF, or OOXML at line" & Val_Tok.Line'Image;
                end if;
 
             elsif Flag_Name = "HEADER"
                or else Flag_Tok.Kind = Token_HEADER
             then
                Opts.Header_Specified := True;
-               Opts.Header_Val := (Val_Str = "YES");
+               Opts.Header_Val := Require_Yes_No (Val_Tok, "HEADER");
 
             elsif Flag_Name = "CHARSET" then
                --  Multi-token charset (e.g. UTF-16 LE).
@@ -1411,6 +1466,7 @@ package body SData.Parser is
                   VLen : constant Natural :=
                      Natural'Min (Val_Tok.Length, Max_Delimiter_Len);
                begin
+                  Require_Dlm (Val_Tok);
                   Opts.DLM_Val (1 .. VLen) := Val_Tok.Text (1 .. VLen);
                   Opts.DLM_Len := VLen;
                end;
@@ -2988,6 +3044,7 @@ package body SData.Parser is
                        VLen : constant Natural :=
                           Natural'Min (Val_Tok.Length, Max_Delimiter_Len);
                begin
+                  Require_Dlm (Val_Tok);
                   Stmt.Table_Save_DLM (1 .. VLen) := Val_Tok.Text (1 .. VLen);
                   Stmt.Table_Save_DLM_Len := VLen;
                end;
@@ -3429,15 +3486,19 @@ package body SData.Parser is
                                     if Val_Str = "CSV" then Stmt.Fmt_Override := SData_Core.Config.CSV;
                                     elsif Val_Str = "ODF" or else Val_Str = "ODS" then Stmt.Fmt_Override := SData_Core.Config.ODF;
                                     elsif Val_Str = "OOXML" or else Val_Str = "XLSX" then Stmt.Fmt_Override := SData_Core.Config.OOXML;
+                                    else
+                                       raise Script_Error with
+                                          "/FMT= must be CSV, ODF, or OOXML at line" & Val_Tok.Line'Image;
                                     end if;
                                  elsif Flag_Name = "DLM" then
+                                    Require_Dlm (Val_Tok);
                                     Stmt.DLM_Len := Val_Tok.Length;
                                     Stmt.DLM_Path (1 .. Val_Tok.Length) := Val_Tok.Text (1 .. Val_Tok.Length);
                                  elsif Flag_Name = "HEADER"
                                     or else Flag_Tok.Kind = Token_HEADER
                                  then
                                     Stmt.Header_Specified := True;
-                                    Stmt.Header_Val := (Val_Str = "YES");
+                                    Stmt.Header_Val := Require_Yes_No (Val_Tok, "HEADER");
                                  elsif Flag_Name = "SHEET" then
                                     declare
                                        VLen : constant Natural :=
@@ -4037,8 +4098,16 @@ package body SData.Parser is
                                        Stmt.Output_CHARSET_Val (1 .. Len) := Buf (1 .. Len);
                                        Stmt.Output_CHARSET_Len := Len;
                                     end;
+                                 else
+                                    raise Script_Error with
+                                       "OUTPUT: unknown option /" & Flag_Name
+                                       & " at line" & Flag_Tok.Line'Image;
                                  end if;
                               end;
+                           else
+                              raise Script_Error with
+                                 "OUTPUT: option /" & Flag_Name
+                                 & " requires =value at line" & Flag_Tok.Line'Image;
                            end if;
                         end;
                      else exit; end if;
@@ -4089,12 +4158,21 @@ package body SData.Parser is
                      Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
                      Key_Str : constant String :=
                         To_Upper (Key_Tok.Text (1 .. Key_Tok.Length));
-                     Val_Str : constant String := Val_Tok.Text (1 .. Val_Tok.Length);
+                     --  A character-set name may span tokens (UTF-8, UTF-16LE).
+                     Val_Str : constant String :=
+                        (if To_Upper (Key_Tok.Text (1 .. Key_Tok.Length)) = "CHARSET"
+                         then Join_Charset_Tokens (Ctx, Val_Tok)
+                         else Val_Tok.Text (1 .. Val_Tok.Length));
                      K_Len   : constant Natural :=
                         Natural'Min (Key_Tok.Length, Max_Name_Len);
                      V_Len   : constant Natural :=
-                        Natural'Min (Val_Tok.Length, 256);
+                        Natural'Min (Val_Str'Length, 256);
                   begin
+                     if Val_Tok.Kind = Token_Minus then
+                        raise Script_Error with
+                           "OPTIONS " & Key_Str & ": value must not be negative at line"
+                           & Val_Tok.Line'Image;
+                     end if;
                      Stmt.Options_Key (1 .. K_Len) := Key_Str (Key_Str'First .. Key_Str'First + K_Len - 1);
                      Stmt.Options_Key_Len := K_Len;
                      Stmt.Options_Val (1 .. V_Len) := Val_Str (Val_Str'First .. Val_Str'First + V_Len - 1);
