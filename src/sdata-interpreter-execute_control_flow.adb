@@ -60,6 +60,9 @@ begin
                      end;
                      Current_I := Current_I + ST;
                   end loop;
+                  --  design.md 7.1: the variable keeps the first out-of-range value.
+                  Set_Permanent (Stmt.For_Var (1 .. Stmt.For_Var_Len),
+                                 (Kind => Val_Numeric, Num_Val => Current_I));
                exception
                   when others => Ctx.Loop_Depth := Ctx.Loop_Depth - 1; raise;
                end;

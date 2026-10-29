@@ -1,3 +1,9 @@
+sdata (0.37.13-1) unstable; urgency=medium
+
+  * FOR loop variable retains the first out-of-range value after normal termination, as design.md 7.1 specifies (F13)
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 27 Oct 2026 23:33:41 -0700
+
 sdata (0.37.12-1) unstable; urgency=medium
 
   * RENAME rejects unknown/duplicate names and numeric-character crossings; long column names warn.
