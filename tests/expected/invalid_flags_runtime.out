@@ -1,5 +1,5 @@
-Error: USE: unsupported character set "BOGUS" (use AUTO, UTF-8, UTF-16, UTF-16LE, UTF-16BE or ASCII)
-Error: SAVE: unsupported character set "BOGUS" (use AUTO, UTF-8, UTF-16, UTF-16LE, UTF-16BE or ASCII)
+Error: USE: unsupported character set "BOGUS" (see "iconv -l" for the names this system knows)
+Error: SAVE: unsupported character set "BOGUS" (see "iconv -l" for the names this system knows)
 Error: OPTIONS TXTFMT must be AUTO, LF, CRLF or CR
-Error: OPTIONS CHARSET: unsupported character set "NOPE" (use AUTO, UTF-8, UTF-16, UTF-16LE, UTF-16BE or ASCII)
+Error: OPTIONS CHARSET: unsupported character set "NOPE" (see "iconv -l" for the names this system knows)
 Dataset opened: tests/data/colon_ranges.csv

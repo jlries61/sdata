@@ -1,3 +1,9 @@
+sdata (0.37.15-1) unstable; urgency=medium
+
+  * Any character set the system's iconv knows is supported for USE, SAVE and OUTPUT /CHARSET=; explicit UTF-8 rejects malformed input; unrepresentable output fails (F46)
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 29 Oct 2026 16:58:24 -0700
+
 sdata (0.37.14-1) unstable; urgency=medium
 
   * Invalid option values and flag values are errors, not silent defaults: OPTIONS (YES/NO keys, TXTFMT, CHARSET, DEBUG, CSVDLM), USE/SAVE /FMT /HEADER /DLM /CHARSET, OUTPUT flags (F32)

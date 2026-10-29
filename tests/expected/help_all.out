@@ -534,7 +534,8 @@ Redirects all console output to a file (written to file AND stdout).
 No arguments: Closes the current output file.
 Options:
   /CHARSET=cs  Character set of the file: UTF-8, UTF-16 (LE, with BOM),
-               UTF-16BE, or ASCII (a non-ASCII character is an error).
+               UTF-16BE, ASCII, or any name the system's iconv knows (iconv -l),
+               e.g. LATIN1, WINDOWS-1252. A character the set lacks is an error.
   /FMT=eol     Line ending of the file: LF, CRLF, CR or AUTO.
 Both also set the matching OPTIONS (CHARSET, TXTFMT) defaults.
 Execution: Immediate -- takes effect at once.
@@ -573,7 +574,7 @@ With no arguments, OPTIONS lists all current option values.
   OPTIONS HEADER YES|NO      : CSV files have a header row (default: YES)
   OPTIONS SAVEOVERWRT YES|NO : Overwrite existing files on SAVE (default: YES)
   OPTIONS TXTFMT AUTO|LF|CRLF|CR  : Line ending for CSV output (default: AUTO)
-  OPTIONS CHARSET name       : Character set: AUTO|UTF-8|UTF-16|UTF-16LE|UTF-16BE|ASCII
+  OPTIONS CHARSET name       : Character set: AUTO, or any name iconv knows (iconv -l)
   OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)
                                0.0/0.0 always raises an error. Cleared by NEW.
   OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.

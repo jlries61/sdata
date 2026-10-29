@@ -757,7 +757,8 @@ package body SData.Help is
       Put_Line ("No arguments: Closes the current output file.");
       Put_Line ("Options:");
       Put_Line ("  /CHARSET=cs  Character set of the file: UTF-8, UTF-16 (LE, with BOM),");
-      Put_Line ("               UTF-16BE, or ASCII (a non-ASCII character is an error).");
+      Put_Line ("               UTF-16BE, ASCII, or any name the system's iconv knows (iconv -l),");
+      Put_Line ("               e.g. LATIN1, WINDOWS-1252. A character the set lacks is an error.");
       Put_Line ("  /FMT=eol     Line ending of the file: LF, CRLF, CR or AUTO.");
       Put_Line ("Both also set the matching OPTIONS (CHARSET, TXTFMT) defaults.");
       Put_Line ("Execution: Immediate -- takes effect at once.");
@@ -817,7 +818,7 @@ package body SData.Help is
       Put_Line ("  OPTIONS HEADER YES|NO      : CSV files have a header row (default: YES)");
       Put_Line ("  OPTIONS SAVEOVERWRT YES|NO : Overwrite existing files on SAVE (default: YES)");
       Put_Line ("  OPTIONS TXTFMT AUTO|LF|CRLF|CR  : Line ending for CSV output (default: AUTO)");
-      Put_Line ("  OPTIONS CHARSET name       : Character set: AUTO|UTF-8|UTF-16|UTF-16LE|UTF-16BE|ASCII");
+      Put_Line ("  OPTIONS CHARSET name       : Character set: AUTO, or any name iconv knows (iconv -l)");
       Put_Line ("  OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)");
       Put_Line ("                               0.0/0.0 always raises an error. Cleared by NEW.");
       Put_Line ("  OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.");

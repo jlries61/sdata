@@ -4,7 +4,7 @@ Error: OPTIONS IEEE_DIVIDE must be YES or NO
 Error: OPTIONS PROGRESS must be YES or NO
 Error: OPTIONS WARNRESERVED must be YES or NO
 Error: OPTIONS TXTFMT must be AUTO, LF, CRLF or CR
-Error: OPTIONS CHARSET: unsupported character set "NOPE" (use AUTO, UTF-8, UTF-16, UTF-16LE, UTF-16BE or ASCII)
+Error: OPTIONS CHARSET: unsupported character set "NOPE" (see "iconv -l" for the names this system knows)
 Error: OPTIONS CSVDLM value cannot be empty
 Error: OPTIONS DEBUG must be between 0 and 3
 Error: Invalid value for OPTIONS MAXINTAB: abc

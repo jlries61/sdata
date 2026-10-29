@@ -1,0 +1,4 @@
+Error: "tests/data/charset_bad_utf8.csv": not valid UTF-8 text at byte 17 (CHARSET=UTF-8)
+Error: "tests/data/charset_latin1.csv": not valid UTF-16 text (CHARSET=UTF-16)
+Error: USE: unsupported character set "NO-SUCH-CHARSET" (see "iconv -l" for the names this system knows)
+Dataset opened: tests/data/charset_bad_utf8.csv
