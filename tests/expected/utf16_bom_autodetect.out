@@ -1,0 +1,6 @@
+Dataset opened: tests/data/utf16_bom_big.csv
+RUN complete. 3000 records and 2 variables processed.
+Permanent Variables (Table Columns):
+A B$
+Session Variables (SET):
+(none)
