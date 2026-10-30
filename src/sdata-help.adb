@@ -818,7 +818,7 @@ package body SData.Help is
       Put_Line ("  OPTIONS HEADER YES|NO      : CSV files have a header row (default: YES)");
       Put_Line ("  OPTIONS SAVEOVERWRT YES|NO : Overwrite existing files on SAVE (default: YES)");
       Put_Line ("  OPTIONS TXTFMT AUTO|LF|CRLF|CR  : Line ending for CSV output (default: AUTO)");
-      Put_Line ("  OPTIONS CHARSET name       : Character set: AUTO, or any name iconv knows (iconv -l)");
+      Put_Line ("  OPTIONS CHARSET name       : Output character set: AUTO, or any name iconv knows (iconv -l); USE auto-detects");
       Put_Line ("  OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)");
       Put_Line ("                               0.0/0.0 always raises an error. Cleared by NEW.");
       Put_Line ("  OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.");

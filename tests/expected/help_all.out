@@ -574,7 +574,7 @@ With no arguments, OPTIONS lists all current option values.
   OPTIONS HEADER YES|NO      : CSV files have a header row (default: YES)
   OPTIONS SAVEOVERWRT YES|NO : Overwrite existing files on SAVE (default: YES)
   OPTIONS TXTFMT AUTO|LF|CRLF|CR  : Line ending for CSV output (default: AUTO)
-  OPTIONS CHARSET name       : Character set: AUTO, or any name iconv knows (iconv -l)
+  OPTIONS CHARSET name       : Output character set: AUTO, or any name iconv knows (iconv -l); USE auto-detects
   OPTIONS IEEE_DIVIDE YES|NO : Float /0 -> +/-Inf instead of error (default: NO)
                                0.0/0.0 always raises an error. Cleared by NEW.
   OPTIONS SHELLTIMEOUT n     : SYSTEM/SHELL timeout in seconds (0 = unlimited). Cleared by NEW.
