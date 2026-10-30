@@ -13,7 +13,6 @@ with SData.System;
 with SData_Core.Statistics;
 with SData.Parser; use SData.Parser;
 with Ada.Streams.Stream_IO;
-with Ada.Exceptions;
 with SData_Core.Config;         use SData_Core.Config;
 with SData_Core.Config.Runtime;
 with SData_Core.IO;        use SData_Core.IO;
