@@ -26,6 +26,9 @@ SData is written in Ada 2012 and requires:
   - `gnat` on Debian/Ubuntu
 - **GPRbuild** — the GNAT project build tool
 - **GNU Make**
+- **iconv** — character-set conversion for `/CHARSET=` (see `HELP USE`).
+  It is part of the C library on Linux and ships with macOS; on Windows it
+  is the separate `libiconv` package (see [Windows](#windows) below).
 
 ### Runtime Requirements
 
@@ -261,7 +264,21 @@ alr exec -- make
 ```
 
 The build produces `bin\sdata.exe`.  Cygwin works too — Alire and a
-recent GNAT toolchain on `PATH` are the only hard requirements.
+recent GNAT toolchain on `PATH` are the only hard requirements, plus the
+libiconv development files.
+
+**libiconv is required.**  Character-set conversion (`/CHARSET=`) uses GNU
+libiconv on Windows, which is linked statically, so the resulting
+`sdata.exe` (and the MSI) need no libiconv DLL at run time.  The build,
+however, needs the development package — `libiconv-devel` under both MSYS2
+and Cygwin:
+
+```sh
+pacman -S libiconv-devel      # MSYS2
+```
+
+(on Cygwin, select `libiconv-devel` in `setup`).  Without it the link fails
+with `cannot find -liconv`.
 
 #### MSI installer
 
