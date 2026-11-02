@@ -1,0 +1,7 @@
+Warning: column name "Aééééééééé..." is 81 characters long; truncated to 64
+Dataset opened: tests/data/utf8_long_name.csv
+RUN complete. 1 records and 2 variables processed.
+Permanent Variables (Table Columns):
+Aééééééééééééééééééééééééééééééé B
+Session Variables (SET):
+(none)

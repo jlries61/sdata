@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.14
+Version:        0.37.15
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Oct 29 2026 John L. Ries <john@theyarnbard.com> - 0.37.15-1
+- Any character set the system's iconv knows is supported for USE, SAVE and OUTPUT /CHARSET=; explicit UTF-8 rejects malformed input; unrepresentable output fails (F46)
+
 * Thu Oct 29 2026 John L. Ries <john@theyarnbard.com> - 0.37.14-1
 - Invalid option values and flag values are errors, not silent defaults: OPTIONS (YES/NO keys, TXTFMT, CHARSET, DEBUG, CSVDLM), USE/SAVE /FMT /HEADER /DLM /CHARSET, OUTPUT flags (F32)
 

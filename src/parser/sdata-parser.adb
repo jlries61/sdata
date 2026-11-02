@@ -59,22 +59,25 @@ package body SData.Parser is
       end if;
    end Require_Dlm;
 
-   --  Join the tokens of a hyphenated character-set name ("UTF", "-", "16",
-   --  "LE") into one string; First has already been consumed.
+   --  Join the tokens of a hyphenated character-set name ("ISO", "-", "8859",
+   --  "-", "1"; or "UTF", "-", "16" and a bare LE/BE) into one string.  First
+   --  has already been consumed.
    function Join_Charset_Tokens
      (Ctx : in out Parser_Context; First : Token) return String
    is
-      Result : constant String := First.Text (1 .. First.Length);
+      Result : Unbounded_String := To_Unbounded_String (First.Text (1 .. First.Length));
    begin
-      if Peek_Next_Token (Ctx.Lex_Ctx).Kind /= Token_Minus then
-         return Result;
-      end if;
+      while Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Minus loop
+         declare
+            Dash : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            Mid  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+            pragma Unreferenced (Dash);
+         begin
+            Append (Result, "-" & Mid.Text (1 .. Mid.Length));
+         end;
+      end loop;
       declare
-         Dash : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-         Mid  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-         pragma Unreferenced (Dash);
-         Head : constant String := Result & "-" & Mid.Text (1 .. Mid.Length);
-         Nxt  : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
+         Nxt : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
       begin
          if Is_Identifier_Token (Nxt)
            and then (To_Upper (Nxt.Text (1 .. Nxt.Length)) = "LE"
@@ -83,11 +86,11 @@ package body SData.Parser is
             declare
                Suf : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
             begin
-               return Head & Suf.Text (1 .. Suf.Length);
+               Append (Result, Suf.Text (1 .. Suf.Length));
             end;
          end if;
-         return Head;
       end;
+      return To_String (Result);
    end Join_Charset_Tokens;
 
    --  Use Identifier_Text wherever an identifier token's name is read, so the
@@ -1180,45 +1183,10 @@ package body SData.Parser is
                      --  Consume multi-token charset names (e.g. UTF-16 LE).
                      declare
                         Val_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                        Buf     : String (1 .. Max_Charset_Len) := (others => ' ');
-                        Len     : Natural := Val_Tok.Length;
-                        P2      : Token;
+                        Name : constant String := Join_Charset_Tokens (Ctx, Val_Tok);
+                        Len  : constant Natural := Natural'Min (Name'Length, Max_Charset_Len);
                      begin
-                        Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
-                        P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                        if P2.Kind = Token_Minus then
-                           declare
-                              Discard2 : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                              Mid_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                              M_Len    : constant Natural := Mid_Tok.Length;
-                              pragma Unreferenced (Discard2);
-                           begin
-                              Buf (Len + 1) := '-';
-                              Buf (Len + 2 .. Len + 1 + M_Len) :=
-                                 Mid_Tok.Text (1 .. M_Len);
-                              Len := Len + 1 + M_Len;
-                              P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                              if Is_Identifier_Token (P2) then
-                                 declare
-                                    S_Upper : constant String :=
-                                       To_Upper (P2.Text (1 .. P2.Length));
-                                 begin
-                                    if S_Upper = "LE" or else S_Upper = "BE" then
-                                       declare
-                                          Suf_Tok : constant Token :=
-                                             Get_Next_Token (Ctx.Lex_Ctx);
-                                          S_Len   : constant Natural := Suf_Tok.Length;
-                                       begin
-                                          Buf (Len + 1 .. Len + S_Len) :=
-                                             Suf_Tok.Text (1 .. S_Len);
-                                          Len := Len + S_Len;
-                                       end;
-                                    end if;
-                                 end;
-                              end if;
-                           end;
-                        end if;
-                        Opts.Charset_Val (1 .. Len) := Buf (1 .. Len);
+                        Opts.Charset_Val (1 .. Len) := Name (Name'First .. Name'First + Len - 1);
                         Opts.Charset_Len := Len;
                      end;
 
@@ -1416,48 +1384,10 @@ package body SData.Parser is
             elsif Flag_Name = "CHARSET" then
                --  Multi-token charset (e.g. UTF-16 LE).
                declare
-                  Buf : String (1 .. Max_Charset_Len) := (others => ' ');
-                  Len : Natural := Val_Tok.Length;
-                  P2  : Token;
+                  Name : constant String := Join_Charset_Tokens (Ctx, Val_Tok);
+                  Len  : constant Natural := Natural'Min (Name'Length, Max_Charset_Len);
                begin
-                  Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
-                  P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                  if P2.Kind = Token_Minus then
-                     declare
-                        Discard2 : constant Token :=
-                           Get_Next_Token (Ctx.Lex_Ctx);
-                        Mid_Tok  : constant Token :=
-                           Get_Next_Token (Ctx.Lex_Ctx);
-                        M_Len    : constant Natural := Mid_Tok.Length;
-                        pragma Unreferenced (Discard2);
-                     begin
-                        Buf (Len + 1) := '-';
-                        Buf (Len + 2 .. Len + 1 + M_Len) :=
-                           Mid_Tok.Text (1 .. M_Len);
-                        Len := Len + 1 + M_Len;
-                        P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                        if Is_Identifier_Token (P2) then
-                           declare
-                              S_Upper : constant String :=
-                                 To_Upper (P2.Text (1 .. P2.Length));
-                           begin
-                              if S_Upper = "LE" or else S_Upper = "BE" then
-                                 declare
-                                    Suf_Tok : constant Token :=
-                                       Get_Next_Token (Ctx.Lex_Ctx);
-                                    S_Len   : constant Natural :=
-                                       Suf_Tok.Length;
-                                 begin
-                                    Buf (Len + 1 .. Len + S_Len) :=
-                                       Suf_Tok.Text (1 .. S_Len);
-                                    Len := Len + S_Len;
-                                 end;
-                              end if;
-                           end;
-                        end if;
-                     end;
-                  end if;
-                  Opts.Charset_Val (1 .. Len) := Buf (1 .. Len);
+                  Opts.Charset_Val (1 .. Len) := Name (Name'First .. Name'First + Len - 1);
                   Opts.Charset_Len := Len;
                end;
 
@@ -3511,45 +3441,10 @@ package body SData.Parser is
                                  elsif Flag_Name = "CHARSET" then
                                     --  Consume multi-token charset names (e.g. UTF - 16 LE)
                                     declare
-                                       Buf : String (1 .. 64) := (others => ' ');
-                                       Len : Natural := Val_Tok.Length;
-                                       P2  : Token;
+                                       Name : constant String := Join_Charset_Tokens (Ctx, Val_Tok);
+                                       Len  : constant Natural := Natural'Min (Name'Length, Max_Charset_Len);
                                     begin
-                                       Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
-                                       P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                       if P2.Kind = Token_Minus then
-                                          declare
-                                             Discard2 : Token := Get_Next_Token (Ctx.Lex_Ctx);
-                                             Mid_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                                             M_Len    : constant Natural := Mid_Tok.Length;
-                                          begin
-                                             pragma Unreferenced (Discard2);
-                                             Buf (Len + 1) := '-';
-                                             Buf (Len + 2 .. Len + 1 + M_Len) :=
-                                                Mid_Tok.Text (1 .. M_Len);
-                                             Len := Len + 1 + M_Len;
-                                             P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                             if Is_Identifier_Token (P2) then
-                                                declare
-                                                   S_Upper : constant String :=
-                                                      To_Upper (P2.Text (1 .. P2.Length));
-                                                begin
-                                                   if S_Upper = "LE" or else S_Upper = "BE" then
-                                                      declare
-                                                         Suf_Tok : constant Token :=
-                                                            Get_Next_Token (Ctx.Lex_Ctx);
-                                                         S_Len   : constant Natural := Suf_Tok.Length;
-                                                      begin
-                                                         Buf (Len + 1 .. Len + S_Len) :=
-                                                            Suf_Tok.Text (1 .. S_Len);
-                                                         Len := Len + S_Len;
-                                                      end;
-                                                   end if;
-                                                end;
-                                             end if;
-                                          end;
-                                       end if;
-                                       Stmt.Output_CHARSET_Val (1 .. Len) := Buf (1 .. Len);
+                                       Stmt.Output_CHARSET_Val (1 .. Len) := Name (Name'First .. Name'First + Len - 1);
                                        Stmt.Output_CHARSET_Len := Len;
                                     end;
                                  end if;
@@ -4057,45 +3952,10 @@ package body SData.Parser is
                                     end;
                                  elsif Flag_Name = "CHARSET" then
                                     declare
-                                       Buf : String (1 .. 64) := (others => ' ');
-                                       Len : Natural := Val_Tok.Length;
-                                       P2  : Token;
+                                       Name : constant String := Join_Charset_Tokens (Ctx, Val_Tok);
+                                       Len  : constant Natural := Natural'Min (Name'Length, Max_Charset_Len);
                                     begin
-                                       Buf (1 .. Len) := Val_Tok.Text (1 .. Len);
-                                       P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                       if P2.Kind = Token_Minus then
-                                          declare
-                                             Discard2 : Token := Get_Next_Token (Ctx.Lex_Ctx);
-                                             Mid_Tok  : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
-                                             M_Len    : constant Natural := Mid_Tok.Length;
-                                          begin
-                                             pragma Unreferenced (Discard2);
-                                             Buf (Len + 1) := '-';
-                                             Buf (Len + 2 .. Len + 1 + M_Len) :=
-                                                Mid_Tok.Text (1 .. M_Len);
-                                             Len := Len + 1 + M_Len;
-                                             P2 := Peek_Next_Token (Ctx.Lex_Ctx);
-                                             if Is_Identifier_Token (P2) then
-                                                declare
-                                                   S_Upper : constant String :=
-                                                      To_Upper (P2.Text (1 .. P2.Length));
-                                                begin
-                                                   if S_Upper = "LE" or else S_Upper = "BE" then
-                                                      declare
-                                                         Suf_Tok : constant Token :=
-                                                            Get_Next_Token (Ctx.Lex_Ctx);
-                                                         S_Len   : constant Natural := Suf_Tok.Length;
-                                                      begin
-                                                         Buf (Len + 1 .. Len + S_Len) :=
-                                                            Suf_Tok.Text (1 .. S_Len);
-                                                         Len := Len + S_Len;
-                                                      end;
-                                                   end if;
-                                                end;
-                                             end if;
-                                          end;
-                                       end if;
-                                       Stmt.Output_CHARSET_Val (1 .. Len) := Buf (1 .. Len);
+                                       Stmt.Output_CHARSET_Val (1 .. Len) := Name (Name'First .. Name'First + Len - 1);
                                        Stmt.Output_CHARSET_Len := Len;
                                     end;
                                  else

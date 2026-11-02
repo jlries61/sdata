@@ -20,7 +20,6 @@
 --    make fuzz-corpus
 
 with Ada.Command_Line;
-with SData_Core.Config;
 with SData_Core.IO;
 with SData_Core.Table;
 with SData_Core.File_IO.OOXML;
