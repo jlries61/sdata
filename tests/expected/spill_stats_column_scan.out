@@ -1,0 +1,47 @@
+RUN complete. 40 records and 4 variables processed.
+Variable   N  NMISS
+-------------------
+X         35      5
+K%        40      0
+S$        32      8
+-------------------
+STATS complete. 3 records and 3 variables processed.
+Obs  _NAME_$   N  NMISS
+-----------------------
+  1  X        35      5
+  2  K%       40      0
+  3  S$       32      8
+-----------------------
+RUN complete. 3 records and 3 variables processed.
+RUN complete. 40 records and 4 variables processed.
+G = 0.00000
+Variable   N      MEAN        SUM
+---------------------------------
+X         12  31.50000  378.00000
+K%        13  21.00000  273.00000
+---------------------------------
+
+G = 1.00000
+Variable   N      MEAN        SUM
+---------------------------------
+X         12  31.50000  378.00000
+K%        14  20.50000  287.00000
+---------------------------------
+
+G = 2.00000
+Variable   N      MEAN        SUM
+---------------------------------
+X         11  28.77273  316.50000
+K%        13  20.00000  260.00000
+---------------------------------
+STATS complete. 6 records and 5 variables processed.
+Obs        G  _NAME_$   N      MEAN        SUM
+----------------------------------------------
+  1  0.00000  X        12  31.50000  378.00000
+  2  0.00000  K%       13  21.00000  273.00000
+  3  1.00000  X        12  31.50000  378.00000
+  4  1.00000  K%       14  20.50000  287.00000
+  5  2.00000  X        11  28.77273  316.50000
+  6  2.00000  K%       13  20.00000  260.00000
+----------------------------------------------
+RUN complete. 6 records and 5 variables processed.

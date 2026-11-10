@@ -322,7 +322,7 @@ scripts/bump-version.sh <new-version> "<changelog-summary>"
 For example:
 
 ```sh
-scripts/bump-version.sh 0.37.15 "Fix path resolution in FPATH SUBMIT handler."
+scripts/bump-version.sh 0.37.16 "Fix path resolution in FPATH SUBMIT handler."
 ```
 
 The script validates the `N.N.N` version format, detects the current version
@@ -337,7 +337,7 @@ Run `sdata` with no arguments to enter the interactive console:
 
 ```
 $ sdata
-SData Statistical Interpreter version 0.37.15
+SData Statistical Interpreter version 0.37.16
 Interactive Console. Type QUIT to exit.
 sdata> use "mydata.csv"
 sdata> print recno, name$, score
