@@ -2345,7 +2345,7 @@ General:
 
 Memory Management:
 
-- *-m* \<*n*\>: Maximum in-memory table size. The unit is cells (rows × columns). 0 means unlimited (all data stays in memory). When the table exceeds this limit the rows are spilled to a temporary SQLite database.
+- *-m* \<*n*\>: Maximum in-memory table size. The unit is cells (rows × columns). 0 means unlimited (all data stays in memory). When the table exceeds this limit the rows are spilled to a temporary SQLite database, created in the directory named by TMPDIR (or TEMP / TMP), else /tmp, and removed on exit.
 - *-t* \<*n*\>: Maximum number of temporary variables/array elements. 0 means unlimited.
 
 Character Variables:

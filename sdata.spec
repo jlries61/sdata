@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.15
+Version:        0.37.16
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Mon Nov 09 2026 John L. Ries <john@theyarnbard.com> - 0.37.16-1
+- perf: STATS reads spilled wide tables a column at a time (F41); spill file in TMPDIR
+
 * Thu Oct 29 2026 John L. Ries <john@theyarnbard.com> - 0.37.15-1
 - Any character set the system's iconv knows is supported for USE, SAVE and OUTPUT /CHARSET=; explicit UTF-8 rejects malformed input; unrepresentable output fails (F46)
 

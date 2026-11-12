@@ -1,3 +1,9 @@
+sdata (0.37.16-1) unstable; urgency=medium
+
+  * perf: STATS reads spilled wide tables a column at a time (F41); spill file in TMPDIR
+
+ -- John L. Ries <john@theyarnbard.com>  Mon, 09 Nov 2026 20:54:06 -0800
+
 sdata (0.37.15-1) unstable; urgency=medium
 
   * Any character set the system's iconv knows is supported for USE, SAVE and OUTPUT /CHARSET=; explicit UTF-8 rejects malformed input; unrepresentable output fails (F46)

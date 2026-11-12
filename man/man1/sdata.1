@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-10-29" "sdata 0.37.15" "User Commands"
+.TH SDATA 1 "2026-11-09" "sdata 0.37.16" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -36,7 +36,8 @@ Print copyright and license information and exit.
 Set the maximum in\-memory table size in cells (rows \(mu columns).
 A value of 0 disables the limit (all data stays in memory).
 When the table grows beyond this limit its rows are spilled to a
-temporary SQLite database on disk.
+temporary SQLite database on disk, created in the directory named by
+\fBTMPDIR\fR (or \fBTEMP\fR / \fBTMP\fR), else \fI/tmp\fR, and removed on exit.
 .TP
 .BI \-t " count"
 Set the maximum number of temporary variables per data step.
