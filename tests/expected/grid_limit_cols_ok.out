@@ -1,0 +1,12 @@
+Dataset opened: tests/data/grid_limit_ok.csv
+Dataset saved: tests/data/grid_limit_ok.xlsx
+RUN complete. 1 records and 16384 variables processed.
+Dataset opened: tests/data/grid_limit_ok.xlsx
+xlsx c1= 1.00000 c16384= 16384.00000
+RUN complete. 1 records and 16384 variables processed.
+Dataset opened: tests/data/grid_limit_ok.csv
+Dataset saved: tests/data/grid_limit_ok.ods
+RUN complete. 1 records and 16384 variables processed.
+Dataset opened: tests/data/grid_limit_ok.ods
+ods c1= 1.00000 c16384= 16384.00000
+RUN complete. 1 records and 16384 variables processed.

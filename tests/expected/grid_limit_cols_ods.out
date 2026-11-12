@@ -1,0 +1,2 @@
+Dataset opened: tests/data/grid_limit_cols.csv
+Error: SAVE: ODS sheets are limited to 16384 columns (this table has 16385); use CSV

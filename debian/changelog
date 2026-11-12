@@ -1,3 +1,9 @@
+sdata (0.37.17-1) unstable; urgency=medium
+
+  * fix: SAVE to XLSX/ODS fails up front beyond the 16384 x 1048576 sheet grid (F35)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 11 Nov 2026 19:53:43 -0800
+
 sdata (0.37.16-1) unstable; urgency=medium
 
   * perf: STATS reads spilled wide tables a column at a time (F41); spill file in TMPDIR

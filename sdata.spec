@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.16
+Version:        0.37.17
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Nov 11 2026 John L. Ries <john@theyarnbard.com> - 0.37.17-1
+- fix: SAVE to XLSX/ODS fails up front beyond the 16384 x 1048576 sheet grid (F35)
+
 * Mon Nov 09 2026 John L. Ries <john@theyarnbard.com> - 0.37.16-1
 - perf: STATS reads spilled wide tables a column at a time (F41); spill file in TMPDIR
 
