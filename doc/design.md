@@ -476,6 +476,8 @@ Same behavior as ODF spreadsheets (see above).
 
 - Sheet size limit: SAVE to *.xlsx* or *.ods* fails, writing nothing, if the table has more than 16,384 columns or more than 1,048,575 data rows (the Excel / LibreOffice grid is 16,384 × 1,048,576 including the header row). Use CSV for larger tables.
 
+- Control characters: XML 1.0 cannot hold the characters U+0001–U+001F other than TAB, LF and CR, so SAVE to *.xlsx* or *.ods* removes them from text and prints one warning per file with the count.
+
 - Unquoted Filenames:
 
   - Converted to uppercase.

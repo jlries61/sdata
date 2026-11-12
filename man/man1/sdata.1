@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-11-11" "sdata 0.37.17" "User Commands"
+.TH SDATA 1 "2026-11-11" "sdata 0.37.18" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -1939,6 +1939,10 @@ Office Open XML spreadsheet (ECMA\-376 / ISO/IEC 29500).
 SAVE to either spreadsheet format fails, writing nothing, if the table has
 more than 16384 columns or more than 1048575 data rows (the sheet grid of
 Excel and LibreOffice, header row included); use CSV for larger tables.
+.PP
+Text containing control characters (U+0001\(enU+001F other than tab, line
+feed and carriage return), which XML cannot represent, has them removed when
+saved to either spreadsheet format; one warning per file gives the count.
 .PP
 File format is auto\-detected from the file extension when not specified
 explicitly.
