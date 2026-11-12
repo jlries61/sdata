@@ -68,6 +68,7 @@ tests/data/save_if_undef_var_out.csv
 tests/data/save_single_target_if_out.csv
 tests/data/qid_alias.csv
 tests/data/wide_table.csv
+tests/data/grid_limit_*
 # txtfmt_test line-ending SAVE outputs (self-generated, read back in-test)
 tests/data/txtfmt_crlf.csv
 tests/data/txtfmt_lf.csv

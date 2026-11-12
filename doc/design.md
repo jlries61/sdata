@@ -474,6 +474,8 @@ Same behavior as ODF spreadsheets (see above).
   - *.ods*, *.ODS*: ODF Workbook.
   - No extension or other extension: CSV.
 
+- Sheet size limit: SAVE to *.xlsx* or *.ods* fails, writing nothing, if the table has more than 16,384 columns or more than 1,048,575 data rows (the Excel / LibreOffice grid is 16,384 × 1,048,576 including the header row). Use CSV for larger tables.
+
 - Unquoted Filenames:
 
   - Converted to uppercase.
