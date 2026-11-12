@@ -1,3 +1,9 @@
+sdata (0.37.18-1) unstable; urgency=medium
+
+  * fix: XLSX/ODS writers remove XML-illegal control characters, preserve padded strings (F10)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 11 Nov 2026 21:22:18 -0800
+
 sdata (0.37.17-1) unstable; urgency=medium
 
   * fix: SAVE to XLSX/ODS fails up front beyond the 16384 x 1048576 sheet grid (F35)

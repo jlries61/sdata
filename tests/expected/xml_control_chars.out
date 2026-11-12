@@ -1,0 +1,16 @@
+Warning: SAVE: removed 2 control character(s) that XLSX cannot hold
+Dataset saved: tests/data/xml_ctl.xlsx
+RUN complete. 2 records and 1 variables processed.
+Warning: SAVE: removed 2 control character(s) that ODS cannot hold
+Dataset saved: tests/data/xml_ctl.ods
+RUN complete. 2 records and 1 variables processed.
+0
+0
+<t xml:space="preserve">  padded  </t>
+Dataset opened: tests/data/xml_ctl.xlsx
+Obs  S$        
+---------------
+  1  xy        
+  2    padded  
+---------------
+RUN complete. 2 records and 1 variables processed.

@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.17
+Version:        0.37.18
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Nov 11 2026 John L. Ries <john@theyarnbard.com> - 0.37.18-1
+- fix: XLSX/ODS writers remove XML-illegal control characters, preserve padded strings (F10)
+
 * Wed Nov 11 2026 John L. Ries <john@theyarnbard.com> - 0.37.17-1
 - fix: SAVE to XLSX/ODS fails up front beyond the 16384 x 1048576 sheet grid (F35)
 
