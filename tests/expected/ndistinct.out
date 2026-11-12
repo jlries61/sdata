@@ -1,0 +1,35 @@
+RUN complete. 12 records and 5 variables processed.
+row-wise: 2.00000
+RUN complete. 12 records and 5 variables processed.
+Variable   N  NDISTINCT
+-----------------------
+X         11          4
+I%        12          3
+S$        11          6
+-----------------------
+STATS complete. 3 records and 3 variables processed.
+RUN complete. 3 records and 3 variables processed.
+RUN complete. 12 records and 3 variables processed.
+G = 0.00000
+Variable  N  NDISTINCT
+----------------------
+X         6          2
+S$        6          5
+----------------------
+
+G = 1.00000
+Variable  N  NDISTINCT
+----------------------
+X         6          2
+S$        6          5
+----------------------
+STATS complete. 4 records and 4 variables processed.
+RUN complete. 4 records and 4 variables processed.
+RUN complete. 12 records and 2 variables processed.
+AGGREGATE complete. 2 records and 3 variables processed.
+Obs        G  ND  NN
+--------------------
+  1  0.00000   2   6
+  2  1.00000   2   6
+--------------------
+RUN complete. 2 records and 3 variables processed.

@@ -226,8 +226,8 @@ Command: AGGREGATE outvar=fn(invar) [outvar=fn(invar) ...]
 Collapses the Data Table to one row per active BY group, computing
 aggregate functions over the chosen input columns. With no active BY,
 the whole (SELECT-filtered) table is one group.
-Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN,
-           PCTL.
+Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, NDISTINCT, GMEAN, HMEAN,
+           MEDIAN, PCTL.
   N() with no argument yields the group row count.
   PCTL(invar, p) computes the p-th percentile (p an integer 0..100,
     literal only) via linear interpolation between order statistics --
@@ -268,7 +268,8 @@ replaces the Data Table.
             array name expands to its elements.
   /STATS=   statistics to compute (default: N MIN MEAN MAX STD).
             Any registered aggregate: SUM MEAN STD VAR MIN MAX N NMISS
-            GMEAN HMEAN MEDIAN PCTL. Only N/NMISS apply to character vars.
+            NDISTINCT GMEAN HMEAN MEDIAN PCTL. Only N/NMISS/NDISTINCT
+            apply to character vars.
             PCTL(p) computes the p-th percentile (integer 0..100, e.g.
             /STATS=N MIN PCTL(25) MEDIAN PCTL(75) MAX); the output column
             is named PCTLp (e.g. PCTL25), and two entries requesting the
@@ -1036,6 +1037,12 @@ Arguments may be individual values or array names (expanded automatically).
 Function: NMISS(v1 [, v2, ...])
 Returns the count of missing values across the supplied arguments.
 Arguments may be individual values or array names (expanded automatically).
+
+Function: NDISTINCT(v1 [, v2, ...])
+Returns the number of distinct non-missing values across the arguments.
+Missing values and empty strings are not counted; 1 and 1.0 are the same
+value; strings compare case-sensitively. Also an AGGREGATE function and a
+STATS statistic (/STATS=NDISTINCT), and allowed for character variables.
 
 Statistical distribution functions follow a uniform naming convention.
 

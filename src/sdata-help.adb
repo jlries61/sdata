@@ -41,7 +41,8 @@ package body SData.Help is
       Put_Line ("  Special:     MISSING, INF, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,");
       Put_Line ("               FALSE, TRUE, ERR, ERL,");
       Put_Line ("               MAXINT, MININT, MAXNUM, MINNUM, MAXLVL");
-      Put_Line ("  Aggregate:   SUM, MEAN, GMEAN, HMEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS");
+      Put_Line ("  Aggregate:   SUM, MEAN, GMEAN, HMEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS,");
+      Put_Line ("               NDISTINCT");
       Put_Line ("  Stat PDF:    ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF,");
       Put_Line ("               MDF, WDF, LDF");
       Put_Line ("  Stat CDF:    ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF,");
@@ -336,8 +337,8 @@ package body SData.Help is
       Put_Line ("Collapses the Data Table to one row per active BY group, computing");
       Put_Line ("aggregate functions over the chosen input columns. With no active BY,");
       Put_Line ("the whole (SELECT-filtered) table is one group.");
-      Put_Line ("Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, GMEAN, HMEAN, MEDIAN,");
-      Put_Line ("           PCTL.");
+      Put_Line ("Functions: SUM, MEAN, STD, VAR, MIN, MAX, N, NMISS, NDISTINCT, GMEAN, HMEAN,");
+      Put_Line ("           MEDIAN, PCTL.");
       Put_Line ("  N() with no argument yields the group row count.");
       Put_Line ("  PCTL(invar, p) computes the p-th percentile (p an integer 0..100,");
       Put_Line ("    literal only) via linear interpolation between order statistics --");
@@ -385,7 +386,8 @@ package body SData.Help is
       Put_Line ("            array name expands to its elements.");
       Put_Line ("  /STATS=   statistics to compute (default: N MIN MEAN MAX STD).");
       Put_Line ("            Any registered aggregate: SUM MEAN STD VAR MIN MAX N NMISS");
-      Put_Line ("            GMEAN HMEAN MEDIAN PCTL. Only N/NMISS apply to character vars.");
+      Put_Line ("            NDISTINCT GMEAN HMEAN MEDIAN PCTL. Only N/NMISS/NDISTINCT");
+      Put_Line ("            apply to character vars.");
       Put_Line ("            PCTL(p) computes the p-th percentile (integer 0..100, e.g.");
       Put_Line ("            /STATS=N MIN PCTL(25) MEDIAN PCTL(75) MAX); the output column");
       Put_Line ("            is named PCTLp (e.g. PCTL25), and two entries requesting the");
@@ -1310,6 +1312,15 @@ package body SData.Help is
       Put_Line ("Arguments may be individual values or array names (expanded automatically).");
    end Help_NMISS;
 
+   procedure Help_NDISTINCT is
+   begin
+      Put_Line ("Function: NDISTINCT(v1 [, v2, ...])");
+      Put_Line ("Returns the number of distinct non-missing values across the arguments.");
+      Put_Line ("Missing values and empty strings are not counted; 1 and 1.0 are the same");
+      Put_Line ("value; strings compare case-sensitively. Also an AGGREGATE function and a");
+      Put_Line ("STATS statistic (/STATS=NDISTINCT), and allowed for character variables.");
+   end Help_NDISTINCT;
+
    -- ==========================================================================
    --  Statistical distributions
    -- ==========================================================================
@@ -1659,6 +1670,7 @@ package body SData.Help is
    K_MEDIAN       : aliased constant String := "MEDIAN";
    K_N            : aliased constant String := "N";
    K_NMISS        : aliased constant String := "NMISS";
+   K_NDISTINCT    : aliased constant String := "NDISTINCT";
    K_DISTRIBUTIONS : aliased constant String := "DISTRIBUTIONS";
    K_DIST         : aliased constant String := "DIST";
    K_ZDF          : aliased constant String := "ZDF";
@@ -1893,6 +1905,7 @@ package body SData.Help is
       (K_MEDIAN'Access,   Help_MEDIAN'Access,   N, F),
       (K_N'Access,        Help_N'Access,        N, F),
       (K_NMISS'Access,    Help_NMISS'Access,    N, F),
+      (K_NDISTINCT'Access, Help_NDISTINCT'Access, N, F),
       --  Statistical distributions
       (K_DISTRIBUTIONS'Access, Help_DISTRIBUTIONS'Access, N, F),
       (K_DIST'Access,     Help_DISTRIBUTIONS'Access, N, N),   --  alias

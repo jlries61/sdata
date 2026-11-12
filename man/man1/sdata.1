@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-11-11" "sdata 0.37.18" "User Commands"
+.TH SDATA 1 "2026-11-12" "sdata 0.37.19" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -849,6 +849,7 @@ group, computing an aggregate
 .BR MAX ,
 .BR N ,
 .BR NMISS ,
+.BR NDISTINCT ,
 .BR GMEAN ,
 .BR HMEAN ,
 .BR MEDIAN ,
@@ -983,11 +984,12 @@ The result replaces the data table.
 Statistics to compute; default
 .BR "N MIN MEAN MAX STD" .
 Any registered aggregate
-.RB ( SUM ", " MEAN ", " STD ", " VAR ", " MIN ", " MAX ", " N ", " NMISS ", " GMEAN ", " HMEAN ", " MEDIAN ", " PCTL ).
+.RB ( SUM ", " MEAN ", " STD ", " VAR ", " MIN ", " MAX ", " N ", " NMISS ", " NDISTINCT ", " GMEAN ", " HMEAN ", " MEDIAN ", " PCTL ).
 Only
-.B N
-and
+.BR N ,
 .B NMISS
+and
+.B NDISTINCT
 may be applied to a character variable.
 .B PCTL
 is written
@@ -1691,7 +1693,7 @@ Degree variants:
 .SS Base conversion
 .BR HEX$ (n[,w]),\  OCT$ (n[,w]),\  BIN$ (n[,w])
 .SS Aggregate (row\-wise, across argument list)
-.BR SUM ,\  MEAN ,\  GMEAN ,\  HMEAN ,\  STD ,\  VAR ,\  MIN ,\  MAX ,\  MEDIAN ,\  N ,\  NMISS ,\  PCTL
+.BR SUM ,\  MEAN ,\  GMEAN ,\  HMEAN ,\  STD ,\  VAR ,\  MIN ,\  MAX ,\  MEDIAN ,\  N ,\  NMISS ,\  NDISTINCT ,\  PCTL
 .PP
 .B STD
 and
