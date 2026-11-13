@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.19
+Version:        0.37.20
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Nov 12 2026 John L. Ries <john@theyarnbard.com> - 0.37.20-1
+- Unit tests for CSV_Unquote edge cases (F47 load-path rewrite in sdata-core 0.16.21)
+
 * Thu Nov 12 2026 John L. Ries <john@theyarnbard.com> - 0.37.19-1
 - feat: NDISTINCT aggregate (distinct non-missing count) for STATS/AGGREGATE/LET
 
