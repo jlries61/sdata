@@ -1,3 +1,9 @@
+sdata (0.37.19-1) unstable; urgency=medium
+
+  * feat: NDISTINCT aggregate (distinct non-missing count) for STATS/AGGREGATE/LET
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 12 Nov 2026 15:40:01 -0800
+
 sdata (0.37.18-1) unstable; urgency=medium
 
   * fix: XLSX/ODS writers remove XML-illegal control characters, preserve padded strings (F10)

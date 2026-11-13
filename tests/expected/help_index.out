@@ -26,7 +26,8 @@ Available Functions:
   Special:     MISSING, INF, NMISS, RAN/RANDOM/RND, DATE$, TIME$, TIMER, SHELL,
                FALSE, TRUE, ERR, ERL,
                MAXINT, MININT, MAXNUM, MINNUM, MAXLVL
-  Aggregate:   SUM, MEAN, GMEAN, HMEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS
+  Aggregate:   SUM, MEAN, GMEAN, HMEAN, STD, VAR, MIN, MAX, MEDIAN, N, NMISS,
+               NDISTINCT
   Stat PDF:    ZDF, NDF, UDF, EDF, BDF, PDF, GDF, XDF, TDF, FDF,
                MDF, WDF, LDF
   Stat CDF:    ZCF, NCF, UCF, ECF, BCF, PCF, GCF, XCF, TCF, FCF,

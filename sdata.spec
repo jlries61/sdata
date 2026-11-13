@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.18
+Version:        0.37.19
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Nov 12 2026 John L. Ries <john@theyarnbard.com> - 0.37.19-1
+- feat: NDISTINCT aggregate (distinct non-missing count) for STATS/AGGREGATE/LET
+
 * Wed Nov 11 2026 John L. Ries <john@theyarnbard.com> - 0.37.18-1
 - fix: XLSX/ODS writers remove XML-illegal control characters, preserve padded strings (F10)
 
