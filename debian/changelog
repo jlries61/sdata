@@ -1,3 +1,9 @@
+sdata (0.37.22-1) unstable; urgency=medium
+
+  * Deep expression/block nesting reports a clean error instead of STORAGE_ERROR (F03)
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 17 Nov 2026 19:55:11 -0800
+
 sdata (0.37.21-1) unstable; urgency=medium
 
   * E-notation literals are floats and accept a leading-dot mantissa (F48/F49)

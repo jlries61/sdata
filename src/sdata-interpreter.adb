@@ -616,6 +616,9 @@ package body SData.Interpreter is
       return Msg;
    end Friendly_Message;
 
+   function Nesting_Too_Deep_Message return String is
+     ("Error: expression or block nested too deeply (out of stack space)");
+
    function Program_Buffer_Length return Natural is
      (Natural (Active_Program_Vec.Length));
 

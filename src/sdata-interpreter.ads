@@ -30,6 +30,10 @@ package SData.Interpreter is
    function Friendly_Message
      (E : Ada.Exceptions.Exception_Occurrence) return String;
 
+   --  The diagnostic for Storage_Error: the 8 MB stack ran out parsing or
+   --  evaluating a pathologically deep expression or block nest (F03).
+   function Nesting_Too_Deep_Message return String;
+
    function Program_Buffer_Length return Natural;
 
    --  Clears the global active program.

@@ -9,7 +9,7 @@ This document specifies a command interpreter modeled on Systat BASIC that opera
 Key Requirements:
 
 - No hard memory or dimensional constraints.
-- No limits on nesting of *FOR* loops or other structures.
+- No fixed limit on nesting of *FOR* loops or other structures; only available stack bounds it (several hundred levels of nested parentheses or blocks on a default 8 MB stack). A script that exhausts it stops with `Error: expression or block nested too deeply (out of stack space)`, and an interactive session discards the line and continues.
 - Can run as stand-alone text-based application or embedded in a larger system.
 - External libraries must be freely available and compatible with proprietary software.
 - Code must be modular, readable, maintainable, and well-documented.
