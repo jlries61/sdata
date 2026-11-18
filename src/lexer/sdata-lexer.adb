@@ -164,6 +164,39 @@ package body SData.Lexer is
    ----------------------------
    --  The core logic of the lexer. Skips whitespace and comments, 
    --  and identifies the next token.
+   --  E-notation tail of a numeric literal (F49): if the cursor is on E/e
+   --  followed by an optional sign and at least one digit, consume it into
+   --  T; otherwise leave the cursor and T untouched (so "1e" is the literal 1
+   --  then the identifier e, as before).  Shared by the digit-led and the
+   --  leading-dot (.5e3) branches.
+   procedure Scan_Exponent (Ctx : in out Lexer_Context; T : in out Token) is
+      Saved_Pos : constant Positive := Ctx.Pos;
+      Saved_Len : constant Natural  := T.Length;
+   begin
+      if Is_End_Of_Source (Ctx)
+         or else not (Current_Char (Ctx) = 'E' or else Current_Char (Ctx) = 'e')
+      then
+         return;
+      end if;
+      Append_Char (T, Current_Char (Ctx));
+      Advance (Ctx);
+      if not Is_End_Of_Source (Ctx)
+         and then (Current_Char (Ctx) = '+' or else Current_Char (Ctx) = '-')
+      then
+         Append_Char (T, Current_Char (Ctx));
+         Advance (Ctx);
+      end if;
+      if not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) then
+         while not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) loop
+            Append_Char (T, Current_Char (Ctx));
+            Advance (Ctx);
+         end loop;
+      else
+         Ctx.Pos := Saved_Pos;
+         T.Length := Saved_Len;
+      end if;
+   end Scan_Exponent;
+
    function Get_Next_Token_Internal (Ctx : in out Lexer_Context) return Token is
       T : Token;
       --  Captures whether the PREVIOUS call emitted a continuation comma
@@ -344,32 +377,7 @@ package body SData.Lexer is
                Advance (Ctx);
             end loop;
             -- E-notation: consume E/e followed by optional sign and digits.
-            if not Is_End_Of_Source (Ctx)
-               and then (Current_Char (Ctx) = 'E' or else Current_Char (Ctx) = 'e')
-            then
-               declare
-                  Saved_Pos : constant Positive := Ctx.Pos;
-                  Saved_Len : constant Natural   := T.Length;
-               begin
-                  Append_Char (T, Current_Char (Ctx));
-                  Advance (Ctx);
-                  if not Is_End_Of_Source (Ctx)
-                     and then (Current_Char (Ctx) = '+' or else Current_Char (Ctx) = '-')
-                  then
-                     Append_Char (T, Current_Char (Ctx));
-                     Advance (Ctx);
-                  end if;
-                  if not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) then
-                     while not Is_End_Of_Source (Ctx) and then Is_Digit (Current_Char (Ctx)) loop
-                        Append_Char (T, Current_Char (Ctx));
-                        Advance (Ctx);
-                     end loop;
-                  else
-                     Ctx.Pos := Saved_Pos;
-                     T.Length := Saved_Len;
-                  end if;
-               end;
-            end if;
+            Scan_Exponent (Ctx, T);
 
          elsif Is_Letter (C) then
             while not Is_End_Of_Source (Ctx) and then (Is_Alphanumeric (Current_Char (Ctx)) or Current_Char (Ctx) = '_' or Current_Char (Ctx) = '$' or Current_Char (Ctx) = '%' or Current_Char (Ctx) = '.') loop
@@ -618,6 +626,7 @@ package body SData.Lexer is
                         Append_Char (T, Current_Char (Ctx));
                         Advance (Ctx);
                      end loop;
+                     Scan_Exponent (Ctx, T);
                   elsif not Is_End_Of_Source (Ctx)
                      and then (Current_Char (Ctx) = 'i' or else Current_Char (Ctx) = 'I'
                                or else Current_Char (Ctx) = 'n' or else Current_Char (Ctx) = 'N')

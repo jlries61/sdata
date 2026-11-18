@@ -321,7 +321,7 @@ Usage with LET/SET:
 - Numeric Literals:
 
   - Base ten only (may change in future versions; tracked in §8.5).
-  - May be integers, floating point numbers, or E notation.
+  - May be integers, floating point numbers, or E notation. An E-notation literal is always floating point (`1e3` is 1000.0, so `1e10 * 1e10` does not overflow integer arithmetic), and its mantissa may start with a decimal point (`.5e3`).
   - Missing numeric value: unquoted period (*.*).
 
 - Character Literals:
