@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.21
+Version:        0.37.22
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Tue Nov 17 2026 John L. Ries <john@theyarnbard.com> - 0.37.22-1
+- Deep expression/block nesting reports a clean error instead of STORAGE_ERROR (F03)
+
 * Tue Nov 17 2026 John L. Ries <john@theyarnbard.com> - 0.37.21-1
 - E-notation literals are floats and accept a leading-dot mantissa (F48/F49)
 

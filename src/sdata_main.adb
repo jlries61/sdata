@@ -194,6 +194,11 @@ exception
       --  file:line text means nothing to the user (F18, F33).
       Put_Line_Error ("Error: " & SData.Interpreter.Friendly_Message (E));
       Set_Exit_Status (Failure);
+   when Storage_Error =>
+      --  Stack exhausted by a pathologically deep expression or block nest
+      --  (F03); the raw s-intman.adb text means nothing to the user.
+      Put_Line_Error (SData.Interpreter.Nesting_Too_Deep_Message);
+      Set_Exit_Status (Failure);
    when E : others =>
       Put_Line_Error ("An error occurred: " & Exception_Name (E) & ": " & Exception_Message (E));
       Set_Exit_Status (Failure);

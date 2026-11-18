@@ -111,6 +111,10 @@ begin
             Put_Line_Error ("Error: " & SData.Interpreter.Friendly_Message (E));
             Buffer := Null_Unbounded_String;
             SData_Core.IO.Flush_Pager_Buffer;
+         when Storage_Error =>
+            Put_Line_Error (SData.Interpreter.Nesting_Too_Deep_Message);
+            Buffer := Null_Unbounded_String;
+            SData_Core.IO.Flush_Pager_Buffer;
          when E : others =>
             Put_Line_Error ("Internal error: " & Exception_Name (E) & ": " & Exception_Message (E));
             Buffer := Null_Unbounded_String;
