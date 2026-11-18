@@ -16,8 +16,25 @@ package body SData.Lexer is
    --  literal longer than Max_Token_Len, e.g. a wide /TYPES= list).
    --  Patching the ten call sites individually would have left the next one
    --  added to bring the crash back.
+   function Full_Text (T : Token) return String is
+   begin
+      return T.Text (1 .. T.Length) & Ada.Strings.Unbounded.To_String (T.Extra);
+   end Full_Text;
+
    procedure Append_Char (T : in out Token; C : Character) is
    begin
+      if T.Length >= Max_Token_Len and then T.Kind = Token_String_Literal then
+         --  A long string literal (F40): the tail lives in Extra.
+         if Ada.Strings.Unbounded.Length (T.Extra) + Max_Token_Len
+              >= Max_String_Literal_Len
+         then
+            raise Script_Error with
+               "string literal longer than" & Max_String_Literal_Len'Image &
+               " characters at line" & T.Line'Image;
+         end if;
+         Ada.Strings.Unbounded.Append (T.Extra, C);
+         return;
+      end if;
       if T.Length >= Max_Token_Len then
          raise Script_Error with
             "token longer than" & Max_Token_Len'Image &
@@ -32,9 +49,17 @@ package body SData.Lexer is
    ------------------
    --  Prepares the lexer with the input source code.
    procedure Initialize (Ctx : in out Lexer_Context; Source : String) is
+      --  A UTF-8 byte-order mark (Windows editors write one at the start of
+      --  a script) is not part of the program text (F43).
+      Skip : constant Natural :=
+        (if Source'Length >= 3
+           and then Source (Source'First) = Character'Val (16#EF#)
+           and then Source (Source'First + 1) = Character'Val (16#BB#)
+           and then Source (Source'First + 2) = Character'Val (16#BF#)
+         then 3 else 0);
    begin
-      Ctx.Source     := To_Unbounded_String (Source);
-      Ctx.Source_Len := Source'Length;
+      Ctx.Source     := To_Unbounded_String (Source (Source'First + Skip .. Source'Last));
+      Ctx.Source_Len := Source'Length - Skip;
       Ctx.Pos := 1;
       Ctx.Line := 1;
       Ctx.Column := 1;
@@ -677,7 +702,7 @@ package body SData.Lexer is
    --------------------
    -- Get_Next_Token --
    --------------------
-   function Get_Next_Token (Ctx : in out Lexer_Context) return Token is
+   function Get_Next_Token_Long (Ctx : in out Lexer_Context) return Token is
       T : Token;
    begin
       if Ctx.Has_Peeked then
@@ -687,6 +712,17 @@ package body SData.Lexer is
          T := Get_Next_Token_Internal (Ctx);
       end if;
       Ctx.Last_Kind := T.Kind;
+      return T;
+   end Get_Next_Token_Long;
+
+   function Get_Next_Token (Ctx : in out Lexer_Context) return Token is
+      T : constant Token := Get_Next_Token_Long (Ctx);
+   begin
+      if Ada.Strings.Unbounded.Length (T.Extra) > 0 then
+         raise Script_Error with
+            "token longer than" & Max_Token_Len'Image &
+            " characters at line" & T.Line'Image;
+      end if;
       return T;
    end Get_Next_Token;
 
