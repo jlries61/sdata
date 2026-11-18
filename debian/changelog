@@ -1,3 +1,9 @@
+sdata (0.37.21-1) unstable; urgency=medium
+
+  * E-notation literals are floats and accept a leading-dot mantissa (F48/F49)
+
+ -- John L. Ries <john@theyarnbard.com>  Tue, 17 Nov 2026 18:21:51 -0800
+
 sdata (0.37.20-1) unstable; urgency=medium
 
   * Unit tests for CSV_Unquote edge cases (F47 load-path rewrite in sdata-core 0.16.21)

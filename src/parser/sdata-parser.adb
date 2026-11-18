@@ -526,7 +526,9 @@ package body SData.Parser is
                         Has_Dot : Boolean := False;
                      begin
                         for Ch of S loop
-                           if Ch = '.' then Has_Dot := True; exit; end if;
+                           --  An exponent makes it a float too: 1e10 * 1e10
+                           --  must promote, not overflow int64 (F48).
+                           if Ch in '.' | 'e' | 'E' then Has_Dot := True; exit; end if;
                         end loop;
                         Node.Value := Real'Value (S);
                         if not Has_Dot then
