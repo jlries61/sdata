@@ -501,6 +501,8 @@ The value 50 000 000 was derived from targeting ~1.5 GB on an 8 GB machine (the 
 
 **Consequences:** Large datasets no longer silently exhaust RAM by default. The threshold is conservative for numeric-heavy data (actual cell size ≈ 16 bytes → ~800 MB at 50M cells) and reasonable for mixed data. The static value is easy to explain, easy to override, and requires no OS-specific code.
 
+**Amendment (2026-11, pre-1.0 stress test F47):** The 24–32 bytes/cell estimate above was low. Measured on a 432 MB, 438-column CSV (~84 M cells), a resident `Value` cell costs about 55–65 bytes, so 50 000 000 cells peaked near 2.7 GB RSS rather than 1.5 GB -- heavy on an 8 GB machine. The default is now **20 000 000 cells** (about 1.1 GB, which holds 200 000 rows × 100 columns). Larger tables spill to SQLite sooner; users with more RAM raise it with `OPTIONS MAXINTAB N` or `-m N`. The title above keeps the original value for ADR-table stability.
+
 ---
 
 ### ADR-037: Add configurable SYSTEM/SHELL timeout defaulting to 300 s in batch mode, unlimited in interactive

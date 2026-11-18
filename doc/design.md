@@ -27,7 +27,7 @@ The interpreter operates on a two-dimensional table containing any number of row
 
 Memory Management:
 
-- Maximum in-memory table size, measured in cells (rows × columns): set by *-m* command line option or *OPTIONS MAXINTAB*.
+- Maximum in-memory table size, measured in cells (rows × columns): set by *-m* command line option or *OPTIONS MAXINTAB* (default 20,000,000 cells, roughly 1.1 GB; larger tables spill to disk).
 - External file storage: used when the table exceeds the maximum in-memory cell count.
 - Cache size: derived from the same cell-count limit, but never less than a single row.
 - Implementation details: format and properties of external file and cache are implementation-defined.

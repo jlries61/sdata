@@ -1,3 +1,9 @@
+sdata (0.37.20-1) unstable; urgency=medium
+
+  * Unit tests for CSV_Unquote edge cases (F47 load-path rewrite in sdata-core 0.16.21)
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 12 Nov 2026 19:22:39 -0800
+
 sdata (0.37.19-1) unstable; urgency=medium
 
   * feat: NDISTINCT aggregate (distinct non-missing count) for STATS/AGGREGATE/LET

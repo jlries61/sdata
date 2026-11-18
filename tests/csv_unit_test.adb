@@ -160,6 +160,16 @@ begin
       CSV_Unquote ("""  hello  """), "  hello  ");
    Check ("CUQ-7 single-char no quotes trimmed",
       CSV_Unquote ("  x  "), "x");
+   Check ("CUQ-8 lone quote unchanged",
+      CSV_Unquote ("""") , """");
+   Check ("CUQ-9 unclosed quote unchanged",
+      CSV_Unquote ("""abc"), """abc");
+   Check ("CUQ-10 doubled quotes only",
+      CSV_Unquote ("""""""""") , """");
+   Check ("CUQ-11 doubled single-quote",
+      CSV_Unquote ("'it''s'"), "it's");
+   Check ("CUQ-12 quote pair before closer",
+      CSV_Unquote ("""a"""""), "a""");
 
    --  ── Split_Indices ─────────────────────────────────────────────────────
    Split_Indices ("a,b,c", ",", FV);
