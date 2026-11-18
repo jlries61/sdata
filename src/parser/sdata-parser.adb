@@ -516,7 +516,9 @@ package body SData.Parser is
                return null;
             end if;
             declare
-               Actual_Tok : constant Token := Get_Next_Token (Ctx.Lex_Ctx);
+               --  The Long variant: an expression operand may be a string
+               --  literal longer than Max_Token_Len (F40).
+               Actual_Tok : constant Token := Get_Next_Token_Long (Ctx.Lex_Ctx);
             begin
                case Actual_Tok.Kind is
                   when Token_Numeric_Literal =>
@@ -544,7 +546,7 @@ package body SData.Parser is
 
                   when Token_String_Literal =>
                      Node := new Expression (Expr_String_Literal);
-                     Node.Str_Value := To_Unbounded_String (Actual_Tok.Text (1 .. Actual_Tok.Length));
+                     Node.Str_Value := To_Unbounded_String (Full_Text (Actual_Tok));
                      return Node;
 
                   when Token_Identifier | Token_Quoted_Identifier | Token_NEXT | Token_IF =>

@@ -329,6 +329,8 @@ Usage with LET/SET:
   - Surrounded by single or double quotes.
   - The character missing value is the empty string (*""*); an empty character literal denotes missing.
   - Single-line only: a closing quote must appear before the end of the line or end of source. An unterminated string literal is a lexical error.
+  - An expression may contain a literal of up to 1,048,576 characters; the value is then stored subject to the usual string-length limit (*--clen*). Where only short text fits (file names, option values, SYSTEM commands), a literal longer than 1,024 characters is an error.
+  - A UTF-8 byte-order mark at the very start of a script file is ignored.
 
 ## 4. FILE I/O
 

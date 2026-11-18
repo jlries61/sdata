@@ -52,6 +52,11 @@ package SData.Lexer is
    --  in the lexer; tokens longer than this raise Constraint_Error.
    Max_Token_Len : constant := 1024;
 
+   --  Longest string literal an expression may contain (F40).  Only the
+   --  first Max_Token_Len characters live in Token.Text; the rest goes to
+   --  Token.Extra, and only Get_Next_Token_Long hands such a token out.
+   Max_String_Literal_Len : constant := 1_048_576;
+
    --  Represents a single lexical unit.
    type Token is record
       Kind   : Token_Kind;
@@ -67,7 +72,13 @@ package SData.Lexer is
       --  comma-delimited grammars keep testing Kind = Token_Comma and ignore
       --  it (ADR-072, ADR-080).
       Continuation : Boolean := False;
+      --  Characters of a string literal beyond Max_Token_Len (F40); empty
+      --  for every other token.
+      Extra : Ada.Strings.Unbounded.Unbounded_String;
    end record;
+
+   --  The whole text of T (Text plus any Extra).
+   function Full_Text (T : Token) return String;
 
    --  Encapsulates the state of the lexer during processing.
    type Lexer_Context is private;
@@ -76,7 +87,14 @@ package SData.Lexer is
    procedure Initialize (Ctx : in out Lexer_Context; Source : String);
 
    --  Extracts and returns the next token from the input stream.
+   --  Raises Script_Error for a string literal longer than Max_Token_Len
+   --  (the Token.Text buffer cannot hold it, and statement options, file
+   --  names and the like have no use for one).
    function Get_Next_Token (Ctx : in out Lexer_Context) return Token;
+
+   --  As Get_Next_Token, but returns an over-long string literal with its
+   --  tail in Token.Extra.  For expression operands only (F40).
+   function Get_Next_Token_Long (Ctx : in out Lexer_Context) return Token;
 
    --  Looks at the next token without advancing the lexer's position.
    function Peek_Next_Token (Ctx : in out Lexer_Context) return Token;
