@@ -241,6 +241,13 @@ begin
             Continue_On_Error := True;
          elsif Arg'Length > 0 and then Arg (1) /= '-' then
             -- This is the main command file to execute.
+            if Result.Filename_Len > 0 then
+               Put_Line_Error ("Error: unexpected extra argument """
+                               & Arg & """ (only one command file allowed)");
+               Set_Exit_Status (Failure);
+               Result.Outcome := Exit_Now;
+               return Result;
+            end if;
             if Arg'Length > Result.Filename'Length then
                Put_Line_Error ("Error: filename is too long (max"
                                & Result.Filename'Length'Image & " characters)");
@@ -272,6 +279,12 @@ begin
                   end;
                end if;
             end;
+         else
+            Put_Line_Error ("Error: unknown option """ & Arg
+                            & """ (try --help)");
+            Set_Exit_Status (Failure);
+            Result.Outcome := Exit_Now;
+            return Result;
          end if;
       end;
       Idx := Idx + 1;

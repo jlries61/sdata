@@ -40,4 +40,9 @@ begin
          end;
       end;
    end;
+exception
+   --  A directory opens successfully on POSIX but fails on first access.
+   when Ada.Streams.Stream_IO.Device_Error =>
+      raise SData.Script_Error with
+         "cannot read """ & Filename & """: not a regular file";
 end Read_File;

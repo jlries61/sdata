@@ -1,0 +1,3 @@
+REPEAT 1
+LET 5 = 5
+RUN

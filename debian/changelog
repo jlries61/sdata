@@ -1,3 +1,9 @@
+sdata (0.37.25-1) unstable; urgency=medium
+
+  * Stricter validation: unknown CLI options, LET with a literal target, DISPLAY of unknown variables; 0**negative honours IEEE_DIVIDE
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 25 Nov 2026 15:53:50 -0800
+
 sdata (0.37.24-1) unstable; urgency=medium
 
   * Deterministic nesting limit (250 levels) replaces reliance on stack exhaustion (F03 follow-up)
