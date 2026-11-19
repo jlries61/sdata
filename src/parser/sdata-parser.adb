@@ -2,6 +2,7 @@
 --  License: GNU General Public License v3 or later
 --  See LICENSE or <https://www.gnu.org/licenses/gpl-3.0.html>
 
+with Ada.Finalization;
 with SData_Core.Evaluator; use SData_Core.Evaluator;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
 with Ada.Strings.Unbounded;   use Ada.Strings.Unbounded;
@@ -33,6 +34,36 @@ with SData_Core.Values;    use SData_Core.Values;
 --  expression.
 
 package body SData.Parser is
+
+
+   --  Nesting limit (F03).  Parse_Primary (parentheses, unary chains) and
+   --  Parse_Statement (nested blocks) each hold one Depth_Guard; past
+   --  Config.Max_Nesting_Depth (default 250, --max-nesting) the parse fails with a clean error.  A fixed limit
+   --  replaces reliance on stack exhaustion, whose recovery in the GNAT
+   --  runtime is racy (intermittent hangs / raw STORAGE_ERROR).  The limit
+   --  is far beyond real scripts and well inside the default 8 MB stack.
+   Nesting_Depth     : Natural := 0;
+
+   type Depth_Guard is new Ada.Finalization.Limited_Controlled with null record;
+   overriding procedure Initialize (G : in out Depth_Guard);
+   overriding procedure Finalize   (G : in out Depth_Guard);
+
+   procedure Initialize (G : in out Depth_Guard) is
+      pragma Unreferenced (G);
+   begin
+      if Nesting_Depth >= SData_Core.Config.Max_Nesting_Depth then
+         raise Script_Error with
+            "expression or block nested too deeply (limit"
+            & Integer'Image (SData_Core.Config.Max_Nesting_Depth) & " levels)";
+      end if;
+      Nesting_Depth := Nesting_Depth + 1;
+   end Initialize;
+
+   procedure Finalize (G : in out Depth_Guard) is
+      pragma Unreferenced (G);
+   begin
+      Nesting_Depth := Nesting_Depth - 1;
+   end Finalize;
 
    --  A quoted identifier (`name`) is accepted anywhere a bare identifier is.
    function Is_Identifier_Token (T : Token) return Boolean is
@@ -489,6 +520,8 @@ package body SData.Parser is
    --  handled identically to Token_Identifier here: if followed by '(' or '{'
    --  they become an Expr_Function_Call node; otherwise an Expr_Variable node.
    function Parse_Primary (Ctx : in out Parser_Context) return Expression_Access is
+      Guard : Depth_Guard;
+      pragma Unreferenced (Guard);
       Tok : constant Token := Peek_Next_Token (Ctx.Lex_Ctx);
       Node : Expression_Access;
    begin
@@ -3076,6 +3109,8 @@ package body SData.Parser is
    -- Parse_Statement --
    ---------------------
    function Parse_Statement (Ctx : in out Parser_Context) return Statement_Access is
+      Guard : Depth_Guard;
+      pragma Unreferenced (Guard);
       Tok : Token := Get_Next_Token (Ctx.Lex_Ctx);
       Stmt : Statement_Access;
    begin

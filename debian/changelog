@@ -1,3 +1,9 @@
+sdata (0.37.24-1) unstable; urgency=medium
+
+  * Deterministic nesting limit (250 levels) replaces reliance on stack exhaustion (F03 follow-up)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 18 Nov 2026 21:22:33 -0800
+
 sdata (0.37.23-1) unstable; urgency=medium
 
   * Long string literals in expressions; scripts may start with a UTF-8 BOM (F40/F43)
