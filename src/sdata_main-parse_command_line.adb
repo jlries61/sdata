@@ -171,6 +171,16 @@ begin
                   Result.Outcome := Exit_Now;
                   return Result;
             end;
+         elsif Arg'Length > 14 and then Arg (1 .. 14) = "--max-nesting=" then
+            begin
+               Max_Nesting_Depth := Positive'Value (Arg (15 .. Arg'Last));
+            exception
+               when Constraint_Error =>
+                  Put_Line_Error ("Error: argument to --max-nesting must be a positive integer");
+                  Set_Exit_Status (Failure);
+                  Result.Outcome := Exit_Now;
+                  return Result;
+            end;
          elsif Arg'Length > 16 and then Arg (1 .. 16) = "--shell-timeout=" then
             begin
                SData_Core.Config.Shell_Timeout_Default :=

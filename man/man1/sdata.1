@@ -45,6 +45,11 @@ Set the maximum number of temporary variables per data step.
 .BI \-\-clen " len"
 Set the maximum length of character (string) variables in bytes (default 256).
 .TP
+.BI \-\-max\-nesting= n
+Set the maximum nesting depth of parentheses and block structures (default 250).
+Input nested more deeply is rejected with an error.
+The default suits the standard 8 MB stack; much larger values can exhaust it.
+.TP
 .BI \-\-shell\-timeout " seconds"
 Set the timeout for
 .B SYSTEM

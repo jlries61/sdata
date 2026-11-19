@@ -6,6 +6,8 @@ Options:
   -m <cells>    Set max in-memory table cells (rows*cols; 0 = unlimited)
   -t <count>    Set max temporary variables
   --clen <len>  Set max character variable length (default 256)
+  --max-nesting=N          Parser nesting limit for parentheses/blocks (default 250;
+                           much larger values risk exhausting the stack)
   --shell-timeout=N        SYSTEM/SHELL timeout in seconds (0=unlimited; default 300 in batch)
   --noshell                Disable SHELL command and function
   --nosubmit               Disable SUBMIT command

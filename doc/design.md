@@ -9,7 +9,7 @@ This document specifies a command interpreter modeled on Systat BASIC that opera
 Key Requirements:
 
 - No hard memory or dimensional constraints.
-- Nesting of *FOR* loops, other block structures and parentheses is limited to 250 levels (far beyond real scripts, and safely inside the default 8 MB stack). Deeper input is rejected at parse time with `Error: expression or block nested too deeply (limit 250 levels)` (`expression nested too deeply` for a *SELECT* filter); an interactive session discards the line and continues. Should the stack still be exhausted by some other path, the script stops with `Error: expression or block nested too deeply (out of stack space)`.
+- Nesting of *FOR* loops, other block structures and parentheses is limited to 250 levels by default (*--max-nesting*; far beyond real scripts, and safely inside the default 8 MB stack). Deeper input is rejected at parse time with `Error: expression or block nested too deeply (limit 250 levels)` (`expression nested too deeply` for a *SELECT* filter); an interactive session discards the line and continues. Should the stack still be exhausted by some other path, the script stops with `Error: expression or block nested too deeply (out of stack space)`.
 - Can run as stand-alone text-based application or embedded in a larger system.
 - External libraries must be freely available and compatible with proprietary software.
 - Code must be modular, readable, maintainable, and well-documented.
@@ -2363,6 +2363,7 @@ Memory Management:
 Character Variables:
 
 - *--clen* \<*length*\>: Maximum character variable length (default: 256).
+- *--max-nesting=*\<*n*\>: Parser nesting limit for parentheses and block structures (default: 250; *n* must be a positive integer). The default suits the standard 8 MB stack; much larger values can exhaust it, which stops the script with the out-of-stack-space error.
 
 Execution Control:
 

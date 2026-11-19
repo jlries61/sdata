@@ -38,11 +38,10 @@ package body SData.Parser is
 
    --  Nesting limit (F03).  Parse_Primary (parentheses, unary chains) and
    --  Parse_Statement (nested blocks) each hold one Depth_Guard; past
-   --  Max_Nesting_Depth the parse fails with a clean error.  A fixed limit
+   --  Config.Max_Nesting_Depth (default 250, --max-nesting) the parse fails with a clean error.  A fixed limit
    --  replaces reliance on stack exhaustion, whose recovery in the GNAT
    --  runtime is racy (intermittent hangs / raw STORAGE_ERROR).  The limit
    --  is far beyond real scripts and well inside the default 8 MB stack.
-   Max_Nesting_Depth : constant := 250;
    Nesting_Depth     : Natural := 0;
 
    type Depth_Guard is new Ada.Finalization.Limited_Controlled with null record;
@@ -52,10 +51,10 @@ package body SData.Parser is
    procedure Initialize (G : in out Depth_Guard) is
       pragma Unreferenced (G);
    begin
-      if Nesting_Depth >= Max_Nesting_Depth then
+      if Nesting_Depth >= SData_Core.Config.Max_Nesting_Depth then
          raise Script_Error with
             "expression or block nested too deeply (limit"
-            & Integer'Image (Max_Nesting_Depth) & " levels)";
+            & Integer'Image (SData_Core.Config.Max_Nesting_Depth) & " levels)";
       end if;
       Nesting_Depth := Nesting_Depth + 1;
    end Initialize;
