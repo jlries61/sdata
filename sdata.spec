@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.23
+Version:        0.37.24
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Wed Nov 18 2026 John L. Ries <john@theyarnbard.com> - 0.37.24-1
+- Deterministic nesting limit (250 levels) replaces reliance on stack exhaustion (F03 follow-up)
+
 * Tue Nov 17 2026 John L. Ries <john@theyarnbard.com> - 0.37.23-1
 - Long string literals in expressions; scripts may start with a UTF-8 BOM (F40/F43)
 
