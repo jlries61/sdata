@@ -14,6 +14,8 @@ begin
    Put_Line ("  -m <cells>    Set max in-memory table cells (rows*cols; 0 = unlimited)");
    Put_Line ("  -t <count>    Set max temporary variables");
    Put_Line ("  --clen <len>  Set max character variable length (default 256)");
+   Put_Line ("  --max-nesting=N          Parser nesting limit for parentheses/blocks (default 250;");
+   Put_Line ("                           much larger values risk exhausting the stack)");
    Put_Line ("  --shell-timeout=N        SYSTEM/SHELL timeout in seconds (0=unlimited; default 300 in batch)");
    Put_Line ("  --noshell                Disable SHELL command and function");
    Put_Line ("  --nosubmit               Disable SUBMIT command");

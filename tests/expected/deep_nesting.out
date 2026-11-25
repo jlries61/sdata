@@ -1,1 +1,1 @@
-Error: expression or block nested too deeply (out of stack space)
+Error: expression or block nested too deeply (limit 250 levels)
