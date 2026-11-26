@@ -1,5 +1,5 @@
 Name:           sdata
-Version:        0.37.26
+Version:        0.37.27
 Release:        1%{?dist}
 Summary:        A statistical data interpreter for processing datasets.
 
@@ -71,6 +71,9 @@ make install DESTDIR=%{buildroot} PREFIX=/usr DOCDIR=%{_docdir}/%{name}
 %{_docdir}/%{name}/LICENSE
 
 %changelog
+* Thu Nov 26 2026 John L. Ries <john@theyarnbard.com> - 0.37.27-1
+- SYSTEM: unquoted argument is a variable/expression; command runs under sh -c; timeout stops the whole command (F30)
+
 * Wed Nov 25 2026 John L. Ries <john@theyarnbard.com> - 0.37.26-1
 - Distribution boundary densities, non-integer PMF points, TDF precision (F23)
 

@@ -110,9 +110,36 @@ begin
          if SData_Core.Config.Disable_Shell then
             Put_Line_Error ("Error: SYSTEM command is disabled.");
          else
-            declare Success : Boolean;
+            declare
+               Success : Boolean;
+
+               --  design.md: a quoted command is literal; anything else is a
+               --  variable or expression -- either way it must yield text.
+               function Command_Text return String is
+               begin
+                  if Stmt.Expr = null then
+                     return "";
+                  end if;
+                  declare
+                     V : constant Value := Evaluate (Stmt.Expr);
+                  begin
+                     if V.Kind /= Val_String then
+                        raise Script_Error with
+                           "SYSTEM: the command must be a string (quote it, "
+                           & "or use a character variable or expression)";
+                     end if;
+                     if Length (V.Str_Val) = 0 then
+                        --  A bare SYSTEM opens a shell; an empty command
+                        --  *value* must not do so by accident.
+                        raise Script_Error with "SYSTEM: empty command";
+                     end if;
+                     return To_String (V.Str_Val);
+                  end;
+               end Command_Text;
+
+               Cmd : constant String := Command_Text;
             begin
-               SData.System.Shell_Execute (Stmt.File_Path (1 .. Stmt.File_Len), Success);
+               SData.System.Shell_Execute (Cmd, Success);
             end;
          end if;
       when Stmt_OUTPUT =>

@@ -311,9 +311,12 @@ indefinitely in batch mode.
 
 **Mitigation:** `OPTIONS SHELLTIMEOUT n` and `--shell-timeout=N` set a
 per-command wall-clock timeout (default 300 s in batch mode, unlimited in
-interactive mode). Implementation uses `GNAT.OS_Lib.Non_Blocking_Spawn` +
-0.5 s poll loop + `Kill` + `Wait_Process`. **ADR-037, commits 2d57654 /
-3ca764f.**
+interactive mode). Implementation wraps the command as
+`timeout N /bin/sh -c '<command>'` (single-quoted, so the user's text is
+passed to the shell as one argument and never re-split) under a blocking
+`GNAT.OS_Lib.Spawn`; `timeout(1)` runs the shell in its own process group and
+signals the whole group, so a compound command (`a; b`) cannot outlive the
+limit (F30). **ADR-037, commits 2d57654 / 3ca764f; superseded mechanism.**
 
 **Residual risk:** In interactive mode (`--shell-timeout=0`) there is no
 timeout by default, which is intentional (`SYSTEM "bash"` should not time
