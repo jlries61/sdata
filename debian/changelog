@@ -1,3 +1,9 @@
+sdata (0.37.26-1) unstable; urgency=medium
+
+  * Distribution boundary densities, non-integer PMF points, TDF precision (F23)
+
+ -- John L. Ries <john@theyarnbard.com>  Wed, 25 Nov 2026 16:46:44 -0800
+
 sdata (0.37.25-1) unstable; urgency=medium
 
   * Stricter validation: unknown CLI options, LET with a literal target, DISPLAY of unknown variables; 0**negative honours IEEE_DIVIDE

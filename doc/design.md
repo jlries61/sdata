@@ -1185,6 +1185,8 @@ Deferred Execution Commands are part of the program that is executed with the ne
 
 Functions perform computations and return values. Unless otherwise stated:
 
+**Distribution functions at the edges of the support.** A continuous density evaluated exactly on the boundary of its support (*XDF*/*GDF* at *x* = 0, *BDF* at *x* = 0 or 1) returns the limiting value: *+Inf* when the shape parameter is below 1, the rate or other shape parameter when it equals 1, and 0 when it is above 1. A discrete mass function (*NDF*, *PDF*) is 0 at a non-integer argument. *TDF* stays accurate to about 1e-13 for very large degrees of freedom.
+
 <table>
 <tbody>
 <tr>
