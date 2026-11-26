@@ -1,3 +1,9 @@
+sdata (0.37.27-1) unstable; urgency=medium
+
+  * SYSTEM: unquoted argument is a variable/expression; command runs under sh -c; timeout stops the whole command (F30)
+
+ -- John L. Ries <john@theyarnbard.com>  Thu, 26 Nov 2026 15:03:22 -0800
+
 sdata (0.37.26-1) unstable; urgency=medium
 
   * Distribution boundary densities, non-integer PMF points, TDF precision (F23)

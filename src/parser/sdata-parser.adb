@@ -3371,6 +3371,12 @@ package body SData.Parser is
                elsif Peeked.Kind = Token_Slash then
                   -- Starts with a flag, so no file path
                   Stmt.File_Len := 0;
+               elsif Tok.Kind = Token_SYSTEM then
+                  --  design.md: a quoted command is taken literally, anything
+                  --  else is a variable or expression (F30).  A literal is
+                  --  just the simplest expression, so all forms evaluate at
+                  --  execution time.
+                  Stmt.Expr := Parse_Required_Expression (Ctx, "after SYSTEM");
                else
                   File_Tok := Get_Next_Token (Ctx.Lex_Ctx);
                   Stmt.File_Len := File_Tok.Length;

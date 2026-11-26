@@ -1128,7 +1128,7 @@ END IF</pre></td>
 <td><em>SYSTEM</em></td>
 <td><em>SYSTEM</em> [<em>&lt;cmd&gt;</em>]</td>
 <td>Immediate Execution</td>
-<td>Execute the specified system command. If no command is given, then spawn a shell and resume the program when the shell exits. If the command is quoted, then it will be taken literally. Otherwise, it will be taken as the name of a variable or expression. If execution of a system command inside of a program is desired, then use the <em>SHELL</em> function.</td>
+<td>Execute the specified system command. If no command is given, then spawn a shell and resume the program when the shell exits. If the command is quoted, then it will be taken literally. Otherwise, it will be taken as the name of a variable or expression. Either way the result must be a character value (a non-character value, or an empty one, is an error). The command is run by the system shell (<em>/bin/sh -c</em>), so shell builtins such as <em>cd</em> and command lists (<em>a; b</em>) work; when <em>SHELLTIMEOUT</em> expires, the whole command is stopped. If execution of a system command inside of a program is desired, then use the <em>SHELL</em> function.</td>
 </tr>
 <tr>
 <td><em>TABLES</em></td>

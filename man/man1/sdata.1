@@ -1,4 +1,4 @@
-.TH SDATA 1 "2026-11-25" "sdata 0.37.26" "User Commands"
+.TH SDATA 1 "2026-11-26" "sdata 0.37.27" "User Commands"
 .SH NAME
 sdata \- statistical data interpreter for tabular data processing
 .SH SYNOPSIS
@@ -1330,6 +1330,11 @@ and
 .TP
 .B SYSTEM \fIcmd\fR
 Run an external shell command.
+A quoted command is taken literally; otherwise it is a character variable or
+expression.
+The command is run by
+.IR /bin/sh\ \-c ,
+so shell builtins and command lists work.
 Disabled by
 .BR \-\-noshell .
 A timeout is applied when
