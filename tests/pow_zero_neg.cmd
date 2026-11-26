@@ -1,0 +1,4 @@
+REPEAT 1
+LET V = 0 ** (-1)
+PRINT V
+RUN

@@ -3142,6 +3142,13 @@ package body SData.Parser is
                A_Idx_List   : Expression_List := null;
                A_Is_Slice   : Boolean         := False;
             begin
+               if Var_Tok.Kind in Token_Numeric_Literal | Token_String_Literal
+               then
+                  raise Script_Error with
+                     "Expected a variable name after "
+                     & (if Tok.Kind = Token_LET then "LET" else "SET")
+                     & " at line" & Var_Tok.Line'Image;
+               end if;
                if Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Paren or else
                   Peek_Next_Token (Ctx.Lex_Ctx).Kind = Token_Left_Brace then
                   Is_Arr := True;

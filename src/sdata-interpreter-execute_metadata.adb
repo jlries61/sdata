@@ -293,6 +293,10 @@ begin
                   S_Idx, E_Idx : Natural := 0;
                begin
                   if not R.Is_Range then
+                     if not Has_Column (U_Start) then
+                        raise Script_Error with
+                           "DISPLAY: unknown variable '" & U_Start & "'";
+                     end if;
                      Result.Append (To_Unbounded_String (U_Start));
                   elsif R.Is_Colon_Range then
                      declare
@@ -308,14 +312,17 @@ begin
                            if Name = U_End   then E_Idx := I; end if;
                         end;
                      end loop;
-                     if S_Idx > 0 and E_Idx > 0 then
-                        if S_Idx > E_Idx then
-                           declare T : constant Natural := S_Idx; begin S_Idx := E_Idx; E_Idx := T; end;
-                        end if;
-                        for I in S_Idx .. E_Idx loop
-                           Result.Append (To_Unbounded_String (Column_Name (I)));
-                        end loop;
+                     if S_Idx = 0 or else E_Idx = 0 then
+                        raise Script_Error with
+                           "DISPLAY: unknown variable '"
+                           & (if S_Idx = 0 then U_Start else U_End) & "'";
                      end if;
+                     if S_Idx > E_Idx then
+                        declare T : constant Natural := S_Idx; begin S_Idx := E_Idx; E_Idx := T; end;
+                     end if;
+                     for I in S_Idx .. E_Idx loop
+                        Result.Append (To_Unbounded_String (Column_Name (I)));
+                     end loop;
                   end if;
                end Resolve;
             begin
