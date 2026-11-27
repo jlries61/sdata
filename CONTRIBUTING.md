@@ -105,6 +105,14 @@ The build works on macOS with Alire. Two known issues:
 The recommended path is Alire inside an MSYS2 MinGW64 shell. See the
 **Windows** section of `README.md` for full instructions.
 
+Run `make check` from that POSIX shell (MSYS2, or Cygwin with its `bin` directory
+on `PATH`). The integration tests call Unix tools through `SYSTEM` (`sh`, `rm`,
+`awk`, `od`, `grep`, `unzip`, `head`, `tail`). When no `sh` or `bash` is on `PATH`,
+`SYSTEM` falls back to `cmd.exe`, so launching the suite from Command Prompt or
+PowerShell without those tools on `PATH` fails many tests with "not recognized"
+errors. This is a test-environment requirement only; the interpreter itself works
+without them.
+
 ---
 
 ## Code Map
